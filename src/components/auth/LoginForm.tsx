@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { loginUser, loginWithGoogle } from '../../services/authApi';
 import type { AuthResponse, LoginRequest } from '../../types/auth';
+import { GoogleAccountModal } from './GoogleAccountModal';
 
 interface LoginFormProps {
   onSwitchToRegister: () => void;
@@ -17,6 +18,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister, onLogi
 
   const [loading, setLoading] = useState<boolean>(false);
   const [googleLoading, setGoogleLoading] = useState<boolean>(false);
+  const [isGoogleModalOpen, setIsGoogleModalOpen] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -63,14 +65,18 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister, onLogi
     }
   };
 
-  const handleGoogleLogin = async () => {
+  const handleOpenGoogleModal = () => {
     setError(null);
+    setIsGoogleModalOpen(true);
+  };
+
+  const handleSelectGoogleAccount = async (email: string, fullName: string) => {
+    setIsGoogleModalOpen(false);
     setGoogleLoading(true);
 
     try {
-      // In production, Google One-Tap / OAuth client returns the Google ID Token string.
-      // Here we simulate the Google ID Token payload for local development & testing.
-      const mockGoogleIdToken = `mock-google-token:user.google@hesta.vn:google-sub-${Date.now()}:Hoang Google`;
+      const googleUid = `google-sub-${email.replace(/[^a-zA-Z0-9]/g, '')}`;
+      const mockGoogleIdToken = `mock-google-token:${email}:${googleUid}:${fullName}`;
 
       const response = await loginWithGoogle({
         idToken: mockGoogleIdToken,
@@ -182,7 +188,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister, onLogi
         {/* Google OAuth Button */}
         <button
           type="button"
-          onClick={handleGoogleLogin}
+          onClick={handleOpenGoogleModal}
           disabled={loading || googleLoading}
           className="w-full py-3 px-4 bg-slate-950/80 hover:bg-slate-800/80 border border-slate-700/80 hover:border-slate-600 text-slate-200 font-medium text-sm rounded-xl transition-all shadow-md active:scale-[0.98] flex items-center justify-center gap-3 disabled:opacity-50"
         >
@@ -227,6 +233,13 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister, onLogi
           </p>
         </div>
       </div>
+
+      {/* Google Account Selector Popup Modal */}
+      <GoogleAccountModal
+        isOpen={isGoogleModalOpen}
+        onClose={() => setIsGoogleModalOpen(false)}
+        onSelectAccount={handleSelectGoogleAccount}
+      />
     </div>
   );
 };
