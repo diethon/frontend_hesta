@@ -5,6 +5,13 @@ export interface RegisterRequest {
   phoneNumber?: string;
 }
 
+export interface LoginRequest {
+  email: string;
+  password: string;
+  deviceId?: string;
+  deviceType?: string;
+}
+
 export interface UserResponse {
   id: string;
   fullName: string;
@@ -16,6 +23,14 @@ export interface UserResponse {
   status: 'ACTIVE' | 'LOCKED' | 'DISABLED';
   createdAt: string;
   lastActiveAt?: string;
+}
+
+export interface AuthResponse {
+  accessToken: string;
+  refreshToken: string;
+  tokenType: string;
+  expiresIn: number;
+  user: UserResponse;
 }
 
 export interface ApiResponse<T> {
