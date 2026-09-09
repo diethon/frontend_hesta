@@ -3,6 +3,7 @@ export interface RegisterRequest {
   email: string;
   password: string;
   phoneNumber?: string;
+  inviteCode?: string;
 }
 
 export interface LoginRequest {

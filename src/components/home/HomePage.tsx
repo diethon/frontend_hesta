@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import type { UserResponse } from '../../types/auth';
 import { ProfileModal } from '../profile/ProfileModal';
+import { MemberManagement } from './MemberManagement';
+import { getMyHomes, createHome } from '../../services/homeApi';
 
 interface HomePageProps {
   user: UserResponse;
@@ -12,6 +14,49 @@ export const HomePage: React.FC<HomePageProps> = ({ user: initialUser, onLogout 
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const [userHome, setUserHome] = useState<{homeId: string, role: 'OWNER' | 'MEMBER'} | null>(null);
+  const [newHomeName, setNewHomeName] = useState('');
+  const [createLoading, setCreateLoading] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [homesList, setHomesList] = useState<any[]>([]);
+
+  const fetchHomes = async () => {
+    try {
+      const homes = await getMyHomes();
+      setHomesList(homes || []);
+      if (homes && homes.length > 0) {
+        // Only set userHome if it hasn't been set, or if the current one is no longer in the list
+        setUserHome(prev => {
+          if (!prev) return homes[0];
+          const exists = homes.find((h: any) => h.homeId === prev.homeId);
+          return exists ? prev : homes[0];
+        });
+      }
+    } catch (err) {
+      console.error('Failed to fetch homes', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchHomes();
+  }, []);
+
+
+  const handleCreateHome = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCreateLoading(true);
+    try {
+      await createHome(newHomeName.trim());
+      alert('Tạo nhà thành công!');
+      setIsCreateModalOpen(false);
+      setNewHomeName('');
+      fetchHomes();
+    } catch (err: any) {
+      alert(err.message || 'Lỗi khi tạo nhà');
+    } finally {
+      setCreateLoading(false);
+    }
+  };
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -115,13 +160,32 @@ export const HomePage: React.FC<HomePageProps> = ({ user: initialUser, onLogout 
       {/* Main Content Dashboard */}
       <main className="max-w-6xl mx-auto p-6 space-y-6">
         {/* Welcome Banner */}
-        <div className="bg-gradient-to-r from-slate-900 via-slate-900/90 to-indigo-950 border border-slate-800 rounded-3xl p-8 shadow-xl relative overflow-hidden">
+        <div className="bg-gradient-to-r from-slate-900 via-slate-900/90 to-indigo-950 border border-slate-800 rounded-3xl p-8 shadow-xl relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-cyan-500/5 blur-2xl pointer-events-none" />
-          <h2 className="text-2xl font-bold text-white mb-2">Xin chào, {user.fullName}! 👋</h2>
-          <p className="text-sm text-slate-300 max-w-2xl leading-relaxed">
-            Bạn đã đăng nhập thành công vào hệ thống HESTA Smart Home local-first. 
-            Mã định danh duy nhất của bạn: <span className="font-mono text-cyan-400 text-xs">{user.id}</span>
-          </p>
+          <div className="relative z-10">
+            <h2 className="text-2xl font-bold text-white mb-2">Xin chào, {user.fullName}! 👋</h2>
+            <p className="text-sm text-slate-300 max-w-2xl leading-relaxed">
+              Bạn đã đăng nhập thành công vào hệ thống HESTA Smart Home local-first. 
+              Mã định danh duy nhất của bạn: <span className="font-mono text-cyan-400 text-xs">{user.id}</span>
+            </p>
+          </div>
+          {homesList.length > 0 && (
+            <div className="relative z-10 w-full md:w-auto">
+              <label className="block text-xs font-medium text-slate-400 mb-1">Đang xem thông tin của nhà:</label>
+              <select 
+                value={userHome?.homeId || ''}
+                onChange={(e) => {
+                  const selected = homesList.find(h => h.homeId === e.target.value);
+                  if (selected) setUserHome(selected);
+                }}
+                className="w-full md:w-64 bg-slate-950/80 border border-slate-700 rounded-xl px-4 py-2.5 text-white text-sm focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none transition-all shadow-lg shadow-black/20"
+              >
+                {homesList.map(h => (
+                  <option key={h.homeId} value={h.homeId}>{h.homeName} ({h.role === 'OWNER' ? 'Chủ nhà' : 'Thành viên'})</option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
 
         {/* Dashboard Grid */}
@@ -156,7 +220,64 @@ export const HomePage: React.FC<HomePageProps> = ({ user: initialUser, onLogout 
             <p className="text-xs text-slate-400 leading-relaxed">Thông tin cá nhân, cài đặt nhiệt độ/độ sáng ưu tiên và phân quyền gia đình.</p>
           </div>
         </div>
+
+        {userHome ? (
+          <div className="mt-8">
+            <MemberManagement homeId={userHome.homeId} currentUserRole={userHome.role} />
+          </div>
+        ) : (
+          <div className="mt-8 bg-slate-900/80 border border-slate-800 rounded-2xl p-6 text-center shadow-lg">
+            <div className="w-16 h-16 bg-slate-800 text-slate-400 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-bold text-white mb-2">Bạn chưa tham gia Ngôi nhà nào</h3>
+            <p className="text-sm text-slate-400 mb-6">
+              Bạn cần có một Ngôi nhà để quản lý thiết bị và thành viên. Bạn có thể tự tạo mới hoặc tham gia bằng mã mời.
+            </p>
+            <div className="flex items-center justify-center gap-4">
+              <button 
+                onClick={() => setIsCreateModalOpen(true)}
+                className="px-6 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white font-medium rounded-xl transition-all"
+              >
+                + Tạo nhà mới
+              </button>
+            </div>
+          </div>
+        )}
       </main>
+
+
+      {/* Create Home Modal */}
+      {isCreateModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl">
+            <div className="p-6 border-b border-slate-800 flex justify-between items-center">
+              <h3 className="text-lg font-bold text-white">Tạo Nhà Mới</h3>
+              <button onClick={() => setIsCreateModalOpen(false)} className="text-slate-400 hover:text-white">✕</button>
+            </div>
+            <form onSubmit={handleCreateHome} className="p-6">
+              <label className="block text-sm font-medium text-slate-300 mb-2">Tên ngôi nhà của bạn</label>
+              <input
+                type="text"
+                placeholder="VD: Nhà của tôi, Tổ ấm..."
+                value={newHomeName}
+                onChange={(e) => setNewHomeName(e.target.value)}
+                className="w-full bg-slate-950/50 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-600 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none mb-6"
+                maxLength={50}
+              />
+              <button
+                type="submit"
+                disabled={createLoading}
+                className="w-full py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl font-medium transition-colors"
+              >
+                {createLoading ? 'Đang khởi tạo...' : 'Xác nhận tạo mới'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Profile Modal */}
       <ProfileModal 

@@ -7,12 +7,16 @@ interface RegisterFormProps {
 }
 
 export const RegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin }) => {
+  const urlParams = new URLSearchParams(window.location.search);
+  const initialInviteToken = urlParams.get('inviteToken') || '';
+
   const [formData, setFormData] = useState<RegisterRequest & { confirmPassword: string }>({
     fullName: '',
     email: '',
     password: '',
     confirmPassword: '',
     phoneNumber: '',
+    inviteCode: initialInviteToken,
   });
 
   const [loading, setLoading] = useState<boolean>(false);
@@ -58,6 +62,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin }) =
         email: formData.email.trim(),
         password: formData.password,
         phoneNumber: formData.phoneNumber?.trim() || undefined,
+        inviteCode: formData.inviteCode?.trim() || undefined,
       });
 
       if (response.result) {
@@ -86,29 +91,35 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin }) =
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-white">HESTA Smart Home</h1>
           <p className="text-sm text-slate-400 mt-1">Đăng ký tài khoản hệ thống local-first</p>
+          {initialInviteToken && (
+            <div className="mt-4 inline-block bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-3 py-1.5 rounded-lg text-xs font-medium">
+              ✨ Đăng ký ngay để tự động tham gia vào gia đình được mời
+            </div>
+          )}
         </div>
 
         {/* Success Alert */}
         {registeredUser ? (
-          <div className="bg-emerald-950/60 border border-emerald-500/30 rounded-2xl p-6 text-center space-y-4 animate-fade-in">
-            <div className="w-12 h-12 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center mx-auto">
-              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold text-emerald-300">Đăng ký thành công!</h3>
-              <p className="text-xs text-slate-300 mt-1">
-                Tài khoản <span className="font-mono text-cyan-400">{registeredUser.email}</span> đã được khởi tạo sẵn sàng cho ngôi nhà của bạn.
-              </p>
-            </div>
-            <button
-              onClick={onSwitchToLogin}
-              className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-xl transition-all shadow-lg shadow-emerald-600/30 active:scale-[0.98]"
-            >
-              Chuyển sang Đăng nhập
-            </button>
+          <div className="bg-slate-900/80 backdrop-blur-2xl border border-emerald-900/50 rounded-3xl p-8 shadow-2xl text-center relative z-10">
+          <div className="w-16 h-16 bg-gradient-to-tr from-emerald-500 to-teal-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-emerald-500/20">
+            <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
           </div>
+          <h2 className="text-2xl font-bold text-white mb-2">Đăng ký thành công!</h2>
+          <p className="text-slate-400 mb-6">
+            Chào mừng <span className="text-white font-medium">{registeredUser.fullName}</span> đã đến với HESTA.
+          </p>
+          <button
+            onClick={() => {
+              window.history.replaceState({}, '', '/');
+              onSwitchToLogin?.();
+            }}
+            className="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white rounded-xl font-bold transition-all shadow-lg shadow-emerald-500/25 active:scale-[0.98]"
+          >
+            Chuyển sang Đăng nhập
+          </button>
+        </div>
         ) : (
           /* Form */
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -186,6 +197,8 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin }) =
                 className="w-full bg-slate-950/60 border border-slate-800 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 outline-none transition-all"
               />
             </div>
+
+
 
             <button
               type="submit"
