@@ -5,10 +5,11 @@ import { GoogleSignInButton } from './GoogleAccountModal';
 
 interface LoginFormProps {
   onSwitchToRegister: () => void;
+  onSwitchToForgotPassword: () => void;
   onLoginSuccess: (authData: AuthResponse) => void;
 }
 
-export const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister, onLoginSuccess }) => {
+export const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister, onSwitchToForgotPassword, onLoginSuccess }) => {
   const [formData, setFormData] = useState<LoginRequest>({
     email: '',
     password: '',
@@ -138,7 +139,13 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister, onLogi
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="block text-xs font-medium text-slate-300">Mật khẩu <span className="text-rose-400">*</span></label>
-              <button type="button" className="text-xs text-cyan-400 hover:text-cyan-300">Quên mật khẩu?</button>
+              <button 
+                type="button" 
+                onClick={onSwitchToForgotPassword}
+                className="text-xs text-cyan-400 hover:text-cyan-300"
+              >
+                Quên mật khẩu?
+              </button>
             </div>
             <input
               type="password"

@@ -1,12 +1,29 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import type { UserResponse } from '../../types/auth';
+import { ProfileModal } from '../profile/ProfileModal';
 
 interface HomePageProps {
   user: UserResponse;
   onLogout: () => void;
 }
 
-export const HomePage: React.FC<HomePageProps> = ({ user, onLogout }) => {
+export const HomePage: React.FC<HomePageProps> = ({ user: initialUser, onLogout }) => {
+  const [user, setUser] = useState<UserResponse>(initialUser);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans relative overflow-x-hidden">
       {/* Top Navbar */}
@@ -24,26 +41,74 @@ export const HomePage: React.FC<HomePageProps> = ({ user, onLogout }) => {
         </div>
 
         <div className="flex items-center gap-4">
-          <div className="text-right hidden sm:block">
-            <p className="text-sm font-medium text-slate-200">{user.fullName}</p>
-            <p className="text-xs text-slate-400">{user.email}</p>
-          </div>
-          <span className={`px-2.5 py-1 text-xs font-semibold rounded-full border ${
+          <span className={`hidden sm:inline-block px-2.5 py-1 text-xs font-semibold rounded-full border ${
             user.platformRole === 'ADMIN'
               ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
               : 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30'
           }`}>
             {user.platformRole}
           </span>
-          <button
-            onClick={onLogout}
-            className="py-2 px-3.5 bg-slate-800 hover:bg-rose-950/80 hover:text-rose-300 hover:border-rose-500/40 border border-slate-700 text-xs font-medium rounded-xl transition-all flex items-center gap-1.5"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-            </svg>
-            <span>Đăng xuất</span>
-          </button>
+          
+          <div className="relative" ref={dropdownRef}>
+            <button
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-600 shadow-md hover:shadow-cyan-500/40 transition-all focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 focus:ring-offset-slate-900 border-2 border-slate-800 overflow-hidden"
+            >
+              {user.avatarUrl ? (
+                <img src={user.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-white font-bold text-sm">
+                  {user.fullName.charAt(0).toUpperCase()}
+                </span>
+              )}
+            </button>
+
+            {isDropdownOpen && (
+              <div className="absolute right-0 mt-2 w-48 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl py-1 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="px-4 py-2 border-b border-slate-800">
+                  <p className="text-sm font-medium text-white truncate">{user.fullName}</p>
+                  <p className="text-xs text-slate-400 truncate">{user.email}</p>
+                </div>
+                
+                <div className="p-1">
+                  <button
+                    onClick={() => {
+                      setIsDropdownOpen(false);
+                      setIsProfileModalOpen(true);
+                    }}
+                    className="w-full text-left px-3 py-2 text-sm text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg transition-colors flex items-center gap-2"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                    Hồ sơ & Bảo mật
+                  </button>
+                  
+                  <button
+                    className="w-full text-left px-3 py-2 text-sm text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg transition-colors flex items-center gap-2"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    Cài đặt
+                  </button>
+                </div>
+                
+                <div className="border-t border-slate-800 p-1">
+                  <button
+                    onClick={onLogout}
+                    className="w-full text-left px-3 py-2 text-sm text-rose-400 hover:text-rose-300 hover:bg-rose-950/50 rounded-lg transition-colors flex items-center gap-2"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                    Đăng xuất
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </nav>
 
@@ -92,6 +157,14 @@ export const HomePage: React.FC<HomePageProps> = ({ user, onLogout }) => {
           </div>
         </div>
       </main>
+
+      {/* Profile Modal */}
+      <ProfileModal 
+        isOpen={isProfileModalOpen} 
+        onClose={() => setIsProfileModalOpen(false)} 
+        user={user}
+        onProfileUpdate={(updatedUser) => setUser(updatedUser)}
+      />
     </div>
   );
 };
