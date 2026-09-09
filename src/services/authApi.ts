@@ -1,4 +1,4 @@
-import type { ApiResponse, AuthResponse, LoginRequest, RegisterRequest, UserResponse } from '../types/auth';
+import type { ApiResponse, AuthResponse, GoogleLoginRequest, LoginRequest, RegisterRequest, UserResponse } from '../types/auth';
 
 const API_BASE_URL = 'http://localhost:8080/api/v1';
 
@@ -31,6 +31,23 @@ export async function loginUser(data: LoginRequest): Promise<ApiResponse<AuthRes
   const resData: ApiResponse<AuthResponse> = await response.json();
   if (!response.ok) {
     throw new Error(resData.message || 'Đăng nhập không thành công');
+  }
+
+  return resData;
+}
+
+export async function loginWithGoogle(data: GoogleLoginRequest): Promise<ApiResponse<AuthResponse>> {
+  const response = await fetch(`${API_BASE_URL}/auth/google`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
+
+  const resData: ApiResponse<AuthResponse> = await response.json();
+  if (!response.ok) {
+    throw new Error(resData.message || 'Đăng nhập bằng Google không thành công');
   }
 
   return resData;

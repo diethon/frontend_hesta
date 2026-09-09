@@ -12,6 +12,12 @@ export interface LoginRequest {
   deviceType?: string;
 }
 
+export interface GoogleLoginRequest {
+  idToken: string;
+  deviceId?: string;
+  deviceType?: string;
+}
+
 export interface UserResponse {
   id: string;
   fullName: string;
