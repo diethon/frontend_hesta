@@ -1,10 +1,8 @@
+import { RegisterForm } from './components/auth/RegisterForm';
+
 function App() {
   return (
-    <>
-      <h1 className="text-3xl font-bold underline text-amber-400">
-        Hello world!
-      </h1>
-    </>
+    <RegisterForm onSwitchToLogin={() => alert('Chức năng Đăng nhập sẽ được phát triển tiếp theo!')} />
   );
 }
 
