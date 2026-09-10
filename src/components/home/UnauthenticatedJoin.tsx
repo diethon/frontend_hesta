@@ -1,12 +1,11 @@
 import React from 'react';
 
 interface UnauthenticatedJoinProps {
-  token: string;
   onSelectLogin: () => void;
   onSelectRegister: () => void;
 }
 
-export const UnauthenticatedJoin: React.FC<UnauthenticatedJoinProps> = ({ token, onSelectLogin, onSelectRegister }) => {
+export const UnauthenticatedJoin: React.FC<UnauthenticatedJoinProps> = ({ onSelectLogin, onSelectRegister }) => {
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 font-sans relative overflow-hidden">
       {/* Background Decor */}
@@ -35,10 +34,7 @@ export const UnauthenticatedJoin: React.FC<UnauthenticatedJoinProps> = ({ token,
 
           <div className="space-y-3">
             <button
-              onClick={() => {
-                window.history.pushState({}, '', `/register?inviteToken=${token}`);
-                onSelectRegister();
-              }}
+              onClick={onSelectRegister}
               className="w-full py-3.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white rounded-xl font-bold shadow-lg shadow-cyan-500/25 transition-all active:scale-[0.98] flex items-center justify-center"
             >
               Chưa, Đăng ký tài khoản mới
@@ -54,10 +50,7 @@ export const UnauthenticatedJoin: React.FC<UnauthenticatedJoinProps> = ({ token,
             </div>
 
             <button
-              onClick={() => {
-                window.history.pushState({}, '', `/login?inviteToken=${token}`);
-                onSelectLogin();
-              }}
+              onClick={onSelectLogin}
               className="w-full py-3.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold transition-all border border-slate-700"
             >
               Đã có, Đăng nhập ngay

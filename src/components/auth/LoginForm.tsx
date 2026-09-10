@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
+import { Link, useLocation } from 'react-router';
 import { loginUser, loginWithGoogle } from '../../services/authApi';
 import type { AuthResponse, LoginRequest } from '../../types/auth';
 import { GoogleSignInButton } from './GoogleAccountModal';
 
 interface LoginFormProps {
-  onSwitchToRegister: () => void;
-  onSwitchToForgotPassword: () => void;
   onLoginSuccess: (authData: AuthResponse) => void;
 }
 
-export const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister, onSwitchToForgotPassword, onLoginSuccess }) => {
+export const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
+  const location = useLocation();
   const [formData, setFormData] = useState<LoginRequest>({
     email: '',
     password: '',
@@ -139,13 +139,13 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister, onSwit
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="block text-xs font-medium text-slate-300">Mật khẩu <span className="text-rose-400">*</span></label>
-              <button 
-                type="button" 
-                onClick={onSwitchToForgotPassword}
+              <Link
+                to={{ pathname: '/forgot-password', search: location.search, hash: location.hash }}
+                state={location.state}
                 className="text-xs text-cyan-400 hover:text-cyan-300"
               >
                 Quên mật khẩu?
-              </button>
+              </Link>
             </div>
             <input
               type="password"
@@ -207,13 +207,13 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister, onSwit
         <div className="text-center pt-4">
           <p className="text-xs text-slate-400">
             Chưa có tài khoản?{' '}
-            <button
-              type="button"
-              onClick={onSwitchToRegister}
+            <Link
+              to={{ pathname: '/register', search: location.search, hash: location.hash }}
+              state={location.state}
               className="text-cyan-400 hover:text-cyan-300 font-medium underline underline-offset-4"
             >
               Đăng ký ngay
-            </button>
+            </Link>
           </p>
         </div>
       </div>

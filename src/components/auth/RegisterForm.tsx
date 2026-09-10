@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
+import { useLocation } from 'react-router';
 import { registerUser } from '../../services/authApi';
 import type { RegisterRequest, UserResponse } from '../../types/auth';
 
 interface RegisterFormProps {
-  onSwitchToLogin?: () => void;
+  onSwitchToLogin?: (handledInviteToken?: string) => void;
 }
 
 export const RegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin }) => {
-  const urlParams = new URLSearchParams(window.location.search);
-  const initialInviteToken = urlParams.get('inviteToken') || '';
+  const location = useLocation();
+  const urlParams = new URLSearchParams(location.search);
+  const initialInviteToken = urlParams.get('inviteToken') || urlParams.get('token') || '';
 
   const [formData, setFormData] = useState<RegisterRequest & { confirmPassword: string }>({
     fullName: '',
@@ -112,8 +114,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin }) =
           </p>
           <button
             onClick={() => {
-              window.history.replaceState({}, '', '/');
-              onSwitchToLogin?.();
+              onSwitchToLogin?.(initialInviteToken);
             }}
             className="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white rounded-xl font-bold transition-all shadow-lg shadow-emerald-500/25 active:scale-[0.98]"
           >
@@ -223,7 +224,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin }) =
                 Đã có tài khoản?{' '}
                 <button
                   type="button"
-                  onClick={onSwitchToLogin}
+                  onClick={() => onSwitchToLogin?.()}
                   className="text-cyan-400 hover:text-cyan-300 font-medium underline underline-offset-4"
                 >
                   Đăng nhập ngay

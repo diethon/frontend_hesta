@@ -1,3 +1,4 @@
+import { notifySessionExpired } from './session';
 
 const API_BASE_URL = 'http://localhost:8080/api/v1';
 
@@ -31,8 +32,7 @@ export const getHomeMembers = async (homeId: string): Promise<HomeMember[]> => {
     headers: getAuthHeaders(),
   });
   if (response.status === 401) {
-    localStorage.clear();
-    window.location.href = '/login';
+    notifySessionExpired();
     throw new Error('Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.');
   }
   const resData = await response.json();
@@ -50,8 +50,7 @@ export const generateInvitation = async (homeId: string, email?: string): Promis
     headers: getAuthHeaders(),
   });
   if (response.status === 401) {
-    localStorage.clear();
-    window.location.href = '/login';
+    notifySessionExpired();
     throw new Error('Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.');
   }
   const resData = await response.json();
@@ -85,8 +84,7 @@ export const joinHome = async (codeOrToken: string) => {
     headers: getAuthHeaders(),
   });
   if (response.status === 401) {
-    localStorage.clear();
-    window.location.href = '/login';
+    notifySessionExpired();
     throw new Error('Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.');
   }
   const resData = await response.json();
@@ -100,8 +98,7 @@ export const getMyHomes = async () => {
     headers: getAuthHeaders(),
   });
   if (response.status === 401) {
-    localStorage.clear();
-    window.location.href = '/login';
+    notifySessionExpired();
     throw new Error('Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.');
   }
   const resData = await response.json();

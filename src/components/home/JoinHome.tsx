@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useLocation } from 'react-router';
 import { joinHome } from '../../services/homeApi';
 
 interface JoinHomeProps {
@@ -7,19 +8,11 @@ interface JoinHomeProps {
 }
 
 export const JoinHome: React.FC<JoinHomeProps> = ({ onSuccess, onCancel }) => {
-  const [token, setToken] = useState<string | null>(null);
+  const location = useLocation();
+  const params = new URLSearchParams(location.search);
+  const token = params.get('token') || params.get('inviteToken');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const t = params.get('token');
-    if (!t) {
-      setError('Đường dẫn không hợp lệ hoặc đã thiếu mã token.');
-    } else {
-      setToken(t);
-    }
-  }, []);
+  const [error, setError] = useState<string | null>(token ? null : 'Đường dẫn không hợp lệ hoặc đã thiếu mã token.');
 
   const handleJoin = async () => {
     if (!token) return;
@@ -28,8 +21,6 @@ export const JoinHome: React.FC<JoinHomeProps> = ({ onSuccess, onCancel }) => {
     try {
       await joinHome(token);
       alert('Gia nhập nhà thành công!');
-      // Reset URL to /
-      window.history.replaceState({}, '', '/');
       onSuccess();
     } catch (err: any) {
       setError(err.message || 'Lỗi khi gia nhập nhà. Mã mời có thể đã hết hạn hoặc không tồn tại.');
@@ -39,7 +30,6 @@ export const JoinHome: React.FC<JoinHomeProps> = ({ onSuccess, onCancel }) => {
   };
 
   const handleCancel = () => {
-    window.history.replaceState({}, '', '/');
     onCancel();
   };
 
