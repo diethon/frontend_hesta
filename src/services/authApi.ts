@@ -1,6 +1,6 @@
 import type { ApiResponse, AuthResponse, GoogleLoginRequest, LoginRequest, RegisterRequest, UserResponse } from '../types/auth';
 
-const API_BASE_URL = 'http://localhost:8080/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1';
 
 export async function registerUser(data: RegisterRequest): Promise<ApiResponse<UserResponse>> {
   const response = await fetch(`${API_BASE_URL}/auth/register`, {

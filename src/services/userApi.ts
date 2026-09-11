@@ -1,7 +1,7 @@
 import type { ApiResponse, UserResponse } from '../types/auth';
 import type { UpdateProfileRequest, ChangePasswordRequest } from '../types/user';
 
-const API_BASE_URL = 'http://localhost:8080/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1';
 
 const getAuthHeaders = () => {
   const token = localStorage.getItem('accessToken');
