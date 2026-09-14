@@ -5,7 +5,7 @@ import {
   type StompConfig,
   type StompSubscription,
 } from '@stomp/stompjs';
-import { getRealtimeWebSocketUrl } from '../services/apiConfig';
+import { getRealtimeWebSocketUrl } from '../services/apiClient';
 import type { RealtimeConnectionStatus } from '../store/realtimeSlice';
 import { parseRealtimeEvent, type RealtimeEvent } from './realtimeTypes';
 

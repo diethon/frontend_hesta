@@ -73,10 +73,10 @@ export function AppRoutes() {
       ) : (
         <Navigate to={{ pathname: '/login', search: location.search, hash: location.hash }} state={state} replace />
       )} />
-      <Route element={<RequireAuth user={user} />}>
-        <Route path="/home" element={<HomePage user={user!} onLogout={logout} />} />
+      <Route element={<RequireAuth initialized={initialized} user={user} />}>
+        <Route path="/home" element={<HomePage user={user!} onLogout={logout}  />} />
         <Route path="/home/:homeId/devices" element={<DevicePage />} />
-        <Route element={<RequireAdmin user={user} />}>
+        <Route element={<RequireAdmin initialized={initialized} user={user} />}>
           <Route path="/admin" element={<AdminDashboard user={user!} onLogout={logout} />} />
         </Route>
       </Route>
