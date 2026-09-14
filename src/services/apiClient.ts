@@ -1,31 +1,39 @@
+import axios from 'axios';
 import { notifySessionExpired } from './session';
 
-export const API_BASE_URL = 'http://localhost:8080/api/v1';
+const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim();
 
-interface ApiEnvelope<T> {
-  code: number;
-  message?: string;
-  result: T;
+export const API_BASE_URL = (configuredApiBaseUrl || '/api/v1').replace(/\/+$/, '');
+
+export function getRealtimeWebSocketUrl() {
+  const apiUrl = new URL(API_BASE_URL, window.location.origin);
+  const protocol = apiUrl.protocol === 'https:' ? 'wss:' : 'ws:';
+  return `${protocol}//${apiUrl.host}/ws`;
 }
 
-export async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
+export const apiClient = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+apiClient.interceptors.request.use((config) => {
   const token = localStorage.getItem('accessToken');
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-      ...init.headers,
-    },
-  });
-
-  if (response.status === 401) {
-    notifySessionExpired();
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
   }
+  return config;
+});
 
-  const payload = (await response.json().catch(() => ({}))) as Partial<ApiEnvelope<T>>;
-  if (!response.ok) {
-    throw new Error(payload.message || 'Không thể xử lý yêu cầu.');
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      notifySessionExpired();
+      throw new Error('Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.');
+    }
+    const errorMessage = error.response?.data?.message || error.message || 'Có lỗi xảy ra';
+    throw new Error(errorMessage);
   }
-  return payload.result as T;
-}
+);

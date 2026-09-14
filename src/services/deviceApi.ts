@@ -1,5 +1,31 @@
-import { apiRequest } from './apiClient';
-import type { DeviceResponse } from '../types/scene';
+import { apiClient } from './apiClient';
+import type { DeviceResponse, DeviceUpdateRequest, DeviceStateHistoryResponse } from '../types/device';
 
-export const listHomeDevices = (homeId: string) =>
-  apiRequest<DeviceResponse[]>(`/homes/${homeId}/devices`);
+export const getDevicesByHome = async (homeId: string): Promise<DeviceResponse[]> => {
+  const response = await apiClient.get(`/homes/${homeId}/devices`);
+  return response.data.result;
+};
+
+export const getDevicesByRoom = async (roomId: string): Promise<DeviceResponse[]> => {
+  const response = await apiClient.get(`/rooms/${roomId}/devices`);
+  return response.data.result;
+};
+
+export const getDeviceDetail = async (deviceId: string): Promise<DeviceResponse> => {
+  const response = await apiClient.get(`/devices/${deviceId}`);
+  return response.data.result;
+};
+
+export const updateDeviceConfig = async (deviceId: string, request: DeviceUpdateRequest): Promise<DeviceResponse> => {
+  const response = await apiClient.put(`/devices/${deviceId}`, request);
+  return response.data.result;
+};
+
+export const removeDevice = async (deviceId: string): Promise<void> => {
+  await apiClient.delete(`/devices/${deviceId}`);
+};
+
+export const getDeviceHistory = async (deviceId: string): Promise<DeviceStateHistoryResponse[]> => {
+  const response = await apiClient.get(`/devices/${deviceId}/history`);
+  return response.data.result;
+};

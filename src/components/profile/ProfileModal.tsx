@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import type { UserResponse } from '../../types/auth';
 import { updateProfile, changePassword, uploadAvatar } from '../../services/userApi';
+import { getErrorMessage } from '../../utils/errors';
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -29,22 +30,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
   const [securityError, setSecurityError] = useState<string | null>(null);
   const [securitySuccess, setSecuritySuccess] = useState<string | null>(null);
 
-  // Reset state when modal opens
-  useEffect(() => {
-    if (isOpen) {
-      setFullName(user.fullName);
-      setPhoneNumber(user.phoneNumber || '');
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
-      setInfoError(null);
-      setInfoSuccess(null);
-      setSecurityError(null);
-      setSecuritySuccess(null);
-      setActiveTab('info');
-    }
-  }, [isOpen, user]);
-
   if (!isOpen) return null;
 
   const handleUpdateInfo = async (e: React.FormEvent) => {
@@ -63,15 +48,9 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
       if (response.result) {
         onProfileUpdate(response.result);
         setInfoSuccess('Cập nhật thông tin thành công!');
-        // Cập nhật localStorage
-        const storedUser = localStorage.getItem('userInfo');
-        if (storedUser) {
-          const parsedUser = JSON.parse(storedUser);
-          localStorage.setItem('userInfo', JSON.stringify({ ...parsedUser, ...response.result }));
-        }
       }
-    } catch (err: any) {
-      setInfoError(err.message || 'Cập nhật thất bại. Vui lòng thử lại.');
+    } catch (error: unknown) {
+      setInfoError(getErrorMessage(error, 'Cập nhật thất bại. Vui lòng thử lại.'));
     } finally {
       setIsUpdatingInfo(false);
     }
@@ -100,15 +79,9 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
       if (response.result) {
         onProfileUpdate(response.result);
         setInfoSuccess('Cập nhật ảnh đại diện thành công!');
-        // Cập nhật localStorage
-        const storedUser = localStorage.getItem('userInfo');
-        if (storedUser) {
-          const parsedUser = JSON.parse(storedUser);
-          localStorage.setItem('userInfo', JSON.stringify({ ...parsedUser, ...response.result }));
-        }
       }
-    } catch (err: any) {
-      setInfoError(err.message || 'Tải ảnh thất bại. Vui lòng thử lại.');
+    } catch (error: unknown) {
+      setInfoError(getErrorMessage(error, 'Tải ảnh thất bại. Vui lòng thử lại.'));
     } finally {
       setIsUploadingAvatar(false);
       // Reset input value so the same file can be selected again
@@ -143,8 +116,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
-    } catch (err: any) {
-      setSecurityError(err.message || 'Đổi mật khẩu thất bại. Vui lòng thử lại.');
+    } catch (error: unknown) {
+      setSecurityError(getErrorMessage(error, 'Đổi mật khẩu thất bại. Vui lòng thử lại.'));
     } finally {
       setIsChangingPassword(false);
     }

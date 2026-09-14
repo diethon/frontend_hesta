@@ -9,6 +9,7 @@ import { after, test } from 'node:test';
 import { runInThisContext } from 'node:vm';
 import React from 'react';
 import { renderToString } from 'react-dom/server';
+import { Provider } from 'react-redux';
 import * as router from 'react-router';
 import ts from 'typescript';
 
@@ -16,6 +17,7 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 const require = createRequire(import.meta.url);
 const modules = new Map();
 let redirects = [];
+globalThis.__viteEnv = { VITE_API_BASE_URL: 'http://backend.test/api/v1' };
 
 // Capture redirect destinations during server rendering, where navigation
 // effects do not run. Routes, matching, outlets, and location hooks are real.
@@ -29,7 +31,8 @@ function loadSource(path) {
   if (modules.has(filename)) return modules.get(filename).exports;
   const module = { exports: {} };
   modules.set(filename, module);
-  const { outputText } = ts.transpileModule(readFileSync(filename, 'utf8'), {
+  const source = readFileSync(filename, 'utf8').replaceAll('import.meta.env', 'globalThis.__viteEnv');
+  const { outputText } = ts.transpileModule(source, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
     fileName: filename,
   });
@@ -61,6 +64,7 @@ after(() => {
 });
 
 const { AppRoutes } = loadSource('src/routes/AppRoutes.tsx');
+const { createAppStore } = loadSource('src/store/store.ts');
 const navigation = loadSource('src/routes/navigation.ts');
 const session = loadSource('src/services/session.ts');
 const user = { id: 'test-user', fullName: 'Routing Test', email: 'routing@example.test',
@@ -75,9 +79,11 @@ function renderRoute(path, storedUser = null, state, routeSearch = search) {
     storage.set('accessToken', 'test-access-token');
   }
   redirects = [];
-  return renderToString(React.createElement(router.MemoryRouter, {
-    initialEntries: [{ pathname: path, search: routeSearch, hash: '#flow', state }],
-  }, React.createElement(AppRoutes)));
+  const appStore = createAppStore();
+  return renderToString(React.createElement(Provider, { store: appStore },
+    React.createElement(router.MemoryRouter, {
+      initialEntries: [{ pathname: path, search: routeSearch, hash: '#flow', state }],
+    }, React.createElement(AppRoutes))));
 }
 
 test('public pages render directly, even with an existing ADMIN session', () => {

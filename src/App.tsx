@@ -1,11 +1,15 @@
 ﻿import { BrowserRouter } from 'react-router';
+import { RealtimeLifecycle } from './realtime/RealtimeLifecycle';
 import { AppRoutes } from './routes/AppRoutes';
 
 function App() {
   return (
-    <BrowserRouter>
-      <AppRoutes />
-    </BrowserRouter>
+    <>
+      <RealtimeLifecycle />
+      <BrowserRouter>
+        <AppRoutes />
+      </BrowserRouter>
+    </>
   );
 }
 
