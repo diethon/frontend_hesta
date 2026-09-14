@@ -12,7 +12,8 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({ device, onTogglePower, o
   const isSensor = device.deviceType === 'SENSOR';
   const isLock = device.deviceType === 'LOCK';
   
-  const powerState = device.currentState?.power || 'OFF';
+  const rawPowerState = device.currentState?.power;
+  const powerState = typeof rawPowerState === 'string' ? rawPowerState : 'OFF';
   // If it doesn't have a power toggle, we don't highlight the card as "powered on", except maybe locks if unlocked
   const isPoweredOn = hasPowerToggle && powerState === 'ON';
   const isUnlocked = isLock && device.currentState?.state === 'UNLOCKED';
@@ -43,13 +44,14 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({ device, onTogglePower, o
     if (isSensor) {
       const temp = device.currentState?.temperature;
       const hum = device.currentState?.humidity;
-      if (temp !== undefined && hum !== undefined) {
+      if ((typeof temp === 'number' || typeof temp === 'string')
+        && (typeof hum === 'number' || typeof hum === 'string')) {
         return <span className="text-sm font-semibold text-cyan-400">{temp}°C / {hum}%</span>;
       }
     }
     if (isLock) {
       const bat = device.currentState?.battery;
-      if (bat !== undefined) {
+      if (typeof bat === 'number' || typeof bat === 'string') {
         return <span className="text-xs font-medium text-slate-300">Pin: {bat}%</span>;
       }
     }

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import type { DeviceResponse } from '../../types/device';
+import type { DeviceResponse, DeviceStateHistoryResponse } from '../../types/device';
 import { removeDevice, getDeviceHistory } from '../../services/deviceApi';
+import { getErrorMessage } from '../../utils/errors';
 
 interface DeviceDetailModalProps {
   isOpen: boolean;
@@ -12,7 +13,7 @@ interface DeviceDetailModalProps {
 export const DeviceDetailModal: React.FC<DeviceDetailModalProps> = ({ isOpen, onClose, device, onDeviceRemoved }) => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState('');
-  const [history, setHistory] = useState<import('../../types/device').DeviceStateHistoryResponse[]>([]);
+  const [history, setHistory] = useState<DeviceStateHistoryResponse[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
 
   React.useEffect(() => {
@@ -45,8 +46,8 @@ export const DeviceDetailModal: React.FC<DeviceDetailModalProps> = ({ isOpen, on
       await removeDevice(device.id);
       onDeviceRemoved(device.id);
       onClose();
-    } catch (err: any) {
-      setError(err.message || 'Lỗi khi xóa thiết bị');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Lỗi khi xóa thiết bị'));
     } finally {
       setIsDeleting(false);
     }

@@ -4,7 +4,6 @@ import type { UserResponse } from '../../types/auth';
 import { ProfileModal } from '../profile/ProfileModal';
 import { MemberManagement } from './MemberManagement';
 import { SceneManagement } from './SceneManagement';
-import { getMyHomes, createHome } from '../../services/homeApi';
 import { getMyHomes, createHome, type HomeSummary } from '../../services/homeApi';
 import { currentHomeChanged, currentHomeCleared } from '../../store/homeSlice';
 import { useAppDispatch } from '../../store/hooks';

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { listHomeDevices } from '../../services/deviceApi';
+import { getDevicesByHome } from '../../services/deviceApi';
 import {
   addSceneAction,
   createScene,
@@ -10,11 +10,8 @@ import {
   reorderSceneActions,
   updateScene,
 } from '../../services/sceneApi';
-import type {
-  DeviceResponse,
-  SceneActionType,
-  SceneResponse,
-} from '../../types/scene';
+import type { DeviceResponse } from '../../types/device';
+import type { SceneActionType, SceneResponse } from '../../types/scene';
 
 interface SceneManagementProps {
   homeId: string;
@@ -68,7 +65,7 @@ export const SceneManagement: React.FC<SceneManagementProps> = ({ homeId, curren
     try {
       const [sceneData, deviceData] = await Promise.all([
         listScenes(homeId),
-        listHomeDevices(homeId),
+        getDevicesByHome(homeId),
       ]);
       setScenes(sceneData);
       setDevices(deviceData);

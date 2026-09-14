@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { DeviceCard } from './DeviceCard';
 import { DeviceDetailModal } from './DeviceDetailModal';
 import { getDevicesByHome, getDevicesByRoom } from '../../services/deviceApi';
 import { getHomeRooms } from '../../services/homeApi';
 import type { DeviceResponse } from '../../types/device';
+import { getErrorMessage } from '../../utils/errors';
 export const DevicePage: React.FC = () => {
   const { homeId } = useParams<{ homeId: string }>();
   const navigate = useNavigate();
@@ -16,19 +17,20 @@ export const DevicePage: React.FC = () => {
   const [selectedDevice, setSelectedDevice] = useState<DeviceResponse | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const fetchRooms = async () => {
+  const fetchRooms = useCallback(async () => {
     if (!homeId) return;
     try {
       const data = await getHomeRooms(homeId);
       setRooms(data || []);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Lỗi tải phòng:", err);
     }
-  };
+  }, [homeId]);
 
-  const fetchDevices = async () => {
+  const fetchDevices = useCallback(async () => {
     try {
       setLoading(true);
+      setError('');
       if (homeId) {
         if (selectedRoomId === 'ALL') {
           const data = await getDevicesByHome(homeId);
@@ -38,20 +40,22 @@ export const DevicePage: React.FC = () => {
           setDevices(data || []);
         }
       }
-    } catch (err: any) {
-      setError(err.message || 'Lỗi tải danh sách thiết bị');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Lỗi tải danh sách thiết bị'));
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchRooms();
-  }, [homeId]);
-
-  useEffect(() => {
-    fetchDevices();
   }, [homeId, selectedRoomId]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => void fetchRooms(), 0);
+    return () => window.clearTimeout(timer);
+  }, [fetchRooms]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => void fetchDevices(), 0);
+    return () => window.clearTimeout(timer);
+  }, [fetchDevices]);
 
   const handleTogglePower = (deviceId: string, currentPower: string) => {
     setDevices(prev =>
