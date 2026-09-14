@@ -7,6 +7,7 @@ import { HomePage } from '../components/home/HomePage';
 import { AdminDashboard } from '../components/admin/AdminDashboard';
 import { JoinHome } from '../components/home/JoinHome';
 import { UnauthenticatedJoin } from '../components/home/UnauthenticatedJoin';
+import { DevicePage } from '../components/device/DevicePage';
 import type { AuthResponse } from '../types/auth';
 import { RequireAdmin, RequireAuth } from './RouteGuards';
 import { defaultRoute, invitationSearch, invitationToken, loginDestination, readNavigationState } from './navigation';
@@ -74,6 +75,7 @@ export function AppRoutes() {
       )} />
       <Route element={<RequireAuth user={user} />}>
         <Route path="/home" element={<HomePage user={user!} onLogout={logout} />} />
+        <Route path="/home/:homeId/devices" element={<DevicePage />} />
         <Route element={<RequireAdmin user={user} />}>
           <Route path="/admin" element={<AdminDashboard user={user!} onLogout={logout} />} />
         </Route>
