@@ -30,7 +30,7 @@ export const HomePage: React.FC<HomePageProps> = ({ user, onLogout, onProfileUpd
   const [createLoading, setCreateLoading] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [homesList, setHomesList] = useState<HomeSummary[]>([]);
-
+  const navigate = useNavigate();
   const fetchHomes = async () => {
     try {
       const homes = await getMyHomes();
