@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import type { UserResponse } from '../../types/auth';
 import { ProfileModal } from '../profile/ProfileModal';
 import { MemberManagement } from './MemberManagement';
+import { SceneManagement } from './SceneManagement';
 import { getMyHomes, createHome } from '../../services/homeApi';
 
 interface HomePageProps {
@@ -222,7 +223,8 @@ export const HomePage: React.FC<HomePageProps> = ({ user: initialUser, onLogout 
         </div>
 
         {userHome ? (
-          <div className="mt-8">
+          <div className="mt-8 space-y-6">
+            <SceneManagement key={userHome.homeId} homeId={userHome.homeId} currentUserRole={userHome.role} />
             <MemberManagement homeId={userHome.homeId} currentUserRole={userHome.role} />
           </div>
         ) : (
