@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router';
 import { loginUser, loginWithGoogle } from '../../services/authApi';
 import type { AuthResponse, LoginRequest } from '../../types/auth';
+import { getErrorMessage } from '../../utils/errors';
 import { GoogleSignInButton } from './GoogleAccountModal';
 
 interface LoginFormProps {
@@ -52,14 +53,10 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
       });
 
       if (response.result) {
-        localStorage.setItem('accessToken', response.result.accessToken);
-        localStorage.setItem('refreshToken', response.result.refreshToken);
-        localStorage.setItem('userInfo', JSON.stringify(response.result.user));
-
         onLoginSuccess(response.result);
       }
-    } catch (err: any) {
-      setError(err.message || 'Email hoặc mật khẩu không chính xác.');
+    } catch (error: unknown) {
+      setError(getErrorMessage(error, 'Email hoặc mật khẩu không chính xác.'));
     } finally {
       setLoading(false);
     }
@@ -77,14 +74,10 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
       });
 
       if (response.result) {
-        localStorage.setItem('accessToken', response.result.accessToken);
-        localStorage.setItem('refreshToken', response.result.refreshToken);
-        localStorage.setItem('userInfo', JSON.stringify(response.result.user));
-
         onLoginSuccess(response.result);
       }
-    } catch (err: any) {
-      setError(err.message || 'Xác thực tài khoản Google thất bại.');
+    } catch (error: unknown) {
+      setError(getErrorMessage(error, 'Xác thực tài khoản Google thất bại.'));
     } finally {
       setGoogleLoading(false);
     }

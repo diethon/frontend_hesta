@@ -14,7 +14,7 @@ import type { NavigationState } from './navigation';
 import { useRouteSession } from './useRouteSession';
 
 export function AppRoutes() {
-  const { user, setUser, logout } = useRouteSession();
+  const { initialized, user, login, logout, updateUser } = useRouteSession();
   const location = useLocation();
   const navigate = useNavigate();
   const state = readNavigationState(location.state);
@@ -24,7 +24,7 @@ export function AppRoutes() {
   };
 
   const handleLoginSuccess = (authData: AuthResponse) => {
-    setUser(authData.user);
+    login(authData);
     const destination = loginDestination(authData.user, location.search, state);
     go(destination, { ...state, returnTo: undefined }, true,
       destination === '/join' ? invitationSearch(location.search, 'token') : location.search);
@@ -72,10 +72,14 @@ export function AppRoutes() {
       ) : (
         <Navigate to={{ pathname: '/login', search: location.search, hash: location.hash }} state={state} replace />
       )} />
-      <Route element={<RequireAuth user={user} />}>
-        <Route path="/home" element={<HomePage user={user!} onLogout={logout} />} />
-        <Route element={<RequireAdmin user={user} />}>
-          <Route path="/admin" element={<AdminDashboard user={user!} onLogout={logout} />} />
+      <Route element={<RequireAuth initialized={initialized} user={user} />}>
+        <Route path="/home" element={
+          <HomePage user={user!} onLogout={logout} onProfileUpdate={updateUser} />
+        } />
+        <Route element={<RequireAdmin initialized={initialized} user={user} />}>
+          <Route path="/admin" element={
+            <AdminDashboard user={user!} onLogout={logout} onProfileUpdate={updateUser} />
+          } />
         </Route>
       </Route>
       <Route path="*" element={

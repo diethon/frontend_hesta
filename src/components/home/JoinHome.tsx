@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useLocation } from 'react-router';
 import { joinHome } from '../../services/homeApi';
+import { getErrorMessage } from '../../utils/errors';
 
 interface JoinHomeProps {
   onSuccess: () => void;
@@ -22,8 +23,8 @@ export const JoinHome: React.FC<JoinHomeProps> = ({ onSuccess, onCancel }) => {
       await joinHome(token);
       alert('Gia nhập nhà thành công!');
       onSuccess();
-    } catch (err: any) {
-      setError(err.message || 'Lỗi khi gia nhập nhà. Mã mời có thể đã hết hạn hoặc không tồn tại.');
+    } catch (error: unknown) {
+      setError(getErrorMessage(error, 'Lỗi khi gia nhập nhà. Mã mời có thể đã hết hạn hoặc không tồn tại.'));
     } finally {
       setLoading(false);
     }

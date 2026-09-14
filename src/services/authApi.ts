@@ -1,6 +1,5 @@
 import type { ApiResponse, AuthResponse, GoogleLoginRequest, LoginRequest, RegisterRequest, UserResponse } from '../types/auth';
-
-const API_BASE_URL = 'http://localhost:8080/api/v1';
+import { API_BASE_URL } from './apiConfig';
 
 export async function registerUser(data: RegisterRequest): Promise<ApiResponse<UserResponse>> {
   const response = await fetch(`${API_BASE_URL}/auth/register`, {

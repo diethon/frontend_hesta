@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { getHomeMembers, updateMemberRole, removeMember, generateInvitation } from '../../services/homeApi';
 import type { HomeMember, InvitationResponse } from '../../services/homeApi';
+import { getErrorMessage } from '../../utils/errors';
 
-// Mocking homeId for now since it's not stored in Context yet, but usually we fetch the home user belongs to.
-// In this flow, a user logs in, we assume they have 1 home and we need its ID.
-// For now, let's pass homeId as a prop or fetch it.
 interface MemberManagementProps {
   homeId: string;
   currentUserRole: 'OWNER' | 'MEMBER';
@@ -24,7 +22,7 @@ export const MemberManagement: React.FC<MemberManagementProps> = ({ homeId, curr
       setLoading(true);
       const data = await getHomeMembers(homeId);
       setMembers(data);
-    } catch (err: any) {
+    } catch {
       setError('Lỗi khi lấy danh sách thành viên');
     } finally {
       setLoading(false);
@@ -32,17 +30,25 @@ export const MemberManagement: React.FC<MemberManagementProps> = ({ homeId, curr
   };
 
   useEffect(() => {
-    if (homeId) {
-      fetchMembers();
-    }
+    let active = true;
+    getHomeMembers(homeId).then((data) => {
+      if (active) setMembers(data);
+    }).catch(() => {
+      if (active) setError('Lỗi khi lấy danh sách thành viên');
+    }).finally(() => {
+      if (active) setLoading(false);
+    });
+    return () => {
+      active = false;
+    };
   }, [homeId]);
 
   const handleRoleChange = async (memberId: string, newRole: 'OWNER' | 'MEMBER') => {
     try {
       await updateMemberRole(homeId, memberId, newRole);
-      fetchMembers();
-    } catch (err: any) {
-      alert(err.response?.data?.message || 'Không thể thay đổi quyền');
+      void fetchMembers();
+    } catch (error: unknown) {
+      alert(getErrorMessage(error, 'Không thể thay đổi quyền'));
     }
   };
 
@@ -50,9 +56,9 @@ export const MemberManagement: React.FC<MemberManagementProps> = ({ homeId, curr
     if (!window.confirm('Bạn có chắc chắn muốn xóa thành viên này?')) return;
     try {
       await removeMember(homeId, memberId);
-      fetchMembers();
-    } catch (err: any) {
-      alert(err.response?.data?.message || 'Không thể xóa thành viên');
+      void fetchMembers();
+    } catch (error: unknown) {
+      alert(getErrorMessage(error, 'Không thể xóa thành viên'));
     }
   };
 
@@ -64,8 +70,8 @@ export const MemberManagement: React.FC<MemberManagementProps> = ({ homeId, curr
     try {
       const data = await generateInvitation(homeId);
       setInvitation(data);
-    } catch (err: any) {
-      alert(err.message || 'Không thể tạo link mời');
+    } catch (error: unknown) {
+      alert(getErrorMessage(error, 'Không thể tạo link mời'));
       setShowInviteModal(false);
     } finally {
       setInviteLoading(false);
@@ -84,8 +90,8 @@ export const MemberManagement: React.FC<MemberManagementProps> = ({ homeId, curr
         alert(`⚠️ Lời mời đã được tạo nhưng hệ thống email hiện không khả dụng.\n\nVui lòng copy link bên trên và gửi thủ công cho người thân.`);
       }
       setInviteEmail('');
-    } catch (err: any) {
-      alert(err.message || 'Không thể tạo lời mời');
+    } catch (error: unknown) {
+      alert(getErrorMessage(error, 'Không thể tạo lời mời'));
     } finally {
       setInviteLoading(false);
     }
@@ -94,6 +100,10 @@ export const MemberManagement: React.FC<MemberManagementProps> = ({ homeId, curr
   if (loading) {
     return <div className="p-4 text-slate-400">Đang tải danh sách thành viên...</div>;
   }
+
+  const invitationUrl = invitation
+    ? `${window.location.origin}/join?token=${encodeURIComponent(invitation.inviteToken)}`
+    : '';
 
   return (
     <div className="bg-slate-900/80 rounded-2xl border border-slate-800 p-6 shadow-xl">
@@ -201,12 +211,12 @@ export const MemberManagement: React.FC<MemberManagementProps> = ({ homeId, curr
                       <input
                         type="text"
                         readOnly
-                        value={`http://localhost:5173/join?token=${invitation.inviteToken}`}
+                        value={invitationUrl}
                         className="flex-1 bg-slate-950/50 border border-slate-700 rounded-xl px-4 py-2.5 text-white text-sm focus:border-indigo-500 outline-none"
                       />
                       <button 
                         onClick={() => {
-                          navigator.clipboard.writeText(`http://localhost:5173/join?token=${invitation.inviteToken}`);
+                          navigator.clipboard.writeText(invitationUrl);
                           alert("Đã copy link!");
                         }}
                         className="px-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-medium transition-colors"

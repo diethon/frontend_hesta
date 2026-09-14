@@ -1,7 +1,6 @@
 import type { ApiResponse, UserResponse } from '../types/auth';
 import type { UpdateProfileRequest, ChangePasswordRequest } from '../types/user';
-
-const API_BASE_URL = 'http://localhost:8080/api/v1';
+import { API_BASE_URL } from './apiConfig';
 
 const getAuthHeaders = () => {
   const token = localStorage.getItem('accessToken');

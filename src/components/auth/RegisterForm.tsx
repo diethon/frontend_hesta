@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useLocation } from 'react-router';
 import { registerUser } from '../../services/authApi';
 import type { RegisterRequest, UserResponse } from '../../types/auth';
+import { getErrorMessage } from '../../utils/errors';
 
 interface RegisterFormProps {
   onSwitchToLogin?: (handledInviteToken?: string) => void;
@@ -70,8 +71,8 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin }) =
       if (response.result) {
         setRegisteredUser(response.result);
       }
-    } catch (err: any) {
-      setError(err.message || 'Đã có lỗi xảy ra trong quá trình đăng ký.');
+    } catch (error: unknown) {
+      setError(getErrorMessage(error, 'Đã có lỗi xảy ra trong quá trình đăng ký.'));
     } finally {
       setLoading(false);
     }

@@ -1,6 +1,5 @@
 import { notifySessionExpired } from './session';
-
-const API_BASE_URL = 'http://localhost:8080/api/v1';
+import { API_BASE_URL } from './apiConfig';
 
 const getAuthHeaders = () => {
   const token = localStorage.getItem('accessToken');
@@ -24,6 +23,12 @@ export interface InvitationResponse {
   inviteToken: string;
   expiresAt: string;
   emailSent?: boolean;
+}
+
+export interface HomeSummary {
+  homeId: string;
+  homeName: string;
+  role: 'OWNER' | 'MEMBER';
 }
 
 export const getHomeMembers = async (homeId: string): Promise<HomeMember[]> => {
@@ -92,7 +97,7 @@ export const joinHome = async (codeOrToken: string) => {
   return resData.result;
 };
 
-export const getMyHomes = async () => {
+export const getMyHomes = async (): Promise<HomeSummary[]> => {
   const response = await fetch(`${API_BASE_URL}/homes/my-homes`, {
     method: 'GET',
     headers: getAuthHeaders(),
