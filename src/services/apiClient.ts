@@ -1,7 +1,15 @@
 import axios from 'axios';
 import { notifySessionExpired } from './session';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1';
+const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim();
+
+export const API_BASE_URL = (configuredApiBaseUrl || '/api/v1').replace(/\/+$/, '');
+
+export function getRealtimeWebSocketUrl() {
+  const apiUrl = new URL(API_BASE_URL, window.location.origin);
+  const protocol = apiUrl.protocol === 'https:' ? 'wss:' : 'ws:';
+  return `${protocol}//${apiUrl.host}/ws`;
+}
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,

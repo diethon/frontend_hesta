@@ -5,10 +5,10 @@ import { ProfileModal } from '../profile/ProfileModal';
 interface AdminDashboardProps {
   user: UserResponse;
   onLogout: () => void;
+  onProfileUpdate: (user: UserResponse) => void;
 }
 
-export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: initialUser, onLogout }) => {
-  const [user, setUser] = useState<UserResponse>(initialUser);
+export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout, onProfileUpdate }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -169,12 +169,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: initialUse
       </main>
 
       {/* Profile Modal */}
-      <ProfileModal 
-        isOpen={isProfileModalOpen} 
-        onClose={() => setIsProfileModalOpen(false)} 
-        user={user}
-        onProfileUpdate={(updatedUser) => setUser(updatedUser)}
-      />
+      {isProfileModalOpen ? (
+        <ProfileModal
+          isOpen
+          onClose={() => setIsProfileModalOpen(false)}
+          user={user}
+          onProfileUpdate={onProfileUpdate}
+        />
+      ) : null}
     </div>
   );
 };

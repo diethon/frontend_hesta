@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { verifyOtp, resetPassword } from '../../services/authApi';
+import { getErrorMessage } from '../../utils/errors';
 
 interface ResetPasswordFormProps {
   email: string;
@@ -44,8 +45,8 @@ export const ResetPasswordForm: React.FC<ResetPasswordFormProps> = ({ email, onB
       await verifyOtp({ email, otp: formData.otp });
       // OTP hợp lệ, chuyển sang bước đặt mật khẩu mới
       setStep(2);
-    } catch (err: any) {
-      setError(err.message || 'Mã OTP không hợp lệ hoặc đã hết hạn.');
+    } catch (error: unknown) {
+      setError(getErrorMessage(error, 'Mã OTP không hợp lệ hoặc đã hết hạn.'));
     } finally {
       setLoading(false);
     }
@@ -74,8 +75,8 @@ export const ResetPasswordForm: React.FC<ResetPasswordFormProps> = ({ email, onB
         newPassword: formData.newPassword,
       });
       onSuccess();
-    } catch (err: any) {
-      setError(err.message || 'Khôi phục mật khẩu không thành công. Vui lòng thử lại.');
+    } catch (error: unknown) {
+      setError(getErrorMessage(error, 'Khôi phục mật khẩu không thành công. Vui lòng thử lại.'));
     } finally {
       setLoading(false);
     }

@@ -24,3 +24,7 @@ dist-ssr
 *.sw?
 
 .agents
+.agent
+*.agent
+.env
+.env.local

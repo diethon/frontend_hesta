@@ -16,21 +16,27 @@ export interface InvitationResponse {
   emailSent?: boolean;
 }
 
+export interface HomeSummary {
+  homeId: string;
+  homeName: string;
+  role: 'OWNER' | 'MEMBER';
+}
+
 export const getHomeMembers = async (homeId: string): Promise<HomeMember[]> => {
   const response = await apiClient.get(`/homes/${homeId}/members`);
   return response.data.result;
 };
 
-export const getHomeRooms = async (homeId: string): Promise<{id: string, name: string}[]> => {
+export const getHomeRooms = async (homeId: string): Promise<{ id: string, name: string }[]> => {
   const response = await apiClient.get(`/homes/${homeId}/rooms`);
   return response.data.result;
 };
 
 export const generateInvitation = async (homeId: string, email?: string): Promise<InvitationResponse> => {
-  const url = email 
+  const url = email
     ? `/homes/${homeId}/invitations?email=${encodeURIComponent(email)}`
     : `/homes/${homeId}/invitations`;
-    
+
   const response = await apiClient.post(url);
   return response.data.result;
 };
@@ -50,7 +56,7 @@ export const joinHome = async (codeOrToken: string) => {
   return response.data.result;
 };
 
-export const getMyHomes = async () => {
+export const getMyHomes = async (): Promise<HomeSummary[]> => {
   const response = await apiClient.get(`/homes/my-homes`);
   return response.data.result;
 };

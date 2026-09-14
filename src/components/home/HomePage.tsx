@@ -3,46 +3,65 @@ import { useNavigate } from 'react-router';
 import type { UserResponse } from '../../types/auth';
 import { ProfileModal } from '../profile/ProfileModal';
 import { MemberManagement } from './MemberManagement';
-import { getMyHomes, createHome } from '../../services/homeApi';
+import { getMyHomes, createHome, type HomeSummary } from '../../services/homeApi';
+import { currentHomeChanged, currentHomeCleared } from '../../store/homeSlice';
+import { useAppDispatch } from '../../store/hooks';
+import { getErrorMessage } from '../../utils/errors';
 
 interface HomePageProps {
   user: UserResponse;
   onLogout: () => void;
+  onProfileUpdate: (user: UserResponse) => void;
 }
 
-export const HomePage: React.FC<HomePageProps> = ({ user: initialUser, onLogout }) => {
-  const navigate = useNavigate();
-  const [user, setUser] = useState<UserResponse>(initialUser);
+function retainSelectedHome(homes: HomeSummary[], selectedHome: HomeSummary | null) {
+  if (homes.length === 0) return null;
+  if (!selectedHome) return homes[0];
+  return homes.find((home) => home.homeId === selectedHome.homeId) ?? homes[0];
+}
+
+export const HomePage: React.FC<HomePageProps> = ({ user, onLogout, onProfileUpdate }) => {
+  const dispatch = useAppDispatch();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const [userHome, setUserHome] = useState<{homeId: string, role: 'OWNER' | 'MEMBER'} | null>(null);
+  const [userHome, setUserHome] = useState<HomeSummary | null>(null);
   const [newHomeName, setNewHomeName] = useState('');
   const [createLoading, setCreateLoading] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [homesList, setHomesList] = useState<any[]>([]);
+  const [homesList, setHomesList] = useState<HomeSummary[]>([]);
 
   const fetchHomes = async () => {
     try {
       const homes = await getMyHomes();
       setHomesList(homes || []);
-      if (homes && homes.length > 0) {
-        // Only set userHome if it hasn't been set, or if the current one is no longer in the list
-        setUserHome(prev => {
-          if (!prev) return homes[0];
-          const exists = homes.find((h: any) => h.homeId === prev.homeId);
-          return exists ? prev : homes[0];
-        });
-      }
+      setUserHome((selectedHome) => retainSelectedHome(homes || [], selectedHome));
     } catch (err) {
       console.error('Failed to fetch homes', err);
     }
   };
 
   useEffect(() => {
-    fetchHomes();
+    let active = true;
+    getMyHomes().then((homes) => {
+      if (!active) return;
+      setHomesList(homes || []);
+      setUserHome((selectedHome) => retainSelectedHome(homes || [], selectedHome));
+    }).catch((error: unknown) => {
+      if (active) console.error('Failed to fetch homes', error);
+    });
+    return () => {
+      active = false;
+    };
   }, []);
 
+  useEffect(() => {
+    dispatch(currentHomeChanged(userHome?.homeId ?? null));
+  }, [dispatch, userHome?.homeId]);
+
+  useEffect(() => () => {
+    dispatch(currentHomeCleared());
+  }, [dispatch]);
 
   const handleCreateHome = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,8 +72,8 @@ export const HomePage: React.FC<HomePageProps> = ({ user: initialUser, onLogout 
       setIsCreateModalOpen(false);
       setNewHomeName('');
       fetchHomes();
-    } catch (err: any) {
-      alert(err.message || 'Lỗi khi tạo nhà');
+    } catch (error: unknown) {
+      alert(getErrorMessage(error, 'Lỗi khi tạo nhà'));
     } finally {
       setCreateLoading(false);
     }
@@ -234,7 +253,7 @@ export const HomePage: React.FC<HomePageProps> = ({ user: initialUser, onLogout 
 
         {userHome ? (
           <div className="mt-8">
-            <MemberManagement homeId={userHome.homeId} currentUserRole={userHome.role} />
+            <MemberManagement key={userHome.homeId} homeId={userHome.homeId} currentUserRole={userHome.role} />
           </div>
         ) : (
           <div className="mt-8 bg-slate-900/80 border border-slate-800 rounded-2xl p-6 text-center shadow-lg">
@@ -291,12 +310,14 @@ export const HomePage: React.FC<HomePageProps> = ({ user: initialUser, onLogout 
       )}
 
       {/* Profile Modal */}
-      <ProfileModal 
-        isOpen={isProfileModalOpen} 
-        onClose={() => setIsProfileModalOpen(false)} 
-        user={user}
-        onProfileUpdate={(updatedUser) => setUser(updatedUser)}
-      />
+      {isProfileModalOpen ? (
+        <ProfileModal
+          isOpen
+          onClose={() => setIsProfileModalOpen(false)}
+          user={user}
+          onProfileUpdate={onProfileUpdate}
+        />
+      ) : null}
     </div>
   );
 };
