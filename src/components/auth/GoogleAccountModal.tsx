@@ -71,7 +71,7 @@ export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
 
     const initGoogleSignIn = () => {
       if (!window.google?.accounts?.id) {
-        // SDK chưa load xong — retry sau 200ms
+        // SDK chưa tải xong, thử lại sau 200ms
         setTimeout(initGoogleSignIn, 200);
         return;
       }
@@ -88,12 +88,12 @@ export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
         if (buttonRef.current) {
           window.google.accounts.id.renderButton(buttonRef.current, {
             type: 'standard',
-            theme: 'filled_blue',
+            theme: 'outline',
             size: 'large',
             text: 'signin_with',
-            shape: 'rectangular',
+            shape: 'pill',
             logo_alignment: 'left',
-            width: 360,
+            width: 280,
           });
         }
 
@@ -112,7 +112,7 @@ export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
       {/* Container cho nút Google chính thức */}
       <div
         ref={buttonRef}
-        className={`flex justify-center transition-opacity ${
+        className={`flex min-w-0 justify-center overflow-hidden transition-opacity ${
           disabled ? 'opacity-50 pointer-events-none' : 'opacity-100'
         }`}
       />
@@ -120,7 +120,7 @@ export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
       {/* Fallback nếu SDK chưa load */}
       {!window.google?.accounts?.id && (
         <div className="flex items-center justify-center gap-2 py-3 text-slate-400 text-xs">
-          <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+          <svg aria-hidden={true} className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path
               className="opacity-75"
@@ -128,7 +128,7 @@ export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
               d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
             />
           </svg>
-          <span>Đang tải Google Sign-In...</span>
+          <span>Đang tải Google Sign-In…</span>
         </div>
       )}
     </div>

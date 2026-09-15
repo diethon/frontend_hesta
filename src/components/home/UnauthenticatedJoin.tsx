@@ -1,4 +1,5 @@
 import React from 'react';
+import { AuthShell } from '../ui/AuthShell';
 
 interface UnauthenticatedJoinProps {
   onSelectLogin: () => void;
@@ -7,14 +8,11 @@ interface UnauthenticatedJoinProps {
 
 export const UnauthenticatedJoin: React.FC<UnauthenticatedJoinProps> = ({ onSelectLogin, onSelectRegister }) => {
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 font-sans relative overflow-hidden">
-      {/* Background Decor */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-cyan-500/20 blur-[120px] rounded-full pointer-events-none" />
-
-      <div className="w-full max-w-md relative z-10">
-        <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 rounded-3xl p-8 shadow-2xl">
+    <AuthShell>
+      <div className="relative z-10 mt-20 w-full max-w-md sm:mt-0">
+        <div className="auth-surface gentle-rise p-6 sm:p-8">
           <div className="w-16 h-16 bg-gradient-to-tr from-cyan-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-cyan-500/20 mx-auto mb-6">
-            <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg aria-hidden={true} className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
             </svg>
           </div>
@@ -35,7 +33,7 @@ export const UnauthenticatedJoin: React.FC<UnauthenticatedJoinProps> = ({ onSele
           <div className="space-y-3">
             <button
               onClick={onSelectRegister}
-              className="w-full py-3.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white rounded-xl font-bold shadow-lg shadow-cyan-500/25 transition-all active:scale-[0.98] flex items-center justify-center"
+              className="w-full py-3.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white rounded-xl font-bold shadow-lg shadow-cyan-500/25 transition active:scale-[0.98] flex items-center justify-center"
             >
               Chưa, Đăng ký tài khoản mới
             </button>
@@ -51,13 +49,13 @@ export const UnauthenticatedJoin: React.FC<UnauthenticatedJoinProps> = ({ onSele
 
             <button
               onClick={onSelectLogin}
-              className="w-full py-3.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold transition-all border border-slate-700"
+              className="w-full py-3.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold transition border border-slate-700"
             >
               Đã có, Đăng nhập ngay
             </button>
           </div>
         </div>
       </div>
-    </div>
+    </AuthShell>
   );
 };

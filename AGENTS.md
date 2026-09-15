@@ -66,8 +66,20 @@
 
 ## Styling and accessibility
 - Tailwind v4 runs through @tailwindcss/vite; CSS starts in src/index.css.
-- Reuse the existing dark palette, default scales, and responsive utilities.
-- No project semantic tokens or shared UI primitive library currently exist.
+- The HESTA light Smart Home design system is mandatory for every new or
+  modified interface. Read `docs/UI_DESIGN_SYSTEM.md` before UI work and apply
+  `.agents/skills/hesta-ui-system/SKILL.md` for implementation and review.
+- `src/index.css` is the source of truth for semantic design tokens. Use
+  utilities such as `bg-app`, `bg-surface`, `bg-sidebar`, `border-line`,
+  `text-text`, `text-muted`, `bg-primary`, and `bg-mint`; do not introduce raw
+  color values or a separate page-level palette.
+- Keep the product bright, airy, rounded, and friendly. Do not add dark/navy
+  page surfaces, black backgrounds, purple accents, or dark-mode variants.
+- Reuse components from `src/components/ui` and the shared `app-shell`,
+  `surface-card`, `auth-surface`, and `app-sidebar` classes before creating a
+  parallel visual pattern.
+- New shared UI components must expose intentional variants instead of an
+  unrestricted styling API that allows each call site to invent a new theme.
 - Do not assume animation utilities or plugins are available.
 - Use associated labels, accessible control names, keyboard support, and
   appropriate focus handling for dialogs.
@@ -78,8 +90,8 @@
 - Skill-package README commands are not application commands.
 - For code changes, run npm run lint and npm run build when permitted.
 - Report existing failures separately; do not disable rules to hide them.
-- No automated test suite currently exists. Do not claim tests were run
-  unless they were actually executed.
+- Run `npm test` for the automated routing, realtime, and API contract suite;
+  do not claim tests were run unless they were actually executed.
 - Verify direct route entry, refresh, Back/Forward, session restoration,
   logout, role-based routing, profile synchronization, and invitation flows
   when changing routing or authentication.

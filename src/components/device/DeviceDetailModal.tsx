@@ -90,12 +90,12 @@ export const DeviceDetailModal: React.FC<DeviceDetailModalProps> = ({ isOpen, on
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-text/30 p-4 backdrop-blur-sm">
+      <div role="dialog" aria-modal="true" aria-labelledby="device-detail-title" className="auth-surface gentle-rise flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden overscroll-contain">
         <div className="p-6 border-b border-slate-800 flex justify-between items-center shrink-0">
-          <h3 className="text-lg font-bold text-white">Chi tiết thiết bị</h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors">
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <h3 id="device-detail-title" className="text-lg font-bold text-text">Chi tiết thiết bị</h3>
+          <button type="button" aria-label="Đóng chi tiết thiết bị" onClick={onClose} className="rounded-lg p-1 text-icon transition-colors hover:bg-sidebar-hover hover:text-text">
+            <svg aria-hidden={true} className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
@@ -103,7 +103,7 @@ export const DeviceDetailModal: React.FC<DeviceDetailModalProps> = ({ isOpen, on
         
         <div className="p-6 space-y-6 overflow-y-auto">
           {error && (
-            <div className="text-rose-400 bg-rose-950/30 p-3 rounded-lg border border-rose-900/50 text-sm">
+            <div role="alert" aria-live="polite" className="text-rose-400 bg-rose-950/30 p-3 rounded-lg border border-rose-900/50 text-sm">
               {error}
             </div>
           )}
@@ -176,7 +176,7 @@ export const DeviceDetailModal: React.FC<DeviceDetailModalProps> = ({ isOpen, on
           <div className="space-y-3">
             <h4 className="text-sm font-bold text-slate-300 uppercase tracking-wider">Lịch sử hoạt động gần đây</h4>
             {loadingHistory ? (
-              <div className="text-sm text-slate-500 text-center py-4">Đang tải lịch sử...</div>
+              <div role="status" className="text-sm text-slate-500 text-center py-4">Đang tải lịch sử…</div>
             ) : history.length === 0 ? (
               <div className="text-sm text-slate-500 text-center py-4 bg-slate-950/50 rounded-xl border border-slate-800 border-dashed">
                 Chưa có lịch sử hoạt động
@@ -208,7 +208,7 @@ export const DeviceDetailModal: React.FC<DeviceDetailModalProps> = ({ isOpen, on
 
         <div className="p-4 border-t border-slate-800 bg-slate-900 flex justify-between gap-3 shrink-0">
           <button
-            onClick={() => alert('Chức năng cập nhật cấu hình đang phát triển...')}
+            onClick={() => alert('Chức năng cập nhật cấu hình đang phát triển…')}
             className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-medium transition-colors text-sm"
           >
             Chỉnh sửa
@@ -216,9 +216,9 @@ export const DeviceDetailModal: React.FC<DeviceDetailModalProps> = ({ isOpen, on
           <button
             onClick={handleDelete}
             disabled={isDeleting}
-            className="flex-1 py-2.5 bg-rose-600/20 hover:bg-rose-600 text-rose-400 hover:text-white border border-rose-500/30 hover:border-rose-600 rounded-xl font-medium transition-all text-sm"
+            className="flex-1 py-2.5 bg-rose-600/20 hover:bg-rose-600 text-rose-400 hover:text-white border border-rose-500/30 hover:border-rose-600 rounded-xl font-medium transition text-sm"
           >
-            {isDeleting ? 'Đang xóa...' : 'Xóa thiết bị'}
+            {isDeleting ? 'Đang xóa…' : 'Xóa thiết bị'}
           </button>
         </div>
       </div>
