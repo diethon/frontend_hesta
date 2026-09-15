@@ -206,7 +206,7 @@ export const SceneManagement: React.FC<SceneManagementProps> = ({ homeId, curren
   };
 
   return (
-    <section className="bg-slate-900/80 rounded-2xl border border-slate-800 p-6 shadow-xl">
+    <section className="surface-card p-5 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div>
           <h2 className="text-xl font-bold text-slate-100">Quản lý Kịch bản</h2>
@@ -219,9 +219,9 @@ export const SceneManagement: React.FC<SceneManagementProps> = ({ homeId, curren
         )}
       </div>
 
-      {error && <div className="mb-4 rounded-lg border border-rose-800 bg-rose-950/40 px-4 py-3 text-sm text-rose-300">{error}</div>}
+      {error && <div role="alert" aria-live="polite" className="mb-4 rounded-lg border border-rose-800 bg-rose-950/40 px-4 py-3 text-sm text-rose-300">{error}</div>}
       {loading ? (
-        <p className="text-sm text-slate-400">Đang tải kịch bản...</p>
+        <p role="status" className="text-sm text-slate-400">Đang tải kịch bản…</p>
       ) : (
         <div className="grid gap-5 lg:grid-cols-[minmax(220px,0.8fr)_minmax(0,2fr)]">
           <div className="space-y-2">
@@ -275,14 +275,15 @@ export const SceneManagement: React.FC<SceneManagementProps> = ({ homeId, curren
 
               {isOwner && (
                 <form onSubmit={addAction} className="grid gap-2 border-t border-slate-800 pt-4 md:grid-cols-4">
-                  <select required value={actionDeviceId} onChange={(event) => setActionDeviceId(event.target.value)} className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm">
+                  <select aria-label="Thiết bị cho hành động" required value={actionDeviceId} onChange={(event) => setActionDeviceId(event.target.value)} className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm">
                     <option value="">Chọn thiết bị</option>
                     {devices.map((device) => <option key={device.id} value={device.id}>{device.name}</option>)}
                   </select>
-                  <select value={actionType} onChange={(event) => { setActionType(event.target.value as SceneActionType); setActionValue(''); }} className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm">
+                  <select aria-label="Loại hành động" value={actionType} onChange={(event) => { setActionType(event.target.value as SceneActionType); setActionValue(''); }} className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm">
                     {ACTIONS.map((action) => <option key={action} value={action}>{ACTION_LABELS[action]}</option>)}
                   </select>
                   <input
+                    aria-label="Giá trị hành động"
                     value={actionValue}
                     onChange={(event) => setActionValue(event.target.value)}
                     disabled={actionType === 'TURN_ON' || actionType === 'TURN_OFF'}
@@ -299,18 +300,24 @@ export const SceneManagement: React.FC<SceneManagementProps> = ({ homeId, curren
       )}
 
       {showEditor && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
-          <form onSubmit={saveScene} className="w-full max-w-md space-y-4 rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
-            <h3 className="text-lg font-bold text-white">{editingId ? 'Chỉnh sửa kịch bản' : 'Tạo kịch bản'}</h3>
-            <input required maxLength={150} value={name} onChange={(event) => setName(event.target.value)} placeholder="Tên kịch bản" className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3" />
-            <textarea maxLength={2000} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Mô tả" rows={3} className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-text/30 p-4 backdrop-blur-sm">
+          <form aria-label={editingId ? 'Chỉnh sửa kịch bản' : 'Tạo kịch bản'} onSubmit={saveScene} className="auth-surface w-full max-w-md space-y-4 p-6">
+            <h3 className="text-lg font-bold text-text">{editingId ? 'Chỉnh sửa kịch bản' : 'Tạo kịch bản'}</h3>
+            <div>
+              <label htmlFor="scene-name" className="mb-2 block text-sm font-medium text-text">Tên kịch bản</label>
+              <input id="scene-name" required maxLength={150} value={name} onChange={(event) => setName(event.target.value)} placeholder="Ví dụ: Buổi tối thư giãn" autoComplete="off" className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3" />
+            </div>
+            <div>
+              <label htmlFor="scene-description" className="mb-2 block text-sm font-medium text-text">Mô tả</label>
+              <textarea id="scene-description" maxLength={2000} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Mô tả mục đích của kịch bản…" rows={3} className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3" />
+            </div>
             <label className="flex items-center gap-2 text-sm text-slate-300">
               <input type="checkbox" checked={enabled} onChange={(event) => setEnabled(event.target.checked)} />
               Bật kịch bản
             </label>
             <div className="flex justify-end gap-2">
               <button type="button" onClick={() => setShowEditor(false)} className="rounded-lg bg-slate-800 px-4 py-2 text-sm">Hủy</button>
-              <button disabled={saving} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium disabled:opacity-50">{saving ? 'Đang lưu...' : 'Lưu'}</button>
+              <button disabled={saving} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium disabled:opacity-50">{saving ? 'Đang lưu…' : 'Lưu'}</button>
             </div>
           </form>
         </div>

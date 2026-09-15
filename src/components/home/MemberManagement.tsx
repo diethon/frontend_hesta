@@ -98,7 +98,7 @@ export const MemberManagement: React.FC<MemberManagementProps> = ({ homeId, curr
   };
 
   if (loading) {
-    return <div className="p-4 text-slate-400">Đang tải danh sách thành viên...</div>;
+    return <div role="status" className="surface-card p-6 text-muted">Đang tải danh sách thành viên…</div>;
   }
 
   const invitationUrl = invitation
@@ -106,7 +106,7 @@ export const MemberManagement: React.FC<MemberManagementProps> = ({ homeId, curr
     : '';
 
   return (
-    <div className="bg-slate-900/80 rounded-2xl border border-slate-800 p-6 shadow-xl">
+    <div className="surface-card p-5 sm:p-6">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-bold text-slate-100">Quản lý Thành viên</h2>
         {currentUserRole === 'OWNER' && (
@@ -119,7 +119,7 @@ export const MemberManagement: React.FC<MemberManagementProps> = ({ homeId, curr
         )}
       </div>
 
-      {error && <div className="text-rose-400 mb-4">{error}</div>}
+      {error && <div role="alert" aria-live="polite" className="mb-4 text-rose-400">{error}</div>}
 
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse">
@@ -137,7 +137,7 @@ export const MemberManagement: React.FC<MemberManagementProps> = ({ homeId, curr
                 <td className="py-4 flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-slate-800 overflow-hidden flex items-center justify-center shrink-0 border border-slate-700">
                     {member.avatarUrl ? (
-                      <img src={member.avatarUrl} alt={member.fullName} className="w-full h-full object-cover" />
+                      <img src={member.avatarUrl} alt={`Ảnh đại diện của ${member.fullName}`} width={40} height={40} loading="lazy" className="h-full w-full object-cover" />
                     ) : (
                       <span className="text-sm font-bold text-slate-400">{member.fullName.charAt(0)}</span>
                     )}
@@ -160,6 +160,7 @@ export const MemberManagement: React.FC<MemberManagementProps> = ({ homeId, curr
                 {currentUserRole === 'OWNER' && (
                   <td className="py-4 text-right space-x-2">
                     <select
+                      aria-label={`Vai trò của ${member.fullName}`}
                       value={member.role}
                       onChange={(e) => handleRoleChange(member.id, e.target.value as 'OWNER' | 'MEMBER')}
                       className="bg-slate-800 border border-slate-700 text-slate-300 text-xs rounded px-2 py-1 outline-none"
@@ -183,11 +184,11 @@ export const MemberManagement: React.FC<MemberManagementProps> = ({ homeId, curr
 
       {/* Invite Modal */}
       {showInviteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-text/30 p-4 backdrop-blur-sm">
+          <div role="dialog" aria-modal="true" aria-labelledby="invite-modal-title" className="auth-surface w-full max-w-md overflow-hidden overscroll-contain">
             <div className="p-6 border-b border-slate-800 flex justify-between items-center">
-              <h3 className="text-lg font-bold text-white">Mời thành viên</h3>
-              <button onClick={() => setShowInviteModal(false)} className="text-slate-400 hover:text-white">
+              <h3 id="invite-modal-title" className="text-lg font-bold text-text">Mời thành viên</h3>
+              <button type="button" aria-label="Đóng cửa sổ mời thành viên" onClick={() => setShowInviteModal(false)} className="rounded-lg p-1 text-icon hover:bg-sidebar-hover hover:text-text">
                 ✕
               </button>
             </div>
@@ -196,7 +197,7 @@ export const MemberManagement: React.FC<MemberManagementProps> = ({ homeId, curr
               {!invitation ? (
                 <div className="text-center py-8">
                   <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                  <p className="text-sm text-slate-400">Đang tạo link mời...</p>
+                  <p role="status" className="text-sm text-slate-400">Đang tạo link mời…</p>
                 </div>
               ) : (
                 <div className="space-y-6 animate-fade-in">
@@ -206,9 +207,10 @@ export const MemberManagement: React.FC<MemberManagementProps> = ({ homeId, curr
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">1. Gửi qua Link</label>
+                    <label htmlFor="invite-link" className="block text-sm font-medium text-slate-300 mb-2">1. Gửi qua Link</label>
                     <div className="flex gap-2">
                       <input
+                        id="invite-link"
                         type="text"
                         readOnly
                         value={invitationUrl}
@@ -236,14 +238,17 @@ export const MemberManagement: React.FC<MemberManagementProps> = ({ homeId, curr
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">2. Gửi qua Email</label>
+                    <label htmlFor="invite-email" className="block text-sm font-medium text-slate-300 mb-2">2. Gửi qua Email</label>
                     <form onSubmit={handleSendEmail} className="flex gap-2">
                       <input
+                        id="invite-email"
                         type="email"
-                        placeholder="Nhập email người thân..."
+                        placeholder="Nhập email người thân…"
                         value={inviteEmail}
                         onChange={(e) => setInviteEmail(e.target.value)}
                         required
+                        autoComplete="off"
+                        spellCheck={false}
                         className="flex-1 bg-slate-950/50 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
                       />
                       <button
@@ -251,7 +256,7 @@ export const MemberManagement: React.FC<MemberManagementProps> = ({ homeId, curr
                         disabled={inviteLoading}
                         className="px-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-medium transition-colors disabled:opacity-50"
                       >
-                        {inviteLoading ? 'Đang gửi...' : 'Gửi Email'}
+                        {inviteLoading ? 'Đang gửi…' : 'Gửi Email'}
                       </button>
                     </form>
                   </div>

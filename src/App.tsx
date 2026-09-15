@@ -5,6 +5,7 @@ import { AppRoutes } from './routes/AppRoutes';
 function App() {
   return (
     <>
+      <a href="#main-content" className="skip-link">Bỏ qua đến nội dung chính</a>
       <RealtimeLifecycle />
       <BrowserRouter>
         <AppRoutes />

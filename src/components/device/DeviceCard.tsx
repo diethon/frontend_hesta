@@ -60,10 +60,10 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({ device, onTogglePower, o
 
   const getStatusColor = () => {
     switch (device.status) {
-      case 'ONLINE': return 'bg-emerald-500';
-      case 'OFFLINE': return 'bg-slate-500';
-      case 'ERROR': return 'bg-rose-500';
-      default: return 'bg-amber-500';
+      case 'ONLINE': return 'bg-success';
+      case 'OFFLINE': return 'bg-off';
+      case 'ERROR': return 'bg-error';
+      default: return 'bg-warning';
     }
   };
 
@@ -77,10 +77,19 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({ device, onTogglePower, o
   };
 
   return (
-    <div
+    <article
+      role="button"
+      tabIndex={0}
+      aria-label={`Xem chi tiết thiết bị ${device.name}`}
       onClick={() => onClick && onClick(device.id)}
-      className={`bg-slate-900/80 border rounded-2xl p-4 flex flex-col justify-between h-32 relative overflow-hidden transition-transform duration-200 cursor-pointer hover:scale-[1.02] ${
-        isHighlighted ? 'border-cyan-500/50 bg-cyan-950/20 shadow-[0_0_15px_rgba(6,182,212,0.15)]' : 'border-slate-800 hover:border-slate-700'
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onClick?.(device.id);
+        }
+      }}
+      className={`surface-card relative flex min-h-40 cursor-pointer flex-col justify-between overflow-hidden p-5 transition hover:-translate-y-0.5 ${
+        isHighlighted ? 'border-primary bg-info-soft' : 'hover:border-primary'
       }`}
     >
       <div className="flex justify-between items-start">
@@ -90,14 +99,17 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({ device, onTogglePower, o
 
         {hasPowerToggle ? (
           <button
+            type="button"
+            aria-label={`${isPoweredOn ? 'Tắt' : 'Bật'} ${device.name}`}
+            aria-pressed={isPoweredOn}
             onClick={handleToggle}
-            className={`w-10 h-6 rounded-full flex items-center p-1 transition-colors duration-300 ${
-              isPoweredOn ? 'bg-cyan-500' : 'bg-slate-700'
+            className={`flex h-7 w-12 items-center rounded-full p-1 transition-colors duration-300 ${
+              isPoweredOn ? 'bg-success' : 'bg-off'
             }`}
           >
             <div
-              className={`bg-white w-4 h-4 rounded-full shadow-sm transform transition-transform duration-300 ${
-                isPoweredOn ? 'translate-x-4' : 'translate-x-0'
+              className={`h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform duration-300 ${
+                isPoweredOn ? 'translate-x-5' : 'translate-x-0'
               }`}
             />
           </button>
@@ -107,7 +119,7 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({ device, onTogglePower, o
       </div>
 
       <div className="mt-auto">
-        <h3 className="text-base font-semibold text-white truncate pr-2" title={device.name}>
+        <h3 className="truncate pr-2 text-base font-semibold text-text" title={device.name}>
           {device.name}
         </h3>
         <p className="text-xs text-slate-400 mt-1 flex items-center gap-1.5">
@@ -115,6 +127,6 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({ device, onTogglePower, o
           {getStatusText()}
         </p>
       </div>
-    </div>
+    </article>
   );
 };

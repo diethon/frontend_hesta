@@ -6,6 +6,7 @@ import { getDevicesByHome, getDevicesByRoom } from '../../services/deviceApi';
 import { getHomeRooms } from '../../services/homeApi';
 import type { DeviceResponse } from '../../types/device';
 import { getErrorMessage } from '../../utils/errors';
+import { AppSidebar, DeviceIcon, HomeIcon } from '../ui/AppSidebar';
 export const DevicePage: React.FC = () => {
   const { homeId } = useParams<{ homeId: string }>();
   const navigate = useNavigate();
@@ -87,31 +88,42 @@ export const DevicePage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans p-6">
-      <div className="max-w-6xl mx-auto space-y-6">
-        <div className="flex items-center gap-4 border-b border-slate-800 pb-4">
+    <div className="app-shell">
+      <AppSidebar
+        activeItem="devices"
+        contextLabel="Không gian sống"
+        items={[
+          { id: 'home', label: 'Tổng quan', icon: <HomeIcon />, onClick: () => navigate('/home') },
+          { id: 'devices', label: 'Thiết bị', icon: <DeviceIcon />, onClick: () => window.scrollTo({ top: 0, behavior: 'smooth' }) },
+        ]}
+      />
+      <main id="main-content" className="lg:pl-64">
+      <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8">
+        <div className="surface-card flex items-center gap-4 p-5 sm:p-6">
           <button 
+            type="button"
+            aria-label="Quay lại trang tổng quan"
             onClick={() => navigate('/home')}
-            className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-900 border border-slate-800 hover:bg-slate-800 transition-colors"
+            className="flex h-10 w-10 items-center justify-center rounded-xl border border-line bg-sidebar text-icon transition-colors hover:bg-sidebar-hover hover:text-primary-hover"
           >
-            <svg className="w-5 h-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg aria-hidden={true} className="w-5 h-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
           </button>
           <div>
-            <h1 className="text-2xl font-bold text-white">Quản lý Thiết bị</h1>
-            <p className="text-sm text-slate-400">Danh sách các thiết bị trong nhà</p>
+            <h1 className="text-2xl font-bold text-text">Thiết bị trong nhà</h1>
+            <p className="text-sm text-muted">Theo dõi kết nối, trạng thái và thông tin từng phòng</p>
           </div>
         </div>
 
         {/* Room Selection Tabs */}
-        <div className="flex gap-2 overflow-x-auto pb-2 border-b border-slate-800 scrollbar-hide items-center">
+        <div className="flex items-center gap-2 overflow-x-auto rounded-2xl border border-line bg-white p-2 shadow-soft custom-scrollbar">
           <button
             onClick={() => setSelectedRoomId('ALL')}
             className={"px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors " + 
               (selectedRoomId === 'ALL' 
-                ? 'bg-blue-600 text-white' 
-                : 'bg-slate-900 text-slate-400 hover:bg-slate-800')}
+                ? 'bg-primary text-white shadow-sm'
+                : 'bg-transparent text-muted hover:bg-sidebar-hover hover:text-text')}
           >
             Tất cả phòng
           </button>
@@ -121,8 +133,8 @@ export const DevicePage: React.FC = () => {
               onClick={() => setSelectedRoomId(room.id)}
               className={"px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors " + 
                 (selectedRoomId === room.id 
-                  ? 'bg-blue-600 text-white' 
-                  : 'bg-slate-900 text-slate-400 hover:bg-slate-800')}
+                  ? 'bg-primary text-white shadow-sm'
+                  : 'bg-transparent text-muted hover:bg-sidebar-hover hover:text-text')}
             >
               {room.name}
             </button>
@@ -130,11 +142,13 @@ export const DevicePage: React.FC = () => {
         </div>
 
         {loading ? (
-          <div className="text-slate-400 py-10 text-center">Đang tải thiết bị...</div>
+          <div className="surface-card grid grid-cols-1 gap-4 p-5 sm:grid-cols-2 lg:grid-cols-4" aria-label="Đang tải thiết bị">
+            {[0, 1, 2, 3].map((item) => <div key={item} className="h-32 animate-pulse rounded-2xl bg-off-soft" />)}
+          </div>
         ) : error ? (
-          <div className="text-rose-400 bg-rose-950/30 p-4 rounded-xl border border-rose-900/50">{error}</div>
+          <div role="alert" aria-live="polite" className="rounded-xl border border-rose-900/50 bg-rose-950/30 p-4 text-rose-400">{error}</div>
         ) : devices.length === 0 ? (
-          <div className="text-slate-400 py-10 text-center bg-slate-900/50 rounded-2xl border border-slate-800 dashed">
+          <div className="surface-card border-dashed py-14 text-center text-muted">
             Chưa có thiết bị nào trong khu vực này.
           </div>
         ) : (
@@ -150,6 +164,7 @@ export const DevicePage: React.FC = () => {
           </div>
         )}
       </div>
+      </main>
 
       <DeviceDetailModal
         isOpen={isModalOpen}
