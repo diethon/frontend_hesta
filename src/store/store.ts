@@ -2,6 +2,7 @@ import { configureStore } from '@reduxjs/toolkit';
 import { readStoredSession } from '../services/session';
 import { authReducer, sessionRestored } from './authSlice';
 import { homeReducer } from './homeSlice';
+import { notificationReducer } from './notificationSlice';
 import { realtimeReducer } from './realtimeSlice';
 
 export function createAppStore() {
@@ -9,6 +10,7 @@ export function createAppStore() {
     reducer: {
       auth: authReducer,
       home: homeReducer,
+      notification: notificationReducer,
       realtime: realtimeReducer,
     },
   });

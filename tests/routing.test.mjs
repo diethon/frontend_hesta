@@ -107,6 +107,13 @@ test('session restoration happens before protected routes render', () => {
   assert.equal(redirects.length, 0);
 });
 
+test('login exposes an accessible password visibility control', () => {
+  const html = renderRoute('/login');
+  assert.match(html, /type="password"/);
+  assert.match(html, /aria-label="Hiện mật khẩu"/);
+  assert.match(html, /aria-pressed="false"/);
+});
+
 test('protected routes preserve the URL context and return destination', () => {
   for (const path of ['/home', '/admin']) {
     renderRoute(path);

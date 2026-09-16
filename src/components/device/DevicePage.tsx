@@ -7,9 +7,13 @@ import { getHomeRooms } from '../../services/homeApi';
 import type { DeviceResponse } from '../../types/device';
 import { getErrorMessage } from '../../utils/errors';
 import { AppSidebar, DeviceIcon, HomeIcon } from '../ui/AppSidebar';
+import { NotificationBell } from '../notification/NotificationBell';
+import { currentHomeChanged, currentHomeCleared } from '../../store/homeSlice';
+import { useAppDispatch } from '../../store/hooks';
 export const DevicePage: React.FC = () => {
   const { homeId } = useParams<{ homeId: string }>();
   const navigate = useNavigate();
+  const dispatch = useAppDispatch();
   const [rooms, setRooms] = useState<{id: string, name: string}[]>([]);
   const [selectedRoomId, setSelectedRoomId] = useState<string | 'ALL'>('ALL');
   const [devices, setDevices] = useState<DeviceResponse[]>([]);
@@ -17,6 +21,13 @@ export const DevicePage: React.FC = () => {
   const [error, setError] = useState('');
   const [selectedDevice, setSelectedDevice] = useState<DeviceResponse | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  useEffect(() => {
+    dispatch(currentHomeChanged(homeId ?? null));
+    return () => {
+      dispatch(currentHomeCleared());
+    };
+  }, [dispatch, homeId]);
 
   const fetchRooms = useCallback(async () => {
     if (!homeId) return;
@@ -110,10 +121,11 @@ export const DevicePage: React.FC = () => {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
           </button>
-          <div>
+          <div className="min-w-0 flex-1">
             <h1 className="text-2xl font-bold text-text">Thiết bị trong nhà</h1>
             <p className="text-sm text-muted">Theo dõi kết nối, trạng thái và thông tin từng phòng</p>
           </div>
+          <NotificationBell />
         </div>
 
         {/* Room Selection Tabs */}
