@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "test": "node --test tests/routing.test.mjs tests/realtime.test.mjs tests/sceneApi.test.mjs",
+    "test": "node --test tests/routing.test.mjs tests/realtime.test.mjs tests/sceneApi.test.mjs tests/notification.test.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

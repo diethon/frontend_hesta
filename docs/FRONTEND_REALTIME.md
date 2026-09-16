@@ -47,8 +47,8 @@ The Redux `realtime` slice stores infrastructure state only: status, subscribed 
 time, and a safe error message. Every accepted event also appears as a `realtime/realtimeEventReceived`
 action in Redux DevTools. Domain data does not belong in that slice.
 
-A future feature registers a handler once at feature lifecycle level and dispatches its own typed
-Redux action:
+A feature registers a handler once at feature lifecycle level and dispatches its own typed Redux
+action:
 
 ```ts
 const unregister = realtimeEventDispatcher.register<DevicePayload>(
@@ -60,6 +60,15 @@ const unregister = realtimeEventDispatcher.register<DevicePayload>(
 Call `unregister` during feature cleanup. Sensor, device, and notification events all use this same
 dispatcher. The transport parses the shared `RealtimeEvent<T>` contract and keeps a bounded cache
 of recent `eventId` values to ignore simple duplicates.
+
+`NotificationLifecycle` is the implemented notification consumer. A `NOTIFICATION_CREATED` event
+contains only safe metadata (`notificationId`, `recipientId`, `homeId`, `isRead`, `createdAt`), so
+the lifecycle verifies the active user/home and retrieves the private notification content through
+`GET /notifications/{notificationId}`. The notification slice then inserts by notification ID,
+which also keeps insertion idempotent if distinct events reference the same notification.
+
+Chi tiết đầy đủ về Notification Frontend nằm tại
+[`FRONTEND_NOTIFICATION.md`](./FRONTEND_NOTIFICATION.md).
 
 To add a backend-supported event, add its exact string value to `REALTIME_EVENT_TYPES`, then
 register a feature handler. Do not add a new socket. The backend has no durable replay or global

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import type { UserResponse } from '../../types/auth';
+import { NotificationBell } from '../notification/NotificationBell';
 import { ProfileModal } from '../profile/ProfileModal';
 import { AdminIcon, AppSidebar, HomeIcon } from '../ui/AppSidebar';
 
@@ -39,35 +40,37 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout, 
       />
       <div className="lg:pl-64">
       {/* Top Navbar */}
-      <nav className="sticky top-0 z-20 flex items-center justify-between border-b border-line bg-white/90 px-4 py-3 backdrop-blur-xl sm:px-6">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-600 flex items-center justify-center shadow-lg shadow-amber-500/20">
+      <nav className="sticky top-0 z-20 flex items-center justify-between gap-2 border-b border-line bg-white/90 px-4 py-3 backdrop-blur-xl sm:px-6">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-warning text-white shadow-soft">
             <svg aria-hidden={true} className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
             </svg>
           </div>
-          <div>
-            <h1 className="text-lg font-bold tracking-tight text-text">HESTA Admin Center</h1>
-            <p className="text-xs font-medium text-muted">Theo dõi sức khỏe nền tảng HESTA</p>
+          <div className="min-w-0">
+            <h1 className="truncate text-base font-bold tracking-tight text-text sm:text-lg">HESTA Admin Center</h1>
+            <p className="hidden text-xs font-medium text-muted sm:block">Theo dõi sức khỏe nền tảng HESTA</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex shrink-0 items-center gap-2 sm:gap-4">
           <span className={`hidden sm:inline-block px-2.5 py-1 text-xs font-semibold rounded-full border ${
             user.platformRole === 'ADMIN'
-              ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
-              : 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30'
+              ? 'border-warning bg-warning-soft text-text'
+              : 'border-info bg-info-soft text-primary-hover'
           }`}>
             {user.platformRole}
           </span>
           
+          <NotificationBell />
+
           <div className="relative" ref={dropdownRef}>
             <button
               type="button"
               aria-label="Mở menu tài khoản quản trị"
               aria-expanded={isDropdownOpen}
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-              className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-tr from-amber-500 to-orange-600 shadow-md hover:shadow-amber-500/40 transition focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 focus:ring-offset-slate-900 border-2 border-slate-800 overflow-hidden"
+              className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border-2 border-line bg-warning shadow-soft transition-colors hover:bg-warning-soft focus:outline-none focus:ring-2 focus:ring-warning focus:ring-offset-2 focus:ring-offset-surface"
             >
               {user.avatarUrl ? (
                 <img src={user.avatarUrl} alt={`Ảnh đại diện của ${user.fullName}`} width={40} height={40} className="h-full w-full object-cover" />

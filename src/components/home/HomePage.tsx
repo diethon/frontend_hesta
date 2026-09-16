@@ -9,6 +9,7 @@ import { currentHomeChanged, currentHomeCleared } from '../../store/homeSlice';
 import { useAppDispatch } from '../../store/hooks';
 import { getErrorMessage } from '../../utils/errors';
 import { AdminIcon, AppSidebar, DeviceIcon, HomeIcon, PeopleIcon, SceneIcon } from '../ui/AppSidebar';
+import { NotificationBell } from '../notification/NotificationBell';
 
 interface HomePageProps {
   user: UserResponse;
@@ -114,27 +115,29 @@ export const HomePage: React.FC<HomePageProps> = ({ user, onLogout, onProfileUpd
       />
       <div className="lg:pl-64">
       {/* Top Navbar */}
-      <nav className="sticky top-0 z-20 flex items-center justify-between border-b border-line bg-white/90 px-4 py-3 backdrop-blur-xl sm:px-6">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+      <nav className="sticky top-0 z-20 flex items-center justify-between gap-2 border-b border-line bg-white/90 px-4 py-3 backdrop-blur-xl sm:px-6">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-white shadow-soft">
             <svg aria-hidden={true} className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
             </svg>
           </div>
-          <div>
-            <h1 className="text-lg font-bold tracking-tight text-text">HESTA Smart Home</h1>
-            <p className="text-xs text-muted">Mọi điều quan trọng trong một nơi</p>
+          <div className="min-w-0">
+            <h1 className="truncate text-base font-bold tracking-tight text-text sm:text-lg">HESTA Smart Home</h1>
+            <p className="hidden text-xs text-muted sm:block">Mọi điều quan trọng trong một nơi</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex shrink-0 items-center gap-2 sm:gap-4">
           <span className={`hidden sm:inline-block px-2.5 py-1 text-xs font-semibold rounded-full border ${
             user.platformRole === 'ADMIN'
-              ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
-              : 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30'
+              ? 'border-warning bg-warning-soft text-text'
+              : 'border-info bg-info-soft text-primary-hover'
           }`}>
             {user.platformRole}
           </span>
+
+          <NotificationBell />
           
           <div className="relative" ref={dropdownRef}>
             <button
@@ -142,7 +145,7 @@ export const HomePage: React.FC<HomePageProps> = ({ user, onLogout, onProfileUpd
               aria-label="Mở menu tài khoản"
               aria-expanded={isDropdownOpen}
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-              className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-600 shadow-md hover:shadow-cyan-500/40 transition focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 focus:ring-offset-slate-900 border-2 border-slate-800 overflow-hidden"
+              className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border-2 border-line bg-primary shadow-soft transition-colors hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-surface"
             >
               {user.avatarUrl ? (
                 <img src={user.avatarUrl} alt={`Ảnh đại diện của ${user.fullName}`} width={40} height={40} className="h-full w-full object-cover" />

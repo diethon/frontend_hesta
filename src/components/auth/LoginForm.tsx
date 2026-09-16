@@ -22,6 +22,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
   const [loading, setLoading] = useState<boolean>(false);
   const [googleLoading, setGoogleLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -140,17 +141,38 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
                 Quên mật khẩu?
               </Link>
             </div>
-            <input
-              id="login-password"
-              type="password"
-              name="password"
-              placeholder="••••••••"
-              value={formData.password}
-              onChange={handleChange}
-              required
-              autoComplete="current-password"
-              className="w-full bg-slate-950/60 border border-slate-800 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 outline-none transition"
-            />
+            <div className="relative">
+              <input
+                id="login-password"
+                type={showPassword ? 'text' : 'password'}
+                name="password"
+                placeholder="••••••••"
+                value={formData.password}
+                onChange={handleChange}
+                required
+                autoComplete="current-password"
+                className="w-full rounded-xl border border-line bg-surface px-4 py-2.5 pr-12 text-sm text-text outline-none transition-colors placeholder:text-muted focus:border-primary focus:ring-1 focus:ring-primary"
+              />
+              <button
+                type="button"
+                aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                aria-pressed={showPassword}
+                title={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                onClick={() => setShowPassword((visible) => !visible)}
+                className="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-xl text-icon transition-colors hover:text-primary-hover"
+              >
+                {showPassword ? (
+                  <svg aria-hidden="true" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m3 3 18 18M10.6 10.7a2 2 0 0 0 2.7 2.7M9.9 5.4A10.8 10.8 0 0 1 12 5.2c6 0 9.8 6.8 9.8 6.8a16 16 0 0 1-3.1 3.9M6.2 6.2A16.4 16.4 0 0 0 2.2 12S6 18.8 12 18.8a10.8 10.8 0 0 0 3-.4" />
+                  </svg>
+                ) : (
+                  <svg aria-hidden="true" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.2 12S6 5.2 12 5.2 21.8 12 21.8 12 18 18.8 12 18.8 2.2 12 2.2 12Z" />
+                    <circle cx="12" cy="12" r="2.5" />
+                  </svg>
+                )}
+              </button>
+            </div>
           </div>
 
           <button
