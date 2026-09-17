@@ -6,7 +6,7 @@ import { getDevicesByHome, getDevicesByRoom } from '../../services/deviceApi';
 import { getHomeRooms } from '../../services/homeApi';
 import type { DeviceResponse } from '../../types/device';
 import { getErrorMessage } from '../../utils/errors';
-import { AppSidebar, DeviceIcon, HomeIcon } from '../ui/AppSidebar';
+import { AppSidebar, DeviceIcon, HomeIcon, TwinIcon } from '../ui/AppSidebar';
 import { NotificationBell } from '../notification/NotificationBell';
 import { currentHomeChanged, currentHomeCleared } from '../../store/homeSlice';
 import { useAppDispatch } from '../../store/hooks';
@@ -106,6 +106,7 @@ export const DevicePage: React.FC = () => {
         items={[
           { id: 'home', label: 'Tổng quan', icon: <HomeIcon />, onClick: () => navigate('/home') },
           { id: 'devices', label: 'Thiết bị', icon: <DeviceIcon />, onClick: () => window.scrollTo({ top: 0, behavior: 'smooth' }) },
+          { id: 'twin', label: 'Digital Twin', icon: <TwinIcon />, onClick: () => navigate(`/home/${homeId}/digital-twin`) },
         ]}
       />
       <main id="main-content" className="lg:pl-64">

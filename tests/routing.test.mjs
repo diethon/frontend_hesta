@@ -98,7 +98,9 @@ test('public pages render directly, even with an existing ADMIN session', () => 
 });
 
 test('session restoration happens before protected routes render', () => {
-  assert.ok(renderRoute('/home', user).includes('Routing Test'));
+  const homeHtml = renderRoute('/home', user);
+  assert.ok(homeHtml.includes('Routing Test'));
+  assert.ok(homeHtml.includes('Digital Twin'));
   assert.equal(redirects.length, 0);
   assert.ok(renderRoute('/admin', admin).includes('HESTA Admin Center'));
   assert.equal(redirects.length, 0);
@@ -115,7 +117,7 @@ test('login exposes an accessible password visibility control', () => {
 });
 
 test('protected routes preserve the URL context and return destination', () => {
-  for (const path of ['/home', '/admin']) {
+  for (const path of ['/home', '/admin', '/home/home-1/digital-twin']) {
     renderRoute(path);
     assert.deepEqual(redirects[0].to, { pathname: '/login', search, hash: '#flow' });
     assert.equal(redirects[0].state.returnTo, path);
@@ -123,6 +125,12 @@ test('protected routes preserve the URL context and return destination', () => {
   }
   renderRoute('/admin', user);
   assert.deepEqual(redirects[0].to, { pathname: '/home', search, hash: '#flow' });
+});
+
+test('authenticated Digital Twin direct entry matches its route and renders the initial loading state', () => {
+  const html = renderRoute('/home/home-1/digital-twin', user);
+  assert.match(html, /Đang tải Digital Twin/);
+  assert.equal(redirects.length, 0);
 });
 
 test('join renders the correct public or authenticated invitation view', () => {

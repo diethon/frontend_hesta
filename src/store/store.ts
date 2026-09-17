@@ -4,6 +4,7 @@ import { authReducer, sessionRestored } from './authSlice';
 import { homeReducer } from './homeSlice';
 import { notificationReducer } from './notificationSlice';
 import { realtimeReducer } from './realtimeSlice';
+import { twinReducer } from './twinSlice';
 
 export function createAppStore() {
   const createdStore = configureStore({
@@ -12,6 +13,7 @@ export function createAppStore() {
       home: homeReducer,
       notification: notificationReducer,
       realtime: realtimeReducer,
+      twin: twinReducer,
     },
   });
   createdStore.dispatch(sessionRestored(readStoredSession()));

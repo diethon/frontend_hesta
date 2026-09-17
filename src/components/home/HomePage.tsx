@@ -8,7 +8,7 @@ import { getMyHomes, createHome, type HomeSummary } from '../../services/homeApi
 import { currentHomeChanged, currentHomeCleared } from '../../store/homeSlice';
 import { useAppDispatch } from '../../store/hooks';
 import { getErrorMessage } from '../../utils/errors';
-import { AdminIcon, AppSidebar, DeviceIcon, HomeIcon, PeopleIcon, SceneIcon } from '../ui/AppSidebar';
+import { AdminIcon, AppSidebar, DeviceIcon, HomeIcon, PeopleIcon, SceneIcon, TwinIcon } from '../ui/AppSidebar';
 import { NotificationBell } from '../notification/NotificationBell';
 
 interface HomePageProps {
@@ -104,6 +104,12 @@ export const HomePage: React.FC<HomePageProps> = ({ user, onLogout, onProfileUpd
             id: 'devices', label: 'Thiết bị', icon: <DeviceIcon />, onClick: () => {
               if (userHome) navigate(`/home/${userHome.homeId}/devices`);
               else alert('Vui lòng tạo hoặc tham gia một ngôi nhà trước khi quản lý thiết bị.');
+            },
+          },
+          {
+            id: 'twin', label: 'Digital Twin', icon: <TwinIcon />, onClick: () => {
+              if (userHome) navigate(`/home/${userHome.homeId}/digital-twin`);
+              else alert('Vui lòng tạo hoặc tham gia một ngôi nhà trước khi mở Digital Twin.');
             },
           },
           { id: 'scenes', label: 'Kịch bản', icon: <SceneIcon />, onClick: () => document.getElementById('scenes-section')?.scrollIntoView({ behavior: 'smooth' }) },
