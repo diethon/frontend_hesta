@@ -1,8 +1,8 @@
 import { useRef, useState, type PointerEvent } from 'react';
 import { useAppSelector } from '../../store/hooks';
+import type { TwinHealthStatus } from '../../types/twin';
 import type { TwinLayoutGeometry, TwinNodeLayout, TwinRoomLayout } from '../../types/twinLayout';
 import { clampRoom, moveLayoutNode, nodeKey, resizeRoom } from './layoutGeometry';
-import { TwinHealthBadge } from './TwinHealthBadge';
 import { DeviceGlyph, RoomGlyph, SensorGlyph } from './TwinVisualIcon';
 import { RoomFurnishing } from './TwinRoomFurnishing';
 import { roomKind } from './roomKind';
@@ -11,22 +11,42 @@ import { PALETTE_MIME, placePaletteItem, type PaletteItem } from './layoutPalett
 export type LayoutSelection = { kind: 'room'; id: string } | { kind: 'node'; id: string };
 type Interaction = { pointerId: number; startX: number; startY: number; width: number; height: number; selection: LayoutSelection; resize: boolean; origin: TwinLayoutGeometry; preview: TwinLayoutGeometry };
 
+const healthDotStyles: Record<TwinHealthStatus, string> = {
+  ACTIVE: 'border-surface bg-success',
+  STALE: 'border-surface bg-warning',
+  OFFLINE: 'border-surface bg-off',
+};
+
+const healthLabels: Record<TwinHealthStatus, string> = {
+  ACTIVE: 'Dữ liệu mới',
+  STALE: 'Dữ liệu đã cũ',
+  OFFLINE: 'Không có dữ liệu mới',
+};
+
+function tooltipPosition(node: TwinNodeLayout) {
+  const vertical = node.y > 0.72 ? 'bottom-14' : 'top-14';
+  const horizontal = node.x < 0.18 ? 'left-0' : node.x > 0.82 ? 'right-0' : 'left-1/2 -translate-x-1/2';
+  return `${vertical} ${horizontal}`;
+}
+
+const markerPosition = (coordinate: number) => `clamp(1.5rem, ${coordinate * 100}%, calc(100% - 1.5rem))`;
+
 export function TwinNodeSummary({ node }: { node: TwinNodeLayout }) {
   const device = useAppSelector((state) => node.nodeType === 'DEVICE' ? state.twin.devicesById[node.nodeId] : undefined);
   const sensor = useAppSelector((state) => node.nodeType === 'SENSOR' ? state.twin.sensorsById[node.nodeId] : undefined);
-  if (!device && !sensor) return <span className="text-xs text-muted">Không còn trong dữ liệu</span>;
+  if (!device && !sensor) return <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-off-soft text-xs font-semibold text-muted">?</span>;
   const power = device?.currentState && typeof device.currentState === 'object' && !Array.isArray(device.currentState) ? device.currentState.power : null;
-  if (device) return <span className="flex min-w-0 flex-col items-center gap-1">
-    <DeviceGlyph deviceType={device.deviceType} size={20} />
-    <span className="max-w-28 truncate text-center text-xs font-semibold text-text">{device.name}</span>
-    <span className="text-[11px] font-medium text-muted">{`${power === true ? 'ON' : power === false ? 'OFF' : typeof power === 'string' ? power : '—'} · ${device.status}`}</span>
-    <TwinHealthBadge compact healthStatus={device.healthStatus} />
-  </span>;
-  return <span className="flex min-w-0 flex-col items-center gap-1">
-    <SensorGlyph metricType={sensor!.metricType} size={20} />
-    <span className="text-sm font-bold text-text">{`${sensor!.latestValue ?? '—'}${sensor!.unit ? ` ${sensor!.unit}` : ''}`}</span>
-    <span className="max-w-24 truncate text-[11px] font-medium text-muted">{sensor!.metricType}</span>
-    <TwinHealthBadge compact healthStatus={sensor!.healthStatus} />
+  const healthStatus = (device ?? sensor)!.healthStatus;
+  return <span className="relative flex h-10 w-10 items-center justify-center">
+    {device ? <DeviceGlyph deviceType={device.deviceType} size={20} /> : <SensorGlyph metricType={sensor!.metricType} size={20} />}
+    <span aria-hidden="true" className={`absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full border-2 ${healthDotStyles[healthStatus]}`} />
+    <span aria-hidden="true" className={`pointer-events-none absolute z-40 w-40 rounded-xl border border-line bg-surface px-3 py-2 text-center opacity-0 shadow-float transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100 ${tooltipPosition(node)}`}>
+      <span className="block truncate text-xs font-semibold text-text">{device?.name ?? sensor!.metricType}</span>
+      <span className="mt-0.5 block text-xs font-medium text-muted">
+        {device ? `${power === true ? 'ON' : power === false ? 'OFF' : typeof power === 'string' ? power : '—'} · ${device.status}` : `${sensor!.latestValue ?? '—'}${sensor!.unit ? ` ${sensor!.unit}` : ''}`}
+      </span>
+      <span className="mt-1 block text-[10px] font-semibold text-muted">{`${healthStatus} · ${healthLabels[healthStatus]}`}</span>
+    </span>
   </span>;
 }
 
@@ -107,14 +127,22 @@ export function TwinCanvas({ geometry, editable, selection, onSelect, onChange, 
           className="absolute -bottom-2 -right-2 z-20 flex h-11 w-11 touch-none cursor-se-resize items-end justify-end text-text"><span className="flex h-5 w-5 items-center justify-center border border-icon bg-surface text-xs">↘</span></button> : null}
       </div>;
     })}
-    {shown.nodes.map((node) => <button type="button" key={nodeKey(node)} data-node-key={nodeKey(node)} data-x={node.x} data-y={node.y}
+    {shown.nodes.map((node) => {
+      const device = node.nodeType === 'DEVICE' ? devicesById[node.nodeId] : undefined;
+      const sensor = node.nodeType === 'SENSOR' ? sensorsById[node.nodeId] : undefined;
+      const label = device
+        ? `${device.name}, ${device.status}, ${device.healthStatus}`
+        : sensor ? `${sensor.metricType}, ${sensor.latestValue ?? 'chưa có dữ liệu'}${sensor.unit ? ` ${sensor.unit}` : ''}, ${sensor.healthStatus}` : 'Đối tượng không còn trong dữ liệu';
+      return <button type="button" key={nodeKey(node)} data-node-key={nodeKey(node)} data-x={node.x} data-y={node.y}
+      aria-label={`Chọn ${node.nodeType === 'DEVICE' ? 'thiết bị' : 'cảm biến'} ${label}`}
       aria-pressed={selection?.kind === 'node' && selection.id === nodeKey(node)}
-      style={{ left: `${node.x * 100}%`, top: `${node.y * 100}%`, transform: `translate(-${node.x * 100}%, -${node.y * 100}%)` }}
+      style={{ left: markerPosition(node.x), top: markerPosition(node.y), transform: 'translate(-50%, -50%)' }}
       onClick={() => onSelect({ kind: 'node', id: nodeKey(node) })}
       onPointerDown={(event) => begin(event, { kind: 'node', id: nodeKey(node) })} {...handlers}
-      className={`twin-canvas-node absolute z-10 rounded-2xl p-1 text-left text-xs sm:text-sm ${editable ? 'touch-none cursor-move' : ''} ${selection?.kind === 'node' && selection.id === nodeKey(node) ? 'bg-surface/90 ring-2 ring-primary/70' : ''}`}>
+      className={`twin-canvas-node group absolute z-10 flex h-12 w-12 items-center justify-center rounded-2xl border border-line bg-surface shadow-soft hover:z-30 focus-visible:z-30 ${editable ? 'touch-none cursor-move' : ''} ${selection?.kind === 'node' && selection.id === nodeKey(node) ? 'ring-2 ring-primary' : ''}`}>
       <TwinNodeSummary node={node} />
-    </button>)}
+    </button>;
+    })}
     {!shown.rooms.length && !shown.nodes.length ? <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-6 text-center"><div><p className="text-lg font-semibold">Chưa có sơ đồ</p><p className="mt-2 text-sm text-muted">Chủ nhà có thể đặt phòng, thiết bị và cảm biến từ bảng bên dưới.</p></div></div> : null}
   </div></div>;
 }
