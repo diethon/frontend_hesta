@@ -2,7 +2,7 @@
 import { StrictMode, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Provider } from 'react-redux';
-import { HashRouter, Link, Navigate, Route, Routes } from 'react-router';
+import { createHashRouter, Link, Navigate, Route, RouterProvider, Routes } from 'react-router';
 import { createAppStore } from '../src/store/store';
 import { apiClient } from '../src/services/apiClient';
 import { DigitalTwinPage } from '../src/components/twin/DigitalTwinPage';
@@ -21,6 +21,8 @@ let fail = false;
 apiClient.defaults.adapter = async (config) => {
   count += 1;
   if (fail) throw new Error('Fixture error');
+  if (config.url?.endsWith('/my-homes')) return { data: { code: 1000, result: [{ homeId, role: 'OWNER' }] }, status: 200, statusText: 'OK', headers: {}, config };
+  if (config.url?.endsWith('/twin-layout')) return { data: { code: 1000, result: { homeId: config.url.includes('/home-b/') ? 'home-b' : homeId, revision: 0, rooms: [], nodes: [] } }, status: 200, statusText: 'OK', headers: {}, config };
   const isOther = config.url?.includes('/home-b/');
   const result = isOther ? { ...snapshotFixture.result, homeId: 'home-b', name: 'Nhà B', rooms: [] } : snapshotFixture.result;
   store.dispatch(connectionStatusChanged('connected'));
@@ -44,9 +46,10 @@ export function FixtureControls() {
 }
 const root = createRoot(document.getElementById('root')!);
 import.meta.hot?.dispose(() => root.unmount());
-root.render(<StrictMode><Provider store={store}><HashRouter>
+const router = createHashRouter([{ path: '*', element: <>
   <FixtureControls /><Routes>
     <Route path="/home/:homeId/digital-twin" element={<DigitalTwinPage />} />
     <Route path="*" element={<Navigate to={`/home/${homeId}/digital-twin`} replace />} />
   </Routes>
-</HashRouter></Provider></StrictMode>);
+</> }]);
+root.render(<StrictMode><Provider store={store}><RouterProvider router={router} /></Provider></StrictMode>);

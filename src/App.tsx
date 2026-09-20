@@ -1,7 +1,10 @@
-﻿import { BrowserRouter } from 'react-router';
+import { createBrowserRouter, RouterProvider } from 'react-router';
 import { NotificationLifecycle } from './realtime/NotificationLifecycle';
 import { RealtimeLifecycle } from './realtime/RealtimeLifecycle';
 import { AppRoutes } from './routes/AppRoutes';
+
+// Preserve the route tree; React Router's data router supplies navigation blocking.
+const router = createBrowserRouter([{ path: '*', element: <AppRoutes /> }]);
 
 function App() {
   return (
@@ -9,9 +12,7 @@ function App() {
       <a href="#main-content" className="skip-link">Bỏ qua đến nội dung chính</a>
       <RealtimeLifecycle />
       <NotificationLifecycle />
-      <BrowserRouter>
-        <AppRoutes />
-      </BrowserRouter>
+      <RouterProvider router={router} />
     </>
   );
 }

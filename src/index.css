@@ -1,5 +1,19 @@
 @import "tailwindcss";
 
+.twin-viewport { --twin-canvas-height: clamp(28rem, 38vw, 38rem); height: calc(var(--twin-canvas-height) + 2px); }
+.twin-canvas {
+  background-image: linear-gradient(var(--color-line) 1px, transparent 1px), linear-gradient(90deg, var(--color-line) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+.twin-canvas-node { width: 6rem; }
+.twin-canvas-node > span > span[aria-hidden] { width: 3rem; height: 3rem; border: 1px solid var(--color-line); border-radius: 50%; background: var(--color-surface); box-shadow: var(--shadow-soft); }
+.twin-tool { display: flex; align-items: center; gap: .75rem; min-height: 4rem; padding: .75rem; border: 1px solid var(--color-line); border-radius: .75rem; background: var(--color-info-soft); color: var(--color-text); }
+.twin-tool svg { flex-shrink: 0; color: var(--color-primary-hover); }
+.twin-tool strong { display: block; font-size: .75rem; }
+.twin-tool small { display: block; margin-top: .25rem; font-size: .65rem; color: var(--color-muted); }
+@media (min-width: 640px) { .twin-canvas-node { width: 7rem; } }
+@media (max-width: 639px) { .twin-room .twin-furnishing { display: none; } }
+
 @theme {
   --color-app: #f8fcff;
   --color-surface: #ffffff;

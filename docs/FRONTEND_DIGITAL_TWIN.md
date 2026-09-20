@@ -2,8 +2,8 @@
 
 Route yêu cầu đăng nhập `/home/:homeId/digital-twin` hiển thị bản chụp trạng thái
 (snapshot) từ backend theo cấu trúc Nhà → Phòng → Thiết bị / Cảm biến và cập nhật
-từng đối tượng theo thời gian thực. Người dùng mở trang từ thẻ Digital Twin trên
-trang Home. Trang sử dụng cơ chế bảo vệ route hiện có cho phiên OWNER và MEMBER;
+từng đối tượng theo thời gian thực. Người dùng mở trang từ mục Digital Twin trên
+thanh điều hướng bên trái của trang Home hoặc trang Thiết bị. Trang sử dụng cơ chế bảo vệ route hiện có cho phiên OWNER và MEMBER;
 backend quyết định quyền truy cập. Nếu mở liên kết Twin khi chưa đăng nhập,
 Mục **Digital Twin** luôn nằm trong thanh điều hướng bên trái của trang Tổng quan,
 Thiết bị và Digital Twin khi hiển thị giao diện máy tính. Nếu chưa chọn nhà, mục

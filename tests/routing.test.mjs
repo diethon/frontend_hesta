@@ -80,10 +80,11 @@ function renderRoute(path, storedUser = null, state, routeSearch = search) {
   }
   redirects = [];
   const appStore = createAppStore();
+  const testRouter = router.createMemoryRouter([{ path: '*', element: React.createElement(AppRoutes) }], {
+    initialEntries: [{ pathname: path, search: routeSearch, hash: '#flow', state }],
+  });
   return renderToString(React.createElement(Provider, { store: appStore },
-    React.createElement(router.MemoryRouter, {
-      initialEntries: [{ pathname: path, search: routeSearch, hash: '#flow', state }],
-    }, React.createElement(AppRoutes))));
+    React.createElement(router.RouterProvider, { router: testRouter })));
 }
 
 test('public pages render directly, even with an existing ADMIN session', () => {
