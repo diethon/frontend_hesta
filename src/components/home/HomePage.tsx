@@ -3,10 +3,17 @@ import type { UserResponse } from '../../types/auth';
 import { ProfileModal } from '../profile/ProfileModal';
 import { MemberManagement } from './MemberManagement';
 import { getMyHomes, createHome } from '../../services/homeApi';
+import { Link } from 'react-router';
 
 interface HomePageProps {
   user: UserResponse;
   onLogout: () => void;
+}
+
+interface HomeSummary {
+  homeId: string;
+  homeName: string;
+  role: 'OWNER' | 'MEMBER';
 }
 
 export const HomePage: React.FC<HomePageProps> = ({ user: initialUser, onLogout }) => {
@@ -18,17 +25,17 @@ export const HomePage: React.FC<HomePageProps> = ({ user: initialUser, onLogout 
   const [newHomeName, setNewHomeName] = useState('');
   const [createLoading, setCreateLoading] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [homesList, setHomesList] = useState<any[]>([]);
+  const [homesList, setHomesList] = useState<HomeSummary[]>([]);
 
   const fetchHomes = async () => {
     try {
-      const homes = await getMyHomes();
+      const homes = await getMyHomes() as HomeSummary[];
       setHomesList(homes || []);
       if (homes && homes.length > 0) {
         // Only set userHome if it hasn't been set, or if the current one is no longer in the list
         setUserHome(prev => {
           if (!prev) return homes[0];
-          const exists = homes.find((h: any) => h.homeId === prev.homeId);
+          const exists = homes.find((home) => home.homeId === prev.homeId);
           return exists ? prev : homes[0];
         });
       }
@@ -38,7 +45,15 @@ export const HomePage: React.FC<HomePageProps> = ({ user: initialUser, onLogout 
   };
 
   useEffect(() => {
-    fetchHomes();
+    let active = true;
+    getMyHomes()
+      .then((homes: HomeSummary[]) => {
+        if (!active) return;
+        setHomesList(homes || []);
+        if (homes?.length) setUserHome(homes[0]);
+      })
+      .catch(() => { /* The empty-state UI remains available when loading fails. */ });
+    return () => { active = false; };
   }, []);
 
 
@@ -51,8 +66,8 @@ export const HomePage: React.FC<HomePageProps> = ({ user: initialUser, onLogout 
       setIsCreateModalOpen(false);
       setNewHomeName('');
       fetchHomes();
-    } catch (err: any) {
-      alert(err.message || 'Lỗi khi tạo nhà');
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Lỗi khi tạo nhà');
     } finally {
       setCreateLoading(false);
     }
@@ -208,6 +223,10 @@ export const HomePage: React.FC<HomePageProps> = ({ user: initialUser, onLogout 
             </div>
             <h3 className="text-base font-semibold text-white mb-1">Kịch bản & Tự động hóa</h3>
             <p className="text-xs text-slate-400 leading-relaxed">Kích hoạt các ngữ cảnh thông minh (Về nhà, Đi ngủ, Cảnh báo an ninh).</p>
+            {userHome && <div className="mt-4 flex gap-2">
+              <Link to={`/homes/${userHome.homeId}/scenes`} className="rounded-lg bg-blue-700 px-3 py-2 text-xs font-medium text-white hover:bg-blue-600">Scene</Link>
+              <Link to={`/homes/${userHome.homeId}/automation-rules`} className="rounded-lg bg-purple-700 px-3 py-2 text-xs font-medium text-white hover:bg-purple-600">Automation</Link>
+            </div>}
           </div>
 
           <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 hover:border-purple-500/40 transition-all shadow-lg group">
