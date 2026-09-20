@@ -44,6 +44,10 @@ const { createAppStore } = loadSource('src/store/store.ts');
 const twin = loadSource('src/store/twinSlice.ts');
 const layout = loadSource('src/store/twinLayoutSlice.ts');
 const geo = loadSource('src/components/twin/layoutGeometry.ts');
+const geo3d = loadSource('src/components/twin/twin3dGeometry.ts');
+const { supportsWebGL } = loadSource('src/components/twin/twin3dSupport.ts');
+const { TwinViewSwitcher } = loadSource('src/components/twin/TwinViewSwitcher.tsx');
+const { Twin3DInspector } = loadSource('src/components/twin/Twin3DInspector.tsx');
 const { currentHomeChanged } = loadSource('src/store/homeSlice.ts');
 const { sessionEnded } = loadSource('src/store/authSlice.ts');
 const { realtimeEventReceived } = loadSource('src/store/realtimeSlice.ts');
@@ -59,7 +63,7 @@ const roomId = snapshot.rooms[0].roomId;
 const sensorId = sensorEvent.data.sensorId;
 const deviceId = deviceEvent.data.deviceId;
 const saved = { homeId, revision: 3,
-  rooms: [{ roomId, x: 0.05, y: 0.05, width: 0.45, height: 0.4 }],
+  rooms: [{ roomId, floor: 1, x: 0.05, y: 0.05, width: 0.45, height: 0.4 }],
   nodes: [
     { nodeType: 'DEVICE', nodeId: deviceId, roomId, x: 0.25, y: 0.2 },
     { nodeType: 'SENSOR', nodeId: sensorId, roomId: null, x: 0.7, y: 0.4 },
@@ -130,6 +134,91 @@ test('saved layout renders exact normalized room position/dimensions and device/
   const request = requests.find((item) => item.url.endsWith('/twin-layout'));
   assert.equal(request.url, `/homes/${homeId}/twin-layout`);
   assert.equal(request.headers.get('Authorization'), 'Bearer layout-test-token');
+});
+
+test('3D conversion maps normalized x to world X, normalized y to world Z, and reserves Y for elevation', () => {
+  assert.deepEqual(geo3d.normalizedToWorld(0, 0), { x: -geo3d.TWIN_WORLD_WIDTH / 2, y: 0, z: -geo3d.TWIN_WORLD_DEPTH / 2 });
+  assert.deepEqual(geo3d.normalizedToWorld(1, 1, 0.75), { x: geo3d.TWIN_WORLD_WIDTH / 2, y: 0.75, z: geo3d.TWIN_WORLD_DEPTH / 2 });
+  const room = geo3d.roomToWorld({ roomId, x: 0.1, y: 0.2, width: 0.4, height: 0.5 });
+  assert.equal(room.roomId, roomId); assert.equal(room.y, 0); assert.equal(room.width, 7.2); assert.equal(room.depth, 6);
+  assert.ok(Math.abs(room.x + 3.6) < 1e-9 && Math.abs(room.z + 0.6) < 1e-9);
+  assert.equal(geo3d.TWIN_ROOM_WALL_HEIGHT, 2.25);
+});
+
+test('multi-floor presentation groups rooms, filters a floor, and persists floor metadata in Backend writes', () => {
+  const rooms = [
+    { roomId: 'f1', floor: 1, x: .05, y: .05, width: .4, height: .4 },
+    { roomId: 'f2', floor: 2, x: .05, y: .05, width: .4, height: .4 },
+    { roomId: 'f3', floor: 3, x: .05, y: .05, width: .4, height: .4 },
+  ];
+  const geometry = { rooms, nodes: [
+    { nodeType: 'DEVICE', nodeId: 'd1', roomId: 'f1', x: .2, y: .2 },
+    { nodeType: 'SENSOR', nodeId: 's2', roomId: 'f2', x: .2, y: .2 },
+  ] };
+  assert.deepEqual(geo3d.layoutFloors(rooms), [1, 2, 3]);
+  assert.equal(geo3d.floorElevation(3, false), geo3d.TWIN_STOREY_HEIGHT * 2);
+  assert.equal(geo3d.floorElevation(3, true), geo3d.TWIN_EXPLODED_STOREY_HEIGHT * 2);
+  assert.deepEqual(geo3d.geometryForFloor(geometry, 2), { rooms: [rooms[1]], nodes: [geometry.nodes[1]] });
+  const roomElevation = geo3d.floorElevation(2, true);
+  assert.equal(geo3d.roomToWorld(rooms[1], roomElevation).y, roomElevation);
+  const placed = geo3d.resolvePlacedNodes(geometry, ['d1'], ['s2'], new Map([['f2', roomElevation]]));
+  assert.equal(placed[1].y, roomElevation + geo3d.TWIN_MARKER_ELEVATION);
+  assert.deepEqual(geo.layoutRequest(geometry, 1).rooms.map((room) => room.floor), [1, 2, 3]);
+});
+
+test('3D placement resolves DEVICE/SENSOR identities exactly and never invents positions for unplaced runtime nodes', () => {
+  const exactSensorId = 'device:TeMp:stream';
+  const geometry = { rooms: saved.rooms, nodes: [
+    saved.nodes[0],
+    { nodeType: 'SENSOR', nodeId: exactSensorId, roomId, x: 0.3, y: 0.45 },
+    { nodeType: 'SENSOR', nodeId: 'not-in-runtime', roomId, x: 0.4, y: 0.4 },
+  ] };
+  const placed = geo3d.resolvePlacedNodes(geometry, [deviceId, 'unplaced-device'], [exactSensorId, 'unplaced-sensor']);
+  assert.deepEqual(placed.map((node) => `${node.nodeType}:${node.nodeId}`), [`DEVICE:${deviceId}`, `SENSOR:${exactSensorId}`]);
+  assert.deepEqual({ nodeType: placed[1].nodeType, nodeId: placed[1].nodeId, roomId: placed[1].roomId, y: placed[1].y }, { nodeType: 'SENSOR', nodeId: exactSensorId, roomId, y: geo3d.TWIN_MARKER_ELEVATION });
+  assert.ok(Math.abs(placed[1].x + 3.6) < 1e-9 && Math.abs(placed[1].z + 0.6) < 1e-9);
+  assert.deepEqual(geo3d.resolveUnplacedNodes(geometry, [deviceId, 'unplaced-device'], [exactSensorId, 'unplaced-sensor']), { deviceIds: ['unplaced-device'], sensorIds: ['unplaced-sensor'] });
+});
+
+test('3D camera bounds fit the current room geometry rather than one hard-coded fixture', () => {
+  const bounds = geo3d.homeBounds([{ roomId: 'a', x: 0.2, y: 0.1, width: 0.3, height: 0.4 }, { roomId: 'b', x: 0.6, y: 0.5, width: 0.2, height: 0.25 }]);
+  assert.ok(Math.abs(bounds.centerX) < 1e-9 && Math.abs(bounds.centerZ + 0.9) < 1e-9);
+  assert.equal(bounds.width, 10.8); assert.equal(bounds.depth, 7.8);
+  const pose = geo3d.cameraPoseForBounds(bounds);
+  assert.ok(Math.abs(pose.target[0]) < 1e-9 && pose.target[1] === 0 && Math.abs(pose.target[2] + 0.9) < 1e-9);
+  assert.ok(pose.maxDistance > pose.minDistance && pose.position[1] > 0);
+});
+
+test('2D/3D switcher exposes stable pressed state without mutating layout', () => {
+  const noop = () => {};
+  const twoD = renderToString(React.createElement(TwinViewSwitcher, { mode: '2d', onChange: noop }));
+  const threeD = renderToString(React.createElement(TwinViewSwitcher, { mode: '3d', onChange: noop }));
+  assert.match(twoD, /aria-label="Chế độ 2D" aria-pressed="true"/);
+  assert.match(twoD, /aria-label="Chế độ 3D" aria-pressed="false"/);
+  assert.match(threeD, /aria-label="Chế độ 3D" aria-pressed="true"/);
+  assert.deepEqual(saved.rooms[0], { roomId, floor: 1, x: 0.05, y: 0.05, width: 0.45, height: 0.4 });
+});
+
+test('3D inspector renders selected Room, Device and exact Sensor runtime state from Redux', async () => {
+  const store = await ready();
+  const inspector = (selection) => renderToString(React.createElement(Provider, { store }, React.createElement(Twin3DInspector, { geometry: saved, selection, onSelect: () => {}, onEdit2D: () => {} })));
+  assert.match(inspector({ kind: 'room', id: roomId }), /Living Room/);
+  assert.match(inspector({ kind: 'node', id: `DEVICE:${deviceId}` }), /Ceiling light/);
+  assert.match(inspector({ kind: 'node', id: `SENSOR:${sensorId}` }), /TEMPERATURE/);
+});
+
+test('realtime runtime changes never alter 3D world position', async () => {
+  const store = await ready();
+  const before = geo3d.nodeToWorld(saved.nodes[1]);
+  emit(store, { ...sensorEvent, data: { ...sensorEvent.data, latestValue: 30, observedAt: '2026-09-17T09:01:00Z' } });
+  emit(store, { ...healthEvent, timestamp: '2026-09-17T09:02:00Z', data: { ...healthEvent.data, healthStatus: 'OFFLINE', referenceTime: '2026-09-17T09:01:00Z', evaluatedAt: '2026-09-17T09:02:00Z' } });
+  assert.equal(store.getState().twin.sensorsById[sensorId].latestValue, 30);
+  assert.equal(store.getState().twin.sensorsById[sensorId].healthStatus, 'OFFLINE');
+  assert.deepEqual(geo3d.nodeToWorld(saved.nodes[1]), before);
+});
+
+test('WebGL support guard fails safely outside a browser', () => {
+  assert.equal(supportsWebGL(), false);
 });
 
 test('move/resize modify draft only, normalized bounds/precision hold, cancel restores confirmed', async () => {

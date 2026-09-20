@@ -1,6 +1,5 @@
 import { useAppSelector } from '../../store/hooks';
-import type { TwinLayoutGeometry } from '../../types/twinLayout';
-import type { LayoutSelection } from './TwinCanvas';
+import type { TwinLayoutGeometry, TwinLayoutSelection } from '../../types/twinLayout';
 import { clampRoom, moveLayoutNode, nodeKey, resizeRoom } from './layoutGeometry';
 import { TwinDeviceCard } from './TwinDeviceCard';
 import { TwinSensorCard } from './TwinSensorCard';
@@ -8,7 +7,7 @@ import { TwinLayoutButton } from './TwinLayoutButton';
 import { DeviceGlyph, RoomGlyph, SensorGlyph } from './TwinVisualIcon';
 
 export function TwinLayoutInspector({ geometry, selection, editable, onChange }: {
-  geometry: TwinLayoutGeometry; selection: LayoutSelection | null; editable: boolean; onChange: (geometry: TwinLayoutGeometry) => void;
+  geometry: TwinLayoutGeometry; selection: TwinLayoutSelection | null; editable: boolean; onChange: (geometry: TwinLayoutGeometry) => void;
 }) {
   const twin = useAppSelector((state) => state.twin);
   const roomsById = useAppSelector((state) => state.twin.roomsById);

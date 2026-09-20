@@ -6,7 +6,7 @@ import { defaultRoom, nodeKey } from './layoutGeometry';
 import { PALETTE_MIME, placePaletteItem, type PaletteItem } from './layoutPalette';
 import { DeviceGlyph, RoomGlyph, SensorGlyph } from './TwinVisualIcon';
 
-export function TwinUnplacedPanel({ geometry, disabled, onChange }: { geometry: TwinLayoutGeometry; disabled: boolean; onChange: (geometry: TwinLayoutGeometry) => void }) {
+export function TwinUnplacedPanel({ geometry, disabled, onChange, floor }: { geometry: TwinLayoutGeometry; disabled: boolean; onChange: (geometry: TwinLayoutGeometry) => void; floor?: number }) {
   const [activeTab, setActiveTab] = useState<PaletteItem['kind']>('room');
   const [search, setSearch] = useState('');
   const twin = useAppSelector((state) => state.twin);
@@ -27,7 +27,7 @@ export function TwinUnplacedPanel({ geometry, disabled, onChange }: { geometry: 
     <div className="max-h-80 space-y-2 overflow-y-auto">
       {filtered.map((item) => <button key={item.id} type="button" disabled={disabled} draggable={!disabled} aria-label={`Đặt ${item.name}`}
         onDragStart={(event) => { event.dataTransfer.setData(PALETTE_MIME, JSON.stringify({ kind: item.kind, id: item.id })); event.dataTransfer.effectAllowed = 'copy'; }}
-        onClick={() => { const point = item.kind === 'room' ? defaultRoom(item.id, geometry.rooms.length) : { x: 0.5, y: 0.5 }; onChange(placePaletteItem(geometry, item, point.x, point.y)); }}
+        onClick={() => { const point = item.kind === 'room' ? defaultRoom(item.id, geometry.rooms.length, floor) : { x: 0.5, y: 0.5 }; onChange(placePaletteItem(geometry, item, point.x, point.y, floor)); }}
         className="flex min-h-14 w-full items-center gap-3 rounded-lg border border-line bg-app p-2 text-left disabled:opacity-50">
         {item.icon}<span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold text-text">+ {item.name}</span><span className="block text-xs text-muted">{item.detail}</span></span><GripVertical size={16} aria-hidden="true" className="shrink-0 text-icon" />
       </button>)}

@@ -7,15 +7,15 @@ export const clampCoordinate = (value: number, max = 1) => round(Math.max(0, Mat
 export function clampRoom(room: TwinRoomLayout): TwinRoomLayout {
   const width = Math.max(0.001, clampCoordinate(room.width));
   const height = Math.max(0.001, clampCoordinate(room.height));
-  return { roomId: room.roomId, width, height, x: clampCoordinate(room.x, 1 - width), y: clampCoordinate(room.y, 1 - height) };
+  return { roomId: room.roomId, width, height, x: clampCoordinate(room.x, 1 - width), y: clampCoordinate(room.y, 1 - height), ...(room.floor ? { floor: room.floor } : {}) };
 }
 
 export function resizeRoom(room: TwinRoomLayout, width: number, height: number) {
   return { ...room, width: Math.max(0.001, clampCoordinate(width, 1 - room.x)), height: Math.max(0.001, clampCoordinate(height, 1 - room.y)) };
 }
 
-export function defaultRoom(roomId: string, count: number): TwinRoomLayout {
-  return { roomId, x: round(0.04 + (count % 2) * 0.48), y: round(0.04 + (Math.floor(count / 2) % 2) * 0.46), width: 0.44, height: 0.4 };
+export function defaultRoom(roomId: string, count: number, floor?: number): TwinRoomLayout {
+  return { roomId, x: round(0.04 + (count % 2) * 0.48), y: round(0.04 + (Math.floor(count / 2) % 2) * 0.46), width: 0.44, height: 0.4, ...(floor ? { floor } : {}) };
 }
 
 // All nodes use full-canvas coordinates. Last rendered room wins an overlapping drop.
@@ -31,9 +31,10 @@ export function geometryError(geometry: TwinLayoutGeometry): string | null {
   if (new Set(geometry.rooms.map((room) => room.roomId)).size !== geometry.rooms.length
     || new Set(geometry.nodes.map(nodeKey)).size !== geometry.nodes.length) return 'Sơ đồ có vị trí trùng lặp.';
   for (const room of geometry.rooms) {
-    if (![room.x, room.y, room.width, room.height].every(coordinate) || room.width <= 0 || room.height <= 0
+    if (!Number.isInteger(room.floor ?? 1) || (room.floor ?? 1) < 1 || (room.floor ?? 1) > 100
+      || ![room.x, room.y, room.width, room.height].every(coordinate) || room.width <= 0 || room.height <= 0
       || Math.round(room.x * 1000) + Math.round(room.width * 1000) > 1000
-      || Math.round(room.y * 1000) + Math.round(room.height * 1000) > 1000) return 'Phòng phải nằm trong sơ đồ và có kích thước lớn hơn 0.';
+      || Math.round(room.y * 1000) + Math.round(room.height * 1000) > 1000) return 'Phòng phải thuộc tầng 1–100, nằm trong sơ đồ và có kích thước lớn hơn 0.';
   }
   if (geometry.nodes.some((node) => !coordinate(node.x) || !coordinate(node.y))) return 'Vị trí phải nằm trong sơ đồ (0–100%).';
   return null;
@@ -43,7 +44,7 @@ export function geometryError(geometry: TwinLayoutGeometry): string | null {
 export function layoutRequest(geometry: TwinLayoutGeometry, expectedRevision: number): TwinLayoutSaveRequest {
   return {
     expectedRevision,
-    rooms: geometry.rooms.map(({ roomId, x, y, width, height }) => ({ roomId, x, y, width, height })),
+    rooms: geometry.rooms.map(({ roomId, floor, x, y, width, height }) => ({ roomId, floor: floor ?? 1, x, y, width, height })),
     nodes: geometry.nodes.map(({ nodeType, nodeId, roomId, x, y }) => ({ nodeType, nodeId, roomId, x, y })),
   };
 }

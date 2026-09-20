@@ -1,0 +1,43 @@
+{
+  "results": [
+    "3D mode creates a WebGL canvas without horizontal overflow",
+    "3D scene renders four rooms and seven runtime markers",
+    "room selection opens the runtime room inspector",
+    "device marker selection shows current device state",
+    "device realtime updates the selected 3D marker",
+    "sensor realtime updates value without moving its 3D marker",
+    "health transitions update the selected 3D sensor",
+    "orbit gesture starts on the WebGL canvas",
+    "OrbitControls rotates the current home",
+    "OrbitControls zoom changes the camera without changing layout data",
+    "Fit to Home reframes the current room bounds",
+    "switching back preserves the existing 2D layout",
+    "home switching clears old 3D rooms and renders the empty state",
+    "mobile 3D has no page-level horizontal overflow",
+    "WebGL failure offers a safe switch to 2D",
+    "multi-floor homes open directly in 3D",
+    "multi-floor fixture renders three selectable levels and fourteen markers",
+    "exploded overview assigns higher world elevation to upper-floor nodes",
+    "custom floor dropdown exposes the current selection and every floor",
+    "floor drill-down isolates only rooms and markers from the selected floor",
+    "stack control reduces inter-floor spacing without changing the floor data",
+    "2D multi-floor overview separates each floor into its own compact plan",
+    "2D floor select isolates the selected floor and its markers",
+    "browser reports no uncaught exceptions during supported 3D flows"
+  ],
+  "errors": [],
+  "screenshots": [
+    "default-isometric-desktop",
+    "selected-room",
+    "selected-device",
+    "health-stale",
+    "health-offline",
+    "selected-sensor-active",
+    "empty-layout",
+    "mobile-390",
+    "multi-floor-exploded",
+    "multi-floor-dropdown-open",
+    "multi-floor-level-2",
+    "multi-floor-stacked"
+  ]
+}

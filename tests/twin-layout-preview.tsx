@@ -16,6 +16,7 @@ import deviceFixture from './fixtures/twin/twin-device-event.json';
 import healthFixture from './fixtures/twin/twin-health-event.json';
 import '../src/index.css';
 import { referenceLayout, referenceSnapshot } from './twin-reference-fixture';
+import { multiFloorLayout, multiFloorSnapshot } from './twin-multifloor-fixture';
 
 const store = createAppStore();
 const homeId = snapshotFixture.result.homeId;
@@ -26,9 +27,18 @@ const initial: TwinLayout = { homeId, revision: 3,
     { nodeType: 'SENSOR', nodeId: sensorFixture.data.sensorId, roomId: snapshotFixture.result.rooms[1].roomId, x: 0.75, y: 0.55 },
   ],
 };
-const reference = new URLSearchParams(location.search).has('reference');
-const key = reference ? 'hesta-layout-reference-only' : 'hesta-layout-fixture-only';
-let saved: TwinLayout = reference ? referenceLayout : JSON.parse(localStorage.getItem(key) ?? 'null') ?? initial;
+const query = new URLSearchParams(location.search);
+const multiFloor = query.has('multifloor');
+const reference = query.has('reference');
+const demo = reference || multiFloor;
+const demoSnapshot = multiFloor ? multiFloorSnapshot : referenceSnapshot;
+const demoLayout = multiFloor ? multiFloorLayout : referenceLayout;
+const referenceRoomIds = demoSnapshot.rooms.map((room) => room.roomId);
+const runtimeSensorFixture = demo ? { ...sensorFixture, deviceId: 'temperature', data: { ...sensorFixture.data, sensorId: 'temperature', deviceId: 'temperature', roomId: referenceRoomIds[0] } } : sensorFixture;
+const runtimeDeviceFixture = demo ? { ...deviceFixture, deviceId: 'main-light', data: { ...deviceFixture.data, deviceId: 'main-light', roomId: referenceRoomIds[0], name: multiFloor ? 'Đèn phòng khách' : 'Đèn chính', deviceType: 'LIGHT' as const } } : deviceFixture;
+const runtimeHealthFixture = demo ? { ...healthFixture, deviceId: 'temperature', data: { ...healthFixture.data, nodeId: 'temperature', deviceId: 'temperature', roomId: referenceRoomIds[0] } } : healthFixture;
+const key = multiFloor ? 'hesta-layout-multifloor-only' : reference ? 'hesta-layout-reference-only' : 'hesta-layout-fixture-only';
+let saved: TwinLayout = demo ? demoLayout : JSON.parse(localStorage.getItem(key) ?? 'null') ?? initial;
 let role: 'OWNER' | 'MEMBER' = 'OWNER';
 let fail = false;
 let forbidden = false;
@@ -49,7 +59,7 @@ apiClient.defaults.adapter = async (config) => {
     }
     result = id === homeId ? saved : { homeId: id, revision: 0, rooms: [], nodes: [] };
   } else {
-    result = id === homeId ? reference ? referenceSnapshot : snapshotFixture.result : { ...snapshotFixture.result, homeId: id, name: 'Nhà B', rooms: [], unassignedDevices: [], unassignedSensors: [] };
+    result = id === homeId ? demo ? demoSnapshot : snapshotFixture.result : { ...snapshotFixture.result, homeId: id, name: 'Nhà B', rooms: [], unassignedDevices: [], unassignedSensors: [] };
     store.dispatch(connectionStatusChanged('connected'));
     store.dispatch(homeSubscriptionChanged(id));
   }
@@ -63,16 +73,16 @@ export function LayoutFixtureShell() {
   return <><details className="border-b border-line bg-warning-soft p-4 text-sm lg:ml-64"><summary>Fixture controls · Không dùng backend thật</summary><div className="mt-3 flex flex-wrap gap-4">
     <button onClick={() => setCount(`${requests.length} REST; ${requests.filter((r) => r.method === 'put').length} PUT`)}>Count requests</button><output>{count}</output>
     <button onClick={() => setJson(JSON.stringify({ layout: store.getState().twinLayout, requests }, null, 2))}>Inspect geometry / requests</button>
-    <button onClick={() => emit({ ...sensorFixture, data: { ...sensorFixture.data, latestValue: 30, observedAt: '2026-09-17T10:00:00Z' }, timestamp: '2026-09-17T10:00:00Z' })}>Sensor → 30</button>
-    <button onClick={() => emit({ ...deviceFixture, data: { ...deviceFixture.data, currentState: { power: 'OFF' } } })}>Device → OFF</button>
-    {(['STALE', 'OFFLINE', 'ACTIVE'] as const).map((healthStatus, index) => <button key={healthStatus} onClick={() => emit({ ...healthFixture, data: { ...healthFixture.data, healthStatus, referenceTime: '2026-09-17T10:00:00Z', evaluatedAt: `2026-09-17T10:0${index + 1}:00Z` } })}>{healthStatus}</button>)}
+    <button onClick={() => emit({ ...runtimeSensorFixture, data: { ...runtimeSensorFixture.data, latestValue: 30, observedAt: '2026-09-19T10:00:00Z' }, timestamp: '2026-09-19T10:00:00Z' })}>Sensor → 30</button>
+    <button onClick={() => emit({ ...runtimeDeviceFixture, data: { ...runtimeDeviceFixture.data, currentState: { power: 'OFF' }, lastSeen: '2026-09-19T10:00:00Z' }, timestamp: '2026-09-19T10:00:00Z' })}>Device → OFF</button>
+    {(['STALE', 'OFFLINE', 'ACTIVE'] as const).map((healthStatus, index) => <button key={healthStatus} onClick={() => emit({ ...runtimeHealthFixture, timestamp: `2026-09-19T10:0${index + 1}:00Z`, data: { ...runtimeHealthFixture.data, healthStatus, referenceTime: '2026-09-19T10:00:00Z', evaluatedAt: `2026-09-19T10:0${index + 1}:00Z` } })}>{healthStatus}</button>)}
     <button onClick={() => { saved = { ...saved, revision: saved.revision + 1 }; }}>Simulate concurrent save</button>
     <button onClick={() => { fail = !fail; }}>Toggle layout failure</button>
     <button onClick={() => { forbidden = !forbidden; }}>Toggle 403</button>
     <button onClick={() => { role = role === 'OWNER' ? 'MEMBER' : 'OWNER'; void store.dispatch(loadLayoutRole(store.getState().twinLayout.homeId ?? homeId)); }}>Toggle OWNER / MEMBER</button>
     <button onClick={() => { saved = { homeId, revision: 0, rooms: [], nodes: [] }; localStorage.setItem(key, JSON.stringify(saved)); }}>Empty fixture layout</button>
-    <button onClick={() => { saved = initial; localStorage.setItem(key, JSON.stringify(saved)); }}>Restore fixture layout</button>
-    <Link to={`/home/${homeId}/digital-twin`}>Home A</Link><Link to="/home/home-b/digital-twin">Home B</Link><Link to="/home">Leave Twin</Link>
+    <button onClick={() => { saved = demo ? demoLayout : initial; localStorage.setItem(key, JSON.stringify(saved)); }}>Restore fixture layout</button>
+    <Link to={`/home/${homeId}/digital-twin`}>Home A</Link><Link to="/home/home-b/digital-twin">Home B</Link><a href="/tests/twin-layout-preview.html?reference=1">Mẫu 1 tầng</a><a href="/tests/twin-layout-preview.html?multifloor=1">Mẫu 3 tầng</a><Link to="/home">Leave Twin</Link>
   </div>{json ? <pre className="mt-3 max-h-80 overflow-auto text-xs">{json}</pre> : null}</details><Outlet /></>;
 }
 const router = createHashRouter([{ element: <LayoutFixtureShell />, children: [

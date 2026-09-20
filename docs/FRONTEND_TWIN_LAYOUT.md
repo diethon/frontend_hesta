@@ -323,25 +323,29 @@ biểu tượng tương tự tên tiếng Anh. Giữ bảng màu sáng và đi�
 
 ### Kiểm tra khả năng hỗ trợ nhiều tầng
 
-Mã nguồn hiện hỗ trợ **một bố cục 2D cho mỗi nhà**, chưa có tầng 1/2/3 hoặc từ
-tầng 1 đến tầng 23. Bằng chứng:
+Backend vẫn hỗ trợ **một bố cục cho mỗi nhà**, nhưng từ migration
+`20260920150000_add_floor_to_twin_room_layouts.sql`, mỗi phòng trong bố cục có
+thêm `floor` từ 1 đến 100. Một bố cục vì vậy có thể chứa nhiều tầng.
 
 - `backend_hesta/supabase/migrations/20260917102640_create_twin_layout.sql` đặt
-  ràng buộc UNIQUE cho `twin_layouts.home_id`; phòng/đối tượng chỉ lưu hình học x/y.
+  ràng buộc UNIQUE cho `twin_layouts.home_id`; migration mới bổ sung tầng vào
+  từng `twin_room_layouts` mà không tạo bố cục thứ hai cho cùng nhà.
 - `Room.java` có home, name, layoutX/layoutY, icon; không có quan hệ với tầng.
-- `TwinLayoutResponse` và `TwinLayout` ở frontend chứa homeId/revision/rooms/nodes,
-  không có floorId hoặc số tầng. Trình chỉnh sửa cũng không có bộ chọn tầng.
+- `TwinLayoutResponse` trả `floor` trên mỗi phòng. Trình chỉnh sửa 2D chưa có bộ
+  chọn tầng; nhà nhiều tầng mặc định mở 3D để tránh các phòng chồng lên nhau.
 - digitalTwinZ của thiết bị là tọa độ riêng có từ trước, không được hợp đồng
   bố cục này sử dụng; trường đó không chứng minh hệ thống hỗ trợ nhiều tầng.
 
-Kết quả này dựa trên mã nguồn/lược đồ hiện tại, không phải truy vấn cơ sở dữ
-liệu đã triển khai. Để thêm tầng cần thực thể/ID tầng, gán phòng vào tầng,
-migration, quy tắc bố cục theo tầng, thay đổi API và bộ chọn tầng. Trong công
-việc dựng giao diện theo ảnh này không thêm các tab tầng giả.
+`floor` là số tầng tối thiểu, không phải thực thể tầng đầy đủ: chưa có tên tầng,
+chiều cao đo đạc hay API CRUD tầng riêng. Bộ chọn **Toàn nhà / T1 / T2 / T3**
+và **Tách tầng / Xếp chồng** chỉ xuất hiện trong 3D. Có thể chạy fixture tại
+`/tests/twin-layout-preview.html?multifloor=1`, hoặc seed Backend local và dùng
+tài khoản `multifloor.owner@hesta.local` để kiểm tra end-to-end.
 
 ### Kiểm chứng hiện tại và đối chiếu giao diện
 
-`npm test` đạt 74/74; `npm run lint` và `npm run build` đều đạt. Bản dựng vẫn
+Kiểm chứng mới nhất đạt 82/82 với `npm test`; `npm run lint` và `npm run build`
+đều đạt. Bản dựng vẫn
 có cảnh báo gói ứng dụng lớn hơn 500 kB như trước.
 Kiểm tra trình duyệt dùng phản hồi API mẫu độc lập, bao gồm kéo/đổi kích thước
 bằng con trỏ thật, thả từ bảng khi thu phóng 125%, tìm kiếm/không có kết quả,

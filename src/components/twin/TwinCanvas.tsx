@@ -1,15 +1,14 @@
 import { useRef, useState, type PointerEvent } from 'react';
 import { useAppSelector } from '../../store/hooks';
 import type { TwinHealthStatus } from '../../types/twin';
-import type { TwinLayoutGeometry, TwinNodeLayout, TwinRoomLayout } from '../../types/twinLayout';
+import type { TwinLayoutGeometry, TwinLayoutSelection, TwinNodeLayout, TwinRoomLayout } from '../../types/twinLayout';
 import { clampRoom, moveLayoutNode, nodeKey, resizeRoom } from './layoutGeometry';
 import { DeviceGlyph, RoomGlyph, SensorGlyph } from './TwinVisualIcon';
 import { RoomFurnishing } from './TwinRoomFurnishing';
 import { roomKind } from './roomKind';
 import { PALETTE_MIME, placePaletteItem, type PaletteItem } from './layoutPalette';
 
-export type LayoutSelection = { kind: 'room'; id: string } | { kind: 'node'; id: string };
-type Interaction = { pointerId: number; startX: number; startY: number; width: number; height: number; selection: LayoutSelection; resize: boolean; origin: TwinLayoutGeometry; preview: TwinLayoutGeometry };
+type Interaction = { pointerId: number; startX: number; startY: number; width: number; height: number; selection: TwinLayoutSelection; resize: boolean; origin: TwinLayoutGeometry; preview: TwinLayoutGeometry };
 
 const healthDotStyles: Record<TwinHealthStatus, string> = {
   ACTIVE: 'border-surface bg-success',
@@ -50,10 +49,12 @@ export function TwinNodeSummary({ node }: { node: TwinNodeLayout }) {
   </span>;
 }
 
-export function TwinCanvas({ geometry, editable, selection, onSelect, onChange, zoom = 1 }: {
-  geometry: TwinLayoutGeometry; editable: boolean; selection: LayoutSelection | null;
+export function TwinCanvas({ geometry, editable, selection, onSelect, onChange, zoom = 1, floor, overview = false }: {
+  geometry: TwinLayoutGeometry; editable: boolean; selection: TwinLayoutSelection | null;
   zoom?: number;
-  onSelect: (selection: LayoutSelection) => void; onChange: (geometry: TwinLayoutGeometry) => void;
+  floor?: number;
+  overview?: boolean;
+  onSelect: (selection: TwinLayoutSelection) => void; onChange: (geometry: TwinLayoutGeometry) => void;
 }) {
   const roomsById = useAppSelector((state) => state.twin.roomsById);
   const devicesById = useAppSelector((state) => state.twin.devicesById);
@@ -62,7 +63,7 @@ export function TwinCanvas({ geometry, editable, selection, onSelect, onChange, 
   const interaction = useRef<Interaction | null>(null);
   const [preview, setPreview] = useState<TwinLayoutGeometry | null>(null);
   const shown = preview ?? geometry;
-  const begin = (event: PointerEvent<HTMLButtonElement>, selected: LayoutSelection, resize = false) => {
+  const begin = (event: PointerEvent<HTMLButtonElement>, selected: TwinLayoutSelection, resize = false) => {
     if (event.button !== 0 || interaction.current) return;
     onSelect(selected);
     if (!editable || !canvas.current) return;
@@ -97,7 +98,7 @@ export function TwinCanvas({ geometry, editable, selection, onSelect, onChange, 
   };
   const handlers = { onPointerMove: move, onPointerUp: (event: PointerEvent<HTMLButtonElement>) => finish(event), onPointerCancel: (event: PointerEvent<HTMLButtonElement>) => finish(event, true), onLostPointerCapture: (event: PointerEvent<HTMLButtonElement>) => finish(event, true) };
   const roomStyle = ({ x, y, width, height }: TwinRoomLayout) => ({ left: `${x * 100}%`, top: `${y * 100}%`, width: `${width * 100}%`, height: `${height * 100}%` });
-  return <div className="twin-viewport overflow-auto rounded-xl border border-line bg-surface shadow-soft"><div ref={canvas} aria-label="Sơ đồ nhà 2D" style={{ width: `${zoom * 100}%`, height: `calc(var(--twin-canvas-height) * ${zoom})` }}
+  return <div className={`twin-viewport overflow-auto rounded-xl border border-line bg-surface shadow-soft ${overview ? 'twin-2d-overview-viewport' : ''}`}><div ref={canvas} aria-label={overview ? 'Tổng quan mặt bằng tầng' : 'Sơ đồ nhà 2D'} style={{ width: `${zoom * 100}%`, height: `calc(var(--twin-canvas-height) * ${zoom})` }}
     onDragOver={(event) => { if (editable && event.dataTransfer.types.includes(PALETTE_MIME)) { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; } }}
     onDrop={(event) => {
       if (!editable || !canvas.current) return;
@@ -106,9 +107,9 @@ export function TwinCanvas({ geometry, editable, selection, onSelect, onChange, 
       try { item = JSON.parse(event.dataTransfer.getData(PALETTE_MIME)); } catch { return; }
       if (!item || typeof item.id !== 'string' || !(item.kind === 'room' ? roomsById[item.id] : item.kind === 'DEVICE' ? devicesById[item.id] : item.kind === 'SENSOR' ? sensorsById[item.id] : false)) return;
       const bounds = canvas.current.getBoundingClientRect();
-      onChange(placePaletteItem(geometry, item, (event.clientX - bounds.left) / bounds.width, (event.clientY - bounds.top) / bounds.height));
+      onChange(placePaletteItem(geometry, item, (event.clientX - bounds.left) / bounds.width, (event.clientY - bounds.top) / bounds.height, floor));
       onSelect({ kind: item.kind === 'room' ? 'room' : 'node', id: item.kind === 'room' ? item.id : `${item.kind}:${item.id}` });
-    }} className="twin-canvas relative isolate overflow-hidden">
+  }} className="twin-canvas relative isolate overflow-hidden">
     <span aria-hidden="true" className="pointer-events-none absolute right-3 top-3 z-20 flex h-11 w-11 flex-col items-center justify-center rounded-full border border-line bg-surface text-xs text-primary-hover shadow-soft">N<span className="text-lg leading-none">▲</span></span>
     {shown.rooms.map((room) => {
       const selected = selection?.kind === 'room' && selection.id === room.roomId;

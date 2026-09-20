@@ -4,6 +4,8 @@ export interface TwinRoomLayout {
   y: number;
   width: number;
   height: number;
+  /** Storey persisted by the Twin Layout API. One-based. */
+  floor?: number;
 }
 
 export interface TwinNodeLayout {
@@ -27,3 +29,5 @@ export interface TwinLayout extends TwinLayoutGeometry {
 export interface TwinLayoutSaveRequest extends TwinLayoutGeometry {
   expectedRevision: number;
 }
+
+export type TwinLayoutSelection = { kind: 'room'; id: string } | { kind: 'node'; id: string };
