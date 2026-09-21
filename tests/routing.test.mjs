@@ -9,6 +9,7 @@ import { after, test } from 'node:test';
 import { runInThisContext } from 'node:vm';
 import React from 'react';
 import { renderToString } from 'react-dom/server';
+import { Provider } from 'react-redux';
 import * as router from 'react-router';
 import ts from 'typescript';
 
@@ -16,6 +17,7 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 const require = createRequire(import.meta.url);
 const modules = new Map();
 let redirects = [];
+globalThis.__viteEnv = { VITE_API_BASE_URL: 'http://backend.test/api/v1' };
 
 // Capture redirect destinations during server rendering, where navigation
 // effects do not run. Routes, matching, outlets, and location hooks are real.
@@ -29,7 +31,8 @@ function loadSource(path) {
   if (modules.has(filename)) return modules.get(filename).exports;
   const module = { exports: {} };
   modules.set(filename, module);
-  const { outputText } = ts.transpileModule(readFileSync(filename, 'utf8'), {
+  const source = readFileSync(filename, 'utf8').replaceAll('import.meta.env', 'globalThis.__viteEnv');
+  const { outputText } = ts.transpileModule(source, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
     fileName: filename,
   });
@@ -62,6 +65,7 @@ after(() => {
 });
 
 const { AppRoutes } = loadSource('src/routes/AppRoutes.tsx');
+const { createAppStore } = loadSource('src/store/store.ts');
 const navigation = loadSource('src/routes/navigation.ts');
 const session = loadSource('src/services/session.ts');
 const user = { id: 'test-user', fullName: 'Routing Test', email: 'routing@example.test',
@@ -76,9 +80,11 @@ function renderRoute(path, storedUser = null, state, routeSearch = search) {
     storage.set('accessToken', 'test-access-token');
   }
   redirects = [];
-  return renderToString(React.createElement(router.MemoryRouter, {
-    initialEntries: [{ pathname: path, search: routeSearch, hash: '#flow', state }],
-  }, React.createElement(AppRoutes)));
+  const appStore = createAppStore();
+  return renderToString(React.createElement(Provider, { store: appStore },
+    React.createElement(router.MemoryRouter, {
+      initialEntries: [{ pathname: path, search: routeSearch, hash: '#flow', state }],
+    }, React.createElement(AppRoutes))));
 }
 
 test('public pages render directly, even with an existing ADMIN session', () => {
@@ -100,6 +106,13 @@ test('session restoration happens before protected routes render', () => {
   // ADMIN users can still visit /home explicitly.
   assert.ok(renderRoute('/home', admin).includes('HESTA Smart Home'));
   assert.equal(redirects.length, 0);
+});
+
+test('login exposes an accessible password visibility control', () => {
+  const html = renderRoute('/login');
+  assert.match(html, /type="password"/);
+  assert.match(html, /aria-label="Hiện mật khẩu"/);
+  assert.match(html, /aria-pressed="false"/);
 });
 
 test('protected routes preserve the URL context and return destination', () => {
@@ -203,14 +216,18 @@ test('service expiry notifications reach one centralized subscriber and unsubscr
 
 test('existing home API 401 paths report expiry without independent storage cleanup', async () => {
   const homeApi = loadSource('src/services/homeApi.ts');
-  const originalFetch = globalThis.fetch;
+  const { apiClient } = loadSource('src/services/apiClient.ts');
+  const originalAdapter = apiClient.defaults.adapter;
   const requests = [];
   let notifications = 0;
   storage.set('accessToken', 'test-access-token');
   storage.set('unrelated-preference', 'keep');
-  globalThis.fetch = async (url, options) => {
-    requests.push({ url: new URL(url), ...options });
-    return new Response('{}', { status: 401 });
+  apiClient.defaults.adapter = async (config) => {
+    requests.push(config);
+    const error = new Error('Request failed with status code 401');
+    error.config = config;
+    error.response = { status: 401, data: {}, headers: {}, config };
+    throw error;
   };
   const unsubscribe = session.subscribeSessionExpired(() => { notifications += 1; });
   try {
@@ -223,13 +240,13 @@ test('existing home API 401 paths report expiry without independent storage clea
       await assert.rejects(request, /Phiên đăng nhập đã hết hạn/);
     }
     assert.equal(notifications, 4);
-    assert.deepEqual(requests.map(({ method }) => method), ['GET', 'GET', 'POST', 'POST']);
-    assert.equal(requests[3].url.searchParams.get('codeOrToken'), 'a+b&c');
-    assert.ok(requests.every(({ headers }) => headers.Authorization === 'Bearer test-access-token'));
+    assert.deepEqual(requests.map(({ method }) => method.toUpperCase()), ['GET', 'GET', 'POST', 'POST']);
+    assert.equal(new URL(requests[3].url, 'http://backend.test').searchParams.get('codeOrToken'), 'a+b&c');
+    assert.ok(requests.every(({ headers }) => headers.get('Authorization') === 'Bearer test-access-token'));
     assert.equal(storage.get('accessToken'), 'test-access-token');
     assert.equal(storage.get('unrelated-preference'), 'keep');
   } finally {
-    globalThis.fetch = originalFetch;
+    apiClient.defaults.adapter = originalAdapter;
     unsubscribe();
   }
 });

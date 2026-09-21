@@ -7,6 +7,7 @@ import { HomePage } from '../components/home/HomePage';
 import { AdminDashboard } from '../components/admin/AdminDashboard';
 import { JoinHome } from '../components/home/JoinHome';
 import { UnauthenticatedJoin } from '../components/home/UnauthenticatedJoin';
+import { DevicePage } from '../components/device/DevicePage';
 import type { AuthResponse } from '../types/auth';
 import { RequireAdmin, RequireAuth } from './RouteGuards';
 import { defaultRoute, invitationSearch, invitationToken, loginDestination, readNavigationState } from './navigation';
@@ -16,7 +17,7 @@ import { ScenePage } from '../components/scene/ScenePage';
 import { AutomationRulePage } from '../components/automation/AutomationRulePage';
 
 export function AppRoutes() {
-  const { user, setUser, logout } = useRouteSession();
+  const { initialized, user, login, logout, updateUser } = useRouteSession();
   const location = useLocation();
   const navigate = useNavigate();
   const state = readNavigationState(location.state);
@@ -26,7 +27,7 @@ export function AppRoutes() {
   };
 
   const handleLoginSuccess = (authData: AuthResponse) => {
-    setUser(authData.user);
+    login(authData);
     const destination = loginDestination(authData.user, location.search, state);
     go(destination, { ...state, returnTo: undefined }, true,
       destination === '/join' ? invitationSearch(location.search, 'token') : location.search);
@@ -74,13 +75,14 @@ export function AppRoutes() {
       ) : (
         <Navigate to={{ pathname: '/login', search: location.search, hash: location.hash }} state={state} replace />
       )} />
-      <Route element={<RequireAuth user={user} />}>
-        <Route path="/home" element={<HomePage user={user!} onLogout={logout} />} />
+      <Route element={<RequireAuth initialized={initialized} user={user} />}>
+        <Route path="/home" element={<HomePage user={user!} onLogout={logout} onProfileUpdate={updateUser} />} />
         <Route path="/homes/:homeId/scenes" element={<ScenePage />} />
         <Route path="/homes/:homeId/scenes/:sceneId" element={<ScenePage />} />
         <Route path="/homes/:homeId/automation-rules" element={<AutomationRulePage />} />
-        <Route element={<RequireAdmin user={user} />}>
-          <Route path="/admin" element={<AdminDashboard user={user!} onLogout={logout} />} />
+        <Route path="/home/:homeId/devices" element={<DevicePage />} />
+        <Route element={<RequireAdmin initialized={initialized} user={user} />}>
+          <Route path="/admin" element={<AdminDashboard user={user!} onLogout={logout} onProfileUpdate={updateUser} />} />
         </Route>
       </Route>
       <Route path="*" element={

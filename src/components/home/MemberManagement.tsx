@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { getHomeMembers, updateMemberRole, removeMember, generateInvitation } from '../../services/homeApi';
 import type { HomeMember, InvitationResponse } from '../../services/homeApi';
+import { getErrorMessage } from '../../utils/errors';
 
-// Mocking homeId for now since it's not stored in Context yet, but usually we fetch the home user belongs to.
-// In this flow, a user logs in, we assume they have 1 home and we need its ID.
-// For now, let's pass homeId as a prop or fetch it.
 interface MemberManagementProps {
   homeId: string;
   currentUserRole: 'OWNER' | 'MEMBER';
@@ -24,7 +22,7 @@ export const MemberManagement: React.FC<MemberManagementProps> = ({ homeId, curr
       setLoading(true);
       const data = await getHomeMembers(homeId);
       setMembers(data);
-    } catch (err: any) {
+    } catch {
       setError('Lỗi khi lấy danh sách thành viên');
     } finally {
       setLoading(false);
@@ -32,17 +30,25 @@ export const MemberManagement: React.FC<MemberManagementProps> = ({ homeId, curr
   };
 
   useEffect(() => {
-    if (homeId) {
-      fetchMembers();
-    }
+    let active = true;
+    getHomeMembers(homeId).then((data) => {
+      if (active) setMembers(data);
+    }).catch(() => {
+      if (active) setError('Lỗi khi lấy danh sách thành viên');
+    }).finally(() => {
+      if (active) setLoading(false);
+    });
+    return () => {
+      active = false;
+    };
   }, [homeId]);
 
   const handleRoleChange = async (memberId: string, newRole: 'OWNER' | 'MEMBER') => {
     try {
       await updateMemberRole(homeId, memberId, newRole);
-      fetchMembers();
-    } catch (err: any) {
-      alert(err.response?.data?.message || 'Không thể thay đổi quyền');
+      void fetchMembers();
+    } catch (error: unknown) {
+      alert(getErrorMessage(error, 'Không thể thay đổi quyền'));
     }
   };
 
@@ -50,9 +56,9 @@ export const MemberManagement: React.FC<MemberManagementProps> = ({ homeId, curr
     if (!window.confirm('Bạn có chắc chắn muốn xóa thành viên này?')) return;
     try {
       await removeMember(homeId, memberId);
-      fetchMembers();
-    } catch (err: any) {
-      alert(err.response?.data?.message || 'Không thể xóa thành viên');
+      void fetchMembers();
+    } catch (error: unknown) {
+      alert(getErrorMessage(error, 'Không thể xóa thành viên'));
     }
   };
 
@@ -64,8 +70,8 @@ export const MemberManagement: React.FC<MemberManagementProps> = ({ homeId, curr
     try {
       const data = await generateInvitation(homeId);
       setInvitation(data);
-    } catch (err: any) {
-      alert(err.message || 'Không thể tạo link mời');
+    } catch (error: unknown) {
+      alert(getErrorMessage(error, 'Không thể tạo link mời'));
       setShowInviteModal(false);
     } finally {
       setInviteLoading(false);
@@ -84,19 +90,23 @@ export const MemberManagement: React.FC<MemberManagementProps> = ({ homeId, curr
         alert(`⚠️ Lời mời đã được tạo nhưng hệ thống email hiện không khả dụng.\n\nVui lòng copy link bên trên và gửi thủ công cho người thân.`);
       }
       setInviteEmail('');
-    } catch (err: any) {
-      alert(err.message || 'Không thể tạo lời mời');
+    } catch (error: unknown) {
+      alert(getErrorMessage(error, 'Không thể tạo lời mời'));
     } finally {
       setInviteLoading(false);
     }
   };
 
   if (loading) {
-    return <div className="p-4 text-slate-400">Đang tải danh sách thành viên...</div>;
+    return <div role="status" className="surface-card p-6 text-muted">Đang tải danh sách thành viên…</div>;
   }
 
+  const invitationUrl = invitation
+    ? `${window.location.origin}/join?token=${encodeURIComponent(invitation.inviteToken)}`
+    : '';
+
   return (
-    <div className="bg-slate-900/80 rounded-2xl border border-slate-800 p-6 shadow-xl">
+    <div className="surface-card p-5 sm:p-6">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-bold text-slate-100">Quản lý Thành viên</h2>
         {currentUserRole === 'OWNER' && (
@@ -109,7 +119,7 @@ export const MemberManagement: React.FC<MemberManagementProps> = ({ homeId, curr
         )}
       </div>
 
-      {error && <div className="text-rose-400 mb-4">{error}</div>}
+      {error && <div role="alert" aria-live="polite" className="mb-4 text-rose-400">{error}</div>}
 
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse">
@@ -127,7 +137,7 @@ export const MemberManagement: React.FC<MemberManagementProps> = ({ homeId, curr
                 <td className="py-4 flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-slate-800 overflow-hidden flex items-center justify-center shrink-0 border border-slate-700">
                     {member.avatarUrl ? (
-                      <img src={member.avatarUrl} alt={member.fullName} className="w-full h-full object-cover" />
+                      <img src={member.avatarUrl} alt={`Ảnh đại diện của ${member.fullName}`} width={40} height={40} loading="lazy" className="h-full w-full object-cover" />
                     ) : (
                       <span className="text-sm font-bold text-slate-400">{member.fullName.charAt(0)}</span>
                     )}
@@ -150,6 +160,7 @@ export const MemberManagement: React.FC<MemberManagementProps> = ({ homeId, curr
                 {currentUserRole === 'OWNER' && (
                   <td className="py-4 text-right space-x-2">
                     <select
+                      aria-label={`Vai trò của ${member.fullName}`}
                       value={member.role}
                       onChange={(e) => handleRoleChange(member.id, e.target.value as 'OWNER' | 'MEMBER')}
                       className="bg-slate-800 border border-slate-700 text-slate-300 text-xs rounded px-2 py-1 outline-none"
@@ -173,11 +184,11 @@ export const MemberManagement: React.FC<MemberManagementProps> = ({ homeId, curr
 
       {/* Invite Modal */}
       {showInviteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-text/30 p-4 backdrop-blur-sm">
+          <div role="dialog" aria-modal="true" aria-labelledby="invite-modal-title" className="auth-surface w-full max-w-md overflow-hidden overscroll-contain">
             <div className="p-6 border-b border-slate-800 flex justify-between items-center">
-              <h3 className="text-lg font-bold text-white">Mời thành viên</h3>
-              <button onClick={() => setShowInviteModal(false)} className="text-slate-400 hover:text-white">
+              <h3 id="invite-modal-title" className="text-lg font-bold text-text">Mời thành viên</h3>
+              <button type="button" aria-label="Đóng cửa sổ mời thành viên" onClick={() => setShowInviteModal(false)} className="rounded-lg p-1 text-icon hover:bg-sidebar-hover hover:text-text">
                 ✕
               </button>
             </div>
@@ -186,7 +197,7 @@ export const MemberManagement: React.FC<MemberManagementProps> = ({ homeId, curr
               {!invitation ? (
                 <div className="text-center py-8">
                   <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                  <p className="text-sm text-slate-400">Đang tạo link mời...</p>
+                  <p role="status" className="text-sm text-slate-400">Đang tạo link mời…</p>
                 </div>
               ) : (
                 <div className="space-y-6 animate-fade-in">
@@ -196,17 +207,18 @@ export const MemberManagement: React.FC<MemberManagementProps> = ({ homeId, curr
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">1. Gửi qua Link</label>
+                    <label htmlFor="invite-link" className="block text-sm font-medium text-slate-300 mb-2">1. Gửi qua Link</label>
                     <div className="flex gap-2">
                       <input
+                        id="invite-link"
                         type="text"
                         readOnly
-                        value={`http://localhost:5173/join?token=${invitation.inviteToken}`}
+                        value={invitationUrl}
                         className="flex-1 bg-slate-950/50 border border-slate-700 rounded-xl px-4 py-2.5 text-white text-sm focus:border-indigo-500 outline-none"
                       />
                       <button 
                         onClick={() => {
-                          navigator.clipboard.writeText(`http://localhost:5173/join?token=${invitation.inviteToken}`);
+                          navigator.clipboard.writeText(invitationUrl);
                           alert("Đã copy link!");
                         }}
                         className="px-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-medium transition-colors"
@@ -226,14 +238,17 @@ export const MemberManagement: React.FC<MemberManagementProps> = ({ homeId, curr
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">2. Gửi qua Email</label>
+                    <label htmlFor="invite-email" className="block text-sm font-medium text-slate-300 mb-2">2. Gửi qua Email</label>
                     <form onSubmit={handleSendEmail} className="flex gap-2">
                       <input
+                        id="invite-email"
                         type="email"
-                        placeholder="Nhập email người thân..."
+                        placeholder="Nhập email người thân…"
                         value={inviteEmail}
                         onChange={(e) => setInviteEmail(e.target.value)}
                         required
+                        autoComplete="off"
+                        spellCheck={false}
                         className="flex-1 bg-slate-950/50 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
                       />
                       <button
@@ -241,7 +256,7 @@ export const MemberManagement: React.FC<MemberManagementProps> = ({ homeId, curr
                         disabled={inviteLoading}
                         className="px-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-medium transition-colors disabled:opacity-50"
                       >
-                        {inviteLoading ? 'Đang gửi...' : 'Gửi Email'}
+                        {inviteLoading ? 'Đang gửi…' : 'Gửi Email'}
                       </button>
                     </form>
                   </div>

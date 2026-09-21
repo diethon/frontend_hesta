@@ -23,4 +23,12 @@ dist-ssr
 *.sln
 *.sw?
 
-.agents
+.agents/*
+!.agents/skills/
+.agents/skills/*
+!.agents/skills/hesta-ui-system/
+!.agents/skills/hesta-ui-system/SKILL.md
+.agent
+*.agent
+.env
+.env.local

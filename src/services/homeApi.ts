@@ -1,14 +1,4 @@
-import { notifySessionExpired } from './session';
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1';
-
-const getAuthHeaders = () => {
-  const token = localStorage.getItem('accessToken');
-  return {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${token}`
-  };
-};
+import { apiClient } from './apiClient';
 
 export interface HomeMember {
   id: string;
@@ -26,93 +16,52 @@ export interface InvitationResponse {
   emailSent?: boolean;
 }
 
+export interface HomeSummary {
+  homeId: string;
+  homeName: string;
+  role: 'OWNER' | 'MEMBER';
+}
+
 export const getHomeMembers = async (homeId: string): Promise<HomeMember[]> => {
-  const response = await fetch(`${API_BASE_URL}/homes/${homeId}/members`, {
-    method: 'GET',
-    headers: getAuthHeaders(),
-  });
-  if (response.status === 401) {
-    notifySessionExpired();
-    throw new Error('Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.');
-  }
-  const resData = await response.json();
-  if (!response.ok) throw new Error(resData.message || 'Lỗi lấy danh sách thành viên');
-  return resData.result;
+  const response = await apiClient.get(`/homes/${homeId}/members`);
+  return response.data.result;
+};
+
+export const getHomeRooms = async (homeId: string): Promise<{ id: string, name: string }[]> => {
+  const response = await apiClient.get(`/homes/${homeId}/rooms`);
+  return response.data.result;
 };
 
 export const generateInvitation = async (homeId: string, email?: string): Promise<InvitationResponse> => {
-  const url = email 
-    ? `${API_BASE_URL}/homes/${homeId}/invitations?email=${encodeURIComponent(email)}`
-    : `${API_BASE_URL}/homes/${homeId}/invitations`;
-    
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: getAuthHeaders(),
-  });
-  if (response.status === 401) {
-    notifySessionExpired();
-    throw new Error('Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.');
-  }
-  const resData = await response.json();
-  if (!response.ok) throw new Error(resData.message || 'Lỗi tạo lời mời');
-  return resData.result;
+  const url = email
+    ? `/homes/${homeId}/invitations?email=${encodeURIComponent(email)}`
+    : `/homes/${homeId}/invitations`;
+
+  const response = await apiClient.post(url);
+  return response.data.result;
 };
 
 export const updateMemberRole = async (homeId: string, memberId: string, role: 'OWNER' | 'MEMBER') => {
-  const response = await fetch(`${API_BASE_URL}/homes/${homeId}/members/${memberId}/role?role=${role}`, {
-    method: 'PUT',
-    headers: getAuthHeaders(),
-  });
-  const resData = await response.json();
-  if (!response.ok) throw new Error(resData.message || 'Lỗi cập nhật quyền');
-  return resData.result;
+  const response = await apiClient.put(`/homes/${homeId}/members/${memberId}/role?role=${role}`);
+  return response.data.result;
 };
 
 export const removeMember = async (homeId: string, memberId: string) => {
-  const response = await fetch(`${API_BASE_URL}/homes/${homeId}/members/${memberId}`, {
-    method: 'DELETE',
-    headers: getAuthHeaders(),
-  });
-  const resData = await response.json();
-  if (!response.ok) throw new Error(resData.message || 'Lỗi xóa thành viên');
-  return resData.result;
+  const response = await apiClient.delete(`/homes/${homeId}/members/${memberId}`);
+  return response.data.result;
 };
 
 export const joinHome = async (codeOrToken: string) => {
-  const response = await fetch(`${API_BASE_URL}/homes/join?codeOrToken=${encodeURIComponent(codeOrToken)}`, {
-    method: 'POST',
-    headers: getAuthHeaders(),
-  });
-  if (response.status === 401) {
-    notifySessionExpired();
-    throw new Error('Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.');
-  }
-  const resData = await response.json();
-  if (!response.ok) throw new Error(resData.message || 'Lỗi vào nhà');
-  return resData.result;
+  const response = await apiClient.post(`/homes/join?codeOrToken=${encodeURIComponent(codeOrToken)}`);
+  return response.data.result;
 };
 
-export const getMyHomes = async () => {
-  const response = await fetch(`${API_BASE_URL}/homes/my-homes`, {
-    method: 'GET',
-    headers: getAuthHeaders(),
-  });
-  if (response.status === 401) {
-    notifySessionExpired();
-    throw new Error('Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.');
-  }
-  const resData = await response.json();
-  if (!response.ok) throw new Error(resData.message || 'Lỗi lấy danh sách nhà');
-  return resData.result;
+export const getMyHomes = async (): Promise<HomeSummary[]> => {
+  const response = await apiClient.get(`/homes/my-homes`);
+  return response.data.result;
 };
 
 export const createHome = async (name?: string) => {
-  const response = await fetch(`${API_BASE_URL}/homes`, {
-    method: 'POST',
-    headers: getAuthHeaders(),
-    body: JSON.stringify({ name: name || '' }),
-  });
-  const resData = await response.json();
-  if (!response.ok) throw new Error(resData.message || 'Lỗi tạo nhà');
-  return resData.result;
+  const response = await apiClient.post(`/homes`, { name: name || '' });
+  return response.data.result;
 };
