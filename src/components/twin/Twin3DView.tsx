@@ -9,6 +9,7 @@ import { TwinLayoutButton } from './TwinLayoutButton';
 import { readTwin3DPalette } from './twin3dPalette';
 import { geometryForFloor, layoutFloors, resolvePlacedNodes, resolveUnplacedNodes } from './twin3dGeometry';
 import { supportsWebGL } from './twin3dSupport';
+import type { TwinDraftingMetadata } from './twinDrafting';
 
 class Twin3DErrorBoundary extends Component<{ children: ReactNode; onError: (error: Error) => void }, { failed: boolean }> {
   state = { failed: false };
@@ -22,8 +23,9 @@ function Stat({ icon, value, label, tone }: { icon: ReactNode; value: number; la
   return <div className="flex min-w-0 items-center gap-3 rounded-2xl border border-line bg-surface p-3 shadow-soft"><span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${tones[tone]}`}>{icon}</span><span className="min-w-0"><strong className="block text-lg leading-none text-text">{value}</strong><small className="mt-1 block truncate text-muted">{label}</small></span></div>;
 }
 
-export function Twin3DView({ geometry, role, onEdit2D }: {
+export function Twin3DView({ geometry, drafting, role, onEdit2D }: {
   geometry: TwinLayoutGeometry;
+  drafting: TwinDraftingMetadata;
   role: 'OWNER' | 'MEMBER' | null;
   onEdit2D: () => void;
 }) {
@@ -88,7 +90,7 @@ export function Twin3DView({ geometry, role, onEdit2D }: {
           {!ready ? <div role="status" className="absolute inset-0 z-20 flex items-center justify-center bg-app"><div className="text-center"><span className="mx-auto block h-10 w-10 animate-pulse rounded-2xl bg-primary" /><p className="mt-3 text-sm font-semibold text-muted">Đang dựng không gian 3D…</p></div></div> : null}
           <div className="pointer-events-none absolute left-3 top-3 z-10 rounded-xl border border-line bg-surface/90 px-3 py-2 shadow-soft"><strong className="block text-xs text-text">{resolvedActiveFloor === 'all' ? 'Toàn bộ ngôi nhà' : `Tầng ${resolvedActiveFloor}`}</strong><span className="text-[10px] text-muted">Kéo để xoay · Cuộn để thu phóng</span></div>
           {floors.length > 1 ? <div className="absolute right-3 top-20 z-10 sm:top-3"><TwinFloorSelect floors={floors} value={resolvedActiveFloor} ariaLabel="Chọn tầng trong mô hình 3D" onChange={chooseFloor} /></div> : null}
-          <Twin3DErrorBoundary onError={setSceneError}><Twin3DCanvas geometry={geometry} activeFloor={resolvedActiveFloor} exploded={exploded} selection={selection} fitRequest={fitRequest} compact={compact} palette={palette} onSelect={setSelection} onReady={handleReady} /></Twin3DErrorBoundary>
+          <Twin3DErrorBoundary onError={setSceneError}><Twin3DCanvas geometry={geometry} drafting={drafting} activeFloor={resolvedActiveFloor} exploded={exploded} selection={selection} fitRequest={fitRequest} compact={compact} palette={palette} onSelect={setSelection} onReady={handleReady} /></Twin3DErrorBoundary>
           <div className="absolute bottom-3 left-3 z-10 flex gap-2"><button type="button" aria-label="Đưa mô hình vừa màn hình" onClick={() => setFitRequest((value) => value + 1)} className="flex min-h-11 items-center gap-2 rounded-xl border border-line bg-surface/95 px-3 text-sm font-semibold text-text shadow-soft hover:bg-sidebar-hover"><Crosshair size={17} aria-hidden="true" />Vừa ngôi nhà</button>{selection ? <button type="button" onClick={() => setSelection(null)} className="min-h-11 rounded-xl border border-line bg-surface/95 px-3 text-sm font-semibold text-muted shadow-soft hover:bg-sidebar-hover">Bỏ chọn</button> : null}</div>
           {floors.length > 1 && resolvedActiveFloor === 'all' ? <button type="button" aria-label={exploded ? 'Xếp chồng các tầng' : 'Tách các tầng'} aria-pressed={exploded} onClick={toggleExploded} className="absolute bottom-3 right-3 z-10 flex min-h-11 items-center gap-2 rounded-xl border border-line bg-surface/95 px-3 text-sm font-semibold text-text shadow-soft hover:bg-sidebar-hover"><UnfoldVertical size={17} aria-hidden="true" /><span className="hidden sm:inline">{exploded ? 'Xếp chồng' : 'Tách tầng'}</span></button> : null}
         </div>

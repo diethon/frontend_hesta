@@ -2,9 +2,11 @@ import { Layers } from 'lucide-react';
 import type { TwinLayoutGeometry, TwinLayoutSelection } from '../../types/twinLayout';
 import { geometryForFloor } from './twin3dGeometry';
 import { TwinCanvas } from './TwinCanvas';
+import type { TwinDraftingMetadata } from './twinDrafting';
 
-export function Twin2DFloorOverview({ geometry, floors, selection, onSelect, onChooseFloor }: {
+export function Twin2DFloorOverview({ geometry, drafting, floors, selection, onSelect, onChooseFloor }: {
   geometry: TwinLayoutGeometry;
+  drafting: TwinDraftingMetadata;
   floors: number[];
   selection: TwinLayoutSelection | null;
   onSelect: (selection: TwinLayoutSelection) => void;
@@ -26,7 +28,7 @@ export function Twin2DFloorOverview({ geometry, floors, selection, onSelect, onC
             <div><p className="text-sm font-semibold text-text">Tầng {floor}</p><p className="text-xs text-muted">{floorGeometry.rooms.length} phòng · {floorGeometry.nodes.length} marker</p></div>
             <button type="button" onClick={() => onChooseFloor(floor)} className="min-h-11 rounded-xl border border-line bg-surface px-3 text-xs font-semibold text-primary-hover hover:bg-sidebar-hover">Mở tầng</button>
           </div>
-          <TwinCanvas geometry={floorGeometry} editable={false} overview selection={selection} onSelect={onSelect} onChange={() => {}} />
+          <TwinCanvas geometry={floorGeometry} drafting={drafting} floor={floor} editable={false} overview selection={selection} onSelect={onSelect} onChange={() => {}} />
         </article>;
       })}
     </div>

@@ -55,7 +55,7 @@ try {
   };
   const waitFor = async (expression) => {
     for (let i = 0; i < 160; i++) { if (await evaluate(expression)) return; await delay(100); }
-    console.error(await evaluate('document.body.innerText'));
+    console.error(await evaluate(`JSON.stringify({ text: document.body.innerText, floors: document.querySelectorAll('[data-twin-floor-label]').length, markers: document.querySelectorAll('.twin-3d-stage button[data-world-y]').length })`));
     throw new Error(`Timed out: ${expression}`);
   };
   const click = async (text) => {
@@ -85,6 +85,12 @@ try {
   await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
   await send('Page.navigate', { url: testUrl });
   await waitFor(`document.querySelector('button[aria-label="Chế độ 3D"]') !== null`);
+  await click('Chỉnh sửa sơ đồ');
+  await evaluate(`document.querySelector('[data-room-id] > button').click()`);
+  await click('Phòng chữ L');
+  await click('Lưu bố cục');
+  await waitFor(`document.body.textContent.includes('Chế độ xem')`);
+  check('saved 2D L-shape metadata is available to the shared 3D generator', await evaluate(`Object.keys(localStorage).some(key => localStorage.getItem(key)?.includes('L_SHAPE'))`));
   await click('Chế độ 3D');
   await waitFor(`document.querySelector('.twin-3d-stage canvas') !== null && !document.body.textContent.includes('Đang dựng không gian 3D')`);
   await waitFor(`document.querySelectorAll('.twin-3d-room-label').length === 4 && document.querySelectorAll('.twin-3d-stage button[aria-label*="ACTIVE"], .twin-3d-stage button[aria-label*="STALE"], .twin-3d-stage button[aria-label*="OFFLINE"]').length === 7`);
@@ -161,7 +167,7 @@ try {
   await send('Page.navigate', { url: multiFloorUrl.href });
   await waitFor(`document.querySelector('button[aria-label="Chế độ 3D"]')?.getAttribute('aria-pressed') === 'true' && document.querySelector('.twin-3d-stage canvas') !== null`);
   check('multi-floor homes open directly in 3D', await evaluate(`document.querySelector('button[aria-label="Chế độ 3D"]')?.getAttribute('aria-pressed') === 'true'`));
-  await waitFor(`document.querySelectorAll('[data-twin-floor-label]').length === 3 && document.querySelector('button[role="combobox"][aria-label="Chọn tầng trong mô hình 3D"]')?.dataset.floorCount === '3'`);
+  await waitFor(`document.querySelectorAll('[data-twin-floor-label]').length === 3 && document.querySelector('button[role="combobox"][aria-label="Chọn tầng trong mô hình 3D"]')?.dataset.floorCount === '3' && document.querySelectorAll('.twin-3d-stage button[data-world-y]').length === 14`);
   check('multi-floor fixture renders three selectable levels and fourteen markers', await evaluate(`document.querySelector('button[role="combobox"][aria-label="Chọn tầng trong mô hình 3D"]')?.dataset.floorCount === '3' && document.querySelectorAll('[data-twin-floor-label]').length === 3 && document.querySelectorAll('.twin-3d-stage button[data-world-y]').length === 14`));
   check('exploded overview assigns higher world elevation to upper-floor nodes', await evaluate(`(() => { const y = label => Number([...document.querySelectorAll('.twin-3d-stage button[data-world-y]')].find(e => e.getAttribute('aria-label')?.includes(label)).dataset.worldY); return y('Đèn làm việc') > y('Điều hòa phòng chính') && y('Điều hòa phòng chính') > y('Đèn phòng khách'); })()`));
   await screenshot('multi-floor-exploded');

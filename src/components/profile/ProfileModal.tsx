@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import type { UserResponse } from '../../types/auth';
 import { updateProfile, changePassword, uploadAvatar } from '../../services/userApi';
 import { getErrorMessage } from '../../utils/errors';
+import { notify } from '../ui/notify';
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -19,7 +20,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
   const [isUpdatingInfo, setIsUpdatingInfo] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [infoError, setInfoError] = useState<string | null>(null);
-  const [infoSuccess, setInfoSuccess] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Security Tab State
@@ -28,7 +28,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [securityError, setSecurityError] = useState<string | null>(null);
-  const [securitySuccess, setSecuritySuccess] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
@@ -40,17 +39,16 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
     }
 
     setInfoError(null);
-    setInfoSuccess(null);
     setIsUpdatingInfo(true);
 
     try {
       const response = await updateProfile({ fullName, phoneNumber });
       if (response.result) {
         onProfileUpdate(response.result);
-        setInfoSuccess('Cập nhật thông tin thành công!');
+        notify.success('Cập nhật thông tin thành công');
       }
     } catch (error: unknown) {
-      setInfoError(getErrorMessage(error, 'Cập nhật thất bại. Vui lòng thử lại.'));
+      notify.error(getErrorMessage(error, 'Cập nhật thất bại. Vui lòng thử lại.'));
     } finally {
       setIsUpdatingInfo(false);
     }
@@ -71,17 +69,16 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
     }
 
     setInfoError(null);
-    setInfoSuccess(null);
     setIsUploadingAvatar(true);
 
     try {
       const response = await uploadAvatar(file);
       if (response.result) {
         onProfileUpdate(response.result);
-        setInfoSuccess('Cập nhật ảnh đại diện thành công!');
+        notify.success('Cập nhật ảnh đại diện thành công');
       }
     } catch (error: unknown) {
-      setInfoError(getErrorMessage(error, 'Tải ảnh thất bại. Vui lòng thử lại.'));
+      notify.error(getErrorMessage(error, 'Tải ảnh thất bại. Vui lòng thử lại.'));
     } finally {
       setIsUploadingAvatar(false);
       // Reset input value so the same file can be selected again
@@ -107,17 +104,16 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
     }
 
     setSecurityError(null);
-    setSecuritySuccess(null);
     setIsChangingPassword(true);
 
     try {
       await changePassword({ currentPassword, newPassword });
-      setSecuritySuccess('Đổi mật khẩu thành công!');
+      notify.success('Đổi mật khẩu thành công');
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
     } catch (error: unknown) {
-      setSecurityError(getErrorMessage(error, 'Đổi mật khẩu thất bại. Vui lòng thử lại.'));
+      notify.error(getErrorMessage(error, 'Đổi mật khẩu thất bại. Vui lòng thử lại.'));
     } finally {
       setIsChangingPassword(false);
     }
@@ -179,15 +175,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                   <span>{infoError}</span>
-                </div>
-              )}
-
-              {infoSuccess && (
-                <div role="status" aria-live="polite" className="bg-emerald-950/60 border border-emerald-500/30 text-emerald-300 px-4 py-3 rounded-xl text-xs flex items-center gap-2">
-                  <svg aria-hidden={true} className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  <span>{infoSuccess}</span>
                 </div>
               )}
 
@@ -300,15 +287,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                   <span>{securityError}</span>
-                </div>
-              )}
-
-              {securitySuccess && (
-                <div role="status" aria-live="polite" className="bg-emerald-950/60 border border-emerald-500/30 text-emerald-300 px-4 py-3 rounded-xl text-xs flex items-center gap-2">
-                  <svg aria-hidden={true} className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  <span>{securitySuccess}</span>
                 </div>
               )}
 

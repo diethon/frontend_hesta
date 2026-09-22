@@ -2,6 +2,7 @@ import { createBrowserRouter, RouterProvider } from 'react-router';
 import { NotificationLifecycle } from './realtime/NotificationLifecycle';
 import { RealtimeLifecycle } from './realtime/RealtimeLifecycle';
 import { AppRoutes } from './routes/AppRoutes';
+import { AppToaster } from './components/ui/AppToast';
 
 // Preserve the route tree; React Router's data router supplies navigation blocking.
 const router = createBrowserRouter([{ path: '*', element: <AppRoutes /> }]);
@@ -13,6 +14,7 @@ function App() {
       <RealtimeLifecycle />
       <NotificationLifecycle />
       <RouterProvider router={router} />
+      <AppToaster />
     </>
   );
 }

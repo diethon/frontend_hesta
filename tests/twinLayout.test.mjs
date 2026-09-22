@@ -45,9 +45,11 @@ const twin = loadSource('src/store/twinSlice.ts');
 const layout = loadSource('src/store/twinLayoutSlice.ts');
 const geo = loadSource('src/components/twin/layoutGeometry.ts');
 const geo3d = loadSource('src/components/twin/twin3dGeometry.ts');
+const drafting = loadSource('src/components/twin/twinDrafting.ts');
 const { supportsWebGL } = loadSource('src/components/twin/twin3dSupport.ts');
 const { TwinViewSwitcher } = loadSource('src/components/twin/TwinViewSwitcher.tsx');
 const { Twin3DInspector } = loadSource('src/components/twin/Twin3DInspector.tsx');
+const { TwinLayoutInspector } = loadSource('src/components/twin/TwinLayoutInspector.tsx');
 const { currentHomeChanged } = loadSource('src/store/homeSlice.ts');
 const { sessionEnded } = loadSource('src/store/authSlice.ts');
 const { realtimeEventReceived } = loadSource('src/store/realtimeSlice.ts');
@@ -143,6 +145,70 @@ test('3D conversion maps normalized x to world X, normalized y to world Z, and r
   assert.equal(room.roomId, roomId); assert.equal(room.y, 0); assert.equal(room.width, 7.2); assert.equal(room.depth, 6);
   assert.ok(Math.abs(room.x + 3.6) < 1e-9 && Math.abs(room.z + 0.6) < 1e-9);
   assert.equal(geo3d.TWIN_ROOM_WALL_HEIGHT, 2.25);
+});
+
+test('room shape templates support rectangle, L, U and custom outlines with editable concave space', () => {
+  const metadata = drafting.createTwinDraftingMetadata();
+  const shapes = ['RECTANGLE', 'L_SHAPE', 'U_SHAPE', 'CUSTOM'];
+  for (const shape of shapes) {
+    const changed = drafting.changeRoomShape(metadata, roomId, shape);
+    assert.equal(changed.rooms[roomId].shape, shape);
+    assert.ok(changed.rooms[roomId].points.length >= 4);
+    assert.match(drafting.polygonCss(changed.rooms[roomId].points), /^polygon\(/);
+  }
+  const lShape = drafting.roomShapePoints('L_SHAPE');
+  assert.equal(drafting.pointInPolygon({ x: 0.2, y: 0.8 }, lShape), true);
+  assert.equal(drafting.pointInPolygon({ x: 0.8, y: 0.8 }, lShape), false);
+  const custom = drafting.changeRoomDrafting(drafting.changeRoomShape(metadata, roomId, 'CUSTOM'), roomId, {
+    shape: 'CUSTOM', points: [{ x: -.4, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 }], widthMeters: 4.2,
+  });
+  assert.equal(custom.rooms[roomId].points[0].x, 0);
+  assert.equal(custom.rooms[roomId].widthMeters, 4.2);
+  assert.equal(drafting.sameTwinDrafting(metadata, custom), false);
+
+  const rotated = drafting.transformRoomPoints(lShape, 'ROTATE_RIGHT');
+  assert.deepEqual(rotated[0], { x: 1, y: 0 });
+  assert.equal(drafting.pointInPolygon({ x: 0.2, y: 0.2 }, rotated), true);
+  assert.equal(drafting.pointInPolygon({ x: 0.2, y: 0.8 }, rotated), false);
+  assert.deepEqual(drafting.transformRoomPoints(rotated, 'ROTATE_LEFT'), lShape);
+  assert.deepEqual(drafting.transformRoomPoints(drafting.transformRoomPoints(lShape, 'FLIP_HORIZONTAL'), 'FLIP_HORIZONTAL'), lShape);
+});
+
+test('grid and edge snapping align rooms while overlap warnings remain floor-scoped', () => {
+  const anchor = { roomId: 'anchor', floor: 1, x: .1, y: .1, width: .3, height: .3 };
+  const moving = { roomId: 'moving', floor: 1, x: .405, y: .101, width: .2, height: .2 };
+  const result = geo.snapRoom(moving, [anchor], { grid: false, edges: true });
+  assert.equal(result.room.x, .4);
+  assert.deepEqual(result.guides.x, [.4]);
+  assert.deepEqual([...geo.overlappingRoomIds([anchor, { ...moving, x: .35 }])].sort(), ['anchor', 'moving']);
+  assert.equal(geo.overlappingRoomIds([anchor, { ...moving, x: .35, floor: 2 }]).size, 0);
+  assert.equal(geo.snapPoint(.113, true), .125);
+});
+
+test('shape-aware placement excludes missing corners and the 3D room uses the same outline metadata', () => {
+  const room = { roomId, floor: 1, x: .1, y: .1, width: .5, height: .5 };
+  const lShape = { shape: 'L_SHAPE', points: drafting.roomShapePoints('L_SHAPE'), floorHeightMeters: 3.1, wallThicknessMeters: .2 };
+  assert.equal(geo.roomContainsPoint(room, .2, .5, lShape.points), true);
+  assert.equal(geo.roomContainsPoint(room, .52, .52, lShape.points), false);
+  const world = geo3d.roomToWorldWithDrafting(room, lShape, .8);
+  assert.equal(world.outline.length, lShape.points.length);
+  assert.equal(world.wallHeight, 3.1);
+  assert.equal(world.wallThickness, .2);
+  assert.equal(world.customShape, true);
+  assert.equal(world.y, .8);
+});
+
+test('2D editor exposes quick draw, shape, snapping and blueprint tools; precise room inspector is optional', async () => {
+  const store = await ready();
+  edit(store);
+  const editor = render(store);
+  for (const label of ['Vẽ nhanh', 'Nhập kích thước', 'Chữ nhật', 'Chữ L', 'Chữ U', 'Tự vẽ', 'Bắt lưới', 'Bắt cạnh', 'Chọn ảnh bản vẽ từ máy']) assert.ok(editor.includes(label), label);
+  const metadata = drafting.changeRoomShape(drafting.createTwinDraftingMetadata(), roomId, 'L_SHAPE');
+  const inspector = renderToString(React.createElement(Provider, { store }, React.createElement(TwinLayoutInspector, {
+    geometry: draft(store), drafting: metadata, mode: 'precise', selection: { kind: 'room', id: roomId }, editable: true,
+    onChange: () => {}, onDraftingChange: () => {},
+  })));
+  for (const label of ['Kích thước thực tế tùy chọn', 'Chiều rộng (m)', 'Chiều sâu (m)', 'Chiều cao tầng (m)', 'Độ dày tường (m)', 'Chữ L']) assert.ok(inspector.includes(label), label);
 });
 
 test('multi-floor presentation groups rooms, filters a floor, and persists floor metadata in Backend writes', () => {

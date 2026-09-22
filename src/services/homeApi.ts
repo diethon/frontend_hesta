@@ -65,3 +65,7 @@ export const createHome = async (name?: string) => {
   const response = await apiClient.post(`/homes`, { name: name || '' });
   return response.data.result;
 };
+
+export const createHomeRoom = async (homeId: string, name: string): Promise<void> => {
+  await apiClient.post('/homes/' + encodeURIComponent(homeId) + '/rooms', { name });
+};

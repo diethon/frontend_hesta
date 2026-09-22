@@ -12,6 +12,7 @@ import {
 } from '../../services/sceneApi';
 import type { DeviceResponse } from '../../types/device';
 import type { SceneActionType, SceneResponse } from '../../types/scene';
+import { notify } from '../ui/notify';
 
 interface SceneManagementProps {
   homeId: string;
@@ -124,8 +125,9 @@ export const SceneManagement: React.FC<SceneManagementProps> = ({ homeId, curren
       );
       setSelectedId(scene.id);
       setShowEditor(false);
+      notify.success(editingId ? 'Đã cập nhật kịch bản' : 'Đã tạo kịch bản');
     } catch (err) {
-      setError(messageOf(err));
+      notify.error(messageOf(err));
     } finally {
       setSaving(false);
     }
@@ -139,8 +141,9 @@ export const SceneManagement: React.FC<SceneManagementProps> = ({ homeId, curren
       const remaining = scenes.filter((item) => item.id !== scene.id);
       setScenes(remaining);
       setSelectedId(remaining[0]?.id ?? null);
+      notify.success('Đã xóa kịch bản', scene.name);
     } catch (err) {
-      setError(messageOf(err));
+      notify.error(messageOf(err));
     }
   };
 
@@ -172,8 +175,9 @@ export const SceneManagement: React.FC<SceneManagementProps> = ({ homeId, curren
       });
       setActionValue('');
       await refreshScene(selectedScene.id);
+      notify.success('Đã thêm hành động vào kịch bản');
     } catch (err) {
-      setError(messageOf(err));
+      notify.error(messageOf(err));
     } finally {
       setSaving(false);
     }
@@ -185,8 +189,9 @@ export const SceneManagement: React.FC<SceneManagementProps> = ({ homeId, curren
     try {
       await removeSceneAction(homeId, selectedScene.id, actionId);
       await refreshScene(selectedScene.id);
+      notify.success('Đã xóa hành động');
     } catch (err) {
-      setError(messageOf(err));
+      notify.error(messageOf(err));
     }
   };
 
@@ -200,8 +205,9 @@ export const SceneManagement: React.FC<SceneManagementProps> = ({ homeId, curren
     try {
       const updated = await reorderSceneActions(homeId, selectedScene.id, reordered.map((action) => action.id));
       setScenes((current) => current.map((scene) => (scene.id === updated.id ? updated : scene)));
+      notify.success('Đã cập nhật thứ tự hành động');
     } catch (err) {
-      setError(messageOf(err));
+      notify.error(messageOf(err));
     }
   };
 

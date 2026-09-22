@@ -1,5 +1,6 @@
 {
   "results": [
+    "saved 2D L-shape metadata is available to the shared 3D generator",
     "3D mode creates a WebGL canvas without horizontal overflow",
     "3D scene renders four rooms and seven runtime markers",
     "room selection opens the runtime room inspector",

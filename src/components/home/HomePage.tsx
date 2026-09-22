@@ -10,6 +10,7 @@ import { useAppDispatch } from '../../store/hooks';
 import { getErrorMessage } from '../../utils/errors';
 import { AdminIcon, AppSidebar, DeviceIcon, HomeIcon, PeopleIcon, SceneIcon, TwinIcon } from '../ui/AppSidebar';
 import { NotificationBell } from '../notification/NotificationBell';
+import { notify } from '../ui/notify';
 
 interface HomePageProps {
   user: UserResponse;
@@ -71,12 +72,12 @@ export const HomePage: React.FC<HomePageProps> = ({ user, onLogout, onProfileUpd
     setCreateLoading(true);
     try {
       await createHome(newHomeName.trim());
-      alert('Tạo nhà thành công!');
+      notify.success('Tạo nhà thành công', 'Bạn có thể mở Digital Twin để bắt đầu thiết kế sơ đồ.');
       setIsCreateModalOpen(false);
       setNewHomeName('');
       fetchHomes();
     } catch (error: unknown) {
-      alert(getErrorMessage(error, 'Lỗi khi tạo nhà'));
+      notify.error(getErrorMessage(error, 'Lỗi khi tạo nhà'));
     } finally {
       setCreateLoading(false);
     }
@@ -103,13 +104,13 @@ export const HomePage: React.FC<HomePageProps> = ({ user, onLogout, onProfileUpd
           {
             id: 'devices', label: 'Thiết bị', icon: <DeviceIcon />, onClick: () => {
               if (userHome) navigate(`/home/${userHome.homeId}/devices`);
-              else alert('Vui lòng tạo hoặc tham gia một ngôi nhà trước khi quản lý thiết bị.');
+              else notify.info('Hãy tạo hoặc tham gia một ngôi nhà trước khi quản lý thiết bị.');
             },
           },
           {
             id: 'twin', label: 'Digital Twin', icon: <TwinIcon />, onClick: () => {
               if (userHome) navigate(`/home/${userHome.homeId}/digital-twin`);
-              else alert('Vui lòng tạo hoặc tham gia một ngôi nhà trước khi mở Digital Twin.');
+              else notify.info('Hãy tạo hoặc tham gia một ngôi nhà trước khi mở Digital Twin.');
             },
           },
           { id: 'scenes', label: 'Kịch bản', icon: <SceneIcon />, onClick: () => document.getElementById('scenes-section')?.scrollIntoView({ behavior: 'smooth' }) },
@@ -251,7 +252,7 @@ export const HomePage: React.FC<HomePageProps> = ({ user, onLogout, onProfileUpd
               if (userHome) {
                 navigate(`/home/${userHome.homeId}/devices`);
               } else {
-                alert('Vui lòng chọn hoặc tham gia một Ngôi nhà trước khi quản lý thiết bị.');
+                notify.info('Hãy tạo hoặc tham gia một ngôi nhà trước khi quản lý thiết bị.');
               }
             }}
             className="surface-card group cursor-pointer p-6 transition hover:-translate-y-0.5 hover:border-primary md:col-span-3"

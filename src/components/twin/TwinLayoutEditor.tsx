@@ -12,6 +12,9 @@ import { Expand, MousePointer2, Move, Trash2, Eye, Pencil, House, Save } from 'l
 import { removeSelection } from './layoutPalette';
 import { TwinViewSwitcher, type TwinViewMode } from './TwinViewSwitcher';
 import { geometryForFloor, layoutFloors, roomFloorLevel } from './twin3dGeometry';
+import { TwinDraftingToolbar, type TwinDraftingMode } from './TwinDraftingToolbar';
+import { notify } from '../ui/notify';
+import { loadTwinDrafting, pruneTwinDrafting, sameTwinDrafting, saveTwinDrafting, type TwinDraftingMetadata } from './twinDrafting';
 
 const Twin3DView = lazy(() => import('./Twin3DView').then((module) => ({ default: module.Twin3DView })));
 
@@ -22,6 +25,10 @@ export function TwinLayoutEditor({ homeId }: { homeId: string }) {
   const [zoom, setZoom] = useState(1);
   const [selectedViewMode, setViewMode] = useState<TwinViewMode | null>(null);
   const [selected2DFloor, setSelected2DFloor] = useState<number | 'all'>('all');
+  const [draftingMode, setDraftingMode] = useState<TwinDraftingMode>('quick');
+  const [drafting, setDrafting] = useState<TwinDraftingMetadata>(() => loadTwinDrafting(homeId));
+  const [confirmedDrafting, setConfirmedDrafting] = useState<TwinDraftingMetadata>(() => loadTwinDrafting(homeId));
+  const [storageWarning, setStorageWarning] = useState<string | null>(null);
   if (state.homeId !== homeId) return null;
   const { confirmed, draft, dirty, loading, saving, error, role, roleError, roleRequestId } = state;
   const geometry = draft ?? confirmed;
@@ -32,6 +39,8 @@ export function TwinLayoutEditor({ homeId }: { homeId: string }) {
   const visible2DGeometry = geometry ? geometryForFloor(geometry, active2DFloor) : null;
   const blocked = loading || saving;
   const editable = !!draft && role === 'OWNER' && !blocked;
+  const draftingDirty = !!draft && !sameTwinDrafting(drafting, confirmedDrafting);
+  const hasUnsavedChanges = dirty || draftingDirty;
   const canEdit2DSelection = editable && (floorLevels.length <= 1 || active2DFloor !== 'all');
   const change = (next: TwinLayoutGeometry) => dispatch(layoutDraftChanged(next));
   const changeVisible2D = (next: TwinLayoutGeometry) => {
@@ -47,17 +56,52 @@ export function TwinLayoutEditor({ homeId }: { homeId: string }) {
       nodes: geometry.nodes.filter((node) => !floorNodeKeys.has(`${node.nodeType}:${node.nodeId}`)).concat(next.nodes),
     });
   };
+  const changeDrafting = (next: TwinDraftingMetadata) => { if (editable) setDrafting(next); };
   const confirmDiscard = () => window.confirm('Bỏ các thay đổi sơ đồ chưa lưu? Dữ liệu thiết bị và cảm biến mới nhất vẫn được giữ.');
-  const cancel = () => { if (!dirty || confirmDiscard()) dispatch(layoutEditingCancelled()); };
-  const reload = () => { if (!dirty || confirmDiscard()) void dispatch(loadTwinLayout(homeId)); };
+  const cancel = () => {
+    if (!hasUnsavedChanges || confirmDiscard()) {
+      setDrafting(confirmedDrafting);
+      dispatch(layoutEditingCancelled());
+    }
+  };
+  const reload = () => {
+    if (!hasUnsavedChanges || confirmDiscard()) {
+      setDrafting(confirmedDrafting);
+      void dispatch(loadTwinLayout(homeId));
+    }
+  };
+  const save = async () => {
+    if (!geometry || !draft || !hasUnsavedChanges) return;
+    let roomIds = geometry.rooms.map((room) => room.roomId);
+    if (dirty) {
+      const action = await dispatch(saveTwinLayout(homeId));
+      if (!saveTwinLayout.fulfilled.match(action)) return;
+      roomIds = action.payload.rooms.map((room) => room.roomId);
+    } else {
+      dispatch(layoutEditingCancelled());
+    }
+    const next = pruneTwinDrafting(drafting, roomIds);
+    setDrafting(next);
+    setConfirmedDrafting(next);
+    const metadataSaved = saveTwinDrafting(homeId, next);
+    setStorageWarning(metadataSaved ? null : 'Bố cục đã lưu, nhưng metadata hình phòng hoặc ảnh nền vượt giới hạn lưu trữ của trình duyệt.');
+    if (metadataSaved) notify.success('Đã lưu sơ đồ Digital Twin');
+    else notify.warning('Bố cục đã lưu nhưng chưa lưu được ảnh nền hoặc hình phòng', 'Dữ liệu này vượt giới hạn lưu trữ của trình duyệt.');
+  };
   const editIn2D = () => {
     setViewMode('2d');
     if (floorLevels.length > 1) setSelected2DFloor(floorLevels[0]);
-    if (!draft && confirmed && role === 'OWNER' && !blocked) dispatch(layoutEditingStarted());
+    if (!draft && confirmed && role === 'OWNER' && !blocked) {
+      setDrafting(confirmedDrafting);
+      dispatch(layoutEditingStarted());
+    }
   };
   const startEditing2D = () => {
     if (floorLevels.length > 1 && active2DFloor === 'all') setSelected2DFloor(floorLevels[0]);
-    if (!draft) dispatch(layoutEditingStarted());
+    if (!draft) {
+      setDrafting(confirmedDrafting);
+      dispatch(layoutEditingStarted());
+    }
   };
   return <section aria-label="Sơ đồ Digital Twin" className="min-w-0 space-y-5">
     <div className="flex flex-wrap items-center justify-between gap-4">
@@ -65,7 +109,7 @@ export function TwinLayoutEditor({ homeId }: { homeId: string }) {
       <div className="flex items-center gap-3 rounded-xl bg-info-soft px-4 py-3"><House size={32} className="shrink-0 text-primary-hover" aria-hidden="true" /><div><h2 className="text-sm font-semibold text-text">{viewMode === '2d' ? 'Thiết kế không gian sống thông minh' : 'Ngôi nhà trực quan theo thời gian thực'}</h2><p className="mt-1 text-xs text-muted">{viewMode === '2d' ? 'Kéo, thả và sắp xếp phòng, thiết bị, cảm biến' : 'Xoay, thu phóng và khám phá dữ liệu trong không gian 3D'}</p></div></div>
        <div className="flex flex-wrap items-center gap-2"><TwinViewSwitcher mode={viewMode} disabled={loading} onChange={setViewMode} />{viewMode === '2d' && floorLevels.length > 1 ? <TwinFloorSelect floors={floorLevels} value={active2DFloor} allLabel="Tất cả tầng" ariaLabel="Chọn tầng trong sơ đồ 2D" onChange={(floor) => { setSelection(null); setSelected2DFloor(floor); }} /> : null}{viewMode === '2d' && draft ? <>
         <TwinLayoutButton disabled={blocked} onClick={cancel}>Hủy</TwinLayoutButton>
-        <TwinLayoutButton variant="primary" leadingIcon={<Save size={18} />} disabled={!dirty || blocked || role !== 'OWNER' || error?.kind === 'conflict' || error?.kind === 'forbidden'} onClick={() => void dispatch(saveTwinLayout(homeId))}>{saving ? 'Đang lưu…' : 'Lưu bố cục'}</TwinLayoutButton>
+        <TwinLayoutButton variant="primary" leadingIcon={<Save size={18} />} disabled={!hasUnsavedChanges || blocked || role !== 'OWNER' || error?.kind === 'conflict' || error?.kind === 'forbidden'} onClick={() => void save()}>{saving ? 'Đang lưu…' : 'Lưu bố cục'}</TwinLayoutButton>
       </> : confirmed ? <TwinLayoutButton disabled={blocked} onClick={reload}>Tải mới nhất</TwinLayoutButton> : null}</div>
     </div>
     {viewMode === '2d' ? <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line">
@@ -73,7 +117,7 @@ export function TwinLayoutEditor({ homeId }: { homeId: string }) {
         <button type="button" aria-pressed={!draft} disabled={blocked} onClick={cancel} className={`flex min-h-12 items-center gap-2 border-b-2 px-3 text-sm font-semibold ${!draft ? 'border-primary text-primary-hover' : 'border-transparent text-muted'}`}><Eye size={18} aria-hidden="true" />Xem</button>
          {role === 'OWNER' ? <button type="button" aria-pressed={!!draft} disabled={!confirmed || blocked} onClick={startEditing2D} className={`flex min-h-12 items-center gap-2 border-b-2 px-3 text-sm font-semibold ${draft ? 'border-primary text-primary-hover' : 'border-transparent text-muted'}`}><Pencil size={18} aria-hidden="true" />Chỉnh sửa sơ đồ</button> : null}
       </div>
-      <p role="status" className="pb-2 text-xs text-muted">{confirmed ? `Phiên bản ${confirmed.revision} · ${draft ? dirty ? 'Có thay đổi chưa lưu' : 'Đang chỉnh sửa' : 'Chế độ xem'}` : 'Đang tải sơ đồ…'}</p>
+      <p role="status" className="pb-2 text-xs text-muted">{confirmed ? `Phiên bản ${confirmed.revision} · ${draft ? hasUnsavedChanges ? 'Có thay đổi chưa lưu' : 'Đang chỉnh sửa' : 'Chế độ xem'}` : 'Đang tải sơ đồ…'}</p>
     </div> : <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3"><p className="text-sm font-semibold text-primary-hover">Chế độ xem 3D · {draft ? 'Đang xem trước bản nháp 2D' : 'Bố cục đã lưu'}</p><button type="button" onClick={editIn2D} className="min-h-11 rounded-xl px-3 text-sm font-semibold text-text hover:bg-sidebar-hover"><Pencil size={17} className="mr-2 inline" aria-hidden="true" />{role === 'OWNER' ? 'Chỉnh sửa trong 2D' : 'Xem sơ đồ 2D'}</button></div>}
     {roleRequestId ? <p role="status" className="text-sm text-muted">Đang kiểm tra quyền chỉnh sửa…</p> : null}
     {role === 'MEMBER' ? <p className="text-sm text-muted">Thành viên · Chỉ xem sơ đồ.</p> : null}
@@ -84,25 +128,27 @@ export function TwinLayoutEditor({ homeId }: { homeId: string }) {
       {draft && error.kind === 'error' ? <p className="text-sm">Bản nháp vẫn được giữ. Bạn có thể sửa và chọn Lưu sơ đồ để thử lại.</p> : null}
     </div> : null}
     {loading ? <p role="status" className="rounded-xl bg-info-soft p-4 text-sm">Đang tải sơ đồ…</p> : null}
-    {geometry && viewMode === '3d' ? <Suspense fallback={<div role="status" className="surface-card p-8 text-center text-sm text-muted">Đang tải trình xem 3D…</div>}><Twin3DView geometry={geometry} role={role} onEdit2D={editIn2D} /></Suspense> : null}
+    {storageWarning ? <p role="alert" className="rounded-xl border border-warning bg-warning-soft p-4 text-sm text-text">{storageWarning}</p> : null}
+    {geometry && viewMode === '3d' ? <Suspense fallback={<div role="status" className="surface-card p-8 text-center text-sm text-muted">Đang tải trình xem 3D…</div>}><Twin3DView geometry={geometry} drafting={drafting} role={role} onEdit2D={editIn2D} /></Suspense> : null}
      {geometry && viewMode === '2d' ? <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_21rem]">
        <div className="min-w-0 space-y-3">
+        {draft ? <TwinDraftingToolbar metadata={drafting} selection={selection} floor={active2DFloor === 'all' ? floorLevels[0] ?? 1 : active2DFloor} disabled={!editable} mode={draftingMode} onModeChange={setDraftingMode} onChange={changeDrafting} /> : null}
         {draft ? <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <div className="twin-tool"><MousePointer2 size={20} aria-hidden="true" /><span><strong>Kéo & thả</strong><small>Đặt từ bảng bên cạnh</small></span></div>
           <div className="twin-tool"><Move size={20} aria-hidden="true" /><span><strong>Di chuyển</strong><small>Kéo đối tượng trên sơ đồ</small></span></div>
           <div className="twin-tool"><Expand size={20} aria-hidden="true" /><span><strong>Kích thước</strong><small>Kéo góc hoặc nhập số</small></span></div>
-           <button type="button" disabled={!selection || !canEdit2DSelection || !(selection.kind === 'room' ? visible2DGeometry?.rooms.some((room) => room.roomId === selection.id) : visible2DGeometry?.nodes.some((node) => `${node.nodeType}:${node.nodeId}` === selection.id))} onClick={() => { if (selection && visible2DGeometry) { changeVisible2D(removeSelection(visible2DGeometry, selection)); setSelection(null); } }} className="twin-tool text-left disabled:opacity-40"><Trash2 size={20} aria-hidden="true" /><span><strong>Bỏ vị trí</strong><small>{active2DFloor === 'all' && floorLevels.length > 1 ? 'Chọn một tầng trước' : 'Đối tượng đang chọn'}</small></span></button>
+           <button type="button" disabled={!selection || !canEdit2DSelection || !(selection.kind === 'room' ? visible2DGeometry?.rooms.some((room) => room.roomId === selection.id) : visible2DGeometry?.nodes.some((node) => `${node.nodeType}:${node.nodeId}` === selection.id))} onClick={() => { if (selection && visible2DGeometry) { changeVisible2D(removeSelection(visible2DGeometry, selection)); if (selection.kind === 'room') { const rooms = { ...drafting.rooms }; delete rooms[selection.id]; setDrafting({ ...drafting, rooms }); } setSelection(null); } }} className="twin-tool text-left disabled:opacity-40"><Trash2 size={20} aria-hidden="true" /><span><strong>Bỏ vị trí</strong><small>{active2DFloor === 'all' && floorLevels.length > 1 ? 'Chọn một tầng trước' : 'Đối tượng đang chọn'}</small></span></button>
          </div> : null}
-         {active2DFloor === 'all' && floorLevels.length > 1 ? <Twin2DFloorOverview geometry={geometry} floors={floorLevels} selection={selection} onSelect={setSelection} onChooseFloor={(floor) => { setSelection(null); setSelected2DFloor(floor); }} /> : <TwinCanvas key={`${draft ? 'edit' : 'view'}-${active2DFloor}`} geometry={visible2DGeometry ?? geometry} floor={active2DFloor === 'all' ? undefined : active2DFloor} editable={editable} selection={selection} onSelect={setSelection} onChange={changeVisible2D} zoom={zoom} />}
+         {active2DFloor === 'all' && floorLevels.length > 1 ? <Twin2DFloorOverview geometry={geometry} drafting={drafting} floors={floorLevels} selection={selection} onSelect={setSelection} onChooseFloor={(floor) => { setSelection(null); setSelected2DFloor(floor); }} /> : <TwinCanvas key={`${draft ? 'edit' : 'view'}-${active2DFloor}`} geometry={visible2DGeometry ?? geometry} drafting={drafting} floor={active2DFloor === 'all' ? undefined : active2DFloor} editable={editable} selection={selection} onSelect={setSelection} onChange={changeVisible2D} onDraftingChange={changeDrafting} zoom={zoom} />}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap gap-2"><div className="flex items-center rounded-xl border border-line bg-surface p-1"><button type="button" aria-label="Thu nhỏ sơ đồ" disabled={zoom <= 0.5} onClick={() => setZoom((value) => Math.max(0.5, value - 0.25))} className="h-11 w-11 rounded-lg text-lg text-muted hover:bg-sidebar-hover disabled:opacity-40">−</button><output aria-label="Mức thu phóng" className="min-w-14 text-center text-sm font-semibold text-text">{Math.round(zoom * 100)}%</output><button type="button" aria-label="Phóng to sơ đồ" disabled={zoom >= 2} onClick={() => setZoom((value) => Math.min(2, value + 0.25))} className="h-11 w-11 rounded-lg text-lg text-text hover:bg-sidebar-hover disabled:opacity-40">+</button></div><button type="button" aria-label="Đưa sơ đồ vừa màn hình" onClick={() => setZoom(1)} className="flex min-h-11 items-center gap-2 rounded-xl border border-line bg-surface px-3 text-sm font-semibold text-text hover:bg-sidebar-hover"><Expand size={16} aria-hidden="true" />Vừa màn hình</button></div>
           <div className="flex items-center gap-3 text-xs text-muted"><span className="h-3 w-3 rounded-full bg-info" />Phòng<span className="h-3 w-3 rounded-full bg-mint" />Thiết bị<span className="h-3 w-3 rounded-full bg-warning" />Cảm biến</div>
         </div>
-         <p className="text-xs text-muted">{draft ? active2DFloor === 'all' && floorLevels.length > 1 ? 'Đang xem tổng quan. Chọn một tầng trong bộ chọn để chỉnh sửa.' : 'Kéo ↘ ở góc phòng để thay đổi kích thước. Mọi thay đổi chỉ được lưu khi bạn bấm Lưu bố cục.' : 'Bố cục được lấy từ phiên bản đã lưu.'}</p>
+         <p className="text-xs text-muted">{draft ? active2DFloor === 'all' && floorLevels.length > 1 ? 'Đang xem tổng quan. Chọn một tầng trong bộ chọn để chỉnh sửa.' : 'Kéo các điểm tròn để chỉnh góc phòng, kéo góc dưới để đổi khung bao. Mọi thay đổi chỉ được lưu khi bạn bấm Lưu bố cục.' : 'Bố cục được lấy từ phiên bản đã lưu.'}</p>
       </div>
       <aside className="min-w-0 space-y-4">
          {draft && (floorLevels.length <= 1 || active2DFloor !== 'all') ? <TwinUnplacedPanel geometry={geometry} floor={active2DFloor === 'all' ? undefined : active2DFloor} disabled={!editable} onChange={change} /> : null}
-         <TwinLayoutInspector geometry={visible2DGeometry ?? geometry} selection={selection} editable={canEdit2DSelection} onChange={changeVisible2D} />
+         <TwinLayoutInspector geometry={visible2DGeometry ?? geometry} drafting={drafting} mode={draftingMode} selection={selection} editable={canEdit2DSelection} onChange={changeVisible2D} onDraftingChange={changeDrafting} />
       </aside>
     </div> : null}
   </section>;

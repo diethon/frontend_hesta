@@ -86,7 +86,7 @@ try {
     await mouse('mouseReleased', x + dx, y + dy);
     await delay(80);
   };
-  await Promise.all([send('Page.enable'), send('Runtime.enable')]);
+  await Promise.all([send('Page.enable'), send('Runtime.enable'), send('DOM.enable')]);
   await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1100, deviceScaleFactor: 1, mobile: false });
   await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
   await send('Page.navigate', { url: process.env.TEST_LAYOUT_URL ?? 'http://127.0.0.1:5173/tests/twin-layout-preview.html' });
@@ -112,6 +112,29 @@ try {
   await drag(`[data-room-id="${initialRoom.roomId}"] button[aria-label^="Đổi kích thước"]`, -50, -40);
   state = await inspect();
   check('real pointer resize changes draft dimensions', state.layout.draft.rooms[0].width < beforeResize);
+  await fixtureOpen(false);
+  await click('Phòng chữ L');
+  check('shape selector applies an L-shaped outline to the selected room', await evaluate(`document.querySelector('[data-room-id="${initialRoom.roomId}"]').dataset.roomShape === 'L_SHAPE' && document.querySelectorAll('[data-room-id="${initialRoom.roomId}"] button[aria-label^="Kéo đỉnh"]').length === 6`));
+  const outlineBeforeRotate = await evaluate(`document.querySelector('[data-room-id="${initialRoom.roomId}"] polygon').getAttribute('points')`);
+  await click('Xoay phòng sang phải 90 độ');
+  const rotatedRoom = await evaluate(`(() => { const room = document.querySelector('[data-room-id="${initialRoom.roomId}"]'); return { outline: room.querySelector('polygon').getAttribute('points'), handles: room.querySelectorAll('button[aria-label^="Kéo đỉnh"]').length }; })()`);
+  check('L-shaped room rotates 90 degrees without rebuilding its corners', outlineBeforeRotate !== rotatedRoom.outline && rotatedRoom.handles === 6);
+  const vertexSelector = `[data-room-id="${initialRoom.roomId}"] button[aria-label^="Kéo đỉnh 4"]`;
+  const vertexBefore = await evaluate(`document.querySelector(${JSON.stringify(vertexSelector)}).getAttribute('style')`);
+  await drag(vertexSelector, -22, 14);
+  check('corner drag updates one editable room vertex', vertexBefore !== await evaluate(`document.querySelector(${JSON.stringify(vertexSelector)}).getAttribute('style')`));
+  await click('Nhập kích thước');
+  check('optional metric editor is available without changing API geometry', await evaluate(`(() => { const input = [...document.querySelectorAll('label')].find(e => e.textContent.trim() === 'Chiều rộng (m)')?.querySelector('input'); return !!input && !input.disabled; })()`));
+  await field('Chiều rộng (m)', 4.2);
+  await waitFor(`document.querySelector('[data-room-id="${initialRoom.roomId}"]').textContent.includes('4.2 m')`);
+  check('metric dimension annotates the room while normalized layout geometry stays unchanged', (await inspect()).layout.draft.rooms[0].width === state.layout.draft.rooms[0].width);
+  await fixtureOpen(false);
+  const documentNode = await send('DOM.getDocument');
+  const uploadNode = await send('DOM.querySelector', { nodeId: documentNode.root.nodeId, selector: 'input[type="file"]' });
+  await send('DOM.setFileInputFiles', { nodeId: uploadNode.nodeId, files: [resolve(evidence, 'desktop-view.png')] });
+  await waitFor(`document.querySelector('[data-blueprint-underlay]') !== null`);
+  check('blueprint upload renders a faded image under the editable 2D plan', await evaluate(`document.body.textContent.includes('desktop-view.png') && Number(document.querySelector('[data-blueprint-underlay]').style.opacity) === 0.3`));
+  await screenshot('desktop-shape-precise');
   const sensor = state.layout.draft.nodes.find((node) => node.nodeType === 'SENSOR');
   await fixtureOpen(false);
   const sensorSelector = `[data-node-key="SENSOR:${sensor.nodeId}"]`;
@@ -248,7 +271,7 @@ try {
   await screenshot('reference-four-rooms', true);
   const errors = events.filter((event) => event.method === 'Runtime.exceptionThrown');
   check('browser reports no uncaught exceptions', errors.length === 0);
-  await writeFile(resolve(evidence, 'browser-results.json'), JSON.stringify({ results, screenshots: ['desktop-view', 'desktop-edit-realtime', 'desktop-conflict', 'mobile-view', 'mobile-edit', 'reference-four-rooms'], errors }, null, 2));
+  await writeFile(resolve(evidence, 'browser-results.json'), JSON.stringify({ results, screenshots: ['desktop-view', 'desktop-shape-precise', 'desktop-edit-realtime', 'desktop-conflict', 'mobile-view', 'mobile-edit', 'reference-four-rooms'], errors }, null, 2));
   await send('Browser.close');
 } finally {
   socket?.close(); chrome.kill();

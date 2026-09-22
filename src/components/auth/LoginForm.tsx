@@ -5,6 +5,7 @@ import type { AuthResponse, LoginRequest } from '../../types/auth';
 import { getErrorMessage } from '../../utils/errors';
 import { GoogleSignInButton } from './GoogleAccountModal';
 import { AuthShell } from '../ui/AuthShell';
+import { notify } from '../ui/notify';
 
 interface LoginFormProps {
   onLoginSuccess: (authData: AuthResponse) => void;
@@ -56,6 +57,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
 
       if (response.result) {
         onLoginSuccess(response.result);
+        notify.success('Đăng nhập thành công');
       }
     } catch (error: unknown) {
       setError(getErrorMessage(error, 'Email hoặc mật khẩu không chính xác.'));
@@ -77,6 +79,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
 
       if (response.result) {
         onLoginSuccess(response.result);
+        notify.success('Đăng nhập bằng Google thành công');
       }
     } catch (error: unknown) {
       setError(getErrorMessage(error, 'Xác thực tài khoản Google thất bại.'));

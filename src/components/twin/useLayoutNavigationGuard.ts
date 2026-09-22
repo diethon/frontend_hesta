@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useBlocker } from 'react-router';
 import { useAppSelector } from '../../store/hooks';
+import { notify } from '../ui/notify';
 
 export function useLayoutNavigationGuard() {
   const dirty = useAppSelector((state) => state.twinLayout.dirty);
@@ -9,7 +10,7 @@ export function useLayoutNavigationGuard() {
   useEffect(() => {
     if (blocker.state !== 'blocked') return;
     if (saving) {
-      window.alert('Sơ đồ đang được lưu. Vui lòng chờ kết quả trước khi rời trang.');
+      notify.info('Sơ đồ đang được lưu', 'Vui lòng chờ hoàn tất trước khi rời trang.');
       blocker.reset();
     } else if (window.confirm('Bỏ các thay đổi sơ đồ chưa lưu và rời trang?')) blocker.proceed();
     else blocker.reset();

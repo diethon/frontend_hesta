@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import type { DeviceResponse, DeviceStateHistoryResponse } from '../../types/device';
 import { removeDevice, getDeviceHistory } from '../../services/deviceApi';
 import { getErrorMessage } from '../../utils/errors';
+import { notify } from '../ui/notify';
 
 interface DeviceDetailModalProps {
   isOpen: boolean;
@@ -12,7 +13,6 @@ interface DeviceDetailModalProps {
 
 export const DeviceDetailModal: React.FC<DeviceDetailModalProps> = ({ isOpen, onClose, device, onDeviceRemoved }) => {
   const [isDeleting, setIsDeleting] = useState(false);
-  const [error, setError] = useState('');
   const [history, setHistory] = useState<DeviceStateHistoryResponse[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
 
@@ -41,13 +41,13 @@ export const DeviceDetailModal: React.FC<DeviceDetailModalProps> = ({ isOpen, on
     }
     
     setIsDeleting(true);
-    setError('');
     try {
       await removeDevice(device.id);
       onDeviceRemoved(device.id);
       onClose();
+      notify.success('Đã xóa thiết bị', device.name);
     } catch (err: unknown) {
-      setError(getErrorMessage(err, 'Lỗi khi xóa thiết bị'));
+      notify.error(getErrorMessage(err, 'Lỗi khi xóa thiết bị'));
     } finally {
       setIsDeleting(false);
     }
@@ -102,12 +102,6 @@ export const DeviceDetailModal: React.FC<DeviceDetailModalProps> = ({ isOpen, on
         </div>
         
         <div className="p-6 space-y-6 overflow-y-auto">
-          {error && (
-            <div role="alert" aria-live="polite" className="text-rose-400 bg-rose-950/30 p-3 rounded-lg border border-rose-900/50 text-sm">
-              {error}
-            </div>
-          )}
-
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 bg-slate-800 rounded-xl flex items-center justify-center text-3xl shrink-0">
               {renderIcon()}
@@ -208,7 +202,7 @@ export const DeviceDetailModal: React.FC<DeviceDetailModalProps> = ({ isOpen, on
 
         <div className="p-4 border-t border-slate-800 bg-slate-900 flex justify-between gap-3 shrink-0">
           <button
-            onClick={() => alert('Chức năng cập nhật cấu hình đang phát triển…')}
+            onClick={() => notify.info('Chức năng cập nhật cấu hình đang được phát triển.')}
             className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-medium transition-colors text-sm"
           >
             Chỉnh sửa

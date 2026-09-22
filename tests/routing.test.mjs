@@ -25,6 +25,7 @@ const routerForTests = {
   ...router,
   Navigate: (props) => { redirects.push(props); return null; },
 };
+const toastForServerRender = { __esModule: true, default: Object.assign(() => '', { custom: () => '', dismiss() {} }), Toaster: () => null };
 
 function loadSource(path) {
   const filename = resolve(root, path);
@@ -38,6 +39,7 @@ function loadSource(path) {
   });
   const sourceRequire = (name) => {
     if (name === 'react-router') return routerForTests;
+    if (name === 'react-hot-toast') return toastForServerRender;
     if (!name.startsWith('.')) return require(name);
     const base = resolve(dirname(filename), name);
     const dependencyPath = ['.ts', '.tsx'].map((extension) => base + extension).find(existsSync);

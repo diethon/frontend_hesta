@@ -1,5 +1,18 @@
 @import "tailwindcss";
 
+.hesta-toast {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+.hesta-toast[data-visible="false"] {
+  opacity: 0;
+  transform: translateY(-8px) scale(.98);
+}
+@media (prefers-reduced-motion: reduce) {
+  .hesta-toast { transition: none; }
+}
+
 .twin-viewport { --twin-canvas-height: clamp(28rem, 38vw, 38rem); height: calc(var(--twin-canvas-height) + 2px); }
 .twin-2d-overview-viewport { --twin-canvas-height: clamp(14rem, 20vw, 18rem); }
 .twin-canvas {

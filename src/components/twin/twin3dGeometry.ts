@@ -1,4 +1,5 @@
 import type { TwinLayoutGeometry, TwinNodeLayout, TwinRoomLayout } from '../../types/twinLayout';
+import type { TwinRoomDrafting } from './twinDrafting';
 
 export const TWIN_WORLD_WIDTH = 18;
 export const TWIN_WORLD_DEPTH = 12;
@@ -19,6 +20,18 @@ export interface Twin3DRoomGeometry extends Twin3DPoint {
   roomId: string;
   width: number;
   depth: number;
+}
+
+export interface Twin3DLocalPoint {
+  x: number;
+  z: number;
+}
+
+export interface Twin3DShapedRoomGeometry extends Twin3DRoomGeometry {
+  outline: Twin3DLocalPoint[];
+  wallHeight: number;
+  wallThickness: number;
+  customShape: boolean;
 }
 
 export interface Twin3DNodeGeometry extends Twin3DPoint {
@@ -71,6 +84,25 @@ export function roomToWorld(room: TwinRoomLayout, elevation = 0): Twin3DRoomGeom
     ...center,
     width: room.width * TWIN_WORLD_WIDTH,
     depth: room.height * TWIN_WORLD_DEPTH,
+  };
+}
+
+export function roomToWorldWithDrafting(room: TwinRoomLayout, drafting: TwinRoomDrafting, elevation = 0): Twin3DShapedRoomGeometry {
+  const world = roomToWorld(room, elevation);
+  return {
+    ...world,
+    outline: drafting.points.map((point) => ({
+      x: (point.x - 0.5) * world.width,
+      z: (point.y - 0.5) * world.depth,
+    })),
+    wallHeight: Number.isFinite(drafting.floorHeightMeters)
+      ? Math.max(1.8, Math.min(6, drafting.floorHeightMeters ?? TWIN_ROOM_WALL_HEIGHT))
+      : TWIN_ROOM_WALL_HEIGHT,
+    wallThickness: Number.isFinite(drafting.wallThicknessMeters)
+      ? Math.max(0.05, Math.min(0.5, drafting.wallThicknessMeters ?? TWIN_WALL_THICKNESS))
+      : TWIN_WALL_THICKNESS,
+    customShape: drafting.shape !== 'RECTANGLE' || drafting.points.length !== 4
+      || drafting.points.some((point, index) => point.x !== [0, 1, 1, 0][index] || point.y !== [0, 0, 1, 1][index]),
   };
 }
 

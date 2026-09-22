@@ -1,6 +1,7 @@
-import { memo } from 'react';
-import type { ThreeEvent } from '@react-three/fiber';
+import { memo, useRef } from 'react';
+import { useFrame, type ThreeEvent } from '@react-three/fiber';
 import { RoundedBox } from '@react-three/drei';
+import type { Group } from 'three';
 import type { Twin3DBounds, Twin3DRoomGeometry } from './twin3dGeometry';
 import { TWIN_FLOOR_HEIGHT } from './twin3dGeometry';
 import type { Twin3DPalette } from './twin3dPalette';
@@ -75,11 +76,19 @@ function Window({ position, width, rotation = [0, 0, 0], palette }: { position: 
 }
 
 function ArchitectureDetails({ room, palette }: { room: Twin3DRoomGeometry; palette: Twin3DPalette }) {
+  const backWindow = useRef<Group>(null);
+  const sideWindow = useRef<Group>(null);
+  const door = useRef<Group>(null);
+  useFrame(({ camera }) => {
+    if (backWindow.current) backWindow.current.visible = camera.position.z >= room.z;
+    if (sideWindow.current) sideWindow.current.visible = camera.position.x >= room.x;
+    if (door.current) door.current.visible = camera.position.z <= room.z;
+  });
   const windowWidth = Math.min(2.1, Math.max(1.15, room.width * .3));
   return <>
-    <Window position={[0, 1.35, -room.depth / 2 - .065]} width={windowWidth} palette={palette} />
-    <Window position={[room.width / 2 + .065, 1.28, 0]} width={Math.min(1.7, Math.max(1.05, room.depth * .28))} rotation={[0, -Math.PI / 2, 0]} palette={palette} />
-    <group position={[room.width * .25, 1.12, room.depth / 2 + .068]}>
+    <group ref={backWindow}><Window position={[0, 1.35, -room.depth / 2 - .065]} width={windowWidth} palette={palette} /></group>
+    <group ref={sideWindow}><Window position={[-room.width / 2 - .065, 1.28, 0]} width={Math.min(1.7, Math.max(1.05, room.depth * .28))} rotation={[0, Math.PI / 2, 0]} palette={palette} /></group>
+    <group ref={door} position={[room.width * .25, 1.12, room.depth / 2 + .068]}>
       <Block position={[0, 0, 0]} size={[.92, 1.92, .06]} color={palette.wood} roughness={.86} />
       <Block position={[.32, 0, .045]} size={[.06, .06, .06]} color={palette.dark} metalness={.35} />
     </group>
@@ -247,19 +256,22 @@ function Office({ room, palette }: { room: Twin3DRoomGeometry; palette: Twin3DPa
   </>;
 }
 
-export const Twin3DRoomDecor = memo(function Twin3DRoomDecor({ room, name, palette, compact, onSelect }: {
+export const Twin3DRoomDecor = memo(function Twin3DRoomDecor({ room, name, palette, compact, shaped, onSelect }: {
   room: Twin3DRoomGeometry;
   name: string;
   palette: Twin3DPalette;
   compact: boolean;
+  shaped?: boolean;
   onSelect: (event: ThreeEvent<PointerEvent>) => void;
 }) {
   const value = name.toLocaleLowerCase();
   const kind = /living|khách/.test(value) ? 'living' : /bed|ngủ/.test(value) ? 'bedroom' : /kitchen|bếp/.test(value) ? 'kitchen' : /bath|tắm|vệ sinh/.test(value) ? 'bathroom' : 'other';
   return <group onPointerDown={onSelect}>
-    <FloorPattern room={room} kind={kind} palette={palette} />
-    {!compact ? <ArchitectureDetails room={room} palette={palette} /> : null}
-    {kind === 'living' ? <LivingRoom room={room} palette={palette} /> : kind === 'bedroom' ? <Bedroom room={room} palette={palette} /> : kind === 'kitchen' ? <Kitchen room={room} palette={palette} /> : kind === 'bathroom' ? <Bathroom room={room} palette={palette} /> : <Office room={room} palette={palette} />}
+    {!shaped ? <FloorPattern room={room} kind={kind} palette={palette} /> : null}
+    {!compact && !shaped ? <ArchitectureDetails room={room} palette={palette} /> : null}
+    <group scale={shaped ? [0.7, 1, 0.7] : [1, 1, 1]}>
+      {kind === 'living' ? <LivingRoom room={room} palette={palette} /> : kind === 'bedroom' ? <Bedroom room={room} palette={palette} /> : kind === 'kitchen' ? <Kitchen room={room} palette={palette} /> : kind === 'bathroom' ? <Bathroom room={room} palette={palette} /> : <Office room={room} palette={palette} />}
+    </group>
   </group>;
 });
 
@@ -276,15 +288,15 @@ export const Twin3DLandscape = memo(function Twin3DLandscape({ bounds, palette, 
   const halfW = bounds.width / 2;
   const halfD = bounds.depth / 2;
   const trees: { position: Vec3; scale: number }[] = [
-    { position: [bounds.centerX - halfW - .7, .02, bounds.centerZ - halfD + .8], scale: .85 },
-    { position: [bounds.centerX + halfW + .72, .02, bounds.centerZ - halfD + 1.2], scale: 1 },
-    { position: [bounds.centerX - halfW - .72, .02, bounds.centerZ + halfD - .8], scale: .72 },
-    { position: [bounds.centerX + halfW + .76, .02, bounds.centerZ + halfD - 1.15], scale: .82 },
+    { position: [bounds.centerX - halfW - .46, .02, bounds.centerZ - halfD + .8], scale: .78 },
+    { position: [bounds.centerX + halfW + .46, .02, bounds.centerZ - halfD + 1.2], scale: .9 },
+    { position: [bounds.centerX - halfW - .46, .02, bounds.centerZ + halfD - .8], scale: .7 },
+    { position: [bounds.centerX + halfW + .46, .02, bounds.centerZ + halfD - 1.15], scale: .76 },
   ];
   return <group>
-    <Block position={[bounds.centerX, -.09, bounds.centerZ]} size={[bounds.width + 2.4, .14, bounds.depth + 2.4]} color={palette.successSoft} radius={.32} />
-    <Block position={[bounds.centerX + bounds.width * .24, -.005, bounds.centerZ + halfD + .75]} size={[2.4, .05, 1.35]} color={palette.off} radius={.12} />
+    <Block position={[bounds.centerX, -.09, bounds.centerZ]} size={[bounds.width + 1.2, .14, bounds.depth + 1.2]} color={palette.successSoft} radius={.28} />
+    <Block position={[bounds.centerX + bounds.width * .24, -.005, bounds.centerZ + halfD + .35]} size={[1.8, .05, .8]} color={palette.off} radius={.1} />
     {!compact ? trees.map((tree, index) => <Tree key={index} position={tree.position} scale={tree.scale} palette={palette} />) : null}
-    {[-.32, 0, .32].map((ratio) => <Plant key={ratio} position={[bounds.centerX + bounds.width * ratio, .01, bounds.centerZ - halfD - .63]} scale={.6} palette={palette} />)}
+    {[-.32, 0, .32].map((ratio) => <Plant key={ratio} position={[bounds.centerX + bounds.width * ratio, .01, bounds.centerZ - halfD - .32]} scale={.5} palette={palette} />)}
   </group>;
 });
