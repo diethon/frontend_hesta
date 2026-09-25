@@ -72,7 +72,7 @@ export const DevicePage: React.FC = () => {
     return () => window.clearTimeout(timer);
   }, [fetchDevices]);
 
-  const handleTogglePower = async async (deviceId: string, currentPower: string) => {
+  const handleTogglePower =  async (deviceId: string, currentPower: string) => {
     // 1. Optimistic update
     setPowerPendingId(deviceId); setCommandError(''); setCommandSuccess('');
     try {

@@ -5,6 +5,7 @@ import {
   createScene,
   deleteScene,
   getScene,
+  getSceneActionTypes,
   listScenes,
   removeSceneAction,
   reorderSceneActions,
@@ -12,35 +13,21 @@ import {
 } from '../../services/sceneApi';
 import type { DeviceResponse } from '../../types/device';
 import type { SceneActionType, SceneResponse } from '../../types/scene';
+import { buildSceneActionInput, formatSceneAction, getSceneDeviceActions } from '../scene/sceneActions';
 
 interface SceneManagementProps {
   homeId: string;
   currentUserRole: 'OWNER' | 'MEMBER';
 }
 
-const ACTION_LABELS: Record<SceneActionType, string> = {
-  TURN_ON: 'Bật thiết bị',
-  TURN_OFF: 'Tắt thiết bị',
-  SET_BRIGHTNESS: 'Đặt độ sáng',
-  SET_TEMPERATURE: 'Đặt nhiệt độ',
-  SET_SPEED: 'Đặt tốc độ',
-  SET_STATE: 'Đặt trạng thái JSON',
-};
-
-const ACTIONS = Object.keys(ACTION_LABELS) as SceneActionType[];
-
 const messageOf = (error: unknown) =>
   error instanceof Error ? error.message : 'Đã xảy ra lỗi. Vui lòng thử lại.';
-
-const displayValue = (value: unknown) => {
-  if (value === null || value === undefined) return 'Không có giá trị';
-  return typeof value === 'object' ? JSON.stringify(value) : String(value);
-};
 
 export const SceneManagement: React.FC<SceneManagementProps> = ({ homeId, currentUserRole }) => {
   const isOwner = currentUserRole === 'OWNER';
   const [scenes, setScenes] = useState<SceneResponse[]>([]);
   const [devices, setDevices] = useState<DeviceResponse[]>([]);
+  const [actionTypes, setActionTypes] = useState<SceneActionType[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -51,25 +38,32 @@ export const SceneManagement: React.FC<SceneManagementProps> = ({ homeId, curren
   const [description, setDescription] = useState('');
   const [enabled, setEnabled] = useState(true);
   const [actionDeviceId, setActionDeviceId] = useState('');
-  const [actionType, setActionType] = useState<SceneActionType>('TURN_OFF');
+  const [actionType, setActionType] = useState('');
   const [actionValue, setActionValue] = useState('');
 
   const selectedScene = useMemo(
     () => scenes.find((scene) => scene.id === selectedId) ?? null,
     [scenes, selectedId],
   );
+  const selectedDevice = devices.find((device) => device.id === actionDeviceId);
+  const availableActions = getSceneDeviceActions(selectedDevice, actionTypes);
+  const selectedAction = availableActions.find((action) => action.code === actionType);
 
   const loadData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [sceneData, deviceData] = await Promise.all([
+      const [sceneData, deviceData, typeData] = await Promise.all([
         listScenes(homeId),
         getDevicesByHome(homeId),
+        getSceneActionTypes(homeId),
       ]);
       setScenes(sceneData);
       setDevices(deviceData);
-      setActionDeviceId((current) => current || deviceData[0]?.id || '');
+      setActionTypes(typeData);
+      setActionDeviceId('');
+      setActionType('');
+      setActionValue('');
       setSelectedId((current) =>
         current && sceneData.some((scene) => scene.id === current)
           ? current
@@ -145,32 +139,17 @@ export const SceneManagement: React.FC<SceneManagementProps> = ({ homeId, curren
     }
   };
 
-  const parseActionValue = (): unknown | null => {
-    if (actionType === 'TURN_ON' || actionType === 'TURN_OFF') return null;
-    if (actionType === 'SET_STATE') {
-      const parsed: unknown = JSON.parse(actionValue);
-      if (!parsed || Array.isArray(parsed) || typeof parsed !== 'object') {
-        throw new Error('Trạng thái phải là một đối tượng JSON.');
-      }
-      return parsed;
-    }
-    const parsed = Number(actionValue);
-    if (!Number.isFinite(parsed)) throw new Error('Giá trị hành động phải là số.');
-    return parsed;
-  };
-
   const addAction = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!selectedScene || !actionDeviceId) return;
+    if (!selectedScene) return;
     setSaving(true);
     setError(null);
     try {
-      await addSceneAction(homeId, selectedScene.id, {
-        targetDeviceId: actionDeviceId,
-        action: actionType,
-        value: parseActionValue(),
-        order: selectedScene.actions.length,
-      });
+      const input = buildSceneActionInput(
+        { deviceId: actionDeviceId, action: actionType, value: actionValue },
+        selectedScene.actions.length, devices, actionTypes,
+      );
+      await addSceneAction(homeId, selectedScene.id, input);
       setActionValue('');
       await refreshScene(selectedScene.id);
     } catch (err) {
@@ -261,7 +240,7 @@ export const SceneManagement: React.FC<SceneManagementProps> = ({ homeId, curren
                     <span className="w-6 text-center text-xs font-semibold text-slate-500">{index + 1}</span>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm text-slate-200">{action.targetDeviceName}</p>
-                      <p className="truncate text-xs text-slate-500">{ACTION_LABELS[action.action]} · {displayValue(action.value)}</p>
+                      <p className="truncate text-xs text-slate-500">{formatSceneAction(action)}</p>
                     </div>
                     {isOwner && (
                       <div className="flex gap-1">
@@ -275,24 +254,43 @@ export const SceneManagement: React.FC<SceneManagementProps> = ({ homeId, curren
               </div>
 
               {isOwner && (
-                <form onSubmit={addAction} className="grid gap-2 border-t border-slate-800 pt-4 md:grid-cols-4">
-                  <select aria-label="Thiết bị cho hành động" required value={actionDeviceId} onChange={(event) => setActionDeviceId(event.target.value)} className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm">
-                    <option value="">Chọn thiết bị</option>
-                    {devices.map((device) => <option key={device.id} value={device.id}>{device.name}</option>)}
-                  </select>
-                  <select aria-label="Loại hành động" value={actionType} onChange={(event) => { setActionType(event.target.value as SceneActionType); setActionValue(''); }} className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm">
-                    {ACTIONS.map((action) => <option key={action} value={action}>{ACTION_LABELS[action]}</option>)}
-                  </select>
-                  <input
-                    aria-label="Giá trị hành động"
-                    value={actionValue}
-                    onChange={(event) => setActionValue(event.target.value)}
-                    disabled={actionType === 'TURN_ON' || actionType === 'TURN_OFF'}
-                    required={actionType !== 'TURN_ON' && actionType !== 'TURN_OFF'}
-                    placeholder={actionType === 'SET_STATE' ? '{"mode":"eco"}' : 'Giá trị'}
-                    className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm disabled:opacity-40"
-                  />
-                  <button disabled={saving || devices.length === 0} className="rounded-lg bg-cyan-600 px-3 py-2 text-sm font-medium disabled:opacity-50">Thêm hành động</button>
+                <form onSubmit={addAction} className="grid gap-3 border-t border-line pt-4 sm:grid-cols-2 lg:grid-cols-3">
+                  <label className="block text-sm text-text">Thiết bị
+                    <select required value={actionDeviceId} onChange={(event) => {
+                      const nextDeviceId = event.target.value;
+                      const firstAction = getSceneDeviceActions(devices.find((device) => device.id === nextDeviceId), actionTypes)[0];
+                      setActionDeviceId(nextDeviceId);
+                      setActionType(firstAction?.code ?? '');
+                      setActionValue(firstAction?.defaultValue ?? '');
+                    }} className="input mt-1">
+                      <option value="" disabled>Chọn thiết bị đã ghép nối</option>
+                      {devices.map((device) => <option key={device.id} value={device.id}>{device.name}</option>)}
+                    </select>
+                  </label>
+                  <label className="block text-sm text-text">Hành động
+                    <select required value={actionType} onChange={(event) => {
+                      const nextAction = availableActions.find((action) => action.code === event.target.value);
+                      setActionType(nextAction?.code ?? '');
+                      setActionValue(nextAction?.defaultValue ?? '');
+                    }} disabled={!selectedDevice || !availableActions.length} className="input mt-1">
+                      {!selectedDevice && <option value="">Chọn thiết bị trước</option>}
+                      {selectedDevice && !availableActions.length && <option value="">Không có hành động phù hợp</option>}
+                      {availableActions.map((action) => <option key={action.code} value={action.code}>{action.label}</option>)}
+                    </select>
+                  </label>
+                  {(selectedAction?.valueKind === 'percentage' || selectedAction?.valueKind === 'number') && (
+                    <label className="block text-sm text-text">{selectedAction.valueLabel}
+                      <input required type="number" min={selectedAction.valueKind === 'percentage' ? 0 : undefined} max={selectedAction.valueKind === 'percentage' ? 100 : undefined} step={selectedAction.valueKind === 'percentage' ? 1 : 'any'} value={actionValue} onChange={(event) => setActionValue(event.target.value)} className="input mt-1" />
+                    </label>
+                  )}
+                  {selectedAction?.valueKind === 'json' && (
+                    <label className="block text-sm text-text">{selectedAction.valueLabel}
+                      <textarea required value={actionValue} onChange={(event) => setActionValue(event.target.value)} placeholder='{"power":"ON"}' className="input mt-1" />
+                    </label>
+                  )}
+                  {selectedDevice && !availableActions.length && <p className="text-sm text-muted sm:col-span-2 lg:col-span-3">Thiết bị này chưa hỗ trợ hành động hợp lệ cho kịch bản.</p>}
+                  {!devices.length && <p className="text-sm text-muted sm:col-span-2 lg:col-span-3">Chưa có thiết bị đã ghép nối trong nhà này.</p>}
+                  <button disabled={saving || !selectedAction} className="rounded-xl bg-primary px-3 py-2 text-sm font-medium text-white disabled:opacity-50 sm:col-span-2 lg:col-span-3">{saving ? 'Đang thêm...' : 'Thêm hành động'}</button>
                 </form>
               )}
             </div>

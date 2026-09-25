@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
-import { createScene, deleteScene, executeScene, getDevices, getScene, getSceneExecutions, getScenes, updateScene } from '../../services/sceneApi';
-import type { SceneExecutionResponse, SceneResponse } from '../../types/scene';
+import { createScene, deleteScene, executeScene, getDevices, getScene, getSceneActionTypes, getSceneExecutions, getScenes, updateScene } from '../../services/sceneApi';
+import type { SceneActionType, SceneExecutionResponse, SceneResponse } from '../../types/scene';
 import type { DeviceSummary } from '../../types/automation';
 import { buildSceneActionInput, formatSceneAction, getSceneDeviceActions, sceneActionsToDraft, sceneToggleInput, type DraftSceneAction } from './sceneActions';
 import { SchedulePanel } from '../ui/SchedulePanel';
@@ -15,6 +15,8 @@ function SceneWorkspace({ homeId, sceneId }: { homeId: string; sceneId?: string 
   const navigate = useNavigate();
   const [scenes, setScenes] = useState<SceneResponse[]>([]);
   const [devices, setDevices] = useState<DeviceSummary[]>([]);
+  const [actionTypes, setActionTypes] = useState<SceneActionType[]>([]);
+  const [loadingOptions, setLoadingOptions] = useState(true);
   const [editingScene, setEditingScene] = useState<SceneResponse | null>(null);
   const [loadingScene, setLoadingScene] = useState(Boolean(sceneId));
   const [togglingSceneId, setTogglingSceneId] = useState<string | null>(null);
@@ -33,9 +35,10 @@ function SceneWorkspace({ homeId, sceneId }: { homeId: string; sceneId?: string 
 
   const load = useCallback(async () => {
     try {
-      const [sceneResult, deviceResult] = await Promise.all([getScenes(homeId), getDevices(homeId)]);
+      const [sceneResult, deviceResult, typeResult] = await Promise.all([getScenes(homeId), getDevices(homeId), getSceneActionTypes(homeId)]);
       setScenes(sceneResult);
       setDevices(deviceResult);
+      setActionTypes(typeResult);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Không thể tải dữ liệu');
     }
@@ -43,15 +46,17 @@ function SceneWorkspace({ homeId, sceneId }: { homeId: string; sceneId?: string 
 
   useEffect(() => {
     let active = true;
-    Promise.all([getScenes(homeId), getDevices(homeId)])
-      .then(([sceneResult, deviceResult]) => {
+    Promise.all([getScenes(homeId), getDevices(homeId), getSceneActionTypes(homeId)])
+      .then(([sceneResult, deviceResult, typeResult]) => {
         if (!active) return;
         setScenes(sceneResult);
         setDevices(deviceResult);
+        setActionTypes(typeResult);
       })
       .catch((caught: unknown) => {
         if (active) setError(caught instanceof Error ? caught.message : 'Không thể tải dữ liệu');
-      });
+      })
+      .finally(() => { if (active) setLoadingOptions(false); });
     return () => { active = false; };
   }, [homeId]);
 
@@ -76,28 +81,22 @@ function SceneWorkspace({ homeId, sceneId }: { homeId: string; sceneId?: string 
   }, [homeId, sceneId]);
 
   const addAction = () => {
-    const device = devices.find((candidate) => getSceneDeviceActions(candidate).length > 0);
-    const option = getSceneDeviceActions(device)[0];
-    if (device && option) setActions((current) => [...current, {
-      deviceId: device.id, action: option.code, value: option.defaultValue,
-    }]);
+    setActions((current) => [...current, { deviceId: '', action: '', value: '' }]);
   };
 
   const updateAction = (index: number, patch: Partial<DraftSceneAction>) =>
     setActions((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, ...patch } : item));
 
   const changeActionDevice = (index: number, deviceId: string) => {
-    const option = getSceneDeviceActions(devices.find((device) => device.id === deviceId))[0];
+    const option = getSceneDeviceActions(devices.find((device) => device.id === deviceId), actionTypes)[0];
     updateAction(index, { deviceId, action: option?.code ?? '', value: option?.defaultValue ?? '' });
   };
 
   const changeActionType = (index: number, actionCode: string) => {
     const selected = devices.find((device) => device.id === actions[index]?.deviceId);
-    const option = getSceneDeviceActions(selected).find((candidate) => candidate.code === actionCode);
+    const option = getSceneDeviceActions(selected, actionTypes).find((candidate) => candidate.code === actionCode);
     updateAction(index, { action: option?.code ?? '', value: option?.defaultValue ?? '' });
   };
-
-  const hasActionableDevice = devices.some((device) => getSceneDeviceActions(device).length > 0);
 
   const moveAction = (index: number, direction: -1 | 1) => setActions((current) => {
     const target = index + direction;
@@ -115,7 +114,7 @@ function SceneWorkspace({ homeId, sceneId }: { homeId: string; sceneId?: string 
     try {
       const input = {
         name, icon, description, enabled,
-        actions: actions.map((action, order) => buildSceneActionInput(action, order, devices)),
+        actions: actions.map((action, order) => buildSceneActionInput(action, order, devices, actionTypes)),
       };
       if (sceneId) {
         const updated = await updateScene(homeId, sceneId, input);
@@ -229,28 +228,30 @@ function SceneWorkspace({ homeId, sceneId }: { homeId: string; sceneId?: string 
         <Field label="Biểu tượng"><select value={icon} onChange={(e) => setIcon(e.target.value)} className="input"><option value="🏠">🏠 Nhà</option><option value="💡">💡 Đèn</option><option value="🌙">🌙 Ban đêm</option><option value="☀️">☀️ Buổi sáng</option><option value="❄️">❄️ Làm mát</option></select></Field>
         <Field label="Mô tả"><textarea value={description} onChange={(e) => setDescription(e.target.value)} className="input" /></Field>
         <label className="flex gap-2"><input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} /> Bật kịch bản</label>
-        <div className="flex items-center justify-between"><h3 className="font-medium">Hành động</h3><button type="button" onClick={addAction} disabled={!hasActionableDevice} className="button">+ Thêm</button></div>
-        {!hasActionableDevice && <p className="text-sm text-amber-300">Chưa có thiết bị hỗ trợ hành động trong kịch bản.</p>}
+        <div className="flex items-center justify-between"><h3 className="font-medium">Hành động</h3><button type="button" onClick={addAction} disabled={saving || loadingOptions || !devices.length || !actionTypes.length} className="button">+ Thêm</button></div>
+        {loadingOptions ? <p className="text-sm text-muted">Đang tải thiết bị và hành động...</p> : !devices.length && <p className="text-sm text-muted">Chưa có thiết bị đã ghép nối trong nhà này.</p>}
         {actions.map((action, index) => {
           const selectedDevice = devices.find((device) => device.id === action.deviceId);
-          const availableActions = getSceneDeviceActions(selectedDevice);
+          const availableActions = getSceneDeviceActions(selectedDevice, actionTypes);
           const selectedOption = availableActions.find((option) => option.code === action.action);
           return <div key={index} className="space-y-2 rounded-xl border border-slate-700 p-3">
-            <label className="block text-sm">Thiết bị hành động {index + 1}<select value={action.deviceId} onChange={(e) => changeActionDevice(index, e.target.value)} className="input mt-1">
+            <label className="block text-sm">Thiết bị hành động {index + 1}<select required value={action.deviceId} onChange={(e) => changeActionDevice(index, e.target.value)} className="input mt-1">
+              <option value="" disabled>Chọn thiết bị đã ghép nối</option>
               {devices.map((device) => <option key={device.id} value={device.id}>{device.name}</option>)}
             </select></label>
-            <label className="block text-sm">Hành động<select value={action.action} onChange={(e) => changeActionType(index, e.target.value)} disabled={!availableActions.length} className="input mt-1">
-              {!availableActions.length && <option value="">Không có hành động phù hợp</option>}
+            <label className="block text-sm">Hành động<select required value={action.action} onChange={(e) => changeActionType(index, e.target.value)} disabled={!selectedDevice || !availableActions.length} className="input mt-1">
+              {!selectedDevice && <option value="">Chọn thiết bị trước</option>}
+              {selectedDevice && !availableActions.length && <option value="">Không có hành động phù hợp</option>}
               {availableActions.map((option) => <option key={option.code} value={option.code}>{option.label}</option>)}
             </select></label>
             {selectedOption?.valueKind === 'none' && <p className="text-sm text-slate-400">Hành động này không cần nhập giá trị.</p>}
             {(selectedOption?.valueKind === 'percentage' || selectedOption?.valueKind === 'number') && <label className="block text-sm">{selectedOption.valueLabel}<input required type="number" min={selectedOption.valueKind === 'percentage' ? 0 : undefined} max={selectedOption.valueKind === 'percentage' ? 100 : undefined} step={selectedOption.valueKind === 'percentage' ? 1 : 'any'} value={action.value} onChange={(e) => updateAction(index, { value: e.target.value })} className="input mt-1" /></label>}
             {selectedOption?.valueKind === 'json' && <label className="block text-sm">{selectedOption.valueLabel}<textarea required value={action.value} onChange={(e) => updateAction(index, { value: e.target.value })} className="input mt-1" placeholder='{"power": "ON"}' /></label>}
-            {!selectedOption && <p className="text-sm text-amber-300">Thiết bị này chưa khai báo hành động hợp lệ cho kịch bản. Hãy chọn thiết bị khác.</p>}
+            {selectedDevice && !selectedOption && <p className="text-sm text-muted">Thiết bị này chưa hỗ trợ hành động hợp lệ cho kịch bản. Hãy chọn thiết bị khác.</p>}
             <div className="flex gap-3 text-sm"><button type="button" aria-label={`Đưa hành động ${index + 1} lên`} disabled={index === 0} onClick={() => moveAction(index, -1)}>↑</button><button type="button" aria-label={`Đưa hành động ${index + 1} xuống`} disabled={index === actions.length - 1} onClick={() => moveAction(index, 1)}>↓</button><button type="button" onClick={() => setActions((items) => items.filter((_, i) => i !== index))} className="text-rose-400">Xóa</button></div>
           </div>;
         })}
-        <button disabled={saving || actions.some((item) => !getSceneDeviceActions(devices.find((device) => device.id === item.deviceId)).some((option) => option.code === item.action))} className="button w-full">{saving ? 'Đang lưu...' : sceneId ? 'Lưu thay đổi' : 'Tạo kịch bản'}</button>
+        <button disabled={saving || !actionTypes.length || actions.some((item) => !getSceneDeviceActions(devices.find((device) => device.id === item.deviceId), actionTypes).some((option) => option.code === item.action))} className="button w-full">{saving ? 'Đang lưu...' : sceneId ? 'Lưu thay đổi' : 'Tạo kịch bản'}</button>
       </form>}
     </div>
   </FeatureShell>;

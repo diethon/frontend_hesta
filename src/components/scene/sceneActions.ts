@@ -1,13 +1,43 @@
 import type { DeviceSummary } from '../../types/automation';
 import type { SceneResponse, SceneActionResponse, SceneActionRequest, SceneActionType, UpdateSceneRequest } from '../../types/scene';
-import { actionOptions, getDeviceActions } from '../deviceActionOptions.ts';
+import { actionOptions } from '../deviceActionOptions.ts';
 
 export interface DraftSceneAction { deviceId: string; action: string; value: string }
 
-const sceneActionCodes = new Set(['TURN_ON', 'TURN_OFF', 'SET_BRIGHTNESS', 'SET_TEMPERATURE', 'SET_SPEED', 'SET_STATE']);
+// Keep this list aligned with the backend SceneActionType enum.
+const sceneActionCodes = ['TURN_ON', 'TURN_OFF', 'SET_BRIGHTNESS', 'SET_TEMPERATURE', 'SET_SPEED', 'SET_STATE'] as const satisfies readonly SceneActionType[];
 
-export function getSceneDeviceActions(device?: DeviceSummary) {
-  return getDeviceActions(device).filter((option) => sceneActionCodes.has(option.code));
+const attributeActionsByDeviceType: Record<string, Record<string, readonly SceneActionType[]>> = {
+  LIGHT: { power: ['TURN_ON', 'TURN_OFF'], brightness: ['SET_BRIGHTNESS'] },
+  LED: { power: ['TURN_ON', 'TURN_OFF'], brightness: ['SET_BRIGHTNESS'] },
+  FAN: { power: ['TURN_ON', 'TURN_OFF'], speed: ['SET_SPEED'] },
+  AC: { power: ['TURN_ON', 'TURN_OFF'], temperature: ['SET_TEMPERATURE'], fanspeed: ['SET_SPEED'], speed: ['SET_SPEED'] },
+  SOCKET: { power: ['TURN_ON', 'TURN_OFF'] },
+};
+
+const defaultActionsByDeviceType: Record<string, readonly SceneActionType[]> = {
+  LIGHT: ['TURN_ON', 'TURN_OFF', 'SET_BRIGHTNESS'],
+  LED: ['TURN_ON', 'TURN_OFF', 'SET_BRIGHTNESS'],
+  FAN: ['TURN_ON', 'TURN_OFF', 'SET_SPEED'],
+  AC: ['TURN_ON', 'TURN_OFF', 'SET_TEMPERATURE'],
+  SOCKET: ['TURN_ON', 'TURN_OFF'],
+};
+
+export function getSceneDeviceActions(device?: DeviceSummary, allowedTypes: readonly SceneActionType[] = sceneActionCodes) {
+  if (!device) return [];
+  const deviceType = device.deviceType?.toUpperCase() ?? '';
+  const actionsByAttribute = attributeActionsByDeviceType[deviceType] ?? {};
+  const capabilities = device.capabilities?.length ? device.capabilities : defaultActionsByDeviceType[deviceType] ?? [];
+  const supported = new Set<SceneActionType>();
+  for (const capability of capabilities) {
+    const normalized = capability.trim().toUpperCase();
+    if (sceneActionCodes.includes(normalized as SceneActionType)) {
+      supported.add(normalized as SceneActionType);
+    } else {
+      for (const action of actionsByAttribute[capability.trim().toLowerCase()] ?? []) supported.add(action);
+    }
+  }
+  return actionOptions.filter((option) => supported.has(option.code as SceneActionType) && allowedTypes.includes(option.code as SceneActionType));
 }
 
 export function sceneActionsToDraft(actions: SceneActionResponse[]): DraftSceneAction[] {
@@ -22,9 +52,9 @@ export function sceneToggleInput(scene: SceneResponse): UpdateSceneRequest {
   return { name: scene.name, icon: scene.icon, description: scene.description, enabled: !scene.enabled };
 }
 
-export function buildSceneActionInput(item: DraftSceneAction, order: number, devices: DeviceSummary[]): SceneActionRequest {
+export function buildSceneActionInput(item: DraftSceneAction, order: number, devices: DeviceSummary[], allowedTypes: readonly SceneActionType[] = sceneActionCodes): SceneActionRequest {
   const device = devices.find((candidate) => candidate.id === item.deviceId);
-  const option = getSceneDeviceActions(device).find((candidate) => candidate.code === item.action);
+  const option = getSceneDeviceActions(device, allowedTypes).find((candidate) => candidate.code === item.action);
   if (!device || !option) throw new Error(`Hành động ${order + 1} không phù hợp với thiết bị đã chọn.`);
 
   const rawValue = item.value.trim();
