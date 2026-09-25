@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { DeviceCard } from './DeviceCard';
 import { DeviceDetailModal } from './DeviceDetailModal';
-import { getDevicesByHome, getDevicesByRoom, sendManualPowerCommand } from '../../services/deviceApi';
+import { getDevicesByHome, getDevicesByRoom, sendDeviceCommand, sendManualPowerCommand } from '../../services/deviceApi';
 import { getHomeRooms } from '../../services/homeApi';
 import type { DeviceResponse } from '../../types/device';
 import { getErrorMessage } from '../../utils/errors';
@@ -72,7 +72,8 @@ export const DevicePage: React.FC = () => {
     return () => window.clearTimeout(timer);
   }, [fetchDevices]);
 
-  const handleTogglePower = async (deviceId: string, currentPower: string) => {
+  const handleTogglePower = async async (deviceId: string, currentPower: string) => {
+    // 1. Optimistic update
     setPowerPendingId(deviceId); setCommandError(''); setCommandSuccess('');
     try {
       const result = await sendManualPowerCommand(deviceId, currentPower === 'ON' ? 'TURN_OFF' : 'TURN_ON');
@@ -81,6 +82,31 @@ export const DevicePage: React.FC = () => {
       await fetchDevices();
     } catch (caught) { setCommandError(getErrorMessage(caught, 'Không thể điều khiển thiết bị.')); }
     finally { setPowerPendingId(null); }
+
+    // 2. Determine action
+    const actionToSend = currentPower === 'ON' ? 'TURN_OFF' : 'TURN_ON';
+
+    try {
+      // 3. Send API request
+      await sendDeviceCommand(deviceId, actionToSend);
+    } catch (err) {
+      console.error("Lỗi khi gửi lệnh điều khiển:", err);
+      // Revert if error
+      setDevices(prev =>
+        prev.map(d => {
+          if (d.id === deviceId) {
+            return {
+              ...d,
+              currentState: {
+                ...d.currentState,
+                power: currentPower, // Revert back
+              },
+            };
+          }
+          return d;
+        })
+      );
+    }
   };
 
   const handleDeviceClick = (deviceId: string) => {

@@ -30,6 +30,22 @@ export const getDeviceHistory = async (deviceId: string): Promise<DeviceStateHis
   return response.data.result;
 };
 
+export const sendDeviceCommand = async (deviceId: string, action: string, parameters?: Record<string, any>): Promise<any> => {
+  const response = await apiClient.post(`/devices/${deviceId}/command`, {
+    action,
+    parameters: parameters || {}
+  });
+  return response.data.result;
+};
+
+export const sendRoomCommand = async (roomId: string, action: string, parameters?: Record<string, any>): Promise<any> => {
+  const response = await apiClient.post(`/rooms/${roomId}/command`, {
+    action,
+    parameters: parameters || {}
+  });
+  return response.data.result;
+};
+
 export const sendManualPowerCommand = async (deviceId: string, action: 'TURN_ON' | 'TURN_OFF'): Promise<ManualCommandResponse> => {
   const response = await apiClient.post(`/devices/${deviceId}/commands`, { action });
   return response.data.result;
