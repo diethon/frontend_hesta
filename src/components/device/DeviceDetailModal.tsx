@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import type { DeviceResponse, DeviceStateHistoryResponse } from '../../types/device';
-import { removeDevice, getDeviceHistory } from '../../services/deviceApi';
+import { removeDevice, getDeviceHistory, updateDeviceConfig } from '../../services/deviceApi';
 import { getErrorMessage } from '../../utils/errors';
 
 interface DeviceDetailModalProps {
@@ -12,9 +12,18 @@ interface DeviceDetailModalProps {
 
 export const DeviceDetailModal: React.FC<DeviceDetailModalProps> = ({ isOpen, onClose, device, onDeviceRemoved }) => {
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editName, setEditName] = useState('');
   const [error, setError] = useState('');
   const [history, setHistory] = useState<DeviceStateHistoryResponse[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
+
+  React.useEffect(() => {
+    if (device) {
+      setEditName(device.name);
+    }
+  }, [device]);
 
   React.useEffect(() => {
     if (isOpen && device) {
@@ -50,6 +59,35 @@ export const DeviceDetailModal: React.FC<DeviceDetailModalProps> = ({ isOpen, on
       setError(getErrorMessage(err, 'Lỗi khi xóa thiết bị'));
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const handleEdit = async () => {
+    if (!isEditMode) {
+      setIsEditMode(true);
+      return;
+    }
+
+    if (editName.trim() === '') {
+      setError('Tên thiết bị không được để trống');
+      return;
+    }
+
+    if (editName.trim() === device.name) {
+      setIsEditMode(false);
+      return;
+    }
+
+    setIsUpdating(true);
+    setError('');
+    try {
+      await updateDeviceConfig(device.id, { name: editName.trim() });
+      device.name = editName.trim(); // Update locally for instant feedback
+      setIsEditMode(false);
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Lỗi khi cập nhật cấu hình'));
+    } finally {
+      setIsUpdating(false);
     }
   };
 
@@ -108,18 +146,28 @@ export const DeviceDetailModal: React.FC<DeviceDetailModalProps> = ({ isOpen, on
             </div>
           )}
 
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 bg-slate-800 rounded-xl flex items-center justify-center text-3xl shrink-0">
-              {renderIcon()}
+                      <div className="flex items-center gap-4">
+              <div className="w-16 h-16 bg-slate-800 rounded-xl flex items-center justify-center text-3xl shrink-0">
+                {renderIcon()}
+              </div>
+              <div className="min-w-0 flex-1">
+                {isEditMode ? (
+                  <input
+                    type="text"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-white font-bold text-lg focus:outline-none focus:border-indigo-500"
+                    autoFocus
+                  />
+                ) : (
+                  <h4 className="text-xl font-bold text-white truncate" title={device.name}>{device.name}</h4>
+                )}
+                <p className="text-sm text-slate-400 flex items-center gap-1.5 mt-1">
+                  <span className={`inline-block w-2 h-2 rounded-full ${getStatusColor()}`} />
+                  {getStatusText()}
+                </p>
+              </div>
             </div>
-            <div className="min-w-0">
-              <h4 className="text-xl font-bold text-white truncate" title={device.name}>{device.name}</h4>
-              <p className="text-sm text-slate-400 flex items-center gap-1.5 mt-1">
-                <span className={`inline-block w-2 h-2 rounded-full ${getStatusColor()}`} />
-                {getStatusText()}
-              </p>
-            </div>
-          </div>
 
           <div className="space-y-3 bg-slate-950/50 p-4 rounded-xl border border-slate-800">
             <div className="flex justify-between items-center gap-4">
@@ -208,10 +256,10 @@ export const DeviceDetailModal: React.FC<DeviceDetailModalProps> = ({ isOpen, on
 
         <div className="p-4 border-t border-slate-800 bg-slate-900 flex justify-between gap-3 shrink-0">
           <button
-            onClick={() => alert('Chức năng cập nhật cấu hình đang phát triển…')}
+            onClick={handleEdit} disabled={isUpdating}
             className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-medium transition-colors text-sm"
           >
-            Chỉnh sửa
+            {isUpdating ? 'Đang lưu...' : isEditMode ? 'Lưu thay đổi' : 'Chỉnh sửa'}
           </button>
           <button
             onClick={handleDelete}
@@ -225,3 +273,4 @@ export const DeviceDetailModal: React.FC<DeviceDetailModalProps> = ({ isOpen, on
     </div>
   );
 };
+
