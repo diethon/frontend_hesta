@@ -1,7 +1,7 @@
 import type { UserResponse } from '../types/auth';
 
 export interface NavigationState {
-  returnTo?: '/home' | '/admin' | '/join';
+  returnTo?: string;
   resetEmail?: string;
   handledInviteToken?: string;
 }
@@ -10,8 +10,7 @@ export function readNavigationState(value: unknown): NavigationState {
   if (!value || typeof value !== 'object') return {};
   const state = value as Record<string, unknown>;
   return {
-    returnTo: state.returnTo === '/home' || state.returnTo === '/admin' || state.returnTo === '/join'
-      ? state.returnTo : undefined,
+    returnTo: isSafeReturnPath(state.returnTo) ? state.returnTo : undefined,
     resetEmail: typeof state.resetEmail === 'string' ? state.resetEmail : undefined,
     handledInviteToken: typeof state.handledInviteToken === 'string' ? state.handledInviteToken : undefined,
   };
@@ -40,5 +39,13 @@ export function loginDestination(user: UserResponse, search: string, state: Navi
   if (token && state.handledInviteToken !== token) return '/join';
   if (state.returnTo === '/home') return state.returnTo;
   if (state.returnTo === '/admin' && user.platformRole === 'ADMIN') return '/admin';
+  if (state.returnTo?.match(/^\/homes\/[0-9a-f-]+\/(scenes|automation-rules)$/i)) return state.returnTo;
   return defaultRoute(user);
+}
+
+function isSafeReturnPath(value: unknown): value is string {
+  return typeof value === 'string' && (
+    value === '/home' || value === '/admin' || value === '/join' ||
+    /^\/homes\/[0-9a-f-]+\/(scenes|automation-rules)$/i.test(value)
+  );
 }

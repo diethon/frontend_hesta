@@ -273,3 +273,14 @@ textarea:disabled {
     backdrop-filter: none;
   }
 }
+
+
+@layer components {
+  .input {
+    @apply w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 outline-none focus:border-cyan-500;
+  }
+
+  .button {
+    @apply rounded-lg bg-cyan-700 px-3 py-2 text-sm font-medium text-white hover:bg-cyan-600 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+}

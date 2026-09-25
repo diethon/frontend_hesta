@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { DeviceCard } from './DeviceCard';
 import { DeviceDetailModal } from './DeviceDetailModal';
-import { getDevicesByHome, getDevicesByRoom, sendDeviceCommand } from '../../services/deviceApi';
+import { getDevicesByHome, getDevicesByRoom, sendDeviceCommand, sendManualPowerCommand } from '../../services/deviceApi';
 import { getHomeRooms } from '../../services/homeApi';
 import type { DeviceResponse } from '../../types/device';
 import { getErrorMessage } from '../../utils/errors';
@@ -19,6 +19,9 @@ export const DevicePage: React.FC = () => {
   const [devices, setDevices] = useState<DeviceResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [commandError, setCommandError] = useState('');
+  const [commandSuccess, setCommandSuccess] = useState('');
+  const [powerPendingId, setPowerPendingId] = useState<string | null>(null);
   const [selectedDevice, setSelectedDevice] = useState<DeviceResponse | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -69,22 +72,16 @@ export const DevicePage: React.FC = () => {
     return () => window.clearTimeout(timer);
   }, [fetchDevices]);
 
-  const handleTogglePower = async (deviceId: string, currentPower: string) => {
+  const handleTogglePower = async async (deviceId: string, currentPower: string) => {
     // 1. Optimistic update
-    setDevices(prev =>
-      prev.map(d => {
-        if (d.id === deviceId) {
-          return {
-            ...d,
-            currentState: {
-              ...d.currentState,
-              power: currentPower === 'ON' ? 'OFF' : 'ON',
-            },
-          };
-        }
-        return d;
-      })
-    );
+    setPowerPendingId(deviceId); setCommandError(''); setCommandSuccess('');
+    try {
+      const result = await sendManualPowerCommand(deviceId, currentPower === 'ON' ? 'TURN_OFF' : 'TURN_ON');
+      if (!result.command.success) throw new Error(result.command.message || 'Thiết bị không nhận lệnh.');
+      setCommandSuccess('Đã gửi lệnh thủ công. Tự động hóa trên thiết bị này được tạm dừng 30 phút.');
+      await fetchDevices();
+    } catch (caught) { setCommandError(getErrorMessage(caught, 'Không thể điều khiển thiết bị.')); }
+    finally { setPowerPendingId(null); }
 
     // 2. Determine action
     const actionToSend = currentPower === 'ON' ? 'TURN_OFF' : 'TURN_ON';
@@ -155,6 +152,8 @@ export const DevicePage: React.FC = () => {
         </div>
 
         {/* Room Selection Tabs */}
+        {commandError && <p role="alert" className="rounded-xl bg-error-soft p-3 text-text">{commandError}</p>}
+        {commandSuccess && <p role="status" className="rounded-xl bg-success-soft p-3 text-text">{commandSuccess}</p>}
         <div className="flex items-center gap-2 overflow-x-auto rounded-2xl border border-line bg-white p-2 shadow-soft custom-scrollbar">
           <button
             onClick={() => setSelectedRoomId('ALL')}
@@ -195,6 +194,7 @@ export const DevicePage: React.FC = () => {
               <DeviceCard
                 key={device.id}
                 device={device}
+                powerPending={powerPendingId === device.id}
                 onTogglePower={handleTogglePower}
                 onClick={handleDeviceClick}
               />

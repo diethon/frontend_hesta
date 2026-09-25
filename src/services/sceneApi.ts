@@ -1,12 +1,21 @@
-import { apiClient } from './apiClient';
+import type { DeviceSummary } from "../types/automation";
+import { featureRequest } from "./featureApi";
+
+import { apiClient } from "./apiClient";
 import type {
   CreateSceneRequest,
   SceneActionRequest,
   SceneActionResponse,
   SceneResponse,
+  SceneExecutionResponse,
   UpdateSceneRequest,
-} from '../types/scene';
+} from "../types/scene";
 
+export const getDevices = (homeId: string) =>
+  featureRequest<DeviceSummary[]>(`/homes/${homeId}/devices`);
+
+export const getScenes = (homeId: string) =>
+  featureRequest<SceneResponse[]>(`/homes/${homeId}/scenes`);
 const scenePath = (homeId: string) => `/homes/${homeId}/scenes`;
 
 export const listScenes = async (homeId: string): Promise<SceneResponse[]> => {
@@ -14,12 +23,24 @@ export const listScenes = async (homeId: string): Promise<SceneResponse[]> => {
   return response.data.result;
 };
 
-export const getScene = async (homeId: string, sceneId: string): Promise<SceneResponse> => {
+export const getScene = async (
+  homeId: string,
+  sceneId: string,
+): Promise<SceneResponse> => {
   const response = await apiClient.get(`${scenePath(homeId)}/${sceneId}`);
   return response.data.result;
 };
 
-export const createScene = async (homeId: string, request: CreateSceneRequest): Promise<SceneResponse> => {
+export const executeScene = (homeId: string, sceneId: string) =>
+  featureRequest<SceneExecutionResponse>(`${scenePath(homeId)}/${sceneId}/execute`, { method: 'POST' });
+
+export const getSceneExecutions = (homeId: string, sceneId: string) =>
+  featureRequest<SceneExecutionResponse[]>(`${scenePath(homeId)}/${sceneId}/executions`);
+
+export const createScene = async (
+  homeId: string,
+  request: CreateSceneRequest,
+): Promise<SceneResponse> => {
   const response = await apiClient.post(scenePath(homeId), request);
   return response.data.result;
 };
@@ -29,11 +50,17 @@ export const updateScene = async (
   sceneId: string,
   request: UpdateSceneRequest,
 ): Promise<SceneResponse> => {
-  const response = await apiClient.put(`${scenePath(homeId)}/${sceneId}`, request);
+  const response = await apiClient.put(
+    `${scenePath(homeId)}/${sceneId}`,
+    request,
+  );
   return response.data.result;
 };
 
-export const deleteScene = async (homeId: string, sceneId: string): Promise<void> => {
+export const deleteScene = async (
+  homeId: string,
+  sceneId: string,
+): Promise<void> => {
   await apiClient.delete(`${scenePath(homeId)}/${sceneId}`);
 };
 
@@ -42,7 +69,10 @@ export const addSceneAction = async (
   sceneId: string,
   request: SceneActionRequest,
 ): Promise<SceneActionResponse> => {
-  const response = await apiClient.post(`${scenePath(homeId)}/${sceneId}/actions`, request);
+  const response = await apiClient.post(
+    `${scenePath(homeId)}/${sceneId}/actions`,
+    request,
+  );
   return response.data.result;
 };
 
@@ -59,6 +89,9 @@ export const reorderSceneActions = async (
   sceneId: string,
   actionIds: string[],
 ): Promise<SceneResponse> => {
-  const response = await apiClient.put(`${scenePath(homeId)}/${sceneId}/actions/reorder`, { actionIds });
+  const response = await apiClient.put(
+    `${scenePath(homeId)}/${sceneId}/actions/reorder`,
+    { actionIds },
+  );
   return response.data.result;
 };

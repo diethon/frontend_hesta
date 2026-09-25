@@ -1,5 +1,5 @@
 import { apiClient } from './apiClient';
-import type { DeviceResponse, DeviceUpdateRequest, DeviceStateHistoryResponse } from '../types/device';
+import type { DeviceResponse, DeviceUpdateRequest, DeviceStateHistoryResponse, ManualCommandResponse, ManualOverrideRecord } from '../types/device';
 
 export const getDevicesByHome = async (homeId: string): Promise<DeviceResponse[]> => {
   const response = await apiClient.get(`/homes/${homeId}/devices`);
@@ -43,5 +43,20 @@ export const sendRoomCommand = async (roomId: string, action: string, parameters
     action,
     parameters: parameters || {}
   });
+  return response.data.result;
+};
+
+export const sendManualPowerCommand = async (deviceId: string, action: 'TURN_ON' | 'TURN_OFF'): Promise<ManualCommandResponse> => {
+  const response = await apiClient.post(`/devices/${deviceId}/commands`, { action });
+  return response.data.result;
+};
+
+export const cancelDeviceAutomation = async (deviceId: string): Promise<string> => {
+  const response = await apiClient.post(`/devices/${deviceId}/automation/cancel`);
+  return response.data.result;
+};
+
+export const getDeviceOverrideHistory = async (deviceId: string): Promise<ManualOverrideRecord[]> => {
+  const response = await apiClient.get(`/devices/${deviceId}/automation/overrides`);
   return response.data.result;
 };
