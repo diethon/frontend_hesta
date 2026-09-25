@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
-import { createScene, deleteScene, getDevices, getScene, getScenes, updateScene } from '../../services/sceneApi';
-import type { DeviceSummary, Scene } from '../../types/automation';
+import { createScene, deleteScene, executeScene, getDevices, getScene, getSceneExecutions, getScenes, updateScene } from '../../services/sceneApi';
+import type { SceneExecutionResponse, SceneResponse } from '../../types/scene';
+import type { DeviceSummary } from '../../types/automation';
 import { buildSceneActionInput, formatSceneAction, getSceneDeviceActions, sceneActionsToDraft, sceneToggleInput, type DraftSceneAction } from './sceneActions';
+import { SchedulePanel } from '../ui/SchedulePanel';
 
 export function ScenePage() {
   const { homeId = '', sceneId } = useParams();
@@ -11,17 +13,23 @@ export function ScenePage() {
 
 function SceneWorkspace({ homeId, sceneId }: { homeId: string; sceneId?: string }) {
   const navigate = useNavigate();
-  const [scenes, setScenes] = useState<Scene[]>([]);
+  const [scenes, setScenes] = useState<SceneResponse[]>([]);
   const [devices, setDevices] = useState<DeviceSummary[]>([]);
-  const [editingScene, setEditingScene] = useState<Scene | null>(null);
+  const [editingScene, setEditingScene] = useState<SceneResponse | null>(null);
   const [loadingScene, setLoadingScene] = useState(Boolean(sceneId));
   const [togglingSceneId, setTogglingSceneId] = useState<string | null>(null);
   const [name, setName] = useState('');
+  const [icon, setIcon] = useState('🏠');
   const [description, setDescription] = useState('');
   const [enabled, setEnabled] = useState(true);
   const [actions, setActions] = useState<DraftSceneAction[]>([]);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [runningId, setRunningId] = useState<string | null>(null);
+  const [historyId, setHistoryId] = useState<string | null>(null);
+  const [scheduleId, setScheduleId] = useState<string | null>(null);
+  const [executions, setExecutions] = useState<SceneExecutionResponse[]>([]);
+  const [success, setSuccess] = useState('');
 
   const load = useCallback(async () => {
     try {
@@ -55,6 +63,7 @@ function SceneWorkspace({ homeId, sceneId }: { homeId: string; sceneId?: string 
         if (!active) return;
         setEditingScene(scene);
         setName(scene.name);
+        setIcon(scene.icon ?? '🏠');
         setDescription(scene.description ?? '');
         setEnabled(scene.enabled);
         setActions(sceneActionsToDraft(scene.actions));
@@ -102,18 +111,21 @@ function SceneWorkspace({ homeId, sceneId }: { homeId: string; sceneId?: string 
     event.preventDefault();
     setSaving(true);
     setError('');
+    setSuccess('');
     try {
       const input = {
-        name, description, enabled,
+        name, icon, description, enabled,
         actions: actions.map((action, order) => buildSceneActionInput(action, order, devices)),
       };
       if (sceneId) {
         const updated = await updateScene(homeId, sceneId, input);
         setEditingScene(updated);
         setActions(sceneActionsToDraft(updated.actions));
+        setSuccess('Đã lưu thay đổi kịch bản.');
       } else {
         await createScene(homeId, input);
-        setName(''); setDescription(''); setActions([]);
+        setName(''); setIcon('🏠'); setDescription(''); setActions([]);
+        setSuccess('Đã tạo kịch bản.');
       }
       await load();
     } catch (caught) {
@@ -124,6 +136,7 @@ function SceneWorkspace({ homeId, sceneId }: { homeId: string; sceneId?: string 
   };
 
   const remove = async (sceneId: string) => {
+    if (!window.confirm('Xóa kịch bản này? Hành động này không thể hoàn tác.')) return;
     try {
       await deleteScene(homeId, sceneId);
       if (sceneId === editingScene?.id) navigate(`/homes/${homeId}/scenes`);
@@ -132,7 +145,27 @@ function SceneWorkspace({ homeId, sceneId }: { homeId: string; sceneId?: string 
     catch (caught) { setError(caught instanceof Error ? caught.message : 'Không thể xóa kịch bản'); }
   };
 
-  const toggle = async (scene: Scene) => {
+  const run = async (scene: SceneResponse) => {
+    setRunningId(scene.id);
+    setError(''); setSuccess('');
+    try {
+      const result = await executeScene(homeId, scene.id);
+      setSuccess(`Kịch bản “${scene.name}”: ${result.status} (${result.resultDetail.filter((item) => item.success).length}/${result.resultDetail.length} hành động thành công).`);
+      if (historyId === scene.id) setExecutions(await getSceneExecutions(homeId, scene.id));
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Không thể chạy kịch bản.');
+    } finally { setRunningId(null); }
+  };
+
+  const viewHistory = async (selectedId: string) => {
+    if (historyId === selectedId) { setHistoryId(null); return; }
+    setHistoryId(selectedId);
+    setExecutions([]);
+    try { setExecutions(await getSceneExecutions(homeId, selectedId)); }
+    catch (caught) { setError(caught instanceof Error ? caught.message : 'Không thể tải lịch sử.'); }
+  };
+
+  const toggle = async (scene: SceneResponse) => {
     setTogglingSceneId(scene.id);
     setError('');
     try {
@@ -151,13 +184,14 @@ function SceneWorkspace({ homeId, sceneId }: { homeId: string; sceneId?: string 
 
   return <FeatureShell title="Kịch bản" homeId={homeId}>
     {error && <p role="alert" className="rounded-lg bg-rose-950 p-3 text-rose-300">{error}</p>}
+    {success && <p role="status" className="rounded-xl bg-success-soft p-3 text-text">{success}</p>}
     <div className="grid gap-6 lg:grid-cols-2">
       <section className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
         <h2 className="mb-4 text-lg font-semibold">Danh sách kịch bản</h2>
         <div className="space-y-3">
           {scenes.map((scene) => <article key={scene.id} className={`rounded-xl border p-4 ${scene.id === sceneId ? 'border-cyan-500' : 'border-slate-700'}`}>
             <Link to={`/homes/${homeId}/scenes/${scene.id}`} className="block rounded focus-visible:outline-2 focus-visible:outline-cyan-400" aria-label={`Mở kịch bản ${scene.name} để sửa`}>
-              <h3 className="font-medium text-cyan-300">{scene.name}</h3>
+              <h3 className="font-medium text-cyan-300"><span aria-hidden="true">{scene.icon ?? '🏠'} </span>{scene.name}</h3>
               <p className="text-sm text-slate-400">{scene.actions.length} hành động · {scene.enabled ? 'Đang bật' : 'Đang tắt'}</p>
               <ol className="mt-2 list-inside list-decimal text-sm text-slate-300">
                 {scene.actions.map((action) => <li key={action.id}>{action.targetDeviceName}: {formatSceneAction(action)}</li>)}
@@ -169,8 +203,21 @@ function SceneWorkspace({ homeId, sceneId }: { homeId: string; sceneId?: string 
                 <input type="checkbox" role="switch" aria-label={`Bật hoặc tắt kịch bản ${scene.name}`} checked={scene.enabled} disabled={togglingSceneId === scene.id || (saving && sceneId === scene.id)} onChange={() => void toggle(scene)} className="peer sr-only" />
                 <span aria-hidden="true" className="relative h-6 w-11 rounded-full bg-slate-600 transition-colors after:absolute after:left-1 after:top-1 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-transform peer-checked:bg-emerald-500 peer-checked:after:translate-x-5 peer-focus-visible:ring-2 peer-focus-visible:ring-cyan-400" />
               </label>
-              <button type="button" onClick={() => void remove(scene.id)} className="text-sm text-rose-400">Xóa</button>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" disabled={!scene.enabled || runningId === scene.id} onClick={() => void run(scene)} className="rounded-xl bg-primary px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">{runningId === scene.id ? 'Đang chạy...' : 'Chạy'}</button>
+                <button type="button" onClick={() => void viewHistory(scene.id)} className="rounded-xl bg-sidebar px-3 py-2 text-sm text-text">Lịch sử</button>
+                <button type="button" onClick={() => setScheduleId(scheduleId === scene.id ? null : scene.id)} className="rounded-xl bg-sidebar px-3 py-2 text-sm text-text">Lịch chạy</button>
+                <button type="button" onClick={() => void remove(scene.id)} className="rounded-xl bg-error-soft px-3 py-2 text-sm text-text">Xóa</button>
+              </div>
             </div>
+            {historyId === scene.id && <section aria-label={`Lịch sử kịch bản ${scene.name}`} className="mt-3 rounded-xl bg-sidebar p-3 text-sm text-text">
+              {!executions.length ? 'Chưa có lần chạy nào.' : executions.map((item) => <div key={item.id} className="border-b border-line py-2 last:border-0">
+                <p>{new Date(item.startedAt).toLocaleString('vi-VN')} · {item.triggerSource === 'MANUAL' ? 'Thủ công' : item.triggerSource === 'AUTOMATION' ? 'Quy tắc tự động' : 'Theo lịch'} · {item.status}</p>
+                <p className="text-muted">{item.resultDetail.filter((result) => result.success).length}/{item.resultDetail.length} hành động thành công</p>
+                <ol className="mt-1 list-inside list-decimal text-muted">{item.resultDetail.map((result, index) => <li key={`${result.deviceId}-${index}`}>{scene.actions.find((action) => action.targetDeviceId === result.deviceId)?.targetDeviceName ?? result.deviceId}: {result.action} · {result.status}{result.message ? ` · ${result.message}` : ''}</li>)}</ol>
+              </div>)}
+            </section>}
+            {scheduleId === scene.id && <SchedulePanel homeId={homeId} kind="scenes" targetId={scene.id} />}
           </article>)}
           {!scenes.length && <p className="text-sm text-slate-400">Chưa có kịch bản.</p>}
         </div>
@@ -179,6 +226,7 @@ function SceneWorkspace({ homeId, sceneId }: { homeId: string; sceneId?: string 
       {loadingScene ? <section className="rounded-2xl border border-slate-800 bg-slate-900 p-5">Đang tải kịch bản...</section> : sceneId && !editingScene ? <section className="rounded-2xl border border-slate-800 bg-slate-900 p-5"><p>Không thể mở kịch bản này.</p><Link to={`/homes/${homeId}/scenes`} className="text-cyan-300">Về danh sách</Link></section> : <form onSubmit={submit} className="space-y-4 rounded-2xl border border-slate-800 bg-slate-900 p-5">
         <div className="flex items-center justify-between gap-3"><h2 className="text-lg font-semibold">{sceneId ? 'Sửa kịch bản' : 'Tạo kịch bản'}</h2>{sceneId && <Link to={`/homes/${homeId}/scenes`} className="text-sm text-cyan-300">Tạo kịch bản mới</Link>}</div>
         <Field label="Tên"><input required maxLength={150} value={name} onChange={(e) => setName(e.target.value)} className="input" /></Field>
+        <Field label="Biểu tượng"><select value={icon} onChange={(e) => setIcon(e.target.value)} className="input"><option value="🏠">🏠 Nhà</option><option value="💡">💡 Đèn</option><option value="🌙">🌙 Ban đêm</option><option value="☀️">☀️ Buổi sáng</option><option value="❄️">❄️ Làm mát</option></select></Field>
         <Field label="Mô tả"><textarea value={description} onChange={(e) => setDescription(e.target.value)} className="input" /></Field>
         <label className="flex gap-2"><input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} /> Bật kịch bản</label>
         <div className="flex items-center justify-between"><h3 className="font-medium">Hành động</h3><button type="button" onClick={addAction} disabled={!hasActionableDevice} className="button">+ Thêm</button></div>
@@ -210,7 +258,7 @@ function SceneWorkspace({ homeId, sceneId }: { homeId: string; sceneId?: string 
 
 function FeatureShell({ title, homeId, children }: { title: string; homeId: string; children: React.ReactNode }) {
   return <main className="min-h-screen bg-slate-950 p-6 text-slate-100"><div className="mx-auto max-w-6xl space-y-5">
-    <header className="flex items-center justify-between"><div><h1 className="text-2xl font-bold">{title}</h1><p className="text-xs text-slate-500">Nhà: {homeId}</p></div><Link to="/home" className="button">Về trang chủ</Link></header>
+    <header className="flex flex-wrap items-center justify-between gap-3"><div><h1 className="text-2xl font-bold">{title}</h1><p className="text-xs text-muted">Nhà: {homeId}</p></div><nav aria-label="Điều hướng tự động hóa" className="flex gap-2"><Link to={`/homes/${homeId}/automation-rules`} className="rounded-xl bg-sidebar px-3 py-2 text-sm text-text">Quy tắc</Link><Link to="/home" className="button">Về trang chủ</Link></nav></header>
     {children}
   </div></main>;
 }

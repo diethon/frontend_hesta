@@ -1,4 +1,4 @@
-import type { DeviceSummary, Scene } from "../types/automation";
+import type { DeviceSummary } from "../types/automation";
 import { featureRequest } from "./featureApi";
 
 import { apiClient } from "./apiClient";
@@ -7,6 +7,7 @@ import type {
   SceneActionRequest,
   SceneActionResponse,
   SceneResponse,
+  SceneExecutionResponse,
   UpdateSceneRequest,
 } from "../types/scene";
 
@@ -14,7 +15,7 @@ export const getDevices = (homeId: string) =>
   featureRequest<DeviceSummary[]>(`/homes/${homeId}/devices`);
 
 export const getScenes = (homeId: string) =>
-  featureRequest<Scene[]>(`/homes/${homeId}/scenes`);
+  featureRequest<SceneResponse[]>(`/homes/${homeId}/scenes`);
 const scenePath = (homeId: string) => `/homes/${homeId}/scenes`;
 
 export const listScenes = async (homeId: string): Promise<SceneResponse[]> => {
@@ -29,6 +30,12 @@ export const getScene = async (
   const response = await apiClient.get(`${scenePath(homeId)}/${sceneId}`);
   return response.data.result;
 };
+
+export const executeScene = (homeId: string, sceneId: string) =>
+  featureRequest<SceneExecutionResponse>(`${scenePath(homeId)}/${sceneId}/execute`, { method: 'POST' });
+
+export const getSceneExecutions = (homeId: string, sceneId: string) =>
+  featureRequest<SceneExecutionResponse[]>(`${scenePath(homeId)}/${sceneId}/executions`);
 
 export const createScene = async (
   homeId: string,

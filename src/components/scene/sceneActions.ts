@@ -1,4 +1,5 @@
-import type { DeviceSummary, Scene, SceneAction, SceneActionInput, SceneUpdateInput } from '../../types/automation';
+import type { DeviceSummary } from '../../types/automation';
+import type { SceneResponse, SceneActionResponse, SceneActionRequest, SceneActionType, UpdateSceneRequest } from '../../types/scene';
 import { actionOptions, getDeviceActions } from '../deviceActionOptions.ts';
 
 export interface DraftSceneAction { deviceId: string; action: string; value: string }
@@ -9,7 +10,7 @@ export function getSceneDeviceActions(device?: DeviceSummary) {
   return getDeviceActions(device).filter((option) => sceneActionCodes.has(option.code));
 }
 
-export function sceneActionsToDraft(actions: SceneAction[]): DraftSceneAction[] {
+export function sceneActionsToDraft(actions: SceneActionResponse[]): DraftSceneAction[] {
   return [...actions].sort((first, second) => first.order - second.order).map((action) => ({
     deviceId: action.targetDeviceId,
     action: action.action,
@@ -17,11 +18,11 @@ export function sceneActionsToDraft(actions: SceneAction[]): DraftSceneAction[] 
   }));
 }
 
-export function sceneToggleInput(scene: Scene): SceneUpdateInput {
-  return { name: scene.name, description: scene.description, enabled: !scene.enabled };
+export function sceneToggleInput(scene: SceneResponse): UpdateSceneRequest {
+  return { name: scene.name, icon: scene.icon, description: scene.description, enabled: !scene.enabled };
 }
 
-export function buildSceneActionInput(item: DraftSceneAction, order: number, devices: DeviceSummary[]): SceneActionInput {
+export function buildSceneActionInput(item: DraftSceneAction, order: number, devices: DeviceSummary[]): SceneActionRequest {
   const device = devices.find((candidate) => candidate.id === item.deviceId);
   const option = getSceneDeviceActions(device).find((candidate) => candidate.code === item.action);
   if (!device || !option) throw new Error(`Hành động ${order + 1} không phù hợp với thiết bị đã chọn.`);
@@ -42,10 +43,10 @@ export function buildSceneActionInput(item: DraftSceneAction, order: number, dev
     }
   }
 
-  return { targetDeviceId: device.id, action: option.code, value, order };
+  return { targetDeviceId: device.id, action: option.code as SceneActionType, value, order };
 }
 
-export function formatSceneAction(action: SceneAction): string {
+export function formatSceneAction(action: SceneActionResponse): string {
   const label = actionOptions.find((option) => option.code === action.action)?.label ?? action.action;
   if (action.value == null) return label;
   if (action.action === 'SET_BRIGHTNESS' || action.action === 'SET_SPEED') return `${label}: ${action.value}%`;

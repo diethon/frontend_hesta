@@ -116,8 +116,8 @@ export const HomePage: React.FC<HomePageProps> = ({
       setIsCreateModalOpen(false);
       setNewHomeName("");
       fetchHomes();
-    } catch (err: any) {
-      alert(err.message || "Lỗi khi tạo nhà");
+    } catch (err: unknown) {
+      alert(getErrorMessage(err, "Lỗi khi tạo nhà"));
     } finally {
       setCreateLoading(false);
     }
@@ -463,18 +463,24 @@ export const HomePage: React.FC<HomePageProps> = ({
                 ninh).
               </p>
               {userHome && (
-                <div className="mt-4 flex gap-2">
+                <div className="mt-4 flex flex-wrap gap-2">
                   <Link
                     to={`/homes/${userHome.homeId}/scenes`}
-                    className="rounded-lg bg-blue-700 px-3 py-2 text-xs font-medium text-white hover:bg-blue-600"
+                    className="rounded-xl bg-primary px-3 py-2 text-xs font-medium text-white hover:bg-primary-hover"
                   >
                     Scene
                   </Link>
                   <Link
                     to={`/homes/${userHome.homeId}/automation-rules`}
-                    className="rounded-lg bg-purple-700 px-3 py-2 text-xs font-medium text-white hover:bg-purple-600"
+                    className="rounded-xl bg-sidebar px-3 py-2 text-xs font-medium text-text hover:bg-sidebar-hover"
                   >
                     Automation
+                  </Link>
+                  <Link
+                    to={`/homes/${userHome.homeId}/recommendations`}
+                    className="rounded-xl bg-success-soft px-3 py-2 text-xs font-medium text-text hover:bg-sidebar-hover"
+                  >
+                    Gợi ý AI
                   </Link>
                 </div>
               )}

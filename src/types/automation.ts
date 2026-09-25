@@ -25,6 +25,7 @@ export interface Scene {
   id: string;
   homeId: string;
   name: string;
+  icon?: string | null;
   description?: string;
   enabled: boolean;
   actions: SceneAction[];
@@ -32,6 +33,7 @@ export interface Scene {
 
 export interface SceneInput {
   name: string;
+  icon?: string | null;
   description?: string;
   enabled: boolean;
   actions: SceneActionInput[];
@@ -49,7 +51,8 @@ export interface RuleConditionInput {
 }
 
 export interface RuleActionInput {
-  deviceId: string;
+  deviceId?: string;
+  sceneId?: string;
   action: string;
   parameters: Record<string, unknown>;
   order: number;
@@ -63,7 +66,7 @@ export interface AutomationRule {
   triggerType: 'SENSOR' | 'EVENT' | 'SCHEDULE';
   enabled: boolean;
   conditions: Array<RuleConditionInput & { id: string; deviceName?: string }>;
-  actions: Array<RuleActionInput & { id: string; deviceName: string }>;
+  actions: Array<RuleActionInput & { id: string; deviceName?: string; sceneName?: string }>;
 }
 
 export interface AutomationRuleInput {
@@ -73,4 +76,20 @@ export interface AutomationRuleInput {
   enabled: boolean;
   conditions: RuleConditionInput[];
   actions: RuleActionInput[];
+}
+
+export interface AutomationExecution {
+  id: string;
+  ruleId: string;
+  triggerSource: string;
+  status: string;
+  test: boolean;
+  matchedAt: string;
+  resultDetail: Array<{ deviceId?: string; sceneId?: string; action: string; success: boolean; status: string }>;
+}
+
+export interface AutomationTestResult {
+  ruleId: string;
+  matched: boolean;
+  proposedActions: RuleActionInput[];
 }

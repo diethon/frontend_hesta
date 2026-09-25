@@ -3,9 +3,13 @@ import { getDeviceActions } from '../deviceActionOptions.ts';
 
 export { actionOptions, getDeviceActions } from '../deviceActionOptions.ts';
 
-export interface DraftAction { deviceId: string; action: string; value: string }
+export interface DraftAction { deviceId: string; sceneId?: string; action: string; value: string }
 
 export function buildActionInput(item: DraftAction, order: number, devices: DeviceSummary[]): RuleActionInput {
+  if (item.action === 'EXECUTE_SCENE') {
+    if (!item.sceneId) throw new Error(`Vui lòng chọn kịch bản cho hành động ${order + 1}.`);
+    return { sceneId: item.sceneId, action: 'EXECUTE_SCENE', parameters: {}, order };
+  }
   const device = devices.find((candidate) => candidate.id === item.deviceId);
   const option = getDeviceActions(device).find((candidate) => candidate.code === item.action);
   if (!device || !option) throw new Error(`Hành động ${order + 1} không phù hợp với thiết bị đã chọn.`);

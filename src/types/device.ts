@@ -41,3 +41,16 @@ export interface DeviceStateHistoryResponse {
   isTest?: boolean;
   changedAt: string;
 }
+
+export interface ManualCommandResponse {
+  command: { success: boolean; status: string; message?: string; acknowledgedState?: DeviceState };
+  overrideUntil: string;
+}
+
+export interface ManualOverrideRecord {
+  id: string;
+  action: 'OVERRIDE' | 'CANCEL';
+  userId: string;
+  occurredAt: string;
+  expiresAt: string;
+}
