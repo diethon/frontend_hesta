@@ -32,3 +32,4 @@ dist-ssr
 *.agent
 .env
 .env.local
+.tmp/*
