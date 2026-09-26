@@ -25,7 +25,7 @@ const routerForTests = {
   ...router,
   Navigate: (props) => { redirects.push(props); return null; },
 };
-const toastForServerRender = { __esModule: true, default: Object.assign(() => '', { custom: () => '', dismiss() {} }), Toaster: () => null };
+const toastForServerRender = { __esModule: true, default: Object.assign(() => '', { custom: () => '', dismiss() { } }), Toaster: () => null };
 
 function loadSource(path) {
   const filename = resolve(root, path);
@@ -37,26 +37,29 @@ function loadSource(path) {
     compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
     fileName: filename,
   });
+  const executableSource = outputText.replaceAll('import.meta.env', '{}');
   const sourceRequire = (name) => {
     if (name === 'react-router') return routerForTests;
     if (name === 'react-hot-toast') return toastForServerRender;
     if (!name.startsWith('.')) return require(name);
     const base = resolve(dirname(filename), name);
-    const dependencyPath = ['.ts', '.tsx'].map((extension) => base + extension).find(existsSync);
+    const dependencyPath = existsSync(base) ? base : ['.ts', '.tsx'].map((extension) => base + extension).find(existsSync);
     assert.ok(dependencyPath, `Cannot resolve ${name} from ${path}`);
     return loadSource(dependencyPath);
   };
-  runInThisContext(`(function(require, module, exports) { ${outputText}\n})`, { filename })(sourceRequire, module, module.exports);
+  runInThisContext(`(function(require, module, exports) { ${executableSource}\n})`, { filename })(sourceRequire, module, module.exports);
   return module.exports;
 }
 
 const originalStorage = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
 const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
 const storage = new Map();
-Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: {
-  getItem: (key) => storage.get(key) ?? null,
-  removeItem: (key) => storage.delete(key),
-} });
+Object.defineProperty(globalThis, 'localStorage', {
+  configurable: true, value: {
+    getItem: (key) => storage.get(key) ?? null,
+    removeItem: (key) => storage.delete(key),
+  }
+});
 Object.defineProperty(globalThis, 'window', { configurable: true, value: {} });
 after(() => {
   if (originalStorage) Object.defineProperty(globalThis, 'localStorage', originalStorage);
@@ -69,8 +72,10 @@ const { AppRoutes } = loadSource('src/routes/AppRoutes.tsx');
 const { createAppStore } = loadSource('src/store/store.ts');
 const navigation = loadSource('src/routes/navigation.ts');
 const session = loadSource('src/services/session.ts');
-const user = { id: 'test-user', fullName: 'Routing Test', email: 'routing@example.test',
-  platformRole: 'USER', provider: 'LOCAL', status: 'ACTIVE', createdAt: '' };
+const user = {
+  id: 'test-user', fullName: 'Routing Test', email: 'routing@example.test',
+  platformRole: 'USER', provider: 'LOCAL', status: 'ACTIVE', createdAt: ''
+};
 const admin = { ...user, platformRole: 'ADMIN' };
 const search = '?token=a%2Bb%26c&inviteToken=a%2Bb%26c&source=one&source=two';
 
@@ -130,10 +135,22 @@ test('protected routes preserve the URL context and return destination', () => {
   assert.deepEqual(redirects[0].to, { pathname: '/home', search, hash: '#flow' });
 });
 
-test('authenticated Digital Twin direct entry matches its route and renders the initial loading state', () => {
-  const html = renderRoute('/home/home-1/digital-twin', user);
-  assert.match(html, /Đang tải Digital Twin/);
+test('Scene editor supports direct entry and remains protected by the session guard', () => {
+  const path = '/homes/home-1/scenes/scene-1';
+  assert.ok(renderRoute(path, user).includes('Đang tải kịch bản'));
   assert.equal(redirects.length, 0);
+  renderRoute(path);
+  assert.deepEqual(redirects[0].to, { pathname: '/login', search, hash: '#flow' });
+  assert.equal(redirects[0].state.returnTo, path);
+});
+
+test('scene and automation routes support direct entry and preserve login return paths', () => {
+  const homeId = '11111111-1111-4111-8111-111111111111';
+  assert.ok(renderRoute(`/homes/${homeId}/scenes`, user, undefined, '').includes('Kịch bản'));
+  assert.ok(renderRoute(`/homes/${homeId}/automation-rules`, user, undefined, '').includes('Quy tắc tự động'));
+  renderRoute(`/homes/${homeId}/scenes`, null, undefined, '');
+  assert.equal(redirects[0].state.returnTo, `/homes/${homeId}/scenes`);
+  assert.equal(navigation.loginDestination(user, '', redirects[0].state), `/homes/${homeId}/scenes`);
 });
 
 test('join renders the correct public or authenticated invitation view', () => {

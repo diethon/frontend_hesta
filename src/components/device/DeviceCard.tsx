@@ -4,10 +4,11 @@ import type { DeviceResponse } from '../../types/device';
 interface DeviceCardProps {
   device: DeviceResponse;
   onTogglePower?: (deviceId: string, currentPower: string) => void;
+  powerPending?: boolean;
   onClick?: (deviceId: string) => void;
 }
 
-export const DeviceCard: React.FC<DeviceCardProps> = ({ device, onTogglePower, onClick }) => {
+export const DeviceCard: React.FC<DeviceCardProps> = ({ device, onTogglePower, powerPending = false, onClick }) => {
   const hasPowerToggle = ['LIGHT', 'FAN', 'AC', 'SOCKET'].includes(device.deviceType);
   const isSensor = device.deviceType === 'SENSOR';
   const isLock = device.deviceType === 'LOCK';
@@ -102,6 +103,7 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({ device, onTogglePower, o
             type="button"
             aria-label={`${isPoweredOn ? 'Tắt' : 'Bật'} ${device.name}`}
             aria-pressed={isPoweredOn}
+            disabled={powerPending}
             onClick={handleToggle}
             className={`flex h-7 w-12 items-center rounded-full p-1 transition-colors duration-300 ${
               isPoweredOn ? 'bg-success' : 'bg-off'

@@ -116,7 +116,8 @@ export const SceneManagement: React.FC<SceneManagementProps> = ({ homeId, curren
     setError(null);
     try {
       const scene = editingId
-        ? await updateScene(homeId, editingId, { name: name.trim(), description: description.trim(), enabled })
+        ? await updateScene(homeId, editingId, { name: name.trim(), icon: scenes.find((scene) => scene.id === editingId)?.icon,
+            description: description.trim(), enabled })
         : await createScene(homeId, { name: name.trim(), description: description.trim(), enabled, actions: [] });
       setScenes((current) =>
         editingId

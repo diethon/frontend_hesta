@@ -14,6 +14,9 @@ import { RequireAdmin, RequireAuth } from './RouteGuards';
 import { defaultRoute, invitationSearch, invitationToken, loginDestination, readNavigationState } from './navigation';
 import type { NavigationState } from './navigation';
 import { useRouteSession } from './useRouteSession';
+import { ScenePage } from '../components/scene/ScenePage';
+import { AutomationRulePage } from '../components/automation/AutomationRulePage';
+import { RecommendationsPage } from '../components/automation/RecommendationsPage';
 
 export function AppRoutes() {
   const { initialized, user, login, logout, updateUser } = useRouteSession();
@@ -76,6 +79,10 @@ export function AppRoutes() {
       )} />
       <Route element={<RequireAuth initialized={initialized} user={user} />}>
         <Route path="/home" element={<HomePage user={user!} onLogout={logout} onProfileUpdate={updateUser} />} />
+        <Route path="/homes/:homeId/scenes" element={<ScenePage />} />
+        <Route path="/homes/:homeId/scenes/:sceneId" element={<ScenePage />} />
+        <Route path="/homes/:homeId/automation-rules" element={<AutomationRulePage />} />
+        <Route path="/homes/:homeId/recommendations" element={<RecommendationsPage />} />
         <Route path="/home/:homeId/devices" element={<DevicePage />} />
         <Route path="/home/:homeId/digital-twin" element={<DigitalTwinPage />} />
         <Route element={<RequireAdmin initialized={initialized} user={user} />}>
