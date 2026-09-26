@@ -4,6 +4,7 @@ import { registerUser } from '../../services/authApi';
 import type { RegisterRequest, UserResponse } from '../../types/auth';
 import { getErrorMessage } from '../../utils/errors';
 import { AuthShell } from '../ui/AuthShell';
+import { notify } from '../ui/notify';
 
 interface RegisterFormProps {
   onSwitchToLogin?: (handledInviteToken?: string) => void;
@@ -71,6 +72,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin }) =
 
       if (response.result) {
         setRegisteredUser(response.result);
+        notify.success('Đăng ký tài khoản thành công');
       }
     } catch (error: unknown) {
       setError(getErrorMessage(error, 'Đã có lỗi xảy ra trong quá trình đăng ký.'));

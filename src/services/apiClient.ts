@@ -1,6 +1,17 @@
 import axios from 'axios';
 import { notifySessionExpired } from './session';
 
+export class ApiError extends Error {
+  readonly status?: number;
+  readonly code?: number;
+  constructor(message: string, status?: number, code?: number) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.code = code;
+  }
+}
+
 const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim();
 
 export const API_BASE_URL = (configuredApiBaseUrl || '/api/v1').replace(/\/+$/, '');
@@ -34,6 +45,6 @@ apiClient.interceptors.response.use(
       throw new Error('Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.');
     }
     const errorMessage = error.response?.data?.message || error.message || 'Có lỗi xảy ra';
-    throw new Error(errorMessage);
+    throw new ApiError(errorMessage, error.response?.status, error.response?.data?.code);
   }
 );

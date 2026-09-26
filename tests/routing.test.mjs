@@ -25,6 +25,7 @@ const routerForTests = {
   ...router,
   Navigate: (props) => { redirects.push(props); return null; },
 };
+const toastForServerRender = { __esModule: true, default: Object.assign(() => '', { custom: () => '', dismiss() { } }), Toaster: () => null };
 
 function loadSource(path) {
   const filename = resolve(root, path);
@@ -39,6 +40,7 @@ function loadSource(path) {
   const executableSource = outputText.replaceAll('import.meta.env', '{}');
   const sourceRequire = (name) => {
     if (name === 'react-router') return routerForTests;
+    if (name === 'react-hot-toast') return toastForServerRender;
     if (!name.startsWith('.')) return require(name);
     const base = resolve(dirname(filename), name);
     const dependencyPath = existsSync(base) ? base : ['.ts', '.tsx'].map((extension) => base + extension).find(existsSync);
@@ -52,10 +54,12 @@ function loadSource(path) {
 const originalStorage = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
 const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
 const storage = new Map();
-Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: {
-  getItem: (key) => storage.get(key) ?? null,
-  removeItem: (key) => storage.delete(key),
-} });
+Object.defineProperty(globalThis, 'localStorage', {
+  configurable: true, value: {
+    getItem: (key) => storage.get(key) ?? null,
+    removeItem: (key) => storage.delete(key),
+  }
+});
 Object.defineProperty(globalThis, 'window', { configurable: true, value: {} });
 after(() => {
   if (originalStorage) Object.defineProperty(globalThis, 'localStorage', originalStorage);
@@ -68,8 +72,10 @@ const { AppRoutes } = loadSource('src/routes/AppRoutes.tsx');
 const { createAppStore } = loadSource('src/store/store.ts');
 const navigation = loadSource('src/routes/navigation.ts');
 const session = loadSource('src/services/session.ts');
-const user = { id: 'test-user', fullName: 'Routing Test', email: 'routing@example.test',
-  platformRole: 'USER', provider: 'LOCAL', status: 'ACTIVE', createdAt: '' };
+const user = {
+  id: 'test-user', fullName: 'Routing Test', email: 'routing@example.test',
+  platformRole: 'USER', provider: 'LOCAL', status: 'ACTIVE', createdAt: ''
+};
 const admin = { ...user, platformRole: 'ADMIN' };
 const search = '?token=a%2Bb%26c&inviteToken=a%2Bb%26c&source=one&source=two';
 
@@ -81,10 +87,11 @@ function renderRoute(path, storedUser = null, state, routeSearch = search) {
   }
   redirects = [];
   const appStore = createAppStore();
+  const testRouter = router.createMemoryRouter([{ path: '*', element: React.createElement(AppRoutes) }], {
+    initialEntries: [{ pathname: path, search: routeSearch, hash: '#flow', state }],
+  });
   return renderToString(React.createElement(Provider, { store: appStore },
-    React.createElement(router.MemoryRouter, {
-      initialEntries: [{ pathname: path, search: routeSearch, hash: '#flow', state }],
-    }, React.createElement(AppRoutes))));
+    React.createElement(router.RouterProvider, { router: testRouter })));
 }
 
 test('public pages render directly, even with an existing ADMIN session', () => {
@@ -99,7 +106,9 @@ test('public pages render directly, even with an existing ADMIN session', () => 
 });
 
 test('session restoration happens before protected routes render', () => {
-  assert.ok(renderRoute('/home', user).includes('Routing Test'));
+  const homeHtml = renderRoute('/home', user);
+  assert.ok(homeHtml.includes('Routing Test'));
+  assert.ok(homeHtml.includes('Digital Twin'));
   assert.equal(redirects.length, 0);
   assert.ok(renderRoute('/admin', admin).includes('HESTA Admin Center'));
   assert.equal(redirects.length, 0);
@@ -116,7 +125,7 @@ test('login exposes an accessible password visibility control', () => {
 });
 
 test('protected routes preserve the URL context and return destination', () => {
-  for (const path of ['/home', '/admin']) {
+  for (const path of ['/home', '/admin', '/home/home-1/digital-twin']) {
     renderRoute(path);
     assert.deepEqual(redirects[0].to, { pathname: '/login', search, hash: '#flow' });
     assert.equal(redirects[0].state.returnTo, path);

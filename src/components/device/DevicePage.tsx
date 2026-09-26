@@ -2,11 +2,11 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { DeviceCard } from './DeviceCard';
 import { DeviceDetailModal } from './DeviceDetailModal';
-import { getDevicesByHome, getDevicesByRoom, sendDeviceCommand, sendManualPowerCommand } from '../../services/deviceApi';
+import { getDevicesByHome, getDevicesByRoom, sendManualPowerCommand } from '../../services/deviceApi';
 import { getHomeRooms } from '../../services/homeApi';
 import type { DeviceResponse } from '../../types/device';
 import { getErrorMessage } from '../../utils/errors';
-import { AppSidebar, DeviceIcon, HomeIcon } from '../ui/AppSidebar';
+import { AppSidebar, DeviceIcon, HomeIcon, TwinIcon } from '../ui/AppSidebar';
 import { NotificationBell } from '../notification/NotificationBell';
 import { currentHomeChanged, currentHomeCleared } from '../../store/homeSlice';
 import { useAppDispatch } from '../../store/hooks';
@@ -72,8 +72,7 @@ export const DevicePage: React.FC = () => {
     return () => window.clearTimeout(timer);
   }, [fetchDevices]);
 
-  const handleTogglePower = async async (deviceId: string, currentPower: string) => {
-    // 1. Optimistic update
+  const handleTogglePower = async (deviceId: string, currentPower: string) => {
     setPowerPendingId(deviceId); setCommandError(''); setCommandSuccess('');
     try {
       const result = await sendManualPowerCommand(deviceId, currentPower === 'ON' ? 'TURN_OFF' : 'TURN_ON');
@@ -83,30 +82,6 @@ export const DevicePage: React.FC = () => {
     } catch (caught) { setCommandError(getErrorMessage(caught, 'Không thể điều khiển thiết bị.')); }
     finally { setPowerPendingId(null); }
 
-    // 2. Determine action
-    const actionToSend = currentPower === 'ON' ? 'TURN_OFF' : 'TURN_ON';
-
-    try {
-      // 3. Send API request
-      await sendDeviceCommand(deviceId, actionToSend);
-    } catch (err) {
-      console.error("Lỗi khi gửi lệnh điều khiển:", err);
-      // Revert if error
-      setDevices(prev =>
-        prev.map(d => {
-          if (d.id === deviceId) {
-            return {
-              ...d,
-              currentState: {
-                ...d.currentState,
-                power: currentPower, // Revert back
-              },
-            };
-          }
-          return d;
-        })
-      );
-    }
   };
 
   const handleDeviceClick = (deviceId: string) => {
@@ -121,6 +96,13 @@ export const DevicePage: React.FC = () => {
     setDevices(prev => prev.filter(d => d.id !== deviceId));
   };
 
+  const handleDeviceUpdated = (updatedDevice: DeviceResponse) => {
+    setDevices((currentDevices) => currentDevices.map((device) => (
+      device.id === updatedDevice.id ? updatedDevice : device
+    )));
+    setSelectedDevice(updatedDevice);
+  };
+
   return (
     <div className="app-shell">
       <AppSidebar
@@ -129,6 +111,7 @@ export const DevicePage: React.FC = () => {
         items={[
           { id: 'home', label: 'Tổng quan', icon: <HomeIcon />, onClick: () => navigate('/home') },
           { id: 'devices', label: 'Thiết bị', icon: <DeviceIcon />, onClick: () => window.scrollTo({ top: 0, behavior: 'smooth' }) },
+          { id: 'twin', label: 'Digital Twin', icon: <TwinIcon />, onClick: () => navigate(`/home/${homeId}/digital-twin`) },
         ]}
       />
       <main id="main-content" className="lg:pl-64">
@@ -205,6 +188,7 @@ export const DevicePage: React.FC = () => {
       </main>
 
       <DeviceDetailModal
+        key={selectedDevice?.id ?? 'closed'}
         isOpen={isModalOpen}
         onClose={() => {
           setIsModalOpen(false);
@@ -212,6 +196,7 @@ export const DevicePage: React.FC = () => {
         }}
         device={selectedDevice}
         onDeviceRemoved={handleDeviceRemoved}
+        onDeviceUpdated={handleDeviceUpdated}
       />
     </div>
   );

@@ -8,6 +8,7 @@ import { AdminDashboard } from '../components/admin/AdminDashboard';
 import { JoinHome } from '../components/home/JoinHome';
 import { UnauthenticatedJoin } from '../components/home/UnauthenticatedJoin';
 import { DevicePage } from '../components/device/DevicePage';
+import { DigitalTwinPage } from '../components/twin/DigitalTwinPage';
 import type { AuthResponse } from '../types/auth';
 import { RequireAdmin, RequireAuth } from './RouteGuards';
 import { defaultRoute, invitationSearch, invitationToken, loginDestination, readNavigationState } from './navigation';
@@ -83,6 +84,7 @@ export function AppRoutes() {
         <Route path="/homes/:homeId/automation-rules" element={<AutomationRulePage />} />
         <Route path="/homes/:homeId/recommendations" element={<RecommendationsPage />} />
         <Route path="/home/:homeId/devices" element={<DevicePage />} />
+        <Route path="/home/:homeId/digital-twin" element={<DigitalTwinPage />} />
         <Route element={<RequireAdmin initialized={initialized} user={user} />}>
           <Route path="/admin" element={<AdminDashboard user={user!} onLogout={logout} onProfileUpdate={updateUser} />} />
         </Route>

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { forgotPassword } from '../../services/authApi';
 import { getErrorMessage } from '../../utils/errors';
 import { AuthShell } from '../ui/AuthShell';
+import { notify } from '../ui/notify';
 
 interface ForgotPasswordFormProps {
   onBackToLogin: () => void;
@@ -26,6 +27,7 @@ export const ForgotPasswordForm: React.FC<ForgotPasswordFormProps> = ({ onBackTo
     try {
       await forgotPassword({ email: email.trim() });
       onSuccess(email.trim());
+      notify.success('Đã gửi mã khôi phục', 'Vui lòng kiểm tra email của bạn.');
     } catch (error: unknown) {
       setError(getErrorMessage(error, 'Không thể gửi yêu cầu. Vui lòng kiểm tra lại email.'));
     } finally {

@@ -1,5 +1,12 @@
 import { apiClient } from './apiClient';
-import type { DeviceResponse, DeviceUpdateRequest, DeviceStateHistoryResponse, ManualCommandResponse, ManualOverrideRecord } from '../types/device';
+import type {
+  DeviceCommandResult,
+  DeviceResponse,
+  DeviceStateHistoryResponse,
+  DeviceUpdateRequest,
+  ManualCommandResponse,
+  ManualOverrideRecord,
+} from '../types/device';
 
 export const getDevicesByHome = async (homeId: string): Promise<DeviceResponse[]> => {
   const response = await apiClient.get(`/homes/${homeId}/devices`);
@@ -30,7 +37,11 @@ export const getDeviceHistory = async (deviceId: string): Promise<DeviceStateHis
   return response.data.result;
 };
 
-export const sendDeviceCommand = async (deviceId: string, action: string, parameters?: Record<string, any>): Promise<any> => {
+export const sendDeviceCommand = async (
+  deviceId: string,
+  action: string,
+  parameters?: Record<string, unknown>,
+): Promise<DeviceCommandResult> => {
   const response = await apiClient.post(`/devices/${deviceId}/command`, {
     action,
     parameters: parameters || {}
@@ -38,7 +49,11 @@ export const sendDeviceCommand = async (deviceId: string, action: string, parame
   return response.data.result;
 };
 
-export const sendRoomCommand = async (roomId: string, action: string, parameters?: Record<string, any>): Promise<any> => {
+export const sendRoomCommand = async (
+  roomId: string,
+  action: string,
+  parameters?: Record<string, unknown>,
+): Promise<DeviceCommandResult[]> => {
   const response = await apiClient.post(`/rooms/${roomId}/command`, {
     action,
     parameters: parameters || {}
