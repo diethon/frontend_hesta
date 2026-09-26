@@ -9,9 +9,16 @@ interface DeviceDetailModalProps {
   onClose: () => void;
   device: DeviceResponse | null;
   onDeviceRemoved: (deviceId: string) => void;
+  onDeviceUpdated: (device: DeviceResponse) => void;
 }
 
-export const DeviceDetailModal: React.FC<DeviceDetailModalProps> = ({ isOpen, onClose, device, onDeviceRemoved }) => {
+export const DeviceDetailModal: React.FC<DeviceDetailModalProps> = ({
+  isOpen,
+  onClose,
+  device,
+  onDeviceRemoved,
+  onDeviceUpdated,
+}) => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -21,11 +28,6 @@ export const DeviceDetailModal: React.FC<DeviceDetailModalProps> = ({ isOpen, on
   const [overrides, setOverrides] = useState<ManualOverrideRecord[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
 
-  React.useEffect(() => {
-    if (device) {
-      setEditName(device.name);
-    }
-  }, [device]);
   const [cancelPending, setCancelPending] = useState(false);
   const [cancelMessage, setCancelMessage] = useState('');
 
@@ -69,6 +71,8 @@ export const DeviceDetailModal: React.FC<DeviceDetailModalProps> = ({ isOpen, on
 
   const handleEdit = async () => {
     if (!isEditMode) {
+      setEditName(device.name);
+      setError('');
       setIsEditMode(true);
       return;
     }
@@ -86,8 +90,8 @@ export const DeviceDetailModal: React.FC<DeviceDetailModalProps> = ({ isOpen, on
     setIsUpdating(true);
     setError('');
     try {
-      await updateDeviceConfig(device.id, { name: editName.trim() });
-      device.name = editName.trim(); // Update locally for instant feedback
+      const updatedDevice = await updateDeviceConfig(device.id, { name: editName.trim() });
+      onDeviceUpdated(updatedDevice);
       setIsEditMode(false);
     } catch (err: unknown) {
       setError(getErrorMessage(err, 'Lỗi khi cập nhật cấu hình'));

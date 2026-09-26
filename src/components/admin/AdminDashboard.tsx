@@ -4,6 +4,7 @@ import type { UserResponse } from '../../types/auth';
 import { NotificationBell } from '../notification/NotificationBell';
 import { ProfileModal } from '../profile/ProfileModal';
 import { AdminIcon, AppSidebar, HomeIcon } from '../ui/AppSidebar';
+import { UserAvatar } from '../ui/UserAvatar';
 
 interface AdminDashboardProps {
   user: UserResponse;
@@ -72,13 +73,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout, 
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
               className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border-2 border-line bg-warning shadow-soft transition-colors hover:bg-warning-soft focus:outline-none focus:ring-2 focus:ring-warning focus:ring-offset-2 focus:ring-offset-surface"
             >
-              {user.avatarUrl ? (
-                <img src={user.avatarUrl} alt={`Ảnh đại diện của ${user.fullName}`} width={40} height={40} className="h-full w-full object-cover" />
-              ) : (
-                <span className="text-white font-bold text-sm">
-                  {user.fullName.charAt(0).toUpperCase()}
-                </span>
-              )}
+              <UserAvatar
+                src={user.avatarUrl}
+                name={user.fullName}
+                size={40}
+                fallbackClassName="text-sm font-bold text-white"
+              />
             </button>
 
             {isDropdownOpen && (

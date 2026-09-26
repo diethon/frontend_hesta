@@ -51,6 +51,7 @@ export function loginDestination(user: UserResponse, search: string, state: Navi
 function isSafeReturnPath(value: unknown): value is string {
   return typeof value === 'string' && (
     value === '/home' || value === '/admin' || value === '/join' ||
+    isTwinReturnPath(value) ||
     /^\/homes\/[0-9a-f-]+\/(scenes|automation-rules)$/i.test(value)
   );
 }

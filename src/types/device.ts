@@ -2,6 +2,16 @@ export interface DeviceState {
   [key: string]: unknown;
 }
 
+export interface DeviceCommandResult {
+  commandId?: string;
+  success: boolean;
+  status: string;
+  message?: string;
+  errorCode?: string;
+  acknowledgedState?: DeviceState;
+  latencyMs?: number;
+}
+
 export interface DeviceResponse {
   id: string;
   homeId: string;

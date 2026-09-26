@@ -3,6 +3,7 @@ import { getHomeMembers, updateMemberRole, removeMember, generateInvitation } fr
 import type { HomeMember, InvitationResponse } from '../../services/homeApi';
 import { getErrorMessage } from '../../utils/errors';
 import { notify } from '../ui/notify';
+import { UserAvatar } from '../ui/UserAvatar';
 
 interface MemberManagementProps {
   homeId: string;
@@ -140,11 +141,13 @@ export const MemberManagement: React.FC<MemberManagementProps> = ({ homeId, curr
               <tr key={member.id} className="text-slate-300">
                 <td className="py-4 flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-slate-800 overflow-hidden flex items-center justify-center shrink-0 border border-slate-700">
-                    {member.avatarUrl ? (
-                      <img src={member.avatarUrl} alt={`Ảnh đại diện của ${member.fullName}`} width={40} height={40} loading="lazy" className="h-full w-full object-cover" />
-                    ) : (
-                      <span className="text-sm font-bold text-slate-400">{member.fullName.charAt(0)}</span>
-                    )}
+                    <UserAvatar
+                      src={member.avatarUrl}
+                      name={member.fullName}
+                      size={40}
+                      loading="lazy"
+                      fallbackClassName="text-sm font-bold text-slate-400"
+                    />
                   </div>
                   <div>
                     <div className="font-medium text-slate-200">{member.fullName}</div>

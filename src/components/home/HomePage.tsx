@@ -19,6 +19,7 @@ import {
 import { NotificationBell } from "../notification/NotificationBell";
 import { Link } from "react-router";
 import { notify } from '../ui/notify';
+import { UserAvatar } from '../ui/UserAvatar';
 
 interface HomePageProps {
   user: UserResponse;
@@ -246,19 +247,12 @@ export const HomePage: React.FC<HomePageProps> = ({
                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                 className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border-2 border-line bg-primary shadow-soft transition-colors hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-surface"
               >
-                {user.avatarUrl ? (
-                  <img
-                    src={user.avatarUrl}
-                    alt={`Ảnh đại diện của ${user.fullName}`}
-                    width={40}
-                    height={40}
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <span className="text-white font-bold text-sm">
-                    {user.fullName.charAt(0).toUpperCase()}
-                  </span>
-                )}
+                <UserAvatar
+                  src={user.avatarUrl}
+                  name={user.fullName}
+                  size={40}
+                  fallbackClassName="text-sm font-bold text-white"
+                />
               </button>
 
               {isDropdownOpen && (

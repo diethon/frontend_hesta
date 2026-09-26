@@ -3,6 +3,7 @@ import type { UserResponse } from '../../types/auth';
 import { updateProfile, changePassword, uploadAvatar } from '../../services/userApi';
 import { getErrorMessage } from '../../utils/errors';
 import { notify } from '../ui/notify';
+import { UserAvatar } from '../ui/UserAvatar';
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -186,11 +187,12 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
                   className="relative w-20 h-20 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-white text-3xl font-bold shadow-lg shadow-cyan-500/20 mb-3 cursor-pointer group overflow-hidden"
                   onClick={() => !isUploadingAvatar && fileInputRef.current?.click()}
                 >
-                  {user.avatarUrl ? (
-                    <img src={user.avatarUrl} alt={`Ảnh đại diện của ${user.fullName}`} width={80} height={80} className="h-full w-full object-cover" />
-                  ) : (
-                    user.fullName.charAt(0).toUpperCase()
-                  )}
+                  <UserAvatar
+                    src={user.avatarUrl}
+                    name={user.fullName}
+                    size={80}
+                    fallbackClassName="text-3xl font-bold text-white"
+                  />
                   
                   {/* Hover Overlay */}
                   <div className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">

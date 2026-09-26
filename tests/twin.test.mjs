@@ -320,7 +320,15 @@ test('invalid payloads are ignored; unknown event names rejected; Twin login ret
   assert.throws(() => parseRealtimeEvent({ ...sensorEvent, type: 'FAKE_EVENT' }));
   const path = `/home/${homeId}/digital-twin`;
   const state = nav.readNavigationState({ returnTo: path });
+  assert.equal(state.returnTo, path);
   assert.equal(nav.loginDestination({ platformRole: 'USER' }, '', state), path);
+  assert.equal(nav.loginDestination({ platformRole: 'ADMIN' }, '', state), path);
   assert.equal(nav.loginDestination({ platformRole: 'USER' }, '?inviteToken=invite', state), '/join');
-  assert.equal(nav.readNavigationState({ returnTo: '//evil.test' }).returnTo, undefined);
+  assert.equal(nav.loginDestination({ platformRole: 'USER' }, '?token=invite', state), '/join');
+  assert.equal(nav.loginDestination({ platformRole: 'USER' }, '?inviteToken=invite', {
+    ...state, handledInviteToken: 'invite',
+  }), path);
+  for (const returnTo of ['//evil.test', `https://evil.test${path}`, '/home/../digital-twin', `${path}/extra`]) {
+    assert.equal(nav.readNavigationState({ returnTo }).returnTo, undefined);
+  }
 });
