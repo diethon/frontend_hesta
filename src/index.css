@@ -1,5 +1,37 @@
 @import "tailwindcss";
 
+.hesta-toast {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+.hesta-toast[data-visible="false"] {
+  opacity: 0;
+  transform: translateY(-8px) scale(.98);
+}
+@media (prefers-reduced-motion: reduce) {
+  .hesta-toast { transition: none; }
+}
+
+.twin-viewport { --twin-canvas-height: clamp(28rem, 38vw, 38rem); height: calc(var(--twin-canvas-height) + 2px); }
+.twin-2d-overview-viewport { --twin-canvas-height: clamp(14rem, 20vw, 18rem); }
+.twin-canvas {
+  background-image: linear-gradient(var(--color-line) 1px, transparent 1px), linear-gradient(90deg, var(--color-line) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+.twin-3d-stage { height: clamp(30rem, 58vw, 46rem); }
+.twin-3d-stage canvas { touch-action: none; }
+.twin-3d-room-label { max-width: 11rem; }
+.twin-tool { display: flex; align-items: center; gap: .75rem; min-height: 4rem; padding: .75rem; border: 1px solid var(--color-line); border-radius: .75rem; background: var(--color-info-soft); color: var(--color-text); }
+.twin-tool svg { flex-shrink: 0; color: var(--color-primary-hover); }
+.twin-tool strong { display: block; font-size: .75rem; }
+.twin-tool small { display: block; margin-top: .25rem; font-size: .65rem; color: var(--color-muted); }
+@media (max-width: 639px) {
+  .twin-room .twin-furnishing { display: none; }
+  .twin-3d-stage { height: 28rem; }
+  .twin-3d-room-label { min-width: 6.5rem; max-width: 8rem; }
+}
+
 @theme {
   --color-app: #f8fcff;
   --color-surface: #ffffff;
@@ -24,6 +56,17 @@
   --color-error-soft: #fff0f0;
   --color-info: #8ed8f8;
   --color-info-soft: #eef9ff;
+  /* Semantic materials used by the frontend-only Digital Twin renderer. */
+  --color-twin-wood: #a96f3f;
+  --color-twin-wood-light: #d9a46a;
+  --color-twin-fabric: #d1dce1;
+  --color-twin-fabric-accent: #91afc0;
+  --color-twin-leaf: #78ad86;
+  --color-twin-leaf-dark: #4f8767;
+  --color-twin-glass: #bfe3ef;
+  --color-twin-metal: #a8b7c0;
+  --color-twin-dark: #485864;
+  --color-twin-rug: #cbb8a1;
 
   /* Keep legacy utilities on the product palette while components migrate. */
   --color-slate-950: #f8fcff;
@@ -271,5 +314,16 @@ textarea:disabled {
   .auth-surface {
     background: #ffffff;
     backdrop-filter: none;
+  }
+}
+
+
+@layer components {
+  .input {
+    @apply w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 outline-none focus:border-cyan-500;
+  }
+
+  .button {
+    @apply rounded-lg bg-cyan-700 px-3 py-2 text-sm font-medium text-white hover:bg-cyan-600 disabled:cursor-not-allowed disabled:opacity-50;
   }
 }

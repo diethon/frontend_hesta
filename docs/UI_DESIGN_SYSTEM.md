@@ -1,117 +1,99 @@
-# HESTA UI Design System
+# Hệ thống thiết kế giao diện HESTA
 
-This document is the visual source of truth for every new or modified HESTA
-interface. Product behavior and API rules remain in
-`docs/FRONTEND_UI_FUNCTIONAL_SPEC.md`.
+Tài liệu này là nguồn quy chuẩn về hình thức hiển thị cho mọi giao diện HESTA được tạo mới hoặc chỉnh sửa. Hành vi sản phẩm và quy tắc API được mô tả trong `docs/FRONTEND_UI_FUNCTIONAL_SPEC.md`.
 
-## Product direction
+## Định hướng sản phẩm
 
-HESTA is a bright, modern, friendly Smart Home product. Interfaces should feel
-calm and easy for a household to understand at a glance.
+HESTA là sản phẩm Nhà thông minh sáng sủa, hiện đại và thân thiện. Giao diện cần tạo cảm giác dễ chịu để các thành viên trong gia đình có thể hiểu nhanh.
 
-- Use white, pale sky blue, and mint surfaces with soft borders and shadows.
-- Prefer clear hierarchy, generous spacing, rounded controls, and concise
-  Vietnamese copy.
-- Never introduce dark or navy page surfaces, black backgrounds, purple
-  accents, neon styling, or dark-mode variants.
-- Avoid decorative effects that compete with device status or primary actions.
+- Dùng bề mặt màu trắng, xanh da trời nhạt và xanh bạc hà, cùng viền và bóng đổ nhẹ.
+- Ưu tiên phân cấp rõ ràng, khoảng cách thoáng, điều khiển bo góc và nội dung tiếng Việt ngắn gọn.
+- Không dùng bề mặt trang màu tối hoặc xanh navy, nền đen, điểm nhấn màu tím, phong cách neon hay biến thể giao diện tối.
+- Tránh hiệu ứng trang trí lấn át trạng thái thiết bị hoặc thao tác chính.
 
-## Semantic tokens
+## Token theo ngữ nghĩa
 
-All color values live in `src/index.css` under `@theme`. Use the semantic
-Tailwind utilities generated from these tokens; do not place hexadecimal,
-RGB/HSL, or arbitrary color values in React components.
+Mọi giá trị màu nằm trong `src/index.css`, thuộc `@theme`. Dùng các utility Tailwind theo ngữ nghĩa được tạo từ các token này; không đặt mã màu thập lục phân, RGB/HSL hoặc giá trị màu tùy ý trong component React.
 
-| Purpose | Token utility examples | Value |
+| Mục đích | Ví dụ utility token | Giá trị |
 | --- | --- | --- |
-| Application background | `bg-app` | `#F8FCFF` |
-| Card and modal surface | `bg-surface` | `#FFFFFF` |
-| Sidebar | `bg-sidebar` | `#EEF7FB` |
-| Sidebar hover | `bg-sidebar-hover` | `#DFF1F8` |
-| Sidebar active | `bg-sidebar-active` | `#CDEFFA` |
-| Border | `border-line` | `#DCEAF2` |
-| Primary action | `bg-primary`, `text-primary` | `#5BC0EB` |
-| Primary hover | `hover:bg-primary-hover` | `#3DAFD9` |
-| Mint accent | `bg-mint`, `text-mint` | `#7BDCB5` |
-| Mint hover | `hover:bg-mint-hover` | `#5ECFA2` |
-| Primary text | `text-text` | `#3A4A5A` |
-| Secondary text | `text-muted` | `#6B7C8F` |
-| Default icon | `text-icon` | `#7A93A6` |
+| Nền ứng dụng | `bg-app` | `#F8FCFF` |
+| Bề mặt thẻ và hộp thoại | `bg-surface` | `#FFFFFF` |
+| Thanh bên | `bg-sidebar` | `#EEF7FB` |
+| Thanh bên khi rê chuột | `bg-sidebar-hover` | `#DFF1F8` |
+| Mục đang chọn trên thanh bên | `bg-sidebar-active` | `#CDEFFA` |
+| Đường viền | `border-line` | `#DCEAF2` |
+| Thao tác chính | `bg-primary`, `text-primary` | `#5BC0EB` |
+| Thao tác chính khi rê chuột | `hover:bg-primary-hover` | `#3DAFD9` |
+| Điểm nhấn xanh bạc hà | `bg-mint`, `text-mint` | `#7BDCB5` |
+| Xanh bạc hà khi rê chuột | `hover:bg-mint-hover` | `#5ECFA2` |
+| Chữ chính | `text-text` | `#3A4A5A` |
+| Chữ phụ | `text-muted` | `#6B7C8F` |
+| Biểu tượng mặc định | `text-icon` | `#7A93A6` |
 
-State colors must keep their matching soft background:
+Màu trạng thái phải đi cùng màu nền nhạt tương ứng:
 
-| State | Foreground | Background |
+| Trạng thái | Màu chữ/biểu tượng | Màu nền |
 | --- | --- | --- |
-| Success / online | `success` | `success-soft` |
-| Disabled / offline | `off` | `off-soft` |
-| Warning | `warning` | `warning-soft` |
-| Error | `error` | `error-soft` |
-| Information | `info` | `info-soft` |
+| Thành công / trực tuyến | `success` | `success-soft` |
+| Vô hiệu hóa / ngoại tuyến | `off` | `off-soft` |
+| Cảnh báo | `warning` | `warning-soft` |
+| Lỗi | `error` | `error-soft` |
+| Thông tin | `info` | `info-soft` |
 
-Legacy slate/cyan/blue utilities are mapped to the light palette only for
-compatibility with existing components. Do not use them in new UI. New work
-must use semantic tokens.
+Các utility slate/cyan/blue cũ chỉ được ánh xạ sang bảng màu sáng để tương thích với component hiện có. Không dùng chúng trong giao diện mới. Phần việc mới phải dùng token theo ngữ nghĩa.
 
-## Shared foundations
+## Nền tảng dùng chung
 
-Reuse these before adding new layout or surface styles:
+Tái sử dụng các thành phần sau trước khi thêm kiểu bố cục hoặc bề mặt mới:
 
-- `AppSidebar` for authenticated desktop navigation.
-- `AuthShell` for authentication and invitation pages.
-- `.app-shell` for page roots.
-- `.app-sidebar` for navigation surfaces.
-- `.surface-card` for cards and content panels.
-- `.auth-surface` for auth and modal-like forms.
-- `.soft-grid`, `.gentle-rise`, and `.custom-scrollbar` only where their
-  existing purpose matches.
+- `AppSidebar` cho điều hướng trên máy tính khi đã đăng nhập.
+- `AuthShell` cho trang xác thực và lời mời.
+- `.app-shell` cho phần gốc của trang.
+- `.app-sidebar` cho bề mặt điều hướng.
+- `.surface-card` cho thẻ và bảng nội dung.
+- `.auth-surface` cho biểu mẫu xác thực và biểu mẫu dạng hộp thoại.
+- `.soft-grid`, `.gentle-rise` và `.custom-scrollbar` chỉ khi phù hợp với mục đích hiện có của chúng.
 
-When a pattern appears in two or more features, extract a typed component into
-`src/components/ui`. Shared components should offer named variants such as
-`primary`, `secondary`, `danger`, or `success`; callers should not be able to
-replace the whole visual system with arbitrary class strings.
+Khi một mẫu giao diện xuất hiện trong ít nhất hai tính năng, hãy tách thành component có kiểu dữ liệu rõ ràng trong `src/components/ui`. Component dùng chung nên cung cấp các biến thể có tên như `primary`, `secondary`, `danger` hoặc `success`; nơi sử dụng không được thay toàn bộ hệ thống hiển thị bằng chuỗi class tùy ý.
 
-## Component rules
+## Quy tắc cho component
 
-- Page background: `bg-app`; content surface: `surface-card` or `bg-surface`.
-- Cards: `rounded-2xl`/`.surface-card`, `border-line`, and a soft shadow.
-- Inputs: white or soft-blue surface, `border-line`, readable `text-text`, and
-  a primary focus ring. Every input needs a visible associated label.
-- Primary buttons: `bg-primary hover:bg-primary-hover text-white`.
-- Secondary buttons: pale blue surface with `text-text` or `text-muted`.
-- Destructive actions: error foreground/soft background; require confirmation
-  when the action is irreversible.
-- Icons: use `text-icon` by default and `text-primary` when active. Decorative
-  SVGs must be hidden from assistive technology.
-- Use one rounded hierarchy: cards 20–24 px, controls 12–16 px, pills only for
-  status, filters, avatars, and compact actions.
-- Animate only opacity or transform. Respect the global reduced-motion rule and
-  never use `transition-all`.
+- Nền trang: `bg-app`; bề mặt nội dung: `surface-card` hoặc `bg-surface`.
+- Thẻ: `rounded-2xl`/`.surface-card`, `border-line` và bóng đổ nhẹ.
+- Ô nhập liệu: bề mặt trắng hoặc xanh nhạt, `border-line`, chữ `text-text` dễ đọc và vòng viền focus dùng màu chính. Mỗi ô nhập liệu cần nhãn hiển thị gắn với nó.
+- Nút chính: `bg-primary hover:bg-primary-hover text-white`.
+- Nút phụ: bề mặt xanh nhạt với `text-text` hoặc `text-muted`.
+- Thao tác xóa hoặc gây mất dữ liệu: chữ màu lỗi trên nền lỗi nhạt; yêu cầu xác nhận khi thao tác không thể hoàn tác.
+- Biểu tượng: mặc định dùng `text-icon`, khi hoạt động dùng `text-primary`. SVG chỉ để trang trí phải được ẩn khỏi công nghệ hỗ trợ.
+- Dùng một hệ phân cấp bo góc: thẻ 20–24 px, điều khiển 12–16 px; dạng viên chỉ dành cho trạng thái, bộ lọc, ảnh đại diện và thao tác nhỏ gọn.
+- Chỉ tạo hiệu ứng động cho độ mờ hoặc phép biến đổi. Tuân thủ quy tắc giảm chuyển động toàn cục và không dùng `transition-all`.
 
-## Required states and responsive behavior
+## Các trạng thái bắt buộc và hành vi đáp ứng
 
-Every feature that loads or mutates data must deliberately cover:
+Thông báo tạm thời về thành công, lỗi và nhắc thao tác dùng `notify` trong
+`src/components/ui/notify.tsx`. Thành phần `AppToaster` được gắn một lần ở cấp
+ứng dụng, dùng bề mặt sáng và màu trạng thái của hệ thống thiết kế. Giữ lỗi
+kiểm tra dữ liệu cạnh trường nhập và giữ trạng thái lỗi cần thao tác khôi phục
+trong trang. Hộp xác nhận trước thao tác không thể hoàn tác vẫn cần lựa chọn
+rõ ràng của người dùng.
 
-- loading or skeleton state;
-- empty state with a useful next action;
-- API error state with `role="alert"` when appropriate;
-- success feedback for meaningful mutations;
-- disabled and submitting states;
-- confirmation for destructive actions.
+Mọi tính năng tải hoặc thay đổi dữ liệu phải chủ động xử lý:
 
-Start at a 320 px viewport. Avoid fixed content widths that overflow; keep
-touch targets at least 44 px where practical. Desktop sidebars must not make
-mobile content inaccessible. Dialogs need a labelled dialog role, keyboard
-operation, a clear close action, and scroll containment.
+- trạng thái đang tải hoặc khung chờ;
+- trạng thái rỗng kèm hành động tiếp theo hữu ích;
+- trạng thái lỗi API với `role="alert"` khi phù hợp;
+- phản hồi thành công cho thay đổi có ý nghĩa;
+- trạng thái vô hiệu hóa và đang gửi;
+- bước xác nhận cho thao tác xóa hoặc gây mất dữ liệu.
 
-## UI change checklist
+Bắt đầu kiểm tra ở chiều rộng khung nhìn 320 px. Tránh chiều rộng nội dung cố định gây tràn; khi phù hợp, giữ vùng chạm ít nhất 44 px. Thanh bên trên máy tính không được làm nội dung trên điện thoại khó truy cập. Hộp thoại cần vai trò dialog có nhãn, hỗ trợ bàn phím, thao tác đóng rõ ràng và kiểm soát cuộn.
 
-Before handing off UI work:
+## Danh sách kiểm tra khi thay đổi giao diện
 
-1. Confirm the feature still follows `FRONTEND_UI_FUNCTIONAL_SPEC.md` and does
-   not change routes, API payloads, session rules, roles, or realtime behavior.
-2. Confirm new UI uses semantic tokens and shared foundations, with no raw or
-   forbidden colors.
-3. Check keyboard access, labels, focus, dialog semantics, responsive overflow,
-   and loading/empty/error/success/disabled states.
-4. Run `npm run lint`, `npm run build`, and `npm test`.
+Trước khi bàn giao phần giao diện:
 
+1. Xác nhận tính năng vẫn tuân theo `FRONTEND_UI_FUNCTIONAL_SPEC.md` và không thay đổi route, dữ liệu gửi tới API, quy tắc phiên, vai trò hoặc hành vi thời gian thực.
+2. Xác nhận giao diện mới dùng token theo ngữ nghĩa và các thành phần dùng chung, không có màu thô hoặc màu bị cấm.
+3. Kiểm tra truy cập bằng bàn phím, nhãn, focus, ngữ nghĩa hộp thoại, tràn nội dung khi đổi kích thước và các trạng thái đang tải/rỗng/lỗi/thành công/vô hiệu hóa.
+4. Chạy `npm run lint`, `npm run build` và `npm test`.

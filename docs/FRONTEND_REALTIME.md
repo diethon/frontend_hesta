@@ -1,54 +1,41 @@
-# Shared frontend realtime
+# Hạ tầng thời gian thực dùng chung ở frontend
 
-HESTA has one frontend realtime transport. Feature pages, including a future Digital Twin, must
-not create another `WebSocket` or STOMP client.
+HESTA chỉ có một kết nối thời gian thực ở frontend. Các trang tính năng, kể cả Digital Twin, không được tạo thêm kết nối `WebSocket` hoặc client STOMP riêng.
 
 ```text
-Backend event
+Sự kiện từ backend
     |
     v
-shared realtime client
+client thời gian thực dùng chung
     |
     v
-central event dispatcher
+bộ phân phối sự kiện trung tâm
     |
     v
-feature Redux action / feature handler
+action Redux / bộ xử lý của tính năng
 ```
 
-## Connection and authentication
+## Kết nối và xác thực
 
-`RealtimeLifecycle` is mounted once next to the router. It reads the existing access token from
-the Redux authentication state and coordinates the singleton `realtimeClient`. The client connects
-to `/ws`, derived from `VITE_API_BASE_URL`, and sends the token only in the native STOMP `CONNECT`
-header:
+`RealtimeLifecycle` được gắn một lần bên cạnh router. Thành phần này đọc access token hiện có từ trạng thái xác thực Redux và điều phối `realtimeClient` dùng chung. Client kết nối tới `/ws` dựa trên `VITE_API_BASE_URL` và chỉ gửi token trong header STOMP `CONNECT`:
 
 ```text
 Authorization: Bearer <access-token>
 ```
 
-The token is never added to the WebSocket URL or logged. A token change replaces the connection;
-logout deactivates it and clears the realtime Redux state.
+Token không được thêm vào URL WebSocket hoặc ghi vào log. Khi token thay đổi, kết nối được thay thế; khi đăng xuất, kết nối bị ngắt và trạng thái thời gian thực trong Redux được xóa.
 
-## Home subscription and reconnect
+## Đăng ký kênh nhà và kết nối lại
 
-The selected home ID is shared through the small home slice. The lifecycle asks the singleton to
-subscribe to `/topic/homes/{homeId}/events`. Selecting another home first unsubscribes the old
-STOMP subscription, then subscribes the new one. Duplicate subscriptions are ignored.
+ID của nhà đang chọn được chia sẻ qua home slice. Lifecycle yêu cầu client dùng chung đăng ký `/topic/homes/{homeId}/events`. Khi chọn nhà khác, client hủy đăng ký STOMP cũ trước rồi mới đăng ký kênh mới. Các yêu cầu đăng ký trùng lặp bị bỏ qua.
 
-STOMP reconnect uses exponential delays from 1 to 10 seconds. Incoming and outgoing heartbeats
-are both 20 seconds, matching the backend default. After a transport reconnect, the singleton
-authenticates again and restores the selected-home subscription automatically. REST behavior is
-not blocked when realtime is unavailable.
+STOMP kết nối lại với thời gian chờ tăng dần theo hàm mũ, từ 1 đến 10 giây. Heartbeat gửi và nhận đều là 20 giây, khớp với giá trị mặc định của backend. Sau khi kết nối truyền tải được khôi phục, client dùng chung xác thực lại và tự động đăng ký lại kênh của nhà đang chọn. Khi kết nối thời gian thực không khả dụng, các thao tác REST vẫn hoạt động.
 
-## Consuming events in a feature
+## Xử lý sự kiện trong một tính năng
 
-The Redux `realtime` slice stores infrastructure state only: status, subscribed home, last event
-time, and a safe error message. Every accepted event also appears as a `realtime/realtimeEventReceived`
-action in Redux DevTools. Domain data does not belong in that slice.
+Redux slice `realtime` chỉ lưu trạng thái hạ tầng: trạng thái kết nối, nhà đang đăng ký, thời điểm sự kiện cuối và thông báo lỗi an toàn. Mỗi sự kiện được chấp nhận cũng xuất hiện dưới dạng action `realtime/realtimeEventReceived` trong Redux DevTools. Dữ liệu nghiệp vụ không thuộc slice này.
 
-A feature registers a handler once at feature lifecycle level and dispatches its own typed Redux
-action:
+Một tính năng đăng ký bộ xử lý một lần trong vòng đời của tính năng và phát action Redux có kiểu dữ liệu rõ ràng:
 
 ```ts
 const unregister = realtimeEventDispatcher.register<DevicePayload>(
@@ -57,33 +44,21 @@ const unregister = realtimeEventDispatcher.register<DevicePayload>(
 );
 ```
 
-Call `unregister` during feature cleanup. Sensor, device, and notification events all use this same
-dispatcher. The transport parses the shared `RealtimeEvent<T>` contract and keeps a bounded cache
-of recent `eventId` values to ignore simple duplicates.
+Gọi `unregister` khi dọn dẹp tính năng. Sự kiện cảm biến, thiết bị và thông báo đều dùng cùng bộ phân phối này. Lớp truyền tải phân tích hợp đồng `RealtimeEvent<T>` dùng chung và giữ một bộ nhớ đệm có giới hạn gồm các `eventId` gần đây để bỏ qua sự kiện trùng đơn giản.
 
-`NotificationLifecycle` is the implemented notification consumer. A `NOTIFICATION_CREATED` event
-contains only safe metadata (`notificationId`, `recipientId`, `homeId`, `isRead`, `createdAt`), so
-the lifecycle verifies the active user/home and retrieves the private notification content through
-`GET /notifications/{notificationId}`. The notification slice then inserts by notification ID,
-which also keeps insertion idempotent if distinct events reference the same notification.
+`NotificationLifecycle` là bộ xử lý thông báo đã được triển khai. Sự kiện `NOTIFICATION_CREATED` chỉ chứa siêu dữ liệu an toàn (`notificationId`, `recipientId`, `homeId`, `isRead`, `createdAt`), nên lifecycle xác minh người dùng và nhà hiện tại rồi lấy nội dung thông báo riêng tư qua `GET /notifications/{notificationId}`. Sau đó notification slice chèn theo ID thông báo, giúp thao tác vẫn cho cùng kết quả khi các sự kiện khác nhau tham chiếu cùng một thông báo.
 
-Chi tiết đầy đủ về Notification Frontend nằm tại
-[`FRONTEND_NOTIFICATION.md`](./FRONTEND_NOTIFICATION.md).
+Chi tiết đầy đủ về thông báo ở frontend nằm tại [`FRONTEND_NOTIFICATION.md`](./FRONTEND_NOTIFICATION.md).
 
-To add a backend-supported event, add its exact string value to `REALTIME_EVENT_TYPES`, then
-register a feature handler. Do not add a new socket. The backend has no durable replay or global
-ordering guarantee, so consumers should refresh authoritative REST data when recovery requires it.
+Để thêm sự kiện được backend hỗ trợ, thêm chính xác giá trị chuỗi của sự kiện vào `REALTIME_EVENT_TYPES`, rồi đăng ký bộ xử lý cho tính năng. Không tạo socket mới. Backend không bảo đảm phát lại sự kiện lâu dài hoặc thứ tự toàn cục, nên khi cần khôi phục, bộ xử lý phải tải lại dữ liệu chính thức qua REST.
 
-## Local configuration and manual verification
+## Cấu hình cục bộ và kiểm tra thủ công
 
-Development keeps the existing local backend through `.env.development`. For another environment,
-set `VITE_API_BASE_URL` to its REST base URL. The client converts that configured origin from
-`http`/`https` to `ws`/`wss` and appends `/ws`.
+Môi trường phát triển giữ cấu hình backend cục bộ hiện có trong `.env.development`. Với môi trường khác, đặt `VITE_API_BASE_URL` thành URL gốc của REST API. Client chuyển giao thức của origin đã cấu hình từ `http`/`https` sang `ws`/`wss` rồi thêm `/ws`.
 
-1. Start the existing backend and frontend, then log in normally.
-2. Open Redux DevTools and select a home on `/home`.
-3. Confirm `realtime.status` becomes `connected` and `activeHomeId` is the selected home.
-4. Publish a backend test event for that home.
-5. Confirm a `realtime/realtimeEventReceived` action contains the matching `RealtimeEvent`.
-6. Switch homes and verify `activeHomeId` changes; log out and verify status returns to
-   `disconnected` with no active home.
+1. Khởi chạy backend và frontend hiện có, sau đó đăng nhập như bình thường.
+2. Mở Redux DevTools và chọn một nhà tại `/home`.
+3. Xác nhận `realtime.status` chuyển thành `connected` và `activeHomeId` là nhà đã chọn.
+4. Phát một sự kiện thử nghiệm từ backend cho nhà đó.
+5. Xác nhận action `realtime/realtimeEventReceived` chứa `RealtimeEvent` tương ứng.
+6. Chuyển sang nhà khác và kiểm tra `activeHomeId` thay đổi; đăng xuất và kiểm tra trạng thái trở về `disconnected`, không còn nhà đang hoạt động.

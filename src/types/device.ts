@@ -2,6 +2,16 @@ export interface DeviceState {
   [key: string]: unknown;
 }
 
+export interface DeviceCommandResult {
+  commandId?: string;
+  success: boolean;
+  status: string;
+  message?: string;
+  errorCode?: string;
+  acknowledgedState?: DeviceState;
+  latencyMs?: number;
+}
+
 export interface DeviceResponse {
   id: string;
   homeId: string;
@@ -40,4 +50,17 @@ export interface DeviceStateHistoryResponse {
   changedById?: string;
   isTest?: boolean;
   changedAt: string;
+}
+
+export interface ManualCommandResponse {
+  command: { success: boolean; status: string; message?: string; acknowledgedState?: DeviceState };
+  overrideUntil: string;
+}
+
+export interface ManualOverrideRecord {
+  id: string;
+  action: 'OVERRIDE' | 'CANCEL';
+  userId: string;
+  occurredAt: string;
+  expiresAt: string;
 }

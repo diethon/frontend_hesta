@@ -1,42 +1,52 @@
 import React, { useState } from 'react';
-import type { DeviceResponse, DeviceStateHistoryResponse } from '../../types/device';
-import { removeDevice, getDeviceHistory, updateDeviceConfig } from '../../services/deviceApi';
+import type { DeviceResponse, DeviceStateHistoryResponse, ManualOverrideRecord } from '../../types/device';
+import { removeDevice, getDeviceHistory, cancelDeviceAutomation, getDeviceOverrideHistory, updateDeviceConfig } from '../../services/deviceApi';
 import { getErrorMessage } from '../../utils/errors';
+import { notify } from '../ui/notify';
 
 interface DeviceDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   device: DeviceResponse | null;
   onDeviceRemoved: (deviceId: string) => void;
+  onDeviceUpdated: (device: DeviceResponse) => void;
   onColorChange?: (deviceId: string, r: number, g: number, b: number) => void;
   onTempChange?: (deviceId: string, temp: number) => void;
   onModeChange?: (deviceId: string, mode: string) => void;
 }
 
-export const DeviceDetailModal: React.FC<DeviceDetailModalProps> = ({ isOpen, onClose, device, onDeviceRemoved, onColorChange, onTempChange, onModeChange }) => {
+export const DeviceDetailModal: React.FC<DeviceDetailModalProps> = ({
+  isOpen,
+  onClose,
+  device,
+  onDeviceRemoved,
+  onDeviceUpdated,
+  onColorChange,
+  onTempChange,
+  onModeChange
+}) => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editName, setEditName] = useState('');
   const [error, setError] = useState('');
   const [history, setHistory] = useState<DeviceStateHistoryResponse[]>([]);
+  const [overrides, setOverrides] = useState<ManualOverrideRecord[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
 
-  React.useEffect(() => {
-    if (device) {
-      setEditName(device.name);
-    }
-  }, [device]);
+  const [cancelPending, setCancelPending] = useState(false);
+  const [cancelMessage, setCancelMessage] = useState('');
 
   React.useEffect(() => {
     if (isOpen && device) {
       const fetchHistory = async () => {
         try {
           setLoadingHistory(true);
-          const data = await getDeviceHistory(device.id);
+          const [data, overrideData] = await Promise.all([getDeviceHistory(device.id), getDeviceOverrideHistory(device.id)]);
           setHistory(data || []);
+          setOverrides(overrideData || []);
         } catch (err) {
-          console.error('Lỗi tải lịch sử:', err);
+          setError(getErrorMessage(err, 'Không thể tải lịch sử thiết bị.'));
         } finally {
           setLoadingHistory(false);
         }
@@ -53,13 +63,13 @@ export const DeviceDetailModal: React.FC<DeviceDetailModalProps> = ({ isOpen, on
     }
     
     setIsDeleting(true);
-    setError('');
     try {
       await removeDevice(device.id);
       onDeviceRemoved(device.id);
       onClose();
+      notify.success('Đã xóa thiết bị', device.name);
     } catch (err: unknown) {
-      setError(getErrorMessage(err, 'Lỗi khi xóa thiết bị'));
+      notify.error(getErrorMessage(err, 'Lỗi khi xóa thiết bị'));
     } finally {
       setIsDeleting(false);
     }
@@ -67,6 +77,8 @@ export const DeviceDetailModal: React.FC<DeviceDetailModalProps> = ({ isOpen, on
 
   const handleEdit = async () => {
     if (!isEditMode) {
+      setEditName(device.name);
+      setError('');
       setIsEditMode(true);
       return;
     }
@@ -84,14 +96,24 @@ export const DeviceDetailModal: React.FC<DeviceDetailModalProps> = ({ isOpen, on
     setIsUpdating(true);
     setError('');
     try {
-      await updateDeviceConfig(device.id, { name: editName.trim() });
-      device.name = editName.trim(); // Update locally for instant feedback
+      const updatedDevice = await updateDeviceConfig(device.id, { name: editName.trim() });
+      onDeviceUpdated(updatedDevice);
       setIsEditMode(false);
     } catch (err: unknown) {
       setError(getErrorMessage(err, 'Lỗi khi cập nhật cấu hình'));
     } finally {
       setIsUpdating(false);
     }
+  };
+
+  const handleCancelAutomation = async () => {
+    setCancelPending(true); setError(''); setCancelMessage('');
+    try {
+      const until = await cancelDeviceAutomation(device.id);
+      setOverrides(await getDeviceOverrideHistory(device.id));
+      setCancelMessage(`Đã tạm dừng tự động hóa đến ${new Date(until).toLocaleString('vi-VN')}.`);
+    } catch (caught) { setError(getErrorMessage(caught, 'Không thể tạm dừng tự động hóa.')); }
+    finally { setCancelPending(false); }
   };
 
   const getStatusColor = () => {
@@ -148,6 +170,7 @@ export const DeviceDetailModal: React.FC<DeviceDetailModalProps> = ({ isOpen, on
               {error}
             </div>
           )}
+          {cancelMessage && <p role="status" className="rounded-xl bg-success-soft p-3 text-sm text-text">{cancelMessage}</p>}
 
                       <div className="flex items-center gap-4">
               <div className="w-16 h-16 bg-slate-800 rounded-xl flex items-center justify-center text-3xl shrink-0">
@@ -163,7 +186,7 @@ export const DeviceDetailModal: React.FC<DeviceDetailModalProps> = ({ isOpen, on
                     autoFocus
                   />
                 ) : (
-                  <h4 className="text-xl font-bold text-white truncate" title={device.name}>{device.name}</h4>
+                  <h4 className="text-xl font-bold text-text truncate" title={device.name}>{device.name}</h4>
                 )}
                 <p className="text-sm text-slate-400 flex items-center gap-1.5 mt-1">
                   <span className={`inline-block w-2 h-2 rounded-full ${getStatusColor()}`} />
@@ -175,18 +198,18 @@ export const DeviceDetailModal: React.FC<DeviceDetailModalProps> = ({ isOpen, on
           <div className="space-y-3 bg-slate-950/50 p-4 rounded-xl border border-slate-800">
             <div className="flex justify-between items-center gap-4">
               <span className="text-sm text-slate-400 shrink-0">Mã định danh (ID):</span>
-              <span className="text-sm text-white font-mono truncate" title={device.id}>{device.id}</span>
+              <span className="text-sm text-text font-mono truncate" title={device.id}>{device.id}</span>
             </div>
             
             <div className="flex justify-between items-center">
               <span className="text-sm text-slate-400">Loại thiết bị:</span>
-              <span className="text-sm text-white font-medium bg-slate-800 px-2 py-0.5 rounded">{device.deviceType}</span>
+              <span className="text-sm text-text font-medium bg-sidebar px-2 py-0.5 rounded">{device.deviceType}</span>
             </div>
 
             {device.nodeId && (
               <div className="flex justify-between items-center gap-4">
                 <span className="text-sm text-slate-400 shrink-0">Node quản lý:</span>
-                <span className="text-sm text-white font-medium truncate" title={device.nodeId}>{device.nodeName || device.nodeId}</span>
+                <span className="text-sm text-text font-medium truncate" title={device.nodeId}>{device.nodeName || device.nodeId}</span>
               </div>
             )}
 
@@ -200,18 +223,18 @@ export const DeviceDetailModal: React.FC<DeviceDetailModalProps> = ({ isOpen, on
             {device.roomId && (
               <div className="flex justify-between items-center gap-4">
                 <span className="text-sm text-slate-400 shrink-0">Phòng (Room):</span>
-                <span className="text-sm text-white font-medium truncate" title={device.roomId}>{device.roomName || device.roomId}</span>
+                <span className="text-sm text-text font-medium truncate" title={device.roomId}>{device.roomName || device.roomId}</span>
               </div>
             )}
 
             <div className="flex justify-between items-center">
               <span className="text-sm text-slate-400">Lần cuối phản hồi:</span>
-              <span className="text-sm text-white">{formatDate(device.lastSeen)}</span>
+              <span className="text-sm text-text">{formatDate(device.lastSeen)}</span>
             </div>
 
             <div className="flex justify-between items-center">
               <span className="text-sm text-slate-400">Tọa độ 3D (Twin):</span>
-              <span className="text-sm text-white font-mono">
+              <span className="text-sm text-text font-mono">
                 X:{device.digitalTwinX ?? 0} Y:{device.digitalTwinY ?? 0} Z:{device.digitalTwinZ ?? 0}
               </span>
             </div>
@@ -307,9 +330,19 @@ export const DeviceDetailModal: React.FC<DeviceDetailModalProps> = ({ isOpen, on
               </div>
             )}
           </div>
+          <section className="mt-4 space-y-2 rounded-xl bg-sidebar p-3 text-sm text-text" aria-label="Lịch sử hủy và ghi đè tự động">
+            <h4 className="font-semibold">Hủy và ghi đè tự động</h4>
+            {overrides.length ? overrides.map((record) => <p key={record.id} className="border-b border-line py-1 last:border-0">
+              {record.action === 'CANCEL' ? 'Hủy tự động' : 'Lệnh thủ công'} · {new Date(record.occurredAt).toLocaleString('vi-VN')} · hết hạn {new Date(record.expiresAt).toLocaleString('vi-VN')}
+            </p>) : <p className="text-muted">Chưa có thao tác hủy hoặc ghi đè.</p>}
+          </section>
         </div>
 
-        <div className="p-4 border-t border-slate-800 bg-slate-900 flex justify-between gap-3 shrink-0">
+        <div className="flex flex-wrap justify-between gap-3 border-t border-line bg-surface p-4 shrink-0">
+          <button type="button" onClick={() => void handleCancelAutomation()} disabled={cancelPending}
+            className="rounded-xl bg-warning-soft px-4 py-2.5 text-sm font-medium text-text disabled:opacity-50">
+            {cancelPending ? 'Đang tạm dừng...' : 'Hủy tự động 30 phút'}
+          </button>
           <button
             onClick={handleEdit} disabled={isUpdating}
             className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-medium transition-colors text-sm"
