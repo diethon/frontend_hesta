@@ -112,6 +112,52 @@ export const DevicePage: React.FC = () => {
     }
   };
 
+  const handleColorChange = async (deviceId: string, r: number, g: number, b: number) => {
+    try {
+      await sendDeviceCommand(deviceId, 'SET_COLOR' as any, { r, g, b, brightness: 100 });
+      // Cập nhật state local để giao diện mượt
+      setDevices(prev => prev.map(d => {
+        if (d.id === deviceId) {
+          return {
+            ...d,
+            currentState: { ...d.currentState, color: { r, g, b }, power: 'ON' }
+          };
+        }
+        return d;
+      }));
+    } catch (err) {
+      console.error("Lỗi khi đổi màu:", err);
+    }
+  };
+
+  const handleTempChange = async (deviceId: string, temp: number) => {
+    try {
+      await sendDeviceCommand(deviceId, 'SET_TEMPERATURE' as any, { temperature: temp });
+      setDevices(prev => prev.map(d => {
+        if (d.id === deviceId) {
+          return { ...d, currentState: { ...d.currentState, temperature: temp } };
+        }
+        return d;
+      }));
+    } catch (err) {
+      console.error("Lỗi chỉnh nhiệt độ:", err);
+    }
+  };
+
+  const handleModeChange = async (deviceId: string, mode: string) => {
+    try {
+      await sendDeviceCommand(deviceId, 'SET_MODE' as any, { mode });
+      setDevices(prev => prev.map(d => {
+        if (d.id === deviceId) {
+          return { ...d, currentState: { ...d.currentState, mode } };
+        }
+        return d;
+      }));
+    } catch (err) {
+      console.error("Lỗi chỉnh chế độ:", err);
+    }
+  };
+
   const handleDeviceClick = (deviceId: string) => {
     const device = devices.find(d => d.id === deviceId);
     if (device) {
@@ -212,6 +258,9 @@ export const DevicePage: React.FC = () => {
         }}
         device={selectedDevice}
         onDeviceRemoved={handleDeviceRemoved}
+        onColorChange={handleColorChange}
+        onTempChange={handleTempChange}
+        onModeChange={handleModeChange}
       />
     </div>
   );

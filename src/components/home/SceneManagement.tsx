@@ -21,10 +21,14 @@ interface SceneManagementProps {
 const ACTION_LABELS: Record<SceneActionType, string> = {
   TURN_ON: 'Bật thiết bị',
   TURN_OFF: 'Tắt thiết bị',
+  TOGGLE: 'Đổi trạng thái (Bật/Tắt)',
   SET_BRIGHTNESS: 'Đặt độ sáng',
+  SET_COLOR: 'Đổi màu RGB',
   SET_TEMPERATURE: 'Đặt nhiệt độ',
   SET_SPEED: 'Đặt tốc độ',
-  SET_STATE: 'Đặt trạng thái JSON',
+  SEND_IR_CODE: 'Phát mã Hồng ngoại',
+  SET_AI_MODE: 'Bật/Tắt Cảnh báo Camera AI',
+  SET_STATE: 'Đặt trạng thái JSON (Nâng cao)',
 };
 
 const ACTIONS = Object.keys(ACTION_LABELS) as SceneActionType[];

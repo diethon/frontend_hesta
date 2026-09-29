@@ -8,9 +8,12 @@ interface DeviceDetailModalProps {
   onClose: () => void;
   device: DeviceResponse | null;
   onDeviceRemoved: (deviceId: string) => void;
+  onColorChange?: (deviceId: string, r: number, g: number, b: number) => void;
+  onTempChange?: (deviceId: string, temp: number) => void;
+  onModeChange?: (deviceId: string, mode: string) => void;
 }
 
-export const DeviceDetailModal: React.FC<DeviceDetailModalProps> = ({ isOpen, onClose, device, onDeviceRemoved }) => {
+export const DeviceDetailModal: React.FC<DeviceDetailModalProps> = ({ isOpen, onClose, device, onDeviceRemoved, onColorChange, onTempChange, onModeChange }) => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -219,6 +222,58 @@ export const DeviceDetailModal: React.FC<DeviceDetailModalProps> = ({ isOpen, on
                 {JSON.stringify(device.currentState, null, 2)}
               </pre>
             </div>
+
+            {/* GIAO DIỆN MÁY LẠNH (AIR_CONDITIONER) */}
+            {device.deviceType === 'AIR_CONDITIONER' && (
+              <div className="flex flex-col border-t border-slate-800 pt-3 mt-3 gap-4">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-slate-400">Nhiệt độ mục tiêu: <span className="text-white font-bold">{String(device.currentState?.temperature || 24)}°C</span></span>
+                  <input
+                    type="range"
+                    min="16" max="30" step="1"
+                    defaultValue={Number(device.currentState?.temperature || 24)}
+                    className="w-1/2 accent-cyan-500"
+                    onChange={(e) => {
+                      if (onTempChange) onTempChange(device.id, parseInt(e.target.value));
+                    }}
+                  />
+                </div>
+                
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-slate-400">Chế độ gió (Mode):</span>
+                  <select
+                    className="bg-slate-900 border border-slate-700 text-white text-sm rounded-lg px-2 py-1 focus:outline-none focus:border-cyan-500"
+                    defaultValue={String(device.currentState?.mode || 'AUTO')}
+                    onChange={(e) => {
+                      if (onModeChange) onModeChange(device.id, e.target.value);
+                    }}
+                  >
+                    <option value="AUTO">AUTO</option>
+                    <option value="COOL">COOL</option>
+                    <option value="DRY">DRY</option>
+                    <option value="FAN">FAN</option>
+                  </select>
+                </div>
+              </div>
+            )}
+
+            {(device.deviceType === 'LED' || device.deviceType === 'LED_RGB') && (
+              <div className="flex flex-col border-t border-slate-800 pt-3 mt-3 gap-2">
+                <span className="text-sm text-slate-400">Điều chỉnh màu sắc (RGB):</span>
+                <input
+                  type="color"
+                  className="w-full h-12 rounded cursor-pointer bg-slate-900 border border-slate-700"
+                  onChange={(e) => {
+                    const hex = e.target.value;
+                    const r = parseInt(hex.slice(1, 3), 16);
+                    const g = parseInt(hex.slice(3, 5), 16);
+                    const b = parseInt(hex.slice(5, 7), 16);
+                    if (onColorChange) onColorChange(device.id, r, g, b);
+                  }}
+                  title="Chọn màu đèn LED"
+                />
+              </div>
+            )}
           </div>
 
           <div className="space-y-3">
