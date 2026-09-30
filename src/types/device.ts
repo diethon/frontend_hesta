@@ -24,7 +24,7 @@ export interface DeviceResponse {
   gpioPin?: number;
   status: 'ONLINE' | 'OFFLINE' | 'ERROR' | 'UNKNOWN';
   currentState: DeviceState;
-  capabilities?: string[];
+  capabilities?: Record<string, string[]>;
   icon?: string;
   digitalTwinX?: number;
   digitalTwinY?: number;

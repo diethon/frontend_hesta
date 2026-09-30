@@ -6,7 +6,7 @@ export interface DeviceSummary {
   name: string;
   deviceType: string;
   status: string;
-  capabilities?: string[];
+  capabilities?: Record<string, string[]>;
 }
 
 export interface SceneActionInput {
