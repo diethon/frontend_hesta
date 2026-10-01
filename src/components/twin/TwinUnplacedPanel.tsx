@@ -6,7 +6,7 @@ import { loadTwinSnapshot } from '../../store/twinSlice';
 import type { TwinLayoutGeometry } from '../../types/twinLayout';
 import { getErrorMessage } from '../../utils/errors';
 import { defaultRoom, nodeKey } from './layoutGeometry';
-import { PALETTE_MIME, placePaletteItem, type PaletteItem } from './layoutPalette';
+import { PALETTE_MIME, paletteGroup, placePaletteItem, type PaletteItem } from './layoutPalette';
 import { DeviceGlyph, RoomGlyph, SensorGlyph } from './TwinVisualIcon';
 import { notify } from '../ui/notify';
 
@@ -24,7 +24,11 @@ export function TwinUnplacedPanel({ geometry, disabled, onChange, floor }: { geo
     ...twin.deviceIds.filter((id) => !placedNodes.has(`DEVICE:${id}`)).map((id) => ({ kind: 'DEVICE' as const, id, name: twin.devicesById[id].name, detail: 'Thiết bị', icon: <DeviceGlyph deviceType={twin.devicesById[id].deviceType} /> })),
     ...twin.sensorIds.filter((id) => !placedNodes.has(`SENSOR:${id}`)).map((id) => ({ kind: 'SENSOR' as const, id, name: `${twin.sensorsById[id].metricType} · ${twin.devicesById[twin.sensorsById[id].deviceId]?.name ?? 'Cảm biến'}`, detail: 'Cảm biến', icon: <SensorGlyph metricType={twin.sensorsById[id].metricType} /> })),
   ];
-  const filtered = items.filter((item) => item.kind === activeTab && item.name.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()));
+  const groupedItems = items.map((item) => {
+    const group = paletteGroup(item, twin.devicesById);
+    return { ...item, group, detail: group === 'SENSOR' && item.kind === 'DEVICE' ? 'Cảm biến' : item.detail };
+  });
+  const filtered = groupedItems.filter((item) => item.group === activeTab && item.name.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()));
   const handleCreateRoom = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const name = roomName.trim();

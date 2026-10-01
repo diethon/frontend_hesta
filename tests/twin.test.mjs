@@ -86,6 +86,51 @@ const emit = (store, event) => store.dispatch(rt.realtimeEventReceived(parseReal
 const render = (store, id = homeId) => renderToString(React.createElement(Provider, { store },
   React.createElement(MemoryRouter, null, React.createElement(DigitalTwinView, { homeId: id }))));
 
+const { DEVICE_TYPES } = loadSource('src/types/deviceVocabulary.ts');
+const currentDeviceTypes = Object.values(DEVICE_TYPES);
+
+test('GET twin retains every current device type, including node devices without rooms', async () => {
+  const result = structuredClone(snapshot);
+  result.unassignedDevices = currentDeviceTypes.map((deviceType, index) => ({
+    ...deviceEvent.data, deviceId: `current-device-${index}`, roomId: null, deviceType,
+  }));
+  apiClient.defaults.adapter = async (config) => { requests.push(config); return response(config, result); };
+  const store = await ready();
+  const state = store.getState().twin;
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].url, `/homes/${homeId}/twin`);
+  for (const [index, type] of currentDeviceTypes.entries()) {
+    const id = `current-device-${index}`;
+    assert.equal(state.devicesById[id].deviceType, type);
+    assert.ok(state.unassignedDeviceIds.includes(id));
+  }
+});
+
+test('realtime accepts every current device type without rewriting it or mixing sensor streams', async () => {
+  const store = await ready();
+  const sensors = structuredClone(store.getState().twin.sensorsById);
+  for (const type of currentDeviceTypes) {
+    const event = { ...deviceEvent, data: { ...deviceEvent.data, deviceType: type } };
+    assert.equal(isTwinEvent(event), true, type);
+    emit(store, event);
+    assert.equal(store.getState().twin.devicesById[deviceId].deviceType, type);
+  }
+  assert.deepEqual(store.getState().twin.sensorsById, sensors);
+  assert.equal(isTwinEvent({ ...deviceEvent, data: { ...deviceEvent.data, deviceType: 'INVALID_TYPE' } }), false);
+});
+
+test('device icons in twin distinguish the current sensor, plug, remote and camera types', () => {
+  const { DeviceGlyph } = loadSource('src/components/twin/TwinVisualIcon.tsx');
+  const icons = {
+    LIGHT: 'lightbulb', LED_RGB: 'lightbulb', SMART_PLUG: 'plug-zap', IR_REMOTE: 'tv',
+    TEMP_HUMID_SENSOR: 'thermometer', MOTION_SENSOR: 'activity', SMOKE_SENSOR: 'flame', CAMERA_AI: 'camera',
+  };
+  for (const [deviceType, icon] of Object.entries(icons)) {
+    const html = renderToString(React.createElement(DeviceGlyph, { deviceType }));
+    assert.ok(html.includes(`lucide-${icon}`), deviceType);
+  }
+});
+
 test('backend snapshot normalizes rooms, devices and exact canonical sensor IDs; authenticated API uses code 1000', async () => {
   const store = await ready();
   const state = store.getState().twin;

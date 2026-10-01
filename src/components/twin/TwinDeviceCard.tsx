@@ -1,7 +1,7 @@
 import { useAppSelector } from '../../store/hooks';
 import { selectTwinDevice } from '../../store/twinSelectors';
 import type { JsonValue } from '../../types/twin';
-import { DeviceIcon } from '../ui/AppSidebar';
+import { DeviceGlyph } from './TwinVisualIcon';
 import { TwinHealthBadge } from './TwinHealthBadge';
 import { TwinTime } from './TwinTime';
 
@@ -27,7 +27,7 @@ export function TwinDeviceCard({ deviceId }: { deviceId: string }) {
   return (
     <article aria-label={`Thiết bị ${device.name}`} className="min-w-0 rounded-2xl border border-line bg-surface p-4">
       <div className="flex items-start gap-3">
-        <span className="rounded-xl bg-info-soft p-2.5 text-icon"><DeviceIcon /></span>
+        <DeviceGlyph deviceType={device.deviceType} />
         <div className="min-w-0 flex-1">
           <h4 className="break-words font-semibold">{device.name}</h4>
           <p className="mt-1 text-xs text-muted">{device.deviceType}</p>

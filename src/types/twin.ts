@@ -1,3 +1,11 @@
+import { DEVICE_TYPES, type DeviceType } from './deviceVocabulary';
+
+// Keep existing layouts compatible with devices registered before the IoT refactor.
+export type TwinDeviceType = DeviceType | 'FAN' | 'AC' | 'SOCKET' | 'SENSOR' | 'LOCK' | 'CAMERA' | 'MICROPHONE';
+export const TWIN_DEVICE_TYPES: readonly TwinDeviceType[] = [
+  ...Object.values(DEVICE_TYPES), 'FAN', 'AC', 'SOCKET', 'SENSOR', 'LOCK', 'CAMERA', 'MICROPHONE',
+];
+
 export type TwinHealthStatus = 'ACTIVE' | 'STALE' | 'OFFLINE';
 export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
 
@@ -5,7 +13,7 @@ export interface TwinDeviceSnapshotResponse {
   deviceId: string;
   roomId: string | null;
   name: string;
-  deviceType: 'LIGHT' | 'FAN' | 'AC' | 'SOCKET' | 'SENSOR' | 'LOCK' | 'CAMERA' | 'MICROPHONE';
+  deviceType: TwinDeviceType;
   icon: string | null;
   status: 'ONLINE' | 'OFFLINE' | 'ERROR' | 'UNKNOWN';
   currentState: JsonValue;

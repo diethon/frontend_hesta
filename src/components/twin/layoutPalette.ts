@@ -1,9 +1,23 @@
 import type { TwinLayoutGeometry } from '../../types/twinLayout';
+import type { TwinDeviceSnapshotResponse } from '../../types/twin';
+import { DEVICE_TYPES } from '../../types/deviceVocabulary';
 import { clampRoom, defaultRoom, moveLayoutNode, nodeKey } from './layoutGeometry';
 import type { TwinDraftPoint } from './twinDrafting';
 
 export const PALETTE_MIME = 'application/x-hesta-twin-item';
 export type PaletteItem = { kind: 'room' | 'DEVICE' | 'SENSOR'; id: string };
+
+const sensorDeviceTypes = new Set<TwinDeviceSnapshotResponse['deviceType']>([
+  DEVICE_TYPES.TEMP_HUMID_SENSOR, DEVICE_TYPES.MOTION_SENSOR, DEVICE_TYPES.SMOKE_SENSOR,
+  'SENSOR', // Compatibility with devices registered before the IoT refactor.
+]);
+
+// The display group is independent of the layout identity: physical sensors
+// still use DEVICE + deviceId, while reading streams use SENSOR + sensorId.
+export function paletteGroup(item: PaletteItem, devicesById: Record<string, TwinDeviceSnapshotResponse>): PaletteItem['kind'] {
+  if (item.kind === 'DEVICE' && sensorDeviceTypes.has(devicesById[item.id]?.deviceType)) return 'SENSOR';
+  return item.kind;
+}
 
 export function placePaletteItem(geometry: TwinLayoutGeometry, item: PaletteItem, x: number, y: number, floor?: number, roomPoints?: (roomId: string) => readonly TwinDraftPoint[]): TwinLayoutGeometry {
   if (item.kind === 'room') {

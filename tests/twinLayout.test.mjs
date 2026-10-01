@@ -64,6 +64,33 @@ const homeId = snapshot.homeId;
 const roomId = snapshot.rooms[0].roomId;
 const sensorId = sensorEvent.data.sensorId;
 const deviceId = deviceEvent.data.deviceId;
+
+test('editor groups physical sensor types under sensors even without readings and keeps valid layout identities', () => {
+  const { paletteGroup, placePaletteItem } = loadSource('src/components/twin/layoutPalette.ts');
+  const state = twin.normalizeTwinSnapshot(snapshot);
+  state.sensorsById = {};
+  state.sensorIds = [];
+  const { DEVICE_TYPES } = loadSource('src/types/deviceVocabulary.ts');
+  const sensorTypes = [DEVICE_TYPES.TEMP_HUMID_SENSOR, DEVICE_TYPES.MOTION_SENSOR, DEVICE_TYPES.SMOKE_SENSOR, 'SENSOR'];
+  const deviceTypes = [
+    ...Object.values(DEVICE_TYPES).filter((type) => !sensorTypes.includes(type)),
+    'FAN', 'AC', 'SOCKET', 'LOCK', 'CAMERA', 'MICROPHONE',
+  ];
+  for (const type of [...sensorTypes, ...deviceTypes]) {
+    const id = `physical-${type}`;
+    state.devicesById[id] = { ...deviceEvent.data, deviceId: id, deviceType: type, currentState: {} };
+    const item = { kind: 'DEVICE', id };
+    assert.equal(paletteGroup(item, state.devicesById), sensorTypes.includes(type) ? 'SENSOR' : 'DEVICE', type);
+    const placed = placePaletteItem({ rooms: [], nodes: [] }, item, 0.5, 0.5);
+    assert.equal(placed.nodes[0].nodeType, 'DEVICE');
+    assert.equal(placed.nodes[0].nodeId, id);
+    assert.equal(placePaletteItem(placed, item, 0.2, 0.2).nodes.length, 1);
+  }
+  const metric = { kind: 'SENSOR', id: sensorId };
+  assert.equal(paletteGroup(metric, state.devicesById), 'SENSOR');
+  assert.equal(placePaletteItem({ rooms: [], nodes: [] }, metric, 0.5, 0.5).nodes[0].nodeType, 'SENSOR');
+  assert.equal(paletteGroup({ kind: 'room', id: roomId }, state.devicesById), 'room');
+});
 const saved = { homeId, revision: 3,
   rooms: [{ roomId, floor: 1, x: 0.05, y: 0.05, width: 0.45, height: 0.4 }],
   nodes: [

@@ -1,6 +1,24 @@
 import type { LucideIcon } from 'lucide-react';
 import { Activity, Armchair, Bath, BedDouble, Camera, CookingPot, DoorClosed, Droplets, Fan, Flame, House, Lightbulb, PlugZap, Snowflake, Thermometer, Tv, Wind } from 'lucide-react';
 import type { TwinDeviceSnapshotResponse } from '../../types/twin';
+import { DEVICE_TYPES, type DeviceType } from '../../types/deviceVocabulary';
+
+const currentDeviceIcons = {
+  [DEVICE_TYPES.LIGHT]: Lightbulb,
+  [DEVICE_TYPES.LED_RGB]: Lightbulb,
+  [DEVICE_TYPES.SMART_PLUG]: PlugZap,
+  [DEVICE_TYPES.IR_REMOTE]: Tv,
+  [DEVICE_TYPES.TEMP_HUMID_SENSOR]: Thermometer,
+  [DEVICE_TYPES.MOTION_SENSOR]: Activity,
+  [DEVICE_TYPES.SMOKE_SENSOR]: Flame,
+  [DEVICE_TYPES.CAMERA_AI]: Camera,
+} satisfies Record<DeviceType, LucideIcon>;
+
+const deviceIcons: Partial<Record<TwinDeviceSnapshotResponse['deviceType'], LucideIcon>> = {
+  ...currentDeviceIcons,
+  // Compatibility with devices registered before the IoT refactor.
+  AC: Snowflake, FAN: Fan, LOCK: DoorClosed, CAMERA: Camera, SOCKET: PlugZap, SENSOR: Activity, MICROPHONE: Wind,
+};
 
 const roomIcons: Array<[string, LucideIcon]> = [
   ['living', Armchair], ['khách', Armchair], ['bed', BedDouble], ['ngủ', BedDouble], ['kitchen', CookingPot], ['bếp', CookingPot], ['bath', Bath], ['tắm', Bath], ['vệ sinh', Bath],
@@ -19,9 +37,6 @@ export function RoomGlyph({ name, size = 20 }: { name: string; size?: number }) 
 }
 
 export function DeviceGlyph({ deviceType, size = 19 }: { deviceType: TwinDeviceSnapshotResponse['deviceType']; size?: number }) {
-  const deviceIcons: Partial<Record<TwinDeviceSnapshotResponse['deviceType'], LucideIcon>> = {
-    LIGHT: Lightbulb, AC: Snowflake, FAN: Fan, LOCK: DoorClosed, CAMERA: Camera, SOCKET: PlugZap, SENSOR: Activity, MICROPHONE: Wind,
-  };
   const Icon = deviceIcons[deviceType] ?? Tv;
   return <span aria-hidden="true" className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${iconFrame.device}`}><Icon size={size} strokeWidth={1.8} /></span>;
 }
