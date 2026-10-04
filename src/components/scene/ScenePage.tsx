@@ -8,7 +8,7 @@ import { SchedulePanel } from '../ui/SchedulePanel';
 
 export function ScenePage() {
   const { homeId = '', sceneId } = useParams();
-  return <SceneWorkspace key={`${homeId}:${sceneId ?? 'new'}`} homeId={homeId} sceneId={sceneId} />;
+  return <SceneWorkspace key={homeId} homeId={homeId} sceneId={sceneId} />;
 }
 
 function SceneWorkspace({ homeId, sceneId }: { homeId: string; sceneId?: string }) {
@@ -32,6 +32,21 @@ function SceneWorkspace({ homeId, sceneId }: { homeId: string; sceneId?: string 
   const [scheduleId, setScheduleId] = useState<string | null>(null);
   const [executions, setExecutions] = useState<SceneExecutionResponse[]>([]);
   const [success, setSuccess] = useState('');
+  const [selectedSceneId, setSelectedSceneId] = useState(sceneId);
+
+  // Reset only the editor when navigating; keep the workspace data mounted.
+  if (selectedSceneId !== sceneId) {
+    setSelectedSceneId(sceneId);
+    setEditingScene(null);
+    setLoadingScene(Boolean(sceneId));
+    setName('');
+    setIcon('🏠');
+    setDescription('');
+    setEnabled(true);
+    setActions([]);
+    setError('');
+    setSuccess('');
+  }
 
   const load = useCallback(async () => {
     try {
@@ -138,6 +153,7 @@ function SceneWorkspace({ homeId, sceneId }: { homeId: string; sceneId?: string 
     if (!window.confirm('Xóa kịch bản này? Hành động này không thể hoàn tác.')) return;
     try {
       await deleteScene(homeId, sceneId);
+      setScenes((current) => current.filter((scene) => scene.id !== sceneId));
       if (sceneId === editingScene?.id) navigate(`/homes/${homeId}/scenes`);
       else await load();
     }
