@@ -84,7 +84,7 @@ async function ready() {
 }
 const emit = (store, event) => store.dispatch(rt.realtimeEventReceived(parseRealtimeEvent(event)));
 const render = (store, id = homeId) => renderToString(React.createElement(Provider, { store },
-  React.createElement(MemoryRouter, null, React.createElement(DigitalTwinView, { homeId: id }))));
+  React.createElement(MemoryRouter, null, React.createElement(DigitalTwinView, { homeId: id, initialMode: 'overview' }))));
 
 const { DEVICE_TYPES } = loadSource('src/types/deviceVocabulary.ts');
 const currentDeviceTypes = Object.values(DEVICE_TYPES);
@@ -122,7 +122,7 @@ test('realtime accepts every current device type without rewriting it or mixing 
 test('device icons in twin distinguish the current sensor, plug, remote and camera types', () => {
   const { DeviceGlyph } = loadSource('src/components/twin/TwinVisualIcon.tsx');
   const icons = {
-    LIGHT: 'lightbulb', LED_RGB: 'lightbulb', SMART_PLUG: 'plug-zap', IR_REMOTE: 'tv',
+    LIGHT: 'lightbulb', LED_RGB: 'lightbulb', SMART_PLUG: 'plug-zap', IR_REMOTE: 'radio',
     TEMP_HUMID_SENSOR: 'thermometer', MOTION_SENSOR: 'activity', SMOKE_SENSOR: 'flame', CAMERA_AI: 'camera',
   };
   for (const [deviceType, icon] of Object.entries(icons)) {
@@ -267,7 +267,7 @@ test('unassigned and nullable snapshot nodes, device movement and empty currentS
   apiClient.defaults.adapter = async (config) => response(config, data);
   const store = await ready();
   const html = render(store);
-  assert.match(html, /Nhà chưa có phòng/);
+  assert.match(html, /Chưa có phòng/);
   assert.match(html, /Chưa ghi nhận/);
   assert.match(html, /Chưa có dữ liệu/);
   assert.doesNotMatch(html, /undefined|null/);

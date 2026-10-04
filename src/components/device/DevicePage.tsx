@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { DeviceCard } from './DeviceCard';
 import { DeviceDetailModal } from './DeviceDetailModal';
-import { getDevicesByHome, getDevicesByRoom, sendManualPowerCommand } from '../../services/deviceApi';
+import { getDevicesByHome, getDevicesByRoom, sendDeviceCommand, sendManualPowerCommand } from '../../services/deviceApi';
 import { getHomeRooms } from '../../services/homeApi';
 import type { DeviceResponse } from '../../types/device';
 import { getErrorMessage } from '../../utils/errors';
@@ -86,7 +86,7 @@ export const DevicePage: React.FC = () => {
 
   const handleColorChange = async (deviceId: string, r: number, g: number, b: number) => {
     try {
-      await sendDeviceCommand(deviceId, 'SET_COLOR' as any, { r, g, b, brightness: 100 });
+      await sendDeviceCommand(deviceId, 'SET_COLOR', { r, g, b, brightness: 100 });
       // Cập nhật state local để giao diện mượt
       setDevices(prev => prev.map(d => {
         if (d.id === deviceId) {
@@ -104,7 +104,7 @@ export const DevicePage: React.FC = () => {
 
   const handleTempChange = async (deviceId: string, temp: number) => {
     try {
-      await sendDeviceCommand(deviceId, 'SET_TEMPERATURE' as any, { temperature: temp });
+      await sendDeviceCommand(deviceId, 'SET_TEMPERATURE', { temperature: temp });
       setDevices(prev => prev.map(d => {
         if (d.id === deviceId) {
           return { ...d, currentState: { ...d.currentState, temperature: temp } };
@@ -118,7 +118,7 @@ export const DevicePage: React.FC = () => {
 
   const handleModeChange = async (deviceId: string, mode: string) => {
     try {
-      await sendDeviceCommand(deviceId, 'SET_MODE' as any, { mode });
+      await sendDeviceCommand(deviceId, 'SET_MODE', { mode });
       setDevices(prev => prev.map(d => {
         if (d.id === deviceId) {
           return { ...d, currentState: { ...d.currentState, mode } };

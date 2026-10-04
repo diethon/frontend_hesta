@@ -63,6 +63,10 @@ try {
     assert.ok(found, `Control exists: ${text}`); await delay(120);
   };
   const chooseFloor = async (ariaLabel, value) => {
+    if (ariaLabel === 'Chọn tầng trong mô hình 3D') {
+      const selected = await evaluate(`(() => { const button = document.querySelector('[aria-label="${ariaLabel}"] button[data-value="${value}"]'); if (!button) return false; button.click(); return true; })()`);
+      assert.ok(selected, `3D floor segment exists: ${value}`); await delay(500); return;
+    }
     const opened = await evaluate(`(() => { const trigger = document.querySelector('button[role="combobox"][aria-label="${ariaLabel}"]'); if (!trigger) return false; trigger.click(); return true; })()`);
     assert.ok(opened, `Floor select exists: ${ariaLabel}`);
     await waitFor(`document.querySelector('[role="listbox"][aria-label="${ariaLabel}"]') !== null`);
@@ -80,29 +84,87 @@ try {
   const rect = (selector) => evaluate(`(() => { const b = document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect(); return {x:b.x,y:b.y,width:b.width,height:b.height}; })()`);
   const markerPosition = (needle) => evaluate(`(() => { const e = [...document.querySelectorAll('.twin-3d-stage button')].find(e => e.getAttribute('aria-label')?.includes(${JSON.stringify(needle)})); return JSON.stringify({x:e.dataset.worldX,z:e.dataset.worldZ}); })()`);
   const roomLabelRect = (needle) => evaluate(`(() => { const e = [...document.querySelectorAll('.twin-3d-room-label')].find(e => e.textContent.includes(${JSON.stringify(needle)})); const b = e.getBoundingClientRect(); return JSON.stringify({x:Math.round(b.x*10)/10,y:Math.round(b.y*10)/10,width:Math.round(b.width*10)/10,height:Math.round(b.height*10)/10}); })()`);
+  // Wait on actual projected motion, rather than assuming software WebGL renders in 700ms.
+  const settleCamera = (needle = 'Phòng khách') => evaluate(`new Promise(resolve => {
+    let last = '', stable = 0;
+    const frame = () => {
+      const e = [...document.querySelectorAll('.twin-3d-room-label')].find(e => e.textContent.includes(${JSON.stringify(needle)}));
+      if (!e) { requestAnimationFrame(frame); return; }
+      const r = e.getBoundingClientRect(), current = Math.round(r.x * 10) + ':' + Math.round(r.y * 10);
+      stable = current === last ? stable + 1 : 0; last = current;
+      if (stable >= 8) resolve(); else requestAnimationFrame(frame);
+    }; requestAnimationFrame(frame);
+  })`);
 
   await Promise.all([send('Page.enable'), send('Runtime.enable')]);
   await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
   await send('Page.navigate', { url: testUrl });
   await waitFor(`document.querySelector('button[aria-label="Chế độ 3D"]') !== null`);
+  check('Digital Twin opens in 3D Live with all three mode controls', await evaluate(`document.querySelector('button[aria-label="Chế độ 3D"]').getAttribute('aria-pressed') === 'true' && !!document.querySelector('button[aria-label="Chế độ Overview"]')`));
+  await click('Chế độ Overview');
+  await waitFor(`document.querySelector('section[aria-label="Overview"]') !== null`);
+  check('Overview exposes runtime counts and unplaced objects', await evaluate(`['Phòng','Thiết bị','Cảm biến','ACTIVE','STALE','OFFLINE','Chưa đặt'].every(label => document.querySelector('section[aria-label="Overview"]').textContent.includes(label))`));
+  await click('Chế độ 2D');
   await click('Chỉnh sửa sơ đồ');
   await evaluate(`document.querySelector('[data-room-id] > button').click()`);
   await click('Phòng chữ L');
   await click('Lưu bố cục');
   await waitFor(`document.body.textContent.includes('Chế độ xem')`);
   check('saved 2D L-shape metadata is available to the shared 3D generator', await evaluate(`Object.keys(localStorage).some(key => localStorage.getItem(key)?.includes('L_SHAPE'))`));
+  await click('Count requests');
+  const initialRequestCount = await evaluate(`document.querySelector('details output').textContent`);
   await click('Chế độ 3D');
   await waitFor(`document.querySelector('.twin-3d-stage canvas') !== null && !document.body.textContent.includes('Đang dựng không gian 3D')`);
   await waitFor(`document.querySelectorAll('.twin-3d-room-label').length === 4 && document.querySelectorAll('.twin-3d-stage button[aria-label*="ACTIVE"], .twin-3d-stage button[aria-label*="STALE"], .twin-3d-stage button[aria-label*="OFFLINE"]').length === 7`);
   await delay(600);
   check('3D mode creates a WebGL canvas without horizontal overflow', await evaluate(`document.documentElement.scrollWidth <= innerWidth && !!document.querySelector('.twin-3d-stage canvas')`));
   check('3D scene renders four rooms and seven runtime markers', await evaluate(`document.querySelectorAll('.twin-3d-room-label').length === 4 && document.querySelectorAll('.twin-3d-stage button[aria-label*="ACTIVE"], .twin-3d-stage button[aria-label*="STALE"], .twin-3d-stage button[aria-label*="OFFLINE"]').length === 7`));
+  check('floating 3D icons stay compact at the default camera', await evaluate(`[...document.querySelectorAll('.twin-3d-marker')].every(e => { const r = e.getBoundingClientRect(); return r.width >= 32 && r.width <= 40 && r.height <= 40; })`));
   await screenshot('default-isometric-desktop');
 
+  const unchangedMarker = await markerPosition('Đèn chính');
+  for (const view of ['Mặt trước', 'Bên phải', 'Mặt sau', 'Bên trái', 'Từ trên', 'Phối cảnh']) {
+    const before = await roomLabelRect('Phòng khách');
+    await click(`Góc nhìn ${view}`);
+    await settleCamera();
+    check(`camera preset ${view} changes the real WebGL projection`, before !== await roomLabelRect('Phòng khách') && await evaluate(`document.querySelector('[aria-label="Góc nhìn ${view}"]').getAttribute('aria-pressed') === 'true'`));
+    assert.equal(await markerPosition('Đèn chính'), unchangedMarker);
+    if (view === 'Từ trên') await screenshot('camera-top');
+  }
+  const beforeTurn = await roomLabelRect('Phòng khách');
+  await click('Xoay phải 90°');
+  await settleCamera();
+  check('quarter turn rotates around the current target', beforeTurn !== await roomLabelRect('Phòng khách'));
+  await click('Xoay trái 90°');
+  await settleCamera();
+  const restored = JSON.parse(await roomLabelRect('Phòng khách')), original = JSON.parse(beforeTurn);
+  check('opposite quarter turns restore the angle without changing geometry', Math.abs(restored.x - original.x) < 2 && Math.abs(restored.y - original.y) < 2 && unchangedMarker === await markerPosition('Đèn chính'));
+  await click('Góc nhìn Mặt trước');
+  await settleCamera();
+  await click('Reset góc nhìn');
+  await settleCamera();
+  check('reset restores the isometric preset', await evaluate(`document.querySelector('[aria-label="Góc nhìn Phối cảnh"]').getAttribute('aria-pressed') === 'true'`));
+
+  const beforeFocus = await roomLabelRect('Phòng khách');
   await evaluate(`[...document.querySelectorAll('.twin-3d-room-label')].find(e => e.textContent.includes('Phòng khách')).click()`);
   await waitFor(`document.querySelector('[aria-label="Chi tiết phòng Phòng khách"]') !== null`);
   check('room selection opens the runtime room inspector', await evaluate(`document.querySelector('[aria-label="Chi tiết phòng Phòng khách"]').textContent.includes('1 thiết bị')`));
+  await delay(400);
+  check('room selection transitions the camera and exposes room focus controls', beforeFocus !== await roomLabelRect('Phòng khách') && await evaluate(`document.querySelector('[aria-label="Chi tiết phòng Phòng khách"]').textContent.includes('Xem riêng phòng')`));
+  await click('Xem riêng phòng');
+  await delay(500);
   await screenshot('selected-room');
+
+  await click('Góc nhìn Bên trái');
+  await settleCamera();
+  check('changing camera angle keeps the selected room inspector', await evaluate(`!!document.querySelector('[aria-label="Chi tiết phòng Phòng khách"]')`));
+  const focusedCanvas = await rect('.twin-3d-stage canvas');
+  const dragX = focusedCanvas.x + focusedCanvas.width * .92, dragY = focusedCanvas.y + focusedCanvas.height * .15;
+  await send('Input.dispatchMouseEvent', { type: 'mousePressed', x: dragX, y: dragY, button: 'left', buttons: 1, clickCount: 1 });
+  for (let step = 1; step <= 4; step++) await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: dragX - step * 18, y: dragY, button: 'left', buttons: 1 });
+  await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: dragX - 72, y: dragY, button: 'left', buttons: 0, clickCount: 1 });
+  await delay(600);
+  check('dragging the scene preserves room selection and clears preset emphasis', await evaluate(`!!document.querySelector('[aria-label="Chi tiết phòng Phòng khách"]') && !document.querySelector('[aria-label="Góc nhìn 3D"] button[aria-pressed="true"]')`));
 
   await evaluate(`[...document.querySelectorAll('.twin-3d-stage button')].find(e => e.getAttribute('aria-label')?.includes('Đèn chính')).click()`);
   await waitFor(`document.querySelector('[aria-label="Chi tiết thiết bị Đèn chính"]') !== null`);
@@ -123,6 +185,20 @@ try {
   await click('OFFLINE'); await waitFor(`document.querySelector('[aria-label="Chi tiết cảm biến TEMPERATURE"]').textContent.includes('OFFLINE')`); await screenshot('health-offline');
   await click('ACTIVE'); await waitFor(`document.querySelector('[aria-label="Chi tiết cảm biến TEMPERATURE"]').textContent.includes('ACTIVE')`); await screenshot('selected-sensor-active');
   check('health transitions update the selected 3D sensor', await evaluate(`document.querySelector('[aria-label="Chi tiết cảm biến TEMPERATURE"]').textContent.includes('30')`));
+  await click('Count requests');
+  check('mode switches and realtime updates never reload the Twin snapshot', initialRequestCount === await evaluate(`document.querySelector('details output').textContent`));
+  await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
+  await click('Sensor → 31');
+  await waitFor(`document.querySelector('[aria-label="Chi tiết cảm biến TEMPERATURE"]').textContent.includes('31')`);
+  check('reduced motion disables realtime DOM animations', await evaluate(`document.querySelector('[aria-label="Chi tiết cảm biến TEMPERATURE"]').getAnimations({subtree:true}).length === 0`));
+  const reducedBefore = await roomLabelRect('Phòng khách');
+  await click('Góc nhìn Từ trên');
+  await waitFor(`document.querySelector('[aria-label="Góc nhìn Từ trên"]').getAttribute('aria-pressed') === 'true'`);
+  await settleCamera();
+  check('camera presets remain usable with reduced motion', reducedBefore !== await roomLabelRect('Phòng khách'));
+  await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'no-preference' }] });
+  await click('Đưa mô hình vừa màn hình');
+  await delay(350);
 
   const canvas = await rect('.twin-3d-stage canvas');
   const centerX = canvas.x + canvas.width * 0.9, centerY = canvas.y + canvas.height * 0.25;
@@ -139,22 +215,35 @@ try {
   const afterZoom = await roomLabelRect('Phòng khách');
   check('OrbitControls zoom changes the camera without changing layout data', afterOrbit !== afterZoom);
   await click('Đưa mô hình vừa màn hình');
-  await delay(500);
+  await waitFor(`(() => { const e = [...document.querySelectorAll('.twin-3d-room-label')].find(e => e.textContent.includes('Phòng khách')); const b = e.getBoundingClientRect(); return JSON.stringify({x:Math.round(b.x*10)/10,y:Math.round(b.y*10)/10,width:Math.round(b.width*10)/10,height:Math.round(b.height*10)/10}) !== ${JSON.stringify(afterZoom)}; })()`);
   check('Fit to Home reframes the current room bounds', afterZoom !== await roomLabelRect('Phòng khách'));
   await click('Chế độ 2D');
   check('switching back preserves the existing 2D layout', await evaluate(`document.querySelectorAll('[data-room-id]').length === 4 && !document.querySelector('.twin-3d-stage canvas')`));
 
   await click('Home B'); await waitFor(`document.body.textContent.includes('Không gian sống · Nhà B')`); await click('Chế độ 3D');
-  await waitFor(`document.body.textContent.includes('Chưa có sơ đồ nhà.')`);
-  check('home switching clears old 3D rooms and renders the empty state', await evaluate(`!document.querySelector('.twin-3d-stage canvas') && document.body.textContent.includes('Chưa có sơ đồ nhà.')`));
+  await waitFor(`document.body.textContent.includes('Chưa có phòng')`);
+  check('home switching resets mode and selection and clears old rooms', await evaluate(`!document.querySelector('.twin-3d-stage canvas') && document.body.textContent.includes('Chưa có phòng') && document.querySelector('button[aria-label="Chế độ 3D"]').getAttribute('aria-pressed') === 'true'`));
   await screenshot('empty-layout');
 
   await click('Home A'); await waitFor(`document.body.textContent.includes('Không gian sống · Nhà mẫu · 4 phòng')`);
   await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
-  await waitFor('innerWidth === 390'); await click('Chế độ 3D');
+  await waitFor('innerWidth === 390');
+  check('390px mobile 3D retains the scene without overflow', await evaluate(`document.documentElement.scrollWidth <= innerWidth && !!document.querySelector('.twin-3d-stage canvas')`));
+  await screenshot('mobile-390', true);
+  await send('Emulation.setDeviceMetricsOverride', { width: 320, height: 844, deviceScaleFactor: 1, mobile: true });
+  await waitFor('innerWidth === 320');
   await waitFor(`document.querySelector('.twin-3d-stage canvas') !== null && !document.body.textContent.includes('Đang dựng không gian 3D')`);
   check('mobile 3D has no page-level horizontal overflow', await evaluate(`document.documentElement.scrollWidth <= innerWidth`));
-  await screenshot('mobile-390', true);
+  check('all camera presets fit inside the 320px viewport with touch targets', await evaluate(`[...document.querySelectorAll('[aria-label="Góc nhìn 3D"] button')].every(e => { const r = e.getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth && r.height >= 44; })`));
+  await click('Góc nhìn Từ trên');
+  await settleCamera();
+  check('320px mobile switches to the overhead camera preset', await evaluate(`document.querySelector('[aria-label="Góc nhìn Từ trên"]').getAttribute('aria-pressed') === 'true' && document.documentElement.scrollWidth <= innerWidth`));
+  await click('Reset góc nhìn');
+  await settleCamera();
+  await evaluate(`[...document.querySelectorAll('.twin-3d-room-label')].find(e => e.textContent.includes('Phòng khách')).click()`);
+  await waitFor(`document.querySelector('[aria-label="Chi tiết phòng Phòng khách"]') !== null`);
+  check('mobile inspector sits below the scene', await evaluate(`document.querySelector('[aria-label="Chi tiết phòng Phòng khách"]').getBoundingClientRect().top >= document.querySelector('.twin-3d-stage').getBoundingClientRect().bottom`));
+  await screenshot('mobile-320', true);
 
   await click('Chế độ 2D');
   await evaluate(`window.__originalGetContext = HTMLCanvasElement.prototype.getContext; HTMLCanvasElement.prototype.getContext = () => null;`);
@@ -167,25 +256,22 @@ try {
   await send('Page.navigate', { url: multiFloorUrl.href });
   await waitFor(`document.querySelector('button[aria-label="Chế độ 3D"]')?.getAttribute('aria-pressed') === 'true' && document.querySelector('.twin-3d-stage canvas') !== null`);
   check('multi-floor homes open directly in 3D', await evaluate(`document.querySelector('button[aria-label="Chế độ 3D"]')?.getAttribute('aria-pressed') === 'true'`));
-  await waitFor(`document.querySelectorAll('[data-twin-floor-label]').length === 3 && document.querySelector('button[role="combobox"][aria-label="Chọn tầng trong mô hình 3D"]')?.dataset.floorCount === '3' && document.querySelectorAll('.twin-3d-stage button[data-world-y]').length === 14`);
-  check('multi-floor fixture renders three selectable levels and fourteen markers', await evaluate(`document.querySelector('button[role="combobox"][aria-label="Chọn tầng trong mô hình 3D"]')?.dataset.floorCount === '3' && document.querySelectorAll('[data-twin-floor-label]').length === 3 && document.querySelectorAll('.twin-3d-stage button[data-world-y]').length === 14`));
+  await waitFor(`document.querySelectorAll('[aria-label="Chọn tầng trong mô hình 3D"] button').length === 4 && document.querySelectorAll('.twin-3d-stage button[data-world-y]').length === 14`);
+  check('multi-floor fixture renders three selectable levels and fourteen markers', await evaluate(`document.querySelectorAll('[aria-label="Chọn tầng trong mô hình 3D"] button').length === 4 && document.querySelectorAll('.twin-3d-stage button[data-world-y]').length === 14`));
   check('exploded overview assigns higher world elevation to upper-floor nodes', await evaluate(`(() => { const y = label => Number([...document.querySelectorAll('.twin-3d-stage button[data-world-y]')].find(e => e.getAttribute('aria-label')?.includes(label)).dataset.worldY); return y('Đèn làm việc') > y('Điều hòa phòng chính') && y('Điều hòa phòng chính') > y('Đèn phòng khách'); })()`));
   await screenshot('multi-floor-exploded');
-  await click('Chọn tầng trong mô hình 3D');
-  await waitFor(`document.querySelector('[role="listbox"][aria-label="Chọn tầng trong mô hình 3D"]') !== null`);
-  check('custom floor dropdown exposes the current selection and every floor', await evaluate(`document.querySelectorAll('[role="listbox"][aria-label="Chọn tầng trong mô hình 3D"] [role="option"]').length === 4 && document.querySelector('[role="listbox"][aria-label="Chọn tầng trong mô hình 3D"] [role="option"][aria-selected="true"]')?.dataset.value === 'all'`));
-  await screenshot('multi-floor-dropdown-open');
-  await click('Chọn tầng trong mô hình 3D');
+  check('floor toolbar stays outside the house and shows the current selection', await evaluate(`!document.querySelector('[data-twin-floor-label]') && document.querySelector('[aria-label="Chọn tầng trong mô hình 3D"] button[aria-pressed="true"]')?.dataset.value === 'all' && document.querySelector('[aria-label="Chọn tầng trong mô hình 3D"]').getBoundingClientRect().bottom <= document.querySelector('.twin-3d-stage').getBoundingClientRect().top`));
+  await screenshot('multi-floor-controls');
   await chooseFloor('Chọn tầng trong mô hình 3D', 2);
   await waitFor(`document.querySelectorAll('.twin-3d-room-label').length === 3 && document.querySelectorAll('.twin-3d-stage button[data-world-y]').length === 5`);
   check('floor drill-down isolates only rooms and markers from the selected floor', await evaluate(`[...document.querySelectorAll('.twin-3d-room-label')].length === 3 && [...document.querySelectorAll('.twin-3d-room-label')].every(e => e.textContent.includes('Tầng 2'))`));
   await screenshot('multi-floor-level-2');
   await chooseFloor('Chọn tầng trong mô hình 3D', 'all');
-  await waitFor(`document.querySelectorAll('[data-twin-floor-label]').length === 3`);
+  await waitFor(`document.querySelectorAll('.twin-3d-stage button[data-world-y]').length === 14`);
   const explodedOfficeY = await evaluate(`Number([...document.querySelectorAll('.twin-3d-stage button[data-world-y]')].find(e => e.getAttribute('aria-label')?.includes('Đèn làm việc')).dataset.worldY)`);
-  await click('Xếp chồng các tầng');
+  await click('Xếp chồng');
   await waitFor(`Number([...document.querySelectorAll('.twin-3d-stage button[data-world-y]')].find(e => e.getAttribute('aria-label')?.includes('Đèn làm việc')).dataset.worldY) < ${explodedOfficeY}`);
-  check('stack control reduces inter-floor spacing without changing the floor data', await evaluate(`document.querySelectorAll('[data-twin-floor-label]').length === 3 && document.querySelectorAll('.twin-3d-stage button[data-world-y]').length === 14`));
+  check('stack control reduces inter-floor spacing without changing the floor data', await evaluate(`document.querySelector('[aria-label="Bố trí tầng"] button[aria-pressed="true"]').textContent.includes('Xếp chồng') && document.querySelectorAll('.twin-3d-stage button[data-world-y]').length === 14`));
   await screenshot('multi-floor-stacked');
 
   await click('Chế độ 2D');
@@ -199,7 +285,7 @@ try {
 
   const errors = events.filter((event) => event.method === 'Runtime.exceptionThrown');
   check('browser reports no uncaught exceptions during supported 3D flows', errors.length === 0);
-  await writeFile(resolve(evidence, 'browser-results.json'), JSON.stringify({ results, errors, screenshots: ['default-isometric-desktop', 'selected-room', 'selected-device', 'health-stale', 'health-offline', 'selected-sensor-active', 'empty-layout', 'mobile-390', 'multi-floor-exploded', 'multi-floor-dropdown-open', 'multi-floor-level-2', 'multi-floor-stacked'] }, null, 2));
+  await writeFile(resolve(evidence, 'browser-results.json'), JSON.stringify({ results, errors, screenshots: ['default-isometric-desktop', 'camera-top', 'selected-room', 'selected-device', 'health-stale', 'health-offline', 'selected-sensor-active', 'empty-layout', 'mobile-390', 'mobile-320', 'multi-floor-exploded', 'multi-floor-controls', 'multi-floor-level-2', 'multi-floor-stacked'] }, null, 2));
   await send('Browser.close');
 } finally {
   socket?.close(); chrome.kill();

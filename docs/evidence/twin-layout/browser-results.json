@@ -5,6 +5,7 @@
     "fit restores canvas to viewport",
     "entering edit is clean",
     "real pointer drag moves draft room only",
+    "resize feedback uses normalized percentages and shows the original room ghost",
     "real pointer resize changes draft dimensions",
     "shape selector applies an L-shaped outline to the selected room",
     "L-shaped room rotates 90 degrees without rebuilding its corners",
@@ -12,6 +13,7 @@
     "optional metric editor is available without changing API geometry",
     "metric dimension annotates the room while normalized layout geometry stays unchanged",
     "blueprint upload renders a faded image under the editable 2D plan",
+    "node drag keeps a visible source ghost",
     "realtime during active pointer drag preserves preview geometry",
     "active pointer drag displays newest sensor and health",
     "device/sensor realtime and geometry stay independent",
@@ -43,6 +45,11 @@
     "browser Back returns to Twin route with saved Home A layout",
     "browser Forward restores Home B without stale geometry",
     "reference layout renders four rooms and seven live nodes",
+    "auto fit centers the room footprint and fills 70–85% of the viewport",
+    "header safe zone offsets the marker without changing its normalized anchor",
+    "2D marker remains compact when selected and room borders stay thin",
+    "realtime retains manual 2D pan rather than auto fitting again",
+    "390px 2D has no horizontal page overflow",
     "browser reports no uncaught exceptions"
   ],
   "screenshots": [

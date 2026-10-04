@@ -5,6 +5,7 @@ import type { Group } from 'three';
 import type { Twin3DBounds, Twin3DRoomGeometry } from './twin3dGeometry';
 import { TWIN_FLOOR_HEIGHT } from './twin3dGeometry';
 import type { Twin3DPalette } from './twin3dPalette';
+import { roomKind } from './roomKind';
 
 type Vec3 = [number, number, number];
 
@@ -262,15 +263,14 @@ export const Twin3DRoomDecor = memo(function Twin3DRoomDecor({ room, name, palet
   palette: Twin3DPalette;
   compact: boolean;
   shaped?: boolean;
-  onSelect: (event: ThreeEvent<PointerEvent>) => void;
+  onSelect: (event: ThreeEvent<MouseEvent>) => void;
 }) {
-  const value = name.toLocaleLowerCase();
-  const kind = /living|khách/.test(value) ? 'living' : /bed|ngủ/.test(value) ? 'bedroom' : /kitchen|bếp/.test(value) ? 'kitchen' : /bath|tắm|vệ sinh/.test(value) ? 'bathroom' : 'other';
-  return <group onPointerDown={onSelect}>
+  const kind = roomKind(name);
+  return <group onClick={onSelect}>
     {!shaped ? <FloorPattern room={room} kind={kind} palette={palette} /> : null}
     {!compact && !shaped ? <ArchitectureDetails room={room} palette={palette} /> : null}
     <group scale={shaped ? [0.7, 1, 0.7] : [1, 1, 1]}>
-      {kind === 'living' ? <LivingRoom room={room} palette={palette} /> : kind === 'bedroom' ? <Bedroom room={room} palette={palette} /> : kind === 'kitchen' ? <Kitchen room={room} palette={palette} /> : kind === 'bathroom' ? <Bathroom room={room} palette={palette} /> : <Office room={room} palette={palette} />}
+      {kind === 'living' ? <LivingRoom room={room} palette={palette} /> : kind === 'bedroom' ? <Bedroom room={room} palette={palette} /> : kind === 'kitchen' ? <Kitchen room={room} palette={palette} /> : kind === 'bathroom' ? <Bathroom room={room} palette={palette} /> : kind === 'office' ? <Office room={room} palette={palette} /> : <><Table position={[0, TWIN_FLOOR_HEIGHT, 0]} width={Math.min(1.5, room.width * .4)} depth={Math.min(.8, room.depth * .4)} height={.5} palette={palette} /><Plant position={[-room.width * .3, TWIN_FLOOR_HEIGHT, room.depth * .3]} palette={palette} /></>}
     </group>
   </group>;
 });
@@ -294,7 +294,7 @@ export const Twin3DLandscape = memo(function Twin3DLandscape({ bounds, palette, 
     { position: [bounds.centerX + halfW + .46, .02, bounds.centerZ + halfD - 1.15], scale: .76 },
   ];
   return <group>
-    <Block position={[bounds.centerX, -.09, bounds.centerZ]} size={[bounds.width + 1.2, .14, bounds.depth + 1.2]} color={palette.successSoft} radius={.28} />
+    <Block position={[bounds.centerX, -.09, bounds.centerZ]} size={[bounds.width + 1.2, .14, bounds.depth + 1.2]} color={palette.ground} radius={.28} />
     <Block position={[bounds.centerX + bounds.width * .24, -.005, bounds.centerZ + halfD + .35]} size={[1.8, .05, .8]} color={palette.off} radius={.1} />
     {!compact ? trees.map((tree, index) => <Tree key={index} position={tree.position} scale={tree.scale} palette={palette} />) : null}
     {[-.32, 0, .32].map((ratio) => <Plant key={ratio} position={[bounds.centerX + bounds.width * ratio, .01, bounds.centerZ - halfD - .32]} scale={.5} palette={palette} />)}

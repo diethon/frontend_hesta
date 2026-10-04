@@ -25,6 +25,10 @@ export interface Twin3DPalette {
   metal: string;
   dark: string;
   rug: string;
+  wall: string;
+  floorMint: string;
+  floorBlue: string;
+  ground: string;
 }
 
 const token = (styles: CSSStyleDeclaration, name: string, fallback: string) => styles.getPropertyValue(name).trim() || fallback;
@@ -58,5 +62,9 @@ export function readTwin3DPalette(): Twin3DPalette {
     metal: token(styles, '--color-twin-metal', '#a8b7c0'),
     dark: token(styles, '--color-twin-dark', '#485864'),
     rug: token(styles, '--color-twin-rug', '#cbb8a1'),
+    wall: token(styles, '--color-twin-wall', '#d2dde2'),
+    floorMint: token(styles, '--color-twin-floor-mint', '#dce9df'),
+    floorBlue: token(styles, '--color-twin-floor-blue', '#d5e5ed'),
+    ground: token(styles, '--color-twin-ground', '#b8d0bf'),
   };
 }

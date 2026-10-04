@@ -3,12 +3,13 @@ import { Check, ChevronDown, House, Layers3 } from 'lucide-react';
 
 type FloorValue = number | 'all';
 
-export function TwinFloorSelect({ floors, value, onChange, allLabel = 'Toàn nhà', ariaLabel = 'Chọn tầng' }: {
+export function TwinFloorSelect({ floors, value, onChange, allLabel = 'Toàn nhà', ariaLabel = 'Chọn tầng', variant = 'dropdown' }: {
   floors: readonly number[];
   value: FloorValue;
   onChange: (floor: FloorValue) => void;
   allLabel?: string;
   ariaLabel?: string;
+  variant?: 'dropdown' | 'segmented';
 }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -61,6 +62,9 @@ export function TwinFloorSelect({ floors, value, onChange, allLabel = 'Toàn nh�
     }
   };
 
+  if (variant === 'segmented') return <div aria-label={ariaLabel} className="flex max-w-full flex-wrap gap-1 rounded-xl border border-line bg-app p-1">
+    {(['all', ...floors] as const).map((floor) => <button key={floor} type="button" data-value={floor} aria-label={floor === 'all' ? allLabel : `Tầng ${floor}`} aria-pressed={value === floor} onClick={() => onChange(floor)} className={`min-h-11 rounded-lg px-3 text-xs font-semibold ${value === floor ? 'bg-surface text-primary-hover shadow-soft ring-1 ring-primary/30' : 'text-muted hover:bg-sidebar-hover'}`}>{floor === 'all' ? allLabel : `T${floor}`}</button>)}
+  </div>;
   return <div ref={rootRef} className="relative inline-block text-left">
     <button
       ref={triggerRef}

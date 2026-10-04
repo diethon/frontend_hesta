@@ -74,6 +74,7 @@ export function LayoutFixtureShell() {
     <button onClick={() => setCount(`${requests.length} REST; ${requests.filter((r) => r.method === 'put').length} PUT`)}>Count requests</button><output>{count}</output>
     <button onClick={() => setJson(JSON.stringify({ layout: store.getState().twinLayout, requests }, null, 2))}>Inspect geometry / requests</button>
     <button onClick={() => emit({ ...runtimeSensorFixture, data: { ...runtimeSensorFixture.data, latestValue: 30, observedAt: '2026-09-19T10:00:00Z' }, timestamp: '2026-09-19T10:00:00Z' })}>Sensor → 30</button>
+    <button onClick={() => emit({ ...runtimeSensorFixture, data: { ...runtimeSensorFixture.data, latestValue: 31, observedAt: '2026-09-19T10:04:00Z' }, timestamp: '2026-09-19T10:04:00Z' })}>Sensor → 31</button>
     <button onClick={() => emit({ ...runtimeDeviceFixture, data: { ...runtimeDeviceFixture.data, currentState: { power: 'OFF' }, lastSeen: '2026-09-19T10:00:00Z' }, timestamp: '2026-09-19T10:00:00Z' })}>Device → OFF</button>
     {(['STALE', 'OFFLINE', 'ACTIVE'] as const).map((healthStatus, index) => <button key={healthStatus} onClick={() => emit({ ...runtimeHealthFixture, timestamp: `2026-09-19T10:0${index + 1}:00Z`, data: { ...runtimeHealthFixture.data, healthStatus, referenceTime: '2026-09-19T10:00:00Z', evaluatedAt: `2026-09-19T10:0${index + 1}:00Z` } })}>{healthStatus}</button>)}
     <button onClick={() => { saved = { ...saved, revision: saved.revision + 1 }; }}>Simulate concurrent save</button>

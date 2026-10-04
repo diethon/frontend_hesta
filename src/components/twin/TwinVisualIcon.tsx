@@ -1,27 +1,20 @@
 import type { LucideIcon } from 'lucide-react';
-import { Activity, Armchair, Bath, BedDouble, Camera, CookingPot, DoorClosed, Droplets, Fan, Flame, House, Lightbulb, PlugZap, Snowflake, Thermometer, Tv, Wind } from 'lucide-react';
+import { Activity, Armchair, Bath, BedDouble, Camera, Cloud, CookingPot, Cpu, DoorClosed, Droplets, Fan, Flame, House, Lightbulb, Monitor, PlugZap, Radio, Snowflake, Sun, Thermometer, Wind } from 'lucide-react';
 import type { TwinDeviceSnapshotResponse } from '../../types/twin';
-import { DEVICE_TYPES, type DeviceType } from '../../types/deviceVocabulary';
+import { deviceVisualKind, sensorVisualKind } from './twinPresentation';
 
-const currentDeviceIcons = {
-  [DEVICE_TYPES.LIGHT]: Lightbulb,
-  [DEVICE_TYPES.LED_RGB]: Lightbulb,
-  [DEVICE_TYPES.SMART_PLUG]: PlugZap,
-  [DEVICE_TYPES.IR_REMOTE]: Tv,
-  [DEVICE_TYPES.TEMP_HUMID_SENSOR]: Thermometer,
-  [DEVICE_TYPES.MOTION_SENSOR]: Activity,
-  [DEVICE_TYPES.SMOKE_SENSOR]: Flame,
-  [DEVICE_TYPES.CAMERA_AI]: Camera,
-} satisfies Record<DeviceType, LucideIcon>;
-
-const deviceIcons: Partial<Record<TwinDeviceSnapshotResponse['deviceType'], LucideIcon>> = {
-  ...currentDeviceIcons,
-  // Compatibility with devices registered before the IoT refactor.
-  AC: Snowflake, FAN: Fan, LOCK: DoorClosed, CAMERA: Camera, SOCKET: PlugZap, SENSOR: Activity, MICROPHONE: Wind,
+const deviceIcons: Record<ReturnType<typeof deviceVisualKind>, LucideIcon> = {
+  light: Lightbulb, plug: PlugZap, remote: Radio, sensor: Thermometer,
+  motion: Activity, smoke: Flame, camera: Camera, ac: Snowflake, fan: Fan,
+  lock: DoorClosed, microphone: Wind, generic: Cpu,
+};
+const sensorIcons: Record<ReturnType<typeof sensorVisualKind>, LucideIcon> = {
+  temperature: Thermometer, humidity: Droplets, light: Sun, motion: Activity,
+  air: Wind, gas: Cloud, smoke: Flame, generic: Radio,
 };
 
 const roomIcons: Array<[string, LucideIcon]> = [
-  ['living', Armchair], ['khách', Armchair], ['bed', BedDouble], ['ngủ', BedDouble], ['kitchen', CookingPot], ['bếp', CookingPot], ['bath', Bath], ['tắm', Bath], ['vệ sinh', Bath],
+  ['living', Armchair], ['khách', Armchair], ['bed', BedDouble], ['ngủ', BedDouble], ['kitchen', CookingPot], ['bếp', CookingPot], ['bath', Bath], ['tắm', Bath], ['vệ sinh', Bath], ['office', Monitor], ['study', Monitor], ['làm việc', Monitor],
 ];
 
 const iconFrame = {
@@ -37,15 +30,11 @@ export function RoomGlyph({ name, size = 20 }: { name: string; size?: number }) 
 }
 
 export function DeviceGlyph({ deviceType, size = 19 }: { deviceType: TwinDeviceSnapshotResponse['deviceType']; size?: number }) {
-  const Icon = deviceIcons[deviceType] ?? Tv;
+  const Icon = deviceIcons[deviceVisualKind(deviceType)];
   return <span aria-hidden="true" className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${iconFrame.device}`}><Icon size={size} strokeWidth={1.8} /></span>;
 }
 
 export function SensorGlyph({ metricType, size = 19 }: { metricType: string; size?: number }) {
-  const normalized = metricType.toLowerCase();
-  const Icon = normalized.includes('temperature') ? Thermometer
-    : normalized.includes('humidity') ? Droplets
-      : normalized.includes('smoke') ? Flame
-        : normalized.includes('motion') ? Activity : Activity;
+  const Icon = sensorIcons[sensorVisualKind(metricType)];
   return <span aria-hidden="true" className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${iconFrame.sensor}`}><Icon size={size} strokeWidth={1.8} /></span>;
 }
