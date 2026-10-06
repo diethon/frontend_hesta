@@ -100,8 +100,7 @@ function PendantLight({ position, palette, scale = 1 }: { position: Vec3; palett
   return <group position={position} scale={scale}>
     <Block position={[0, .22, 0]} size={[.025, .44, .025]} color={palette.dark} metalness={.4} />
     <mesh castShadow position={[0, -.03, 0]}><coneGeometry args={[.22, .25, 24, 1, true]} /><meshStandardMaterial color={palette.dark} side={2} roughness={.42} /></mesh>
-    <mesh position={[0, -.14, 0]}><sphereGeometry args={[.09, 16, 10]} /><meshStandardMaterial color={palette.warning} emissive={palette.warning} emissiveIntensity={.65} /></mesh>
-    <pointLight position={[0, -.2, 0]} color={palette.warningSoft} intensity={.28} distance={3.2} decay={2} />
+    <mesh position={[0, -.14, 0]}><sphereGeometry args={[.09, 16, 10]} /><meshStandardMaterial color={palette.surface} /></mesh>
   </group>;
 }
 
@@ -257,18 +256,19 @@ function Office({ room, palette }: { room: Twin3DRoomGeometry; palette: Twin3DPa
   </>;
 }
 
-export const Twin3DRoomDecor = memo(function Twin3DRoomDecor({ room, name, palette, compact, shaped, onSelect }: {
+export const Twin3DRoomDecor = memo(function Twin3DRoomDecor({ room, name, palette, compact, shaped, showArchitecture = true, onSelect }: {
   room: Twin3DRoomGeometry;
   name: string;
   palette: Twin3DPalette;
   compact: boolean;
   shaped?: boolean;
+  showArchitecture?: boolean;
   onSelect: (event: ThreeEvent<MouseEvent>) => void;
 }) {
   const kind = roomKind(name);
   return <group onClick={onSelect}>
     {!shaped ? <FloorPattern room={room} kind={kind} palette={palette} /> : null}
-    {!compact && !shaped ? <ArchitectureDetails room={room} palette={palette} /> : null}
+    {!compact && !shaped && showArchitecture ? <ArchitectureDetails room={room} palette={palette} /> : null}
     <group scale={shaped ? [0.7, 1, 0.7] : [1, 1, 1]}>
       {kind === 'living' ? <LivingRoom room={room} palette={palette} /> : kind === 'bedroom' ? <Bedroom room={room} palette={palette} /> : kind === 'kitchen' ? <Kitchen room={room} palette={palette} /> : kind === 'bathroom' ? <Bathroom room={room} palette={palette} /> : kind === 'office' ? <Office room={room} palette={palette} /> : <><Table position={[0, TWIN_FLOOR_HEIGHT, 0]} width={Math.min(1.5, room.width * .4)} depth={Math.min(.8, room.depth * .4)} height={.5} palette={palette} /><Plant position={[-room.width * .3, TWIN_FLOOR_HEIGHT, room.depth * .3]} palette={palette} /></>}
     </group>

@@ -9,6 +9,10 @@ function unwrap(data: LayoutResponse, homeId: string) {
     || data.result.revision < 0 || !Array.isArray(data.result.rooms) || !Array.isArray(data.result.nodes)) {
     throw new Error('Phản hồi sơ đồ không hợp lệ.');
   }
+  if (data.result.architecture && (data.result.architecture.version !== 1 || !data.result.architecture.rooms
+    || typeof data.result.architecture.rooms !== 'object' || Array.isArray(data.result.architecture.rooms))) {
+    throw new Error('Phiên bản geometry không được hỗ trợ.');
+  }
   return data.result;
 }
 

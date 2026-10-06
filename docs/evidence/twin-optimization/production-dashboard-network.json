@@ -1,0 +1,11 @@
+{
+  "route": "/home",
+  "scripts": [
+    "assets/index-BYrLZyam.js",
+    "assets/rolldown-runtime-hePW80VL.js",
+    "assets/twinDrafting-CL3s_GF2.js",
+    "assets/layoutGeometry-Dqkz5LQv.js"
+  ],
+  "forbiddenLoaded": [],
+  "backend": "mocked; no outgoing HESTA requests"
+}

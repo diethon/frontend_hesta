@@ -19,10 +19,12 @@
   background-image: linear-gradient(color-mix(in srgb, var(--color-line) 45%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--color-line) 45%, transparent) 1px, transparent 1px);
   background-size: 20px 20px;
 }
-.twin-3d-stage { height: clamp(30rem, 58vw, 46rem); }
+.twin-3d-stage { height: clamp(30rem, 65vh, 48rem); }
+.twin-3d-panel { max-height: clamp(28rem, 61vh, 45rem); }
 .twin-3d-stage canvas { touch-action: none; }
 .twin-3d-room-label { max-width: 11rem; }
-.twin-3d-marker > span:first-child, .twin-canvas-node > span > span:first-child { width: 28px; height: 28px; border-radius: 8px; }
+.twin-3d-marker > span:first-child { width: 18px; height: 18px; border-radius: 4px; background: transparent; }
+.twin-canvas-node > span > span:first-child { width: 28px; height: 28px; border-radius: 8px; }
 .twin-canvas-node { translate: -50% -50%; transition: scale 180ms ease; }
 .twin-canvas-node:hover { scale: 1.05; }
 .twin-canvas-node[aria-pressed="true"] { scale: 1.1; }
@@ -74,20 +76,32 @@
   --color-info: #8ed8f8;
   --color-info-soft: #eef9ff;
   /* Semantic materials used by the frontend-only Digital Twin renderer. */
+  --color-twin-app: #f4f7fa;
+  --color-twin-scene: #e9eff4;
+  --color-twin-heat-high: #f97316;
+  --color-twin-selected: #38a9e0;
+  --color-twin-border: #cbd5e1;
+  --color-twin-text: #0f172a;
+  --color-twin-muted: #64748b;
+  --color-twin-success: #4dba87;
+  --color-twin-off: #94a3b8;
+  --color-twin-on: #f6c453;
+  --color-twin-warning: #f59e4a;
+  --color-twin-critical: #e86767;
   --color-twin-wood: #a96f3f;
   --color-twin-wood-light: #d9a46a;
-  --color-twin-fabric: #d1dce1;
-  --color-twin-fabric-accent: #91afc0;
+  --color-twin-fabric: #cbd4dc;
+  --color-twin-fabric-accent: #94a3b8;
   --color-twin-leaf: #78ad86;
   --color-twin-leaf-dark: #4f8767;
-  --color-twin-glass: #bfe3ef;
+  --color-twin-glass: #bfd7e5;
   --color-twin-metal: #a8b7c0;
-  --color-twin-dark: #485864;
+  --color-twin-dark: #64748b;
   --color-twin-rug: #cbb8a1;
-  --color-twin-wall: #d2dde2;
-  --color-twin-floor-mint: #dce9df;
-  --color-twin-floor-blue: #d5e5ed;
-  --color-twin-ground: #b8d0bf;
+  --color-twin-wall: #cfd7df;
+  --color-twin-floor-mint: #e8edf2;
+  --color-twin-floor-blue: #e8edf2;
+  --color-twin-ground: #bccbbe;
   --color-twin-room-cream: #f7f2e8;
   --color-twin-room-neutral: #f2efeb;
   --color-twin-room-mint: #edf5ef;

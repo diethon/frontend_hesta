@@ -1,7 +1,8 @@
-import { DEVICE_TYPES, type DeviceType } from './deviceVocabulary';
+import { DEVICE_TYPES } from './deviceVocabulary';
 
 // Keep existing layouts compatible with devices registered before the IoT refactor.
-export type TwinDeviceType = DeviceType | 'FAN' | 'AC' | 'SOCKET' | 'SENSOR' | 'LOCK' | 'CAMERA' | 'MICROPHONE';
+// Backend Device.deviceType is an extensible string; unrecognized types use a generic model.
+export type TwinDeviceType = string;
 export const TWIN_DEVICE_TYPES: readonly TwinDeviceType[] = [
   ...Object.values(DEVICE_TYPES), 'FAN', 'AC', 'SOCKET', 'SENSOR', 'LOCK', 'CAMERA', 'MICROPHONE',
 ];

@@ -57,6 +57,7 @@ try {
   const click = async (text) => {
     const found = await evaluate(`(() => { const e = [...document.querySelectorAll('button,a')].find(e => (e.textContent.trim() === ${JSON.stringify(text)} || e.getAttribute('aria-label') === ${JSON.stringify(text)})); if (!e) return false; e.click(); return true; })()`);
     assert.ok(found, `Control exists: ${text}`); await delay(60);
+    if (text === 'Chỉnh sửa sơ đồ') await waitFor(`document.querySelector('button[aria-label^="Đổi kích thước"]') !== null`);
   };
   const fixtureOpen = (open) => evaluate(`document.querySelector('details').open = ${open}`);
   const inspect = async () => {
@@ -185,7 +186,7 @@ try {
   await waitFor(`document.body.textContent.includes('Không gian sống · Nhà B')`);
   check('home switch loads B without A geometry', (await inspect()).layout.confirmed.homeId === 'home-b' && !await evaluate(`document.querySelector('[data-node-key]') !== null`));
   await click('Home A'); await waitFor(`document.body.textContent.includes('Không gian sống · My Home')`); await click('Chế độ 2D'); await waitFor(`document.querySelector('[data-node-key]') !== null`);
-  await click('Chỉnh sửa sơ đồ'); await fixtureOpen(false); await drag(sensorSelector, 10, 10);
+  await click('Chỉnh sửa sơ đồ'); await fixtureOpen(false); await drag(sensorSelector, 40, 40);
   await click('Simulate concurrent save'); await click('Lưu bố cục');
   await waitFor(`document.body.textContent.includes('phiên khác')`);
   check('conflict preserves work and offers explicit reload', (await inspect()).layout.dirty && await evaluate(`document.body.textContent.includes('Tải sơ đồ mới nhất')`));
@@ -203,7 +204,7 @@ try {
   await evaluate(`document.querySelector(${JSON.stringify(sensorSelector)}).click()`);
   await field('Ngang (%)', 60);
   state = await inspect();
-  check('mobile numeric controls edit normalized position', state.layout.draft.nodes.find((node) => node.nodeType === 'SENSOR').x === 0.6);
+  check('mobile numeric controls snap normalized position to the half-metre grid', state.layout.draft.nodes.find((node) => node.nodeType === 'SENSOR').x === 0.611);
   check('320px edit has no horizontal overflow', await evaluate('document.documentElement.scrollWidth <= innerWidth'));
   await screenshot('mobile-edit', true);
   await fixtureOpen(false);
@@ -217,8 +218,19 @@ try {
   check('touch pointercancel discards only the active gesture', JSON.stringify((await inspect()).layout.draft) === JSON.stringify(beforeTouch));
   await clickWithDialog('Hủy', true);
   await click('Empty fixture layout'); await click('Tải mới nhất');
-  await waitFor(`document.body.textContent.includes('Chưa có sơ đồ')`);
+  await waitFor(`document.querySelector('[data-geometry-source]')?.dataset.geometrySource === 'INFERRED'`);
   await click('Chỉnh sửa sơ đồ');
+  // The fallback is visibly inferred. Clear its placements through the editor before palette checks.
+  while (await evaluate(`!!document.querySelector('[data-room-id] > button')`)) {
+    await evaluate(`document.querySelector('[data-room-id] > button').click()`);
+    await delay(60); await click('Bỏ vị trí khỏi sơ đồ');
+  }
+  while (await evaluate(`!!document.querySelector('[data-node-key]')`)) {
+    await evaluate(`document.querySelector('[data-node-key]').click()`);
+    await delay(60); await click('Bỏ vị trí khỏi sơ đồ');
+  }
+  // Exact-coordinate zoom/header tests below explicitly use the free-placement option.
+  await click('Bắt lưới');
   await field('Tìm đối tượng chưa đặt', 'bed');
   check('palette search filters existing rooms', await evaluate(`!!document.querySelector('[aria-label="Đặt Bedroom"]') && !document.querySelector('[aria-label="Đặt Living Room"]')`));
   await field('Tìm đối tượng chưa đặt', 'no-match');
@@ -277,6 +289,7 @@ try {
   await waitFor(`document.querySelectorAll('[data-room-id]').length === 4`);
   await click('Chỉnh sửa sơ đồ');
   await evaluate(`document.querySelector('[data-room-id] > button').click()`);
+  await click('Bắt lưới');
   check('reference layout renders four rooms and seven live nodes', await evaluate(`document.querySelectorAll('[data-node-key]').length === 7 && document.documentElement.scrollWidth <= innerWidth`));
   await screenshot('reference-four-rooms', true);
   await click('Đưa sơ đồ vừa màn hình');

@@ -11,6 +11,8 @@ import { blueprintKey, changeRoomDrafting, polygonCss, roomDrafting, type TwinDr
 import { fitLayoutViewport, layoutViewportBounds, nodeDisplayPosition, roomHeaderHeight } from './twin2dViewport';
 import { healthSymbols } from './twinPresentation';
 import { useTwinUpdateMotion } from './useTwinMotion';
+import { TWIN_WORLD_WIDTH, TWIN_WORLD_DEPTH } from './twin3dGeometry';
+import { TwinObjectPlan } from './TwinObjectPlan';
 
 type Interaction = { pointerId: number; startX: number; startY: number; width: number; height: number; selection: TwinLayoutSelection; resize: boolean; origin: TwinLayoutGeometry; preview: TwinLayoutGeometry; commit: TwinLayoutGeometry; guides: TwinSnapGuides };
 type VertexInteraction = { pointerId: number; roomId: string; pointIndex: number; origin: TwinDraftingMetadata; preview: TwinDraftingMetadata };
@@ -92,6 +94,9 @@ export function TwinCanvas({ geometry, drafting, editable, selection, onSelect, 
   const [dragFeedback, setDragFeedback] = useState<{ selection: TwinLayoutSelection; resize: boolean; origin: TwinLayoutGeometry } | null>(null);
   const shown = preview ?? geometry;
   const shownDrafting = draftingPreview ?? drafting;
+  const snapOptions = { grid: drafting.settings.gridSnap, edges: drafting.settings.edgeSnap,
+    stepX: (drafting.settings.gridMeters ?? .5) / TWIN_WORLD_WIDTH,
+    stepY: (drafting.settings.gridMeters ?? .5) / TWIN_WORLD_DEPTH };
   const overlapIds = useMemo(() => overlappingRoomIds(shown.rooms), [shown.rooms]);
   const blueprint = shownDrafting.blueprints[blueprintKey(floor ?? shown.rooms[0]?.floor ?? 1)];
   const begin = (event: PointerEvent<HTMLButtonElement>, selected: TwinLayoutSelection, resize = false) => {
@@ -115,17 +120,17 @@ export function TwinCanvas({ geometry, drafting, editable, selection, onSelect, 
       next.rooms = drag.origin.rooms.map((room) => {
         if (room.roomId !== drag.selection.id) return room;
         const candidate = drag.resize ? resizeRoom(room, room.width + dx, room.height + dy) : clampRoom({ ...room, x: room.x + dx, y: room.y + dy });
-        const snapped = snapRoom(candidate, drag.origin.rooms, { grid: drafting.settings.gridSnap, edges: drafting.settings.edgeSnap }, drag.resize);
+        const snapped = snapRoom(candidate, drag.origin.rooms, snapOptions, drag.resize);
         drag.guides = snapped.guides;
         return candidate;
       });
-      commit.rooms = next.rooms.map((room) => room.roomId !== drag.selection.id ? room : snapRoom(room, drag.origin.rooms, { grid: drafting.settings.gridSnap, edges: drafting.settings.edgeSnap }, drag.resize).room);
+      commit.rooms = next.rooms.map((room) => room.roomId !== drag.selection.id ? room : snapRoom(room, drag.origin.rooms, snapOptions, drag.resize).room);
     } else {
       next.nodes = drag.origin.nodes.map((node) => nodeKey(node) !== drag.selection.id ? node : moveLayoutNode(node,
         node.x + dx, node.y + dy, drag.origin.rooms,
         (roomId) => roomDrafting(drafting, roomId).points));
       commit.nodes = drag.origin.nodes.map((node) => nodeKey(node) !== drag.selection.id ? node : moveLayoutNode(node,
-        snapPoint(node.x + dx, drafting.settings.gridSnap), snapPoint(node.y + dy, drafting.settings.gridSnap), drag.origin.rooms,
+        snapPoint(node.x + dx, snapOptions.grid, snapOptions.stepX), snapPoint(node.y + dy, snapOptions.grid, snapOptions.stepY), drag.origin.rooms,
         (roomId) => roomDrafting(drafting, roomId).points));
     }
     drag.preview = next;
@@ -158,10 +163,11 @@ export function TwinCanvas({ geometry, drafting, editable, selection, onSelect, 
     if (!drag || event.pointerId !== drag.pointerId || !roomElement) return;
     const bounds = roomElement.getBoundingClientRect();
     const roomMeta = roomDrafting(drag.origin, drag.roomId);
-    const grid = drafting.settings.gridSnap ? 40 : 1000;
+    const room = geometry.rooms.find((item) => item.roomId === drag.roomId);
+    if (!room) return;
     const point = {
-      x: Math.max(0, Math.min(1, Math.round(((event.clientX - bounds.left) / bounds.width) * grid) / grid)),
-      y: Math.max(0, Math.min(1, Math.round(((event.clientY - bounds.top) / bounds.height) * grid) / grid)),
+      x: snapPoint((event.clientX - bounds.left) / bounds.width, snapOptions.grid, snapOptions.stepX / room.width),
+      y: snapPoint((event.clientY - bounds.top) / bounds.height, snapOptions.grid, snapOptions.stepY / room.height),
     };
     const points = roomMeta.points.map((item, index) => index === drag.pointIndex ? point : item);
     drag.preview = changeRoomDrafting(drag.origin, drag.roomId, { ...roomMeta, points });
@@ -177,7 +183,7 @@ export function TwinCanvas({ geometry, drafting, editable, selection, onSelect, 
   };
   const handlers = { onPointerMove: move, onPointerUp: (event: PointerEvent<HTMLButtonElement>) => finish(event), onPointerCancel: (event: PointerEvent<HTMLButtonElement>) => finish(event, true), onLostPointerCapture: (event: PointerEvent<HTMLButtonElement>) => finish(event, true) };
   const roomStyle = ({ x, y, width, height }: TwinRoomLayout) => ({ left: `${x * 100}%`, top: `${y * 100}%`, width: `${width * 100}%`, height: `${height * 100}%` });
-  return <div ref={viewport} className={`twin-viewport relative overflow-auto rounded-xl border border-line bg-surface shadow-soft ${overview ? 'twin-2d-overview-viewport' : ''}`}><div className="relative" style={viewportSize.width ? { width: Math.max(viewportSize.width, fit.canvasWidth + fit.left), height: Math.max(viewportSize.height, fit.canvasHeight + fit.top) } : undefined}><div ref={canvas} aria-label={overview ? 'Tổng quan mặt bằng tầng' : 'Sơ đồ nhà 2D'} style={{ width: viewportSize.width ? fit.canvasWidth : '100%', height: viewportSize.height ? fit.canvasHeight : 'var(--twin-canvas-height)', left: fit.left, top: fit.top, backgroundImage: drafting.settings.gridSnap ? undefined : 'none' }}
+  return <div ref={viewport} className={`twin-viewport relative overflow-auto rounded-xl border border-line bg-surface shadow-soft ${overview ? 'twin-2d-overview-viewport' : ''}`}><div className="relative" style={viewportSize.width ? { width: Math.max(viewportSize.width, fit.canvasWidth + fit.left), height: Math.max(viewportSize.height, fit.canvasHeight + fit.top) } : undefined}><div ref={canvas} aria-label={overview ? 'Tổng quan mặt bằng tầng' : 'Sơ đồ nhà 2D'} style={{ width: viewportSize.width ? fit.canvasWidth : '100%', height: viewportSize.height ? fit.canvasHeight : 'var(--twin-canvas-height)', left: fit.left, top: fit.top, backgroundImage: drafting.settings.gridSnap ? undefined : 'none', backgroundSize: `${snapOptions.stepX * 100}% ${snapOptions.stepY * 100}%` }}
     onDragOver={(event) => { if (editable && event.dataTransfer.types.includes(PALETTE_MIME)) { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; } }}
     onDrop={(event) => {
       if (!editable || !canvas.current) return;
@@ -187,7 +193,7 @@ export function TwinCanvas({ geometry, drafting, editable, selection, onSelect, 
       if (!item || typeof item.id !== 'string' || !(item.kind === 'room' ? roomsById[item.id] : item.kind === 'DEVICE' ? devicesById[item.id] : item.kind === 'SENSOR' ? sensorsById[item.id] : false)) return;
       const bounds = canvas.current.getBoundingClientRect();
       onChange(placePaletteItem(geometry, item, (event.clientX - bounds.left) / bounds.width, (event.clientY - bounds.top) / bounds.height, floor,
-        (roomId) => roomDrafting(drafting, roomId).points));
+        (roomId) => roomDrafting(drafting, roomId).points, snapOptions));
       onSelect({ kind: item.kind === 'room' ? 'room' : 'node', id: item.kind === 'room' ? item.id : `${item.kind}:${item.id}` });
   }} className="twin-canvas relative isolate overflow-hidden">
     {blueprint ? <img src={blueprint.dataUrl} alt="" aria-hidden="true" data-blueprint-underlay className="pointer-events-none absolute inset-0 h-full w-full object-fill" style={{ opacity: blueprint.opacity }} /> : null}
@@ -215,7 +221,8 @@ export function TwinCanvas({ geometry, drafting, editable, selection, onSelect, 
         <button type="button" aria-pressed={selected} aria-label={`Chọn phòng ${roomsById[room.roomId]?.name ?? room.roomId}`} onClick={() => onSelect({ kind: 'room', id: room.roomId })}
           onPointerDown={(event) => begin(event, { kind: 'room', id: room.roomId })} {...handlers}
           style={{ clipPath: polygon }} className={`relative h-full w-full overflow-hidden p-3 text-left align-top text-sm font-semibold shadow-soft ${roomTint} ${selected ? 'ring-2 ring-primary ring-inset' : ''} ${editable ? 'touch-none cursor-move' : ''}`}>
-          <RoomFurnishing name={name} />
+          {roomMeta.autoFurniture !== false ? <RoomFurnishing name={name} /> : null}
+          <TwinObjectPlan room={room} metadata={roomMeta} />
           <span data-room-header className="twin-room-header" style={{ height: roomHeaderHeight(room.height * fit.canvasHeight) - 10 }}><RoomGlyph name={name} size={17} /><span className="min-w-0"><span className="block truncate text-xs font-semibold text-text sm:text-sm">{name}</span>{room.height * fit.canvasHeight >= 120 || !viewportSize.height ? <span className="mt-1 block truncate text-[10px] font-medium text-muted">{roomsById[room.roomId]?.deviceIds.length ?? 0} thiết bị · {roomsById[room.roomId]?.sensorIds.length ?? 0} cảm biến</span> : null}</span></span>
           {preview && selected && dragFeedback?.resize ? <output aria-label="Kích thước phòng khi resize" className="absolute bottom-3 left-3 rounded-lg bg-surface/95 px-2 py-1 text-xs font-semibold text-text">Rộng {(room.width * 100).toFixed(1)}% · Cao {(room.height * 100).toFixed(1)}%</output> : null}
           {roomMeta.widthMeters || roomMeta.depthMeters ? <span className="absolute bottom-3 left-3 rounded-lg bg-surface/90 px-2 py-1 text-[10px] font-semibold text-text">{roomMeta.widthMeters ? `${roomMeta.widthMeters} m` : 'Chưa đo rộng'} × {roomMeta.depthMeters ? `${roomMeta.depthMeters} m` : 'chưa đo sâu'}</span> : null}

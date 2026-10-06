@@ -1,0 +1,1313 @@
+{
+  "label": "before",
+  "initial": {
+    "files": [
+      "assets/index-C2hv9s43.js"
+    ],
+    "bytes": 698034,
+    "gzip": 201630,
+    "threeModules": []
+  },
+  "digitalTwin": {
+    "files": [
+      "assets/Twin3DView-D33tSs8S.js"
+    ],
+    "bytes": 1046182,
+    "gzip": 283169
+  },
+  "models": [],
+  "chunks": [
+    {
+      "file": "assets/index-C2hv9s43.js",
+      "entry": true,
+      "imports": [],
+      "dynamicImports": [
+        "assets/Twin3DView-D33tSs8S.js"
+      ],
+      "modules": [
+        {
+          "id": "\u0000rolldown/runtime.js",
+          "bytes": 1426
+        },
+        {
+          "id": "\u0000vite/modulepreload-polyfill.js",
+          "bytes": 1205
+        },
+        {
+          "id": "node_modules/react/cjs/react.production.js",
+          "bytes": 15178
+        },
+        {
+          "id": "node_modules/react/index.js",
+          "bytes": 176
+        },
+        {
+          "id": "node_modules/scheduler/cjs/scheduler.production.js",
+          "bytes": 9064
+        },
+        {
+          "id": "node_modules/scheduler/index.js",
+          "bytes": 188
+        },
+        {
+          "id": "node_modules/react-dom/cjs/react-dom.production.js",
+          "bytes": 5713
+        },
+        {
+          "id": "node_modules/react-dom/index.js",
+          "bytes": 468
+        },
+        {
+          "id": "node_modules/react-dom/cjs/react-dom-client.production.js",
+          "bytes": 453153
+        },
+        {
+          "id": "node_modules/react-dom/client.js",
+          "bytes": 473
+        },
+        {
+          "id": "node_modules/use-sync-external-store/cjs/use-sync-external-store-with-selector.production.js",
+          "bytes": 2343
+        },
+        {
+          "id": "node_modules/use-sync-external-store/with-selector.js",
+          "bytes": 242
+        },
+        {
+          "id": "node_modules/react-redux/dist/react-redux.mjs",
+          "bytes": 7540
+        },
+        {
+          "id": "src/index.css",
+          "bytes": 0
+        },
+        {
+          "id": "\u0000vite/preload-helper.js",
+          "bytes": 2142
+        },
+        {
+          "id": "node_modules/react-router/dist/development/chunk-BV7QT456.mjs",
+          "bytes": 213260
+        },
+        {
+          "id": "src/store/hooks.ts",
+          "bytes": 134
+        },
+        {
+          "id": "node_modules/redux/dist/redux.mjs",
+          "bytes": 6665
+        },
+        {
+          "id": "node_modules/immer/dist/immer.mjs",
+          "bytes": 20444
+        },
+        {
+          "id": "node_modules/reselect/dist/reselect.mjs",
+          "bytes": 6954
+        },
+        {
+          "id": "node_modules/redux-thunk/dist/redux-thunk.mjs",
+          "bytes": 408
+        },
+        {
+          "id": "node_modules/@reduxjs/toolkit/dist/redux-toolkit.modern.mjs",
+          "bytes": 21866
+        },
+        {
+          "id": "node_modules/axios/lib/helpers/bind.js",
+          "bytes": 162
+        },
+        {
+          "id": "node_modules/axios/lib/utils.js",
+          "bytes": 15005
+        },
+        {
+          "id": "node_modules/axios/lib/helpers/parseHeaders.js",
+          "bytes": 987
+        },
+        {
+          "id": "node_modules/axios/lib/helpers/sanitizeHeaderValue.js",
+          "bytes": 1367
+        },
+        {
+          "id": "node_modules/axios/lib/core/AxiosHeaders.js",
+          "bytes": 8906
+        },
+        {
+          "id": "node_modules/axios/lib/core/AxiosError.js",
+          "bytes": 4419
+        },
+        {
+          "id": "node_modules/axios/lib/helpers/toFormData.js",
+          "bytes": 4734
+        },
+        {
+          "id": "node_modules/axios/lib/helpers/AxiosURLSearchParams.js",
+          "bytes": 831
+        },
+        {
+          "id": "node_modules/axios/lib/helpers/buildURL.js",
+          "bytes": 984
+        },
+        {
+          "id": "node_modules/axios/lib/core/InterceptorManager.js",
+          "bytes": 2650
+        },
+        {
+          "id": "node_modules/axios/lib/defaults/transitional.js",
+          "bytes": 300
+        },
+        {
+          "id": "node_modules/axios/lib/platform/browser/classes/URLSearchParams.js",
+          "bytes": 201
+        },
+        {
+          "id": "node_modules/axios/lib/platform/browser/classes/FormData.js",
+          "bytes": 157
+        },
+        {
+          "id": "node_modules/axios/lib/platform/browser/classes/Blob.js",
+          "bytes": 141
+        },
+        {
+          "id": "node_modules/axios/lib/platform/browser/index.js",
+          "bytes": 304
+        },
+        {
+          "id": "node_modules/axios/lib/platform/common/utils.js",
+          "bytes": 890
+        },
+        {
+          "id": "node_modules/axios/lib/platform/index.js",
+          "bytes": 131
+        },
+        {
+          "id": "node_modules/axios/lib/helpers/toURLEncodedForm.js",
+          "bytes": 461
+        },
+        {
+          "id": "node_modules/axios/lib/helpers/formDataToJSON.js",
+          "bytes": 1881
+        },
+        {
+          "id": "node_modules/axios/lib/core/methodList.js",
+          "bytes": 208
+        },
+        {
+          "id": "node_modules/axios/lib/defaults/index.js",
+          "bytes": 3496
+        },
+        {
+          "id": "node_modules/axios/lib/core/transformData.js",
+          "bytes": 444
+        },
+        {
+          "id": "node_modules/axios/lib/cancel/isCancel.js",
+          "bytes": 133
+        },
+        {
+          "id": "node_modules/axios/lib/cancel/CanceledError.js",
+          "bytes": 312
+        },
+        {
+          "id": "node_modules/axios/lib/core/settle.js",
+          "bytes": 497
+        },
+        {
+          "id": "node_modules/axios/lib/helpers/normalizeURLForProtocolCheck.js",
+          "bytes": 371
+        },
+        {
+          "id": "node_modules/axios/lib/helpers/parseProtocol.js",
+          "bytes": 190
+        },
+        {
+          "id": "node_modules/axios/lib/helpers/speedometer.js",
+          "bytes": 886
+        },
+        {
+          "id": "node_modules/axios/lib/helpers/throttle.js",
+          "bytes": 768
+        },
+        {
+          "id": "node_modules/axios/lib/helpers/progressEventReducer.js",
+          "bytes": 1241
+        },
+        {
+          "id": "node_modules/axios/lib/helpers/isURLSameOrigin.js",
+          "bytes": 475
+        },
+        {
+          "id": "node_modules/axios/lib/helpers/cookies.js",
+          "bytes": 1260
+        },
+        {
+          "id": "node_modules/axios/lib/helpers/isAbsoluteURL.js",
+          "bytes": 196
+        },
+        {
+          "id": "node_modules/axios/lib/helpers/combineURLs.js",
+          "bytes": 311
+        },
+        {
+          "id": "node_modules/axios/lib/core/buildFullPath.js",
+          "bytes": 1551
+        },
+        {
+          "id": "node_modules/axios/lib/core/mergeConfig.js",
+          "bytes": 4514
+        },
+        {
+          "id": "node_modules/axios/lib/core/setFormDataHeaders.js",
+          "bytes": 428
+        },
+        {
+          "id": "node_modules/axios/lib/helpers/resolveConfig.js",
+          "bytes": 2074
+        },
+        {
+          "id": "node_modules/axios/lib/adapters/xhr.js",
+          "bytes": 5087
+        },
+        {
+          "id": "node_modules/axios/lib/helpers/composeSignals.js",
+          "bytes": 1268
+        },
+        {
+          "id": "node_modules/axios/lib/helpers/trackStream.js",
+          "bytes": 1498
+        },
+        {
+          "id": "node_modules/axios/lib/helpers/estimateDataURLDecodedBytes.js",
+          "bytes": 3036
+        },
+        {
+          "id": "node_modules/axios/lib/env/data.js",
+          "bytes": 82
+        },
+        {
+          "id": "node_modules/axios/lib/adapters/fetch.js",
+          "bytes": 14330
+        },
+        {
+          "id": "node_modules/axios/lib/adapters/adapters.js",
+          "bytes": 1760
+        },
+        {
+          "id": "node_modules/axios/lib/core/dispatchRequest.js",
+          "bytes": 1581
+        },
+        {
+          "id": "node_modules/axios/lib/helpers/validator.js",
+          "bytes": 2034
+        },
+        {
+          "id": "node_modules/axios/lib/core/Axios.js",
+          "bytes": 6453
+        },
+        {
+          "id": "node_modules/axios/lib/cancel/CancelToken.js",
+          "bytes": 1814
+        },
+        {
+          "id": "node_modules/axios/lib/helpers/spread.js",
+          "bytes": 163
+        },
+        {
+          "id": "node_modules/axios/lib/helpers/isAxiosError.js",
+          "bytes": 179
+        },
+        {
+          "id": "node_modules/axios/lib/helpers/HttpStatusCode.js",
+          "bytes": 1853
+        },
+        {
+          "id": "node_modules/axios/lib/axios.js",
+          "bytes": 1189
+        },
+        {
+          "id": "src/services/session.ts",
+          "bytes": 1538
+        },
+        {
+          "id": "src/services/apiClient.ts",
+          "bytes": 1234
+        },
+        {
+          "id": "src/services/notificationApi.ts",
+          "bytes": 871
+        },
+        {
+          "id": "src/utils/errors.ts",
+          "bytes": 165
+        },
+        {
+          "id": "src/store/authSlice.ts",
+          "bytes": 1013
+        },
+        {
+          "id": "src/store/notificationSlice.ts",
+          "bytes": 8958
+        },
+        {
+          "id": "src/store/selectors.ts",
+          "bytes": 286
+        },
+        {
+          "id": "src/realtime/realtimeEvents.ts",
+          "bytes": 634
+        },
+        {
+          "id": "node_modules/goober/dist/goober.modern.js",
+          "bytes": 3092
+        },
+        {
+          "id": "node_modules/react-hot-toast/dist/index.mjs",
+          "bytes": 12611
+        },
+        {
+          "id": "src/utils/toKebabCase.mjs",
+          "bytes": 183
+        },
+        {
+          "id": "src/utils/toLucideIconData.mjs",
+          "bytes": 375
+        },
+        {
+          "id": "src/utils/toCamelCase.mjs",
+          "bytes": 423
+        },
+        {
+          "id": "src/utils/toPascalCase.mjs",
+          "bytes": 232
+        },
+        {
+          "id": "src/utils/mergeClasses.mjs",
+          "bytes": 287
+        },
+        {
+          "id": "src/build/defaultAttributes.mjs",
+          "bytes": 328
+        },
+        {
+          "id": "src/build/buildLucideIconNode.mjs",
+          "bytes": 2617
+        },
+        {
+          "id": "src/build/buildLucideIconForReact.mjs",
+          "bytes": 436
+        },
+        {
+          "id": "src/utils/hasA11yProp.mjs",
+          "bytes": 249
+        },
+        {
+          "id": "node_modules/lucide-react/dist/esm/context.mjs",
+          "bytes": 201
+        },
+        {
+          "id": "node_modules/lucide-react/dist/esm/Icon.mjs",
+          "bytes": 1363
+        },
+        {
+          "id": "node_modules/lucide-react/dist/esm/createLucideIcon.mjs",
+          "bytes": 548
+        },
+        {
+          "id": "node_modules/lucide-react/dist/esm/icons/activity.mjs",
+          "bytes": 371
+        },
+        {
+          "id": "node_modules/lucide-react/dist/esm/icons/armchair.mjs",
+          "bytes": 560
+        },
+        {
+          "id": "node_modules/lucide-react/dist/esm/icons/bath.mjs",
+          "bytes": 536
+        },
+        {
+          "id": "node_modules/lucide-react/dist/esm/icons/bed-double.mjs",
+          "bytes": 496
+        },
+        {
+          "id": "node_modules/lucide-react/dist/esm/icons/box.mjs",
+          "bytes": 479
+        },
+        {
+          "id": "node_modules/lucide-react/dist/esm/icons/camera.mjs",
+          "bytes": 489
+        },
+        {
+          "id": "node_modules/lucide-react/dist/esm/icons/check.mjs",
+          "bytes": 255
+        },
+        {
+          "id": "node_modules/lucide-react/dist/esm/icons/chevron-down.mjs",
+          "bytes": 272
+        },
+        {
+          "id": "node_modules/lucide-react/dist/esm/icons/circle-alert.mjs",
+          "bytes": 504
+        },
+        {
+          "id": "node_modules/lucide-react/dist/esm/icons/cloud.mjs",
+          "bytes": 291
+        },
+        {
+          "id": "node_modules/lucide-react/dist/esm/icons/cooking-pot.mjs",
+          "bytes": 537
+        },
+        {
+          "id": "node_modules/lucide-react/dist/esm/icons/cpu.mjs",
+          "bytes": 1038
+        },
+        {
+          "id": "node_modules/lucide-react/dist/esm/icons/door-closed.mjs",
+          "bytes": 413
+        },
+        {
+          "id": "node_modules/lucide-react/dist/esm/icons/droplets.mjs",
+          "bytes": 522
+        },
+        {
+          "id": "node_modules/lucide-react/dist/esm/icons/expand.mjs",
+          "bytes": 647
+        },
+        {
+          "id": "node_modules/lucide-react/dist/esm/icons/eye.mjs",
+          "bytes": 403
+        },
+        {
+          "id": "node_modules/lucide-react/dist/esm/icons/fan.mjs",
+          "bytes": 466
+        },
+        {
+          "id": "node_modules/lucide-react/dist/esm/icons/flame.mjs",
+          "bytes": 330
+        },
+        {
+          "id": "node_modules/lucide-react/dist/esm/icons/grid-3x3.mjs",
+          "bytes": 561
+        },
+        {
+          "id": "node_modules/lucide-react/dist/esm/icons/grip-vertical.mjs",
+          "bytes": 670
+        },
+        {
+          "id": "node_modules/lucide-react/dist/esm/icons/house.mjs",
+          "bytes": 444
+        },
+        {
+          "id": "node_modules/lucide-react/dist/esm/icons/image-plus.mjs",
+          "bytes": 589
+        },
+        {
+          "id": "node_modules/lucide-react/dist/esm/icons/info.mjs",
+          "bytes": 385
+        },
+        {
+          "id": "node_modules/lucide-react/dist/esm/icons/layers.mjs",
+          "bytes": 620
+        },
+        {
+          "id": "node_modules/lucide-react/dist/esm/icons/layout-dashboard.mjs",
+          "bytes": 642
+        },
+        {
+          "id": "node_modules/lucide-react/dist/esm/icons/lightbulb.mjs",
+          "bytes": 467
+        },
+        {
+          "id": "node_modules/lucide-react/dist/esm/icons/magnet.mjs",
+          "bytes": 576
+        },
+        {
+          "id": "node_modules/lucide-react/dist/esm/icons/monitor.mjs",
+          "bytes": 486
+        },
+        {
+          "id": "node_modules/lucide-react/dist/esm/icons/mouse-pointer-2.mjs",
+          "bytes": 400
+        },
+        {
+          "id": "node_modules/lucide-react/dist/esm/icons/move.mjs",
+          "bytes": 542
+        },
+        {
+          "id": "node_modules/lucide-react/dist/esm/icons/pencil-ruler.mjs",
+          "bytes": 795
+        },
+        {
+          "id": "node_modules/lucide-react/dist/esm/icons/pencil.mjs",
+          "bytes": 421
+        },
+        {
+          "id": "node_modules/lucide-react/dist/esm/icons/plug-zap.mjs",
+          "bytes": 591
+        },
+        {
+          "id": "node_modules/lucide-react/dist/esm/icons/radio.mjs",
+          "bytes": 591
+        },
+        {
+          "id": "node_modules/lucide-react/dist/esm/icons/rotate-ccw.mjs",
+          "bytes": 352
+        },
+        {
+          "id": "node_modules/lucide-react/dist/esm/icons/rotate-cw.mjs",
+          "bytes": 351
+        },
+        {
+          "id": "node_modules/lucide-react/dist/esm/icons/ruler.mjs",
+          "bytes": 605
+        },
+        {
+          "id": "node_modules/lucide-react/dist/esm/icons/save.mjs",
+          "bytes": 498
+        },
+        {
+          "id": "node_modules/lucide-react/dist/esm/icons/search.mjs",
+          "bytes": 324
+        },
+        {
+          "id": "node_modules/lucide-react/dist/esm/icons/snowflake.mjs",
+          "bytes": 959
+        },
+        {
+          "id": "node_modules/lucide-react/dist/esm/icons/sun.mjs",
+          "bytes": 750
+        },
+        {
+          "id": "node_modules/lucide-react/dist/esm/icons/thermometer.mjs",
+          "bytes": 297
+        },
+        {
+          "id": "node_modules/lucide-react/dist/esm/icons/trash.mjs",
+          "bytes": 553
+        },
+        {
+          "id": "node_modules/lucide-react/dist/esm/icons/triangle-alert.mjs",
+          "bytes": 482
+        },
+        {
+          "id": "node_modules/lucide-react/dist/esm/icons/triangles-centerline-dashed-horizontal.mjs",
+          "bytes": 794
+        },
+        {
+          "id": "node_modules/lucide-react/dist/esm/icons/triangles-centerline-dashed-vertical.mjs",
+          "bytes": 787
+        },
+        {
+          "id": "node_modules/lucide-react/dist/esm/icons/wind.mjs",
+          "bytes": 414
+        },
+        {
+          "id": "node_modules/lucide-react/dist/esm/icons/x.mjs",
+          "bytes": 280
+        },
+        {
+          "id": "node_modules/react/cjs/react-jsx-runtime.production.js",
+          "bytes": 871
+        },
+        {
+          "id": "node_modules/react/jsx-runtime.js",
+          "bytes": 200
+        },
+        {
+          "id": "src/components/ui/AppToast.tsx",
+          "bytes": 2737
+        },
+        {
+          "id": "src/components/ui/notify.tsx",
+          "bytes": 711
+        },
+        {
+          "id": "src/realtime/NotificationLifecycle.tsx",
+          "bytes": 1261
+        },
+        {
+          "id": "src/store/realtimeSlice.ts",
+          "bytes": 946
+        },
+        {
+          "id": "node_modules/@stomp/stompjs/bundles/stomp.umd.js",
+          "bytes": 35520
+        },
+        {
+          "id": "src/realtime/realtimeTypes.ts",
+          "bytes": 1412
+        },
+        {
+          "id": "src/realtime/realtimeClient.ts",
+          "bytes": 6103
+        },
+        {
+          "id": "src/realtime/RealtimeLifecycle.tsx",
+          "bytes": 1154
+        },
+        {
+          "id": "src/services/authApi.ts",
+          "bytes": 651
+        },
+        {
+          "id": "src/components/auth/GoogleAccountModal.tsx",
+          "bytes": 2716
+        },
+        {
+          "id": "src/components/ui/AppSidebar.tsx",
+          "bytes": 5620
+        },
+        {
+          "id": "src/components/ui/AuthShell.tsx",
+          "bytes": 2554
+        },
+        {
+          "id": "src/components/auth/LoginForm.tsx",
+          "bytes": 12270
+        },
+        {
+          "id": "src/components/auth/RegisterForm.tsx",
+          "bytes": 12714
+        },
+        {
+          "id": "src/components/auth/ForgotPasswordForm.tsx",
+          "bytes": 6338
+        },
+        {
+          "id": "src/components/auth/ResetPasswordForm.tsx",
+          "bytes": 11379
+        },
+        {
+          "id": "src/services/userApi.ts",
+          "bytes": 465
+        },
+        {
+          "id": "src/components/ui/UserAvatar.tsx",
+          "bytes": 715
+        },
+        {
+          "id": "src/components/profile/ProfileModal.tsx",
+          "bytes": 19589
+        },
+        {
+          "id": "src/services/homeApi.ts",
+          "bytes": 1292
+        },
+        {
+          "id": "src/components/home/MemberManagement.tsx",
+          "bytes": 13898
+        },
+        {
+          "id": "src/services/deviceApi.ts",
+          "bytes": 1375
+        },
+        {
+          "id": "src/services/featureApi.ts",
+          "bytes": 565
+        },
+        {
+          "id": "src/services/sceneApi.ts",
+          "bytes": 1561
+        },
+        {
+          "id": "src/components/home/SceneManagement.tsx",
+          "bytes": 17590
+        },
+        {
+          "id": "src/store/homeSlice.ts",
+          "bytes": 405
+        },
+        {
+          "id": "src/store/notificationSelectors.ts",
+          "bytes": 119
+        },
+        {
+          "id": "src/components/notification/NotificationBell.tsx",
+          "bytes": 12083
+        },
+        {
+          "id": "src/components/home/HomePage.tsx",
+          "bytes": 26115
+        },
+        {
+          "id": "src/components/admin/AdminDashboard.tsx",
+          "bytes": 15512
+        },
+        {
+          "id": "src/components/home/JoinHome.tsx",
+          "bytes": 3827
+        },
+        {
+          "id": "src/components/home/UnauthenticatedJoin.tsx",
+          "bytes": 3300
+        },
+        {
+          "id": "src/components/device/DeviceCard.tsx",
+          "bytes": 4505
+        },
+        {
+          "id": "src/components/device/DeviceDetailModal.tsx",
+          "bytes": 19566
+        },
+        {
+          "id": "src/components/device/DevicePage.tsx",
+          "bytes": 10417
+        },
+        {
+          "id": "src/services/twinApi.ts",
+          "bytes": 348
+        },
+        {
+          "id": "src/realtime/twinEvents.ts",
+          "bytes": 1676
+        },
+        {
+          "id": "src/store/twinSlice.ts",
+          "bytes": 6138
+        },
+        {
+          "id": "src/services/twinLayoutApi.ts",
+          "bytes": 843
+        },
+        {
+          "id": "src/components/twin/twinDrafting.ts",
+          "bytes": 6856
+        },
+        {
+          "id": "src/components/twin/layoutGeometry.ts",
+          "bytes": 6191
+        },
+        {
+          "id": "src/store/twinLayoutSlice.ts",
+          "bytes": 6086
+        },
+        {
+          "id": "src/components/twin/twinPresentation.ts",
+          "bytes": 1899
+        },
+        {
+          "id": "src/components/twin/TwinVisualIcon.tsx",
+          "bytes": 2129
+        },
+        {
+          "id": "src/components/twin/roomKind.ts",
+          "bytes": 402
+        },
+        {
+          "id": "src/components/twin/TwinRoomFurnishing.tsx",
+          "bytes": 4600
+        },
+        {
+          "id": "src/types/deviceVocabulary.ts",
+          "bytes": 296
+        },
+        {
+          "id": "src/components/twin/layoutPalette.ts",
+          "bytes": 1879
+        },
+        {
+          "id": "src/components/twin/twin2dViewport.ts",
+          "bytes": 2006
+        },
+        {
+          "id": "src/components/twin/useTwinMotion.ts",
+          "bytes": 1072
+        },
+        {
+          "id": "src/components/twin/twin3dGeometry.ts",
+          "bytes": 3069
+        },
+        {
+          "id": "src/components/twin/TwinObjectPlan.tsx",
+          "bytes": 886
+        },
+        {
+          "id": "src/components/twin/TwinCanvas.tsx",
+          "bytes": 24302
+        },
+        {
+          "id": "src/components/twin/Twin2DFloorOverview.tsx",
+          "bytes": 3010
+        },
+        {
+          "id": "src/components/twin/TwinFloorSelect.tsx",
+          "bytes": 7316
+        },
+        {
+          "id": "src/components/twin/TwinLayoutButton.tsx",
+          "bytes": 889
+        },
+        {
+          "id": "src/store/twinSelectors.ts",
+          "bytes": 601
+        },
+        {
+          "id": "src/components/twin/TwinHealthBadge.tsx",
+          "bytes": 904
+        },
+        {
+          "id": "src/components/twin/TwinTime.tsx",
+          "bytes": 479
+        },
+        {
+          "id": "src/components/twin/TwinDeviceCard.tsx",
+          "bytes": 4311
+        },
+        {
+          "id": "src/components/twin/TwinSensorCard.tsx",
+          "bytes": 1425
+        },
+        {
+          "id": "src/components/twin/TwinObjectEditor.tsx",
+          "bytes": 6620
+        },
+        {
+          "id": "src/components/twin/TwinLayoutInspector.tsx",
+          "bytes": 10484
+        },
+        {
+          "id": "src/components/twin/TwinUnplacedPanel.tsx",
+          "bytes": 8112
+        },
+        {
+          "id": "src/components/twin/TwinViewSwitcher.tsx",
+          "bytes": 1269
+        },
+        {
+          "id": "src/components/twin/TwinContent.tsx",
+          "bytes": 3721
+        },
+        {
+          "id": "src/components/twin/TwinOverview.tsx",
+          "bytes": 2289
+        },
+        {
+          "id": "src/components/twin/TwinDraftingToolbar.tsx",
+          "bytes": 17735
+        },
+        {
+          "id": "src/components/twin/TwinLayoutEditor.tsx",
+          "bytes": 20970
+        },
+        {
+          "id": "src/components/twin/useLayoutNavigationGuard.ts",
+          "bytes": 1082
+        },
+        {
+          "id": "src/components/twin/DigitalTwinPage.tsx",
+          "bytes": 6336
+        },
+        {
+          "id": "src/routes/navigation.ts",
+          "bytes": 1765
+        },
+        {
+          "id": "src/routes/RouteGuards.tsx",
+          "bytes": 912
+        },
+        {
+          "id": "src/routes/useRouteSession.ts",
+          "bytes": 1733
+        },
+        {
+          "id": "src/components/deviceActionOptions.ts",
+          "bytes": 1810
+        },
+        {
+          "id": "src/components/scene/sceneActions.ts",
+          "bytes": 2436
+        },
+        {
+          "id": "src/services/scheduleApi.ts",
+          "bytes": 615
+        },
+        {
+          "id": "src/components/ui/SchedulePanel.tsx",
+          "bytes": 6935
+        },
+        {
+          "id": "src/components/scene/ScenePage.tsx",
+          "bytes": 24776
+        },
+        {
+          "id": "src/services/automationApi.ts",
+          "bytes": 1054
+        },
+        {
+          "id": "src/components/automation/automationActions.ts",
+          "bytes": 1740
+        },
+        {
+          "id": "src/components/automation/AutomationRulePage.tsx",
+          "bytes": 27988
+        },
+        {
+          "id": "src/services/recommendationApi.ts",
+          "bytes": 512
+        },
+        {
+          "id": "src/components/automation/RecommendationsPage.tsx",
+          "bytes": 7592
+        },
+        {
+          "id": "src/routes/AppRoutes.tsx",
+          "bytes": 5373
+        },
+        {
+          "id": "src/App.tsx",
+          "bytes": 713
+        },
+        {
+          "id": "src/services/deviceCommandService.ts",
+          "bytes": 722
+        },
+        {
+          "id": "src/store/twinCommandSlice.ts",
+          "bytes": 1724
+        },
+        {
+          "id": "src/store/store.ts",
+          "bytes": 439
+        },
+        {
+          "id": "src/main.tsx",
+          "bytes": 331
+        },
+        {
+          "id": "D:/FPTU/Capstone/Resources/hesta_frontend/index.html",
+          "bytes": 0
+        }
+      ],
+      "bytes": 698034,
+      "gzip": 201630
+    },
+    {
+      "file": "assets/Twin3DView-D33tSs8S.js",
+      "entry": false,
+      "imports": [
+        "assets/index-C2hv9s43.js"
+      ],
+      "dynamicImports": [],
+      "modules": [
+        {
+          "id": "node_modules/lucide-react/dist/esm/icons/crosshair.mjs",
+          "bytes": 635
+        },
+        {
+          "id": "node_modules/lucide-react/dist/esm/icons/list-tree.mjs",
+          "bytes": 507
+        },
+        {
+          "id": "node_modules/lucide-react/dist/esm/icons/minus.mjs",
+          "bytes": 245
+        },
+        {
+          "id": "node_modules/lucide-react/dist/esm/icons/plus.mjs",
+          "bytes": 285
+        },
+        {
+          "id": "node_modules/react-reconciler/cjs/react-reconciler-constants.production.js",
+          "bytes": 340
+        },
+        {
+          "id": "node_modules/react-reconciler/constants.js",
+          "bytes": 216
+        },
+        {
+          "id": "node_modules/three/build/three.core.js",
+          "bytes": 654184
+        },
+        {
+          "id": "node_modules/three/build/three.module.js",
+          "bytes": 559750
+        },
+        {
+          "id": "node_modules/use-sync-external-store/cjs/use-sync-external-store-shim.production.js",
+          "bytes": 1824
+        },
+        {
+          "id": "node_modules/use-sync-external-store/shim/index.js",
+          "bytes": 221
+        },
+        {
+          "id": "node_modules/use-sync-external-store/cjs/use-sync-external-store-shim/with-selector.production.js",
+          "bytes": 2351
+        },
+        {
+          "id": "node_modules/use-sync-external-store/shim/with-selector.js",
+          "bytes": 223
+        },
+        {
+          "id": "node_modules/zustand/esm/vanilla.mjs",
+          "bytes": 1093
+        },
+        {
+          "id": "node_modules/zustand/esm/traditional.mjs",
+          "bytes": 910
+        },
+        {
+          "id": "node_modules/suspend-react/index.js",
+          "bytes": 1942
+        },
+        {
+          "id": "node_modules/scheduler/cjs/scheduler.production.js",
+          "bytes": 9305
+        },
+        {
+          "id": "node_modules/scheduler/index.js",
+          "bytes": 222
+        },
+        {
+          "id": "node_modules/react-reconciler/cjs/react-reconciler.production.js",
+          "bytes": 314541
+        },
+        {
+          "id": "node_modules/react-reconciler/index.js",
+          "bytes": 209
+        },
+        {
+          "id": "node_modules/scheduler/cjs/scheduler.production.js",
+          "bytes": 9305
+        },
+        {
+          "id": "node_modules/scheduler/index.js",
+          "bytes": 220
+        },
+        {
+          "id": "node_modules/its-fine/dist/index.js",
+          "bytes": 2428
+        },
+        {
+          "id": "node_modules/@react-three/fiber/dist/events-f8cd670d.esm.js",
+          "bytes": 53838
+        },
+        {
+          "id": "node_modules/react-use-measure/dist/index.js",
+          "bytes": 4030
+        },
+        {
+          "id": "node_modules/@react-three/fiber/dist/react-three-fiber.esm.js",
+          "bytes": 3391
+        },
+        {
+          "id": "node_modules/@babel/runtime/helpers/esm/extends.js",
+          "bytes": 364
+        },
+        {
+          "id": "node_modules/@react-three/drei/web/Html.js",
+          "bytes": 13354
+        },
+        {
+          "id": "node_modules/three-stdlib/_polyfill/constants.js",
+          "bytes": 149
+        },
+        {
+          "id": "node_modules/three-stdlib/_polyfill/uv1.js",
+          "bytes": 108
+        },
+        {
+          "id": "node_modules/three-stdlib/controls/EventDispatcher.js",
+          "bytes": 1587
+        },
+        {
+          "id": "node_modules/three-stdlib/controls/OrbitControls.js",
+          "bytes": 26687
+        },
+        {
+          "id": "node_modules/three-stdlib/lines/LineSegmentsGeometry.js",
+          "bytes": 4252
+        },
+        {
+          "id": "node_modules/three-stdlib/lines/LineGeometry.js",
+          "bytes": 1566
+        },
+        {
+          "id": "node_modules/three-stdlib/lines/LineMaterial.js",
+          "bytes": 12700
+        },
+        {
+          "id": "node_modules/three-stdlib/lines/LineSegments2.js",
+          "bytes": 7649
+        },
+        {
+          "id": "node_modules/three-stdlib/lines/Line2.js",
+          "bytes": 299
+        },
+        {
+          "id": "node_modules/@react-three/drei/core/Line.js",
+          "bytes": 2389
+        },
+        {
+          "id": "node_modules/@react-three/drei/core/Fbo.js",
+          "bytes": 1206
+        },
+        {
+          "id": "node_modules/@react-three/drei/core/PerspectiveCamera.js",
+          "bytes": 1894
+        },
+        {
+          "id": "node_modules/@react-three/drei/core/OrbitControls.js",
+          "bytes": 2231
+        },
+        {
+          "id": "src/components/twin/twin3dCamera.ts",
+          "bytes": 1135
+        },
+        {
+          "id": "src/components/twin/scene/cameraFraming.ts",
+          "bytes": 1262
+        },
+        {
+          "id": "src/components/twin/scene/FitCamera.tsx",
+          "bytes": 3378
+        },
+        {
+          "id": "src/components/twin/neonplan/model.ts",
+          "bytes": 2388
+        },
+        {
+          "id": "src/components/twin/neonplan/geometry/walls.ts",
+          "bytes": 10689
+        },
+        {
+          "id": "src/services/twinArchitectureAdapter.ts",
+          "bytes": 7722
+        },
+        {
+          "id": "src/components/twin/neonplan/geometry/holes.ts",
+          "bytes": 1262
+        },
+        {
+          "id": "src/components/twin/neonplan/viewer/geo.ts",
+          "bytes": 6286
+        },
+        {
+          "id": "src/components/twin/neonplan/viewer/furniture.ts",
+          "bytes": 35060
+        },
+        {
+          "id": "src/components/twin/neonplan/viewer/build.ts",
+          "bytes": 14257
+        },
+        {
+          "id": "src/components/twin/neonplan/viewer/openings.ts",
+          "bytes": 12667
+        },
+        {
+          "id": "src/components/twin/neonplan/viewer/fold.ts",
+          "bytes": 1757
+        },
+        {
+          "id": "src/components/twin/scene/architectureMaterials.ts",
+          "bytes": 2255
+        },
+        {
+          "id": "src/services/twinAdapter.ts",
+          "bytes": 3061
+        },
+        {
+          "id": "src/components/twin/neonplan/heatmap.ts",
+          "bytes": 1459
+        },
+        {
+          "id": "src/components/twin/scene/RoomScene.tsx",
+          "bytes": 4976
+        },
+        {
+          "id": "src/components/twin/neonplan/viewer/lamps.ts",
+          "bytes": 4698
+        },
+        {
+          "id": "src/components/twin/devices/deviceVisualState.ts",
+          "bytes": 973
+        },
+        {
+          "id": "src/components/twin/scene/TwinCutawayContext.ts",
+          "bytes": 135
+        },
+        {
+          "id": "src/components/twin/devices/ArchitecturalOpeningModel.tsx",
+          "bytes": 4456
+        },
+        {
+          "id": "src/components/twin/devices/models.tsx",
+          "bytes": 7884
+        },
+        {
+          "id": "src/components/twin/devices/deviceModelResolver.ts",
+          "bytes": 432
+        },
+        {
+          "id": "src/components/twin/Twin3DDeviceVisual.tsx",
+          "bytes": 325
+        },
+        {
+          "id": "src/components/twin/scene/devicePlacement.ts",
+          "bytes": 1407
+        },
+        {
+          "id": "src/components/twin/scene/SceneNodes.tsx",
+          "bytes": 6527
+        },
+        {
+          "id": "src/components/twin/neonplan/viewer/pattern.ts",
+          "bytes": 3003
+        },
+        {
+          "id": "src/components/twin/scene/FloorScene.tsx",
+          "bytes": 9211
+        },
+        {
+          "id": "src/components/twin/scene/HouseScene.tsx",
+          "bytes": 4321
+        },
+        {
+          "id": "src/components/twin/hooks/useTwinScene.ts",
+          "bytes": 501
+        },
+        {
+          "id": "src/components/twin/Twin3DCanvas.tsx",
+          "bytes": 1026
+        },
+        {
+          "id": "src/components/twin/DeviceControlPanel.tsx",
+          "bytes": 6827
+        },
+        {
+          "id": "src/components/twin/Twin3DInspector.tsx",
+          "bytes": 12397
+        },
+        {
+          "id": "src/components/twin/twin3dPalette.ts",
+          "bytes": 2094
+        },
+        {
+          "id": "src/components/twin/twin3dSupport.ts",
+          "bytes": 388
+        },
+        {
+          "id": "src/components/twin/Twin3DCameraControls.tsx",
+          "bytes": 3066
+        },
+        {
+          "id": "src/components/twin/TwinHeatmapToolbar.tsx",
+          "bytes": 1746
+        },
+        {
+          "id": "src/components/twin/TwinSidebar.tsx",
+          "bytes": 3026
+        },
+        {
+          "id": "src/components/twin/TwinFloorNavigation.tsx",
+          "bytes": 2510
+        },
+        {
+          "id": "src/components/twin/Twin3DView.tsx",
+          "bytes": 15072
+        }
+      ],
+      "bytes": 1046182,
+      "gzip": 283169
+    }
+  ]
+}

@@ -111,8 +111,30 @@ try {
   await click('Lưu bố cục');
   await waitFor(`document.body.textContent.includes('Chế độ xem')`);
   check('saved 2D L-shape metadata is available to the shared 3D generator', await evaluate(`Object.keys(localStorage).some(key => localStorage.getItem(key)?.includes('L_SHAPE'))`));
+  await click('Chỉnh sửa sơ đồ');
+  await evaluate(`document.querySelector('[data-room-id] > button').click()`);
+  await click('Thêm bàn');
+  await evaluate(`(() => { const input = [...document.querySelectorAll('fieldset label')].find(label => label.textContent === 'Ngang (m)').querySelector('input'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, '1.13'); input.dispatchEvent(new Event('input', {bubbles:true})); })()`);
+  check('furniture position snaps to the half-metre grid', await evaluate(`[...document.querySelectorAll('fieldset label')].find(label => label.textContent === 'Ngang (m)').querySelector('input').value === '1'`));
+  await click('Inspect geometry / requests');
+  check('furniture-only edits keep backend geometry clean and enable navigation protection', await evaluate(`(() => { const layout = JSON.parse(document.querySelector('details pre').textContent).layout; return layout.metadataDirty && !layout.dirty; })()`));
+  const dialogStart = events.length;
+  const navigateWithDraft = click('Home B');
+  for (let attempt = 0; attempt < 80 && !events.slice(dialogStart).some(event => event.method === 'Page.javascriptDialogOpening'); attempt++) await delay(50);
+  check('leaving the editor warns for unsaved furniture metadata', events.slice(dialogStart).some(event => event.method === 'Page.javascriptDialogOpening'));
+  await send('Page.handleJavaScriptDialog', {accept:false});
+  await navigateWithDraft;
+  for (const kind of ['DOOR', 'WINDOW']) {
+    await evaluate(`(() => { const select = [...document.querySelectorAll('fieldset select')][0]; Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(select, '${kind}'); select.dispatchEvent(new Event('change', {bubbles:true})); })()`);
+    await click(kind === 'DOOR' ? 'Thêm cửa' : 'Thêm cửa sổ');
+  }
+  await evaluate(`document.querySelector('[data-node-key^="DEVICE:"]').click()`);
+  await evaluate(`(() => { const input = [...document.querySelectorAll('label')].find(label => label.textContent === 'Xoay thiết bị (°)').querySelector('input'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, '91'); input.dispatchEvent(new Event('input', {bubbles:true})); })()`);
+  await click('Lưu bố cục');
+  await waitFor(`document.body.textContent.includes('Chế độ xem')`);
+  check('furniture, architectural openings and snapped device rotation persist together', await evaluate(`Object.keys(localStorage).some(key => { try { const metadata = JSON.parse(localStorage.getItem(key)); return Object.values(metadata.rooms ?? {}).some(room => ['TABLE','DOOR','WINDOW'].every(kind => room.objects?.some(object => object.kind === kind && Number.isFinite(object.x)))) && Object.values(metadata.nodeRotations ?? {}).includes(90); } catch { return false; } })`));
   await click('Count requests');
-  const initialRequestCount = await evaluate(`document.querySelector('details output').textContent`);
+  const initialRequestCount = await evaluate(`document.querySelector('[data-twin-snapshot-requests]').textContent`);
   await click('Chế độ 3D');
   await waitFor(`document.querySelector('.twin-3d-stage canvas') !== null && !document.body.textContent.includes('Đang dựng không gian 3D')`);
   await waitFor(`document.querySelectorAll('.twin-3d-room-label').length === 4 && document.querySelectorAll('.twin-3d-stage button[aria-label*="ACTIVE"], .twin-3d-stage button[aria-label*="STALE"], .twin-3d-stage button[aria-label*="OFFLINE"]').length === 7`);
@@ -169,6 +191,12 @@ try {
   await evaluate(`[...document.querySelectorAll('.twin-3d-stage button')].find(e => e.getAttribute('aria-label')?.includes('Đèn chính')).click()`);
   await waitFor(`document.querySelector('[aria-label="Chi tiết thiết bị Đèn chính"]') !== null`);
   check('device marker selection shows current device state', await evaluate(`document.querySelector('[aria-label="Chi tiết thiết bị Đèn chính"]').textContent.includes('ONLINE')`));
+  await waitFor(`document.querySelector('[aria-label="Điều khiển thiết bị"]')?.textContent.includes('Độ sáng')`);
+  await evaluate(`[...document.querySelectorAll('[aria-label="Điều khiển thiết bị"] button')].find(e => e.textContent === 'Tắt').click()`);
+  await waitFor(`document.querySelector('[aria-label="Điều khiển thiết bị"]').textContent.includes('Đang chờ thiết bị xác nhận')`);
+  check('device control locks actions while waiting for MQTT ACK', await evaluate(`[...document.querySelectorAll('[aria-label="Điều khiển thiết bị"] button')].every(button => button.disabled)`));
+  await waitFor(`document.querySelector('[aria-label="Điều khiển thiết bị"]').textContent.includes('Thiết bị đã xác nhận lệnh')`);
+  check('successful ACK alone cannot optimistically turn the Twin device OFF', await evaluate(`document.querySelector('[aria-label="Điều khiển thiết bị"]').textContent.includes('Nguồn · ON')`));
   await click('Device → OFF');
   await waitFor(`[...document.querySelectorAll('.twin-3d-stage button')].some(e => e.getAttribute('aria-label')?.includes('Đèn chính') && e.getAttribute('aria-label')?.includes('OFF · ONLINE'))`);
   check('device realtime updates the selected 3D marker', await evaluate(`document.querySelector('[aria-label="Chi tiết thiết bị Đèn chính"]').textContent.includes('OFF')`));
@@ -185,8 +213,13 @@ try {
   await click('OFFLINE'); await waitFor(`document.querySelector('[aria-label="Chi tiết cảm biến TEMPERATURE"]').textContent.includes('OFFLINE')`); await screenshot('health-offline');
   await click('ACTIVE'); await waitFor(`document.querySelector('[aria-label="Chi tiết cảm biến TEMPERATURE"]').textContent.includes('ACTIVE')`); await screenshot('selected-sensor-active');
   check('health transitions update the selected 3D sensor', await evaluate(`document.querySelector('[aria-label="Chi tiết cảm biến TEMPERATURE"]').textContent.includes('30')`));
+  await click('Nhiệt độ');
+  await waitFor(`[...document.querySelectorAll('.twin-3d-room-label')].some(label => label.textContent.includes('30 °C'))`);
+  check('temperature heatmap reads live room sensor data', await evaluate(`document.querySelector('[aria-label="Heatmap"] button[aria-pressed="true"]').textContent === 'Nhiệt độ'`));
+  await click('Bình thường');
+  check('heatmap can be disabled without changing scene geometry', beforeRealtime === await markerPosition('TEMPERATURE'));
   await click('Count requests');
-  check('mode switches and realtime updates never reload the Twin snapshot', initialRequestCount === await evaluate(`document.querySelector('details output').textContent`));
+  check('mode switches, capability fetches, commands and realtime never reload the Twin snapshot', initialRequestCount === await evaluate(`document.querySelector('[data-twin-snapshot-requests]').textContent`));
   await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
   await click('Sensor → 31');
   await waitFor(`document.querySelector('[aria-label="Chi tiết cảm biến TEMPERATURE"]').textContent.includes('31')`);
@@ -222,6 +255,7 @@ try {
 
   await click('Home B'); await waitFor(`document.body.textContent.includes('Không gian sống · Nhà B')`); await click('Chế độ 3D');
   await waitFor(`document.body.textContent.includes('Chưa có phòng')`);
+  await waitFor(`!document.querySelector('.twin-3d-stage canvas') && document.querySelector('button[aria-label="Chế độ 3D"]').getAttribute('aria-pressed') === 'true'`);
   check('home switching resets mode and selection and clears old rooms', await evaluate(`!document.querySelector('.twin-3d-stage canvas') && document.body.textContent.includes('Chưa có phòng') && document.querySelector('button[aria-label="Chế độ 3D"]').getAttribute('aria-pressed') === 'true'`));
   await screenshot('empty-layout');
 

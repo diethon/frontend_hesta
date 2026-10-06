@@ -1,7 +1,6 @@
 import { Box, MousePointer2 } from 'lucide-react';
 import { useAppSelector } from '../../store/hooks';
 import type { TwinLayoutGeometry, TwinLayoutSelection } from '../../types/twinLayout';
-import { TwinDeviceCard } from './TwinDeviceCard';
 import { TwinHealthBadge } from './TwinHealthBadge';
 import { TwinLayoutButton } from './TwinLayoutButton';
 import { TwinSensorCard } from './TwinSensorCard';
@@ -9,6 +8,8 @@ import { DeviceGlyph, RoomGlyph, SensorGlyph } from './TwinVisualIcon';
 import { nodeKey } from './layoutGeometry';
 import { roomFloorLevel } from './twin3dGeometry';
 import { TwinContent } from './TwinContent';
+import { DeviceControlPanel } from './DeviceControlPanel';
+import { summarizeState } from './twinPresentation';
 
 export function Twin3DInspector({ geometry, selection, onSelect, onEdit2D, canEdit = false, onFocusRoom, onFitHome }: {
   geometry: TwinLayoutGeometry;
@@ -30,12 +31,10 @@ export function Twin3DInspector({ geometry, selection, onSelect, onEdit2D, canEd
     const id = device?.roomId ?? sensor?.roomId;
     return id ? state.twin.roomsById[id] : undefined;
   });
-  const roomsById = useAppSelector((state) => !selection ? state.twin.roomsById : undefined);
 
   if (!selection) return <section aria-label="Chi tiết 3D" className="surface-card p-5">
     <div className="flex items-center gap-3"><span className="flex h-11 w-11 items-center justify-center rounded-xl bg-info-soft text-primary-hover"><MousePointer2 size={21} aria-hidden="true" /></span><div><h3 className="font-semibold text-text">Khám phá ngôi nhà</h3><p className="text-xs text-muted">Chọn phòng hoặc marker để xem dữ liệu trực tiếp.</p></div></div>
     <p className="mt-4 text-sm leading-6 text-muted">Kéo để xoay, cuộn để thu phóng. Mô hình này được tạo từ sơ đồ 2D đã lưu, không phải bản đo kiến trúc thực tế.</p>
-    <div className="mt-4 space-y-2" aria-label="Chọn phòng bằng bàn phím">{Object.values(roomsById ?? {}).map((item) => <button type="button" key={item.roomId} onClick={() => onSelect({ kind: 'room', id: item.roomId })} className="min-h-11 w-full break-words rounded-xl border border-line bg-app p-3 text-left text-sm font-semibold hover:bg-sidebar-hover">{item.name}</button>)}</div>
     <details className="mt-4 min-w-0"><summary className="cursor-pointer text-sm font-semibold text-primary-hover">Đọc tất cả dữ liệu trực tiếp</summary><div className="mt-3"><TwinContent /></div></details>
     <TwinLayoutButton leadingIcon={<Box size={18} />} onClick={onEdit2D}>{canEdit ? 'Chỉnh sửa trong 2D' : 'Xem sơ đồ 2D'}</TwinLayoutButton>
   </section>;
@@ -54,8 +53,10 @@ export function Twin3DInspector({ geometry, selection, onSelect, onEdit2D, canEd
   }
 
   if (device) return <section aria-label={`Chi tiết thiết bị ${device.name}`} className="surface-card space-y-4 p-4">
-    <p className="px-1 text-xs font-semibold uppercase tracking-wider text-muted">Marker thiết bị đang chọn</p>
-    <TwinDeviceCard deviceId={device.deviceId} />
+    <div className="flex items-center gap-3"><DeviceGlyph deviceType={device.deviceType} /><div className="min-w-0"><h3 className="text-lg font-semibold text-text">{device.name}</h3><p className="mt-1 text-xs text-muted">{device.status} · {businessRoom?.name ?? 'Chưa gán phòng'}</p></div><TwinHealthBadge compact healthStatus={device.healthStatus} /></div>
+    <DeviceControlPanel key={device.deviceId} deviceId={device.deviceId} />
+    <p className="break-words text-xs text-muted">{summarizeState(device.currentState)}</p>
+    <p className="text-xs text-muted">Cập nhật · {device.lastSeen ? new Date(device.lastSeen).toLocaleString('vi-VN') : 'Chưa có dữ liệu'}</p>
     <p className="break-words text-sm text-muted">Phòng · {businessRoom?.name ?? 'Chưa gán phòng'}</p>
     {nodeLayout?.roomId ? <TwinLayoutButton onClick={() => onSelect({ kind: 'room', id: nodeLayout.roomId! })}>Xem phòng chứa marker</TwinLayoutButton> : null}
     {!nodeLayout ? <p className="text-xs text-muted">Chưa đặt vào layout</p> : null}

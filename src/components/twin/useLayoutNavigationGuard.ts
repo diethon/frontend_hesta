@@ -4,7 +4,7 @@ import { useAppSelector } from '../../store/hooks';
 import { notify } from '../ui/notify';
 
 export function useLayoutNavigationGuard() {
-  const dirty = useAppSelector((state) => state.twinLayout.dirty);
+  const dirty = useAppSelector((state) => state.twinLayout.dirty || state.twinLayout.metadataDirty);
   const saving = useAppSelector((state) => state.twinLayout.saving);
   const blocker = useBlocker(({ currentLocation, nextLocation }) => (dirty || saving) && currentLocation.pathname !== nextLocation.pathname);
   useEffect(() => {

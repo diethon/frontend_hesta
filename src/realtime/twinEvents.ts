@@ -1,6 +1,5 @@
 import type { RealtimeEvent } from './realtimeTypes';
 import type { TwinDeviceSnapshotResponse, TwinHealthStatusChangedPayload, TwinSensorSnapshotResponse } from '../types/twin';
-import { TWIN_DEVICE_TYPES } from '../types/twin';
 
 export type TwinEvent =
   | (RealtimeEvent<TwinDeviceSnapshotResponse> & { type: 'DEVICE_STATE_CHANGED' })
@@ -20,7 +19,7 @@ export function isTwinEvent(event: RealtimeEvent): event is TwinEvent {
   switch (event.type) {
     case 'DEVICE_STATE_CHANGED':
       return typeof data.name === 'string' && typeof data.deviceType === 'string'
-        && TWIN_DEVICE_TYPES.some((type) => type === data.deviceType)
+        && data.deviceType.trim().length > 0
         && ['ONLINE', 'OFFLINE', 'ERROR', 'UNKNOWN'].includes(String(data.status))
         && nullableString(data.icon) && data.currentState !== undefined && nullableTime(data.lastSeen);
     case 'SENSOR_READING_UPDATED':

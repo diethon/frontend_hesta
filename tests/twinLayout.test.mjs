@@ -129,7 +129,9 @@ test('camera toolbar exposes keyboard buttons and only the selected preset is pr
   assert.match(markup, /aria-label="Góc nhìn Từ trên" aria-pressed="true"/);
   assert.match(markup, /aria-label="Xoay trái 90°"/);
   assert.match(markup, /aria-label="Xoay phải 90°"/);
-  assert.equal((markup.match(/type="button"/g) ?? []).length, 8);
+  assert.equal((markup.match(/type="button"/g) ?? []).length, 10);
+  assert.match(markup, /aria-label="Phóng to mô hình 3D"/);
+  assert.match(markup, /aria-label="Thu nhỏ mô hình 3D"/);
   const custom = renderToString(React.createElement(Twin3DCameraControls, { activeView: null, onChange: () => {} }));
   assert.equal((custom.match(/aria-pressed="true"/g) ?? []).length, 0);
 });
@@ -183,7 +185,7 @@ const adapter = async (config) => {
   if (config.url.endsWith('/twin')) return response(config, snapshot);
   if (config.method === 'put') {
     const body = JSON.parse(config.data);
-    backendLayout = { homeId, revision: backendLayout.revision + 1, rooms: body.rooms, nodes: body.nodes };
+    backendLayout = { homeId, revision: backendLayout.revision + 1, rooms: body.rooms, nodes: body.nodes, ...(body.architecture ? { architecture: body.architecture } : {}) };
   }
   return response(config, backendLayout);
 };
@@ -219,7 +221,7 @@ test('empty layout is valid; owner can edit and first save sends revision zero',
   backendLayout = empty;
   const store = await ready();
   assert.equal(store.getState().twinLayout.confirmed.revision, 0);
-  assert.match(render(store), /Chưa có sơ đồ/);
+  assert.match(render(store), /data-geometry-source="INFERRED"/);
   assert.match(render(store), /Chỉnh sửa sơ đồ/);
   edit(store); assert.equal(store.getState().twinLayout.dirty, false);
   change(store, { rooms: [geo.defaultRoom(roomId, 0)], nodes: [] });
@@ -479,6 +481,114 @@ test('move/resize modify draft only, normalized bounds/precision hold, cancel re
   store.dispatch(layout.layoutEditingCancelled());
   assert.equal(draft(store), null); assert.equal(store.getState().twinLayout.dirty, false);
   assert.match(render(store), /left:5%;top:5%;width:45%;height:40%/);
+});
+
+test('architecture-only edits are guarded and saved through the existing backend layout revision', async () => {
+  const store = await ready(); edit(store);
+  store.dispatch(layout.layoutMetadataDirtyChanged(true));
+  assert.equal(store.getState().twinLayout.metadataDirty, true);
+  assert.equal(store.getState().twinLayout.dirty, false);
+  const architecture = { version: 1, rooms: {} };
+  store.dispatch(layout.layoutArchitectureChanged(architecture));
+  await store.dispatch(layout.saveTwinLayout(homeId));
+  assert.equal(puts().length, 1);
+  assert.deepEqual(JSON.parse(puts()[0].data).architecture, architecture);
+  store.dispatch(layout.layoutEditingCancelled());
+  assert.equal(store.getState().twinLayout.metadataDirty, false);
+  store.dispatch(layout.layoutMetadataDirtyChanged(true));
+  assert.equal(store.getState().twinLayout.metadataDirty, false);
+});
+
+test('generated geometry uses existing room identities and explicitly reports its source', () => {
+  const { inferTwinGeometry, twinGeometrySource } = loadSource('src/services/twinGeometrySource.ts');
+  const ids = ['living', 'bedroom'];
+  const nodes = [{ nodeType: 'DEVICE', nodeId: 'lamp', roomId: 'living' }];
+  const inferred = inferTwinGeometry(ids, nodes);
+  assert.deepEqual(inferred, inferTwinGeometry(ids, nodes));
+  assert.deepEqual(inferred.rooms.map(r => r.roomId), ids);
+  assert.equal(twinGeometrySource(null, 0), 'DEFAULT');
+  assert.equal(twinGeometrySource({ ...inferred, revision: 2 }, 2), 'INFERRED');
+  assert.equal(twinGeometrySource({ ...inferred, revision: 2, architecture: { version: 1, rooms: { living: { autoFurniture: false }, bedroom: { autoFurniture: false } } } }, 2), 'PERSISTED');
+});
+
+test('explicit Save freezes inferred architecture and excludes browser and runtime fields', () => {
+  const { materializeTwinArchitecture } = loadSource('src/services/twinLayoutMaterialize.ts');
+  const { createTwinDraftingMetadata, draftingFromArchitecture } = loadSource('src/components/twin/twinDrafting.ts');
+  const geometry = { rooms: [geo.defaultRoom('living', 0)], nodes: [] };
+  const metadata = { ...createTwinDraftingMetadata(), blueprints: { 1: { dataUrl: 'data:image/png;base64,draft' } } };
+  const architecture = materializeTwinArchitecture('house', geometry, metadata, { living: 'Living Room' });
+  assert.equal(architecture.rooms.living.autoFurniture, false);
+  assert.ok(architecture.rooms.living.objects.some(o => o.kind === 'SOFA'));
+  assert.ok(architecture.rooms.living.objects.some(o => o.kind === 'DOOR' || o.kind === 'WINDOW'));
+  assert.deepEqual(materializeTwinArchitecture('house', geometry, draftingFromArchitecture(architecture), { living: 'Living Room' }), architecture);
+  assert.ok(!JSON.stringify(architecture).includes('data:image'));
+  assert.ok(!('settings' in architecture) && !('blueprints' in architecture) && !('state' in architecture));
+});
+
+test('MIT wall port shares partial edges, handles T junctions and preserves real room IDs', () => {
+  const { generateWalls } = loadSource('src/components/twin/neonplan/geometry/walls.ts');
+  const room = (id, points) => ({ id, name: id, floor_material: 'wood', points });
+  const rooms = [room('living', [[0, 0], [4, 0], [4, 4], [0, 4]]), room('bedroom', [[4, 0], [7, 0], [7, 2], [4, 2]]), room('bath', [[4, 2], [7, 2], [7, 4], [4, 4]])];
+  const result = generateWalls(rooms, { exterior: .2, interior: .12 });
+  assert.deepEqual(result.warnings, []);
+  const shared = result.walls.filter((wall) => !wall.exterior);
+  assert.equal(shared.length, 3);
+  assert.ok(shared.every((wall) => wall.left === .06 && wall.right === .06));
+  assert.ok(result.walls.every((wall) => wall.footprint.length >= 3 && wall.sources.every((source) => rooms.some((room) => room.id === source.room_id))));
+});
+
+test('ported wall mesh has actual opening voids and polygon slabs, rather than a rectangle behind icons', () => {
+  const THREE = require('three');
+  const { buildFloorGeometry } = loadSource('src/components/twin/neonplan/viewer/build.ts');
+  const floor = { id: 'floor', name: 'Floor', elevation: 0, height: 2.5, cut_height: .85, rooms: [{ id: 'l', name: 'L room', floor_material: 'wood', points: [[0,0],[4,0],[4,2],[2,2],[2,4],[0,4]] }], furniture: [], walls: [], openings: [{ id: 'door', room_id: 'l', type: 'door', edge: 0, offset: 2, width: .9, height: 2.1, sill: 0, hinge: 'left', swing: 'in', leaves: 1 }] };
+  const built = buildFloorGeometry(floor, .2, .12);
+  const wallMesh = new THREE.Mesh(built.walls, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
+  const ray = (x,y) => new THREE.Raycaster(new THREE.Vector3(x,y,-.3), new THREE.Vector3(0,0,1), 0,.5).intersectObject(wallMesh);
+  assert.equal(ray(2,1).length, 0, 'door cavity has no wall faces');
+  assert.ok(ray(.6,1).length > 0, 'wall remains beside door');
+  assert.ok(ray(2,2.3).length > 0, 'lintel remains above door');
+  const floorMesh = new THREE.Mesh(built.floor, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
+  assert.equal(new THREE.Raycaster(new THREE.Vector3(3,1,3), new THREE.Vector3(0,-1,0),0,2).intersectObject(floorMesh).length,0,'L-shaped missing corner stays empty');
+  assert.ok(built.walls.getAttribute('normal') && built.roomTris[0].roomId === 'l');
+  Object.values(built).forEach((value) => { if (value?.isBufferGeometry) value.dispose(); });
+  wallMesh.material.dispose(); floorMesh.material.dispose();
+});
+
+test('cutaway masks and picking agree through a complete orbit', () => {
+  const { updateWallMasks, foldVisible } = loadSource('src/components/twin/scene/architectureMaterials.ts');
+  const masks = { standing: { value: 65535 }, glass: { value: 0 } }, buckets = [[1,0], [0,1], [-1,0], [0,-1], null];
+  for (let side=0;side<4;side++) {
+    updateWallMasks(masks,buckets,buckets[side][0],buckets[side][1],'auto');
+    assert.equal(masks.glass.value,1 << side);
+    assert.equal(foldVisible(side,masks),false,'camera-facing solid cannot intercept interior clicks');
+    assert.equal(foldVisible((side+2)%4,masks),true,'far wall stays solid');
+  }
+  updateWallMasks(masks,buckets,1,0,'cut');
+  assert.equal(foldVisible(0,masks),false); assert.equal(foldVisible(16,masks),true); assert.equal(foldVisible(32,masks),true); assert.equal(foldVisible(48,masks),true);
+});
+
+test('NeonPlan furniture primitives cover requested architectural objects without external packs', () => {
+  const { GeoBuffer, LineBuffer } = loadSource('src/components/twin/neonplan/viewer/geo.ts');
+  const { pushFurniture } = loadSource('src/components/twin/neonplan/viewer/furniture.ts');
+  for (const type of ['bed','sofa','chair','table','desk','tv_board','wardrobe','kitchen','sink','wc','shower','bathtub','plant','fridge']) {
+    const buffer=new GeoBuffer();
+    pushFurniture(buffer,new LineBuffer(),new GeoBuffer(),{id:type,type,x:0,z:0,rotation:15,w:1,d:.6,h:1});
+    // The source fridge is a ten-triangle cabinet resting on the floor (no bottom face).
+    assert.ok(buffer.count>=10,type+' has procedural surface geometry');
+    assert.ok(buffer.p.every(Number.isFinite));
+  }
+  const { pushLampModel } = loadSource('src/components/twin/neonplan/viewer/lamps.ts');
+  const lamp=new GeoBuffer(); pushLampModel(lamp,{x:0,z:0,lamp:'pendant'},2.5,0xffeecc); assert.ok(lamp.count>12);
+});
+
+test('Day heatmap interpolates surfaces and RGB state remains HESTA-only', () => {
+  const { heatColor } = loadSource('src/components/twin/neonplan/heatmap.ts');
+  assert.deepEqual(heatColor('temperature',17),[.24,.48,1]);
+  assert.deepEqual(heatColor('humidity',75),[.3,.4,1]);
+  const mid=heatColor('co2',625); assert.ok(mid[0]>.3 && mid[0]<1);
+  const { lightColor } = loadSource('src/components/twin/devices/deviceVisualState.ts');
+  assert.equal(lightColor({state:{color:{r:255,g:100,b:45}}},'#ffffff'),'#ff642d');
+  assert.equal(lightColor({state:{color:{r:999,g:0,b:0}}},'#ffffff'),'#ffffff');
 });
 
 test('unchanged geometry and returning to saved geometry are clean; invalid draft is rejected', async () => {

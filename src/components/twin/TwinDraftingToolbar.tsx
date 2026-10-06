@@ -71,6 +71,7 @@ export function TwinDraftingToolbar({ metadata, selection, floor, disabled, mode
   };
 
   return <section aria-label="Công cụ dựng mặt bằng" className="surface-card space-y-4 p-4">
+    <label className="flex min-h-11 items-center gap-3 text-xs font-semibold text-muted">Bước lưới (m)<select disabled={disabled} value={metadata.settings.gridMeters ?? .5} onChange={(event) => onChange({ ...metadata, settings: { ...metadata.settings, gridMeters: Number(event.target.value) } })} className="min-h-11 rounded-xl border border-line bg-surface px-3 text-text">{[.25, .5, 1].map((step) => <option key={step} value={step}>{step} m</option>)}</select></label>
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div>
         <h2 className="font-semibold text-text">Dựng mặt bằng</h2>
@@ -104,7 +105,7 @@ export function TwinDraftingToolbar({ metadata, selection, floor, disabled, mode
     </div>
 
     <div className="grid gap-2 sm:grid-cols-2">
-      <button type="button" aria-pressed={metadata.settings.gridSnap} disabled={disabled} onClick={() => onChange({ ...metadata, settings: { ...metadata.settings, gridSnap: !metadata.settings.gridSnap } })} className={`flex min-h-12 items-center gap-3 rounded-xl border px-3 text-left text-sm font-semibold ${metadata.settings.gridSnap ? 'border-primary bg-info-soft text-primary-hover' : 'border-line bg-surface text-muted'}`}><Grid3X3 size={18} aria-hidden="true" /><span>Bắt lưới<small className="block font-normal text-muted">Bước 2,5% mặt bằng</small></span></button>
+      <button type="button" aria-label="Bắt lưới" aria-pressed={metadata.settings.gridSnap} disabled={disabled} onClick={() => onChange({ ...metadata, settings: { ...metadata.settings, gridSnap: !metadata.settings.gridSnap } })} className={`flex min-h-12 items-center gap-3 rounded-xl border px-3 text-left text-sm font-semibold ${metadata.settings.gridSnap ? 'border-primary bg-info-soft text-primary-hover' : 'border-line bg-surface text-muted'}`}><Grid3X3 size={18} aria-hidden="true" /><span>Bắt lưới<small className="block font-normal text-muted">{metadata.settings.gridMeters ?? .5} m trên mặt bằng</small></span></button>
       <button type="button" aria-pressed={metadata.settings.edgeSnap} disabled={disabled} onClick={() => onChange({ ...metadata, settings: { ...metadata.settings, edgeSnap: !metadata.settings.edgeSnap } })} className={`flex min-h-12 items-center gap-3 rounded-xl border px-3 text-left text-sm font-semibold ${metadata.settings.edgeSnap ? 'border-primary bg-info-soft text-primary-hover' : 'border-line bg-surface text-muted'}`}><Magnet size={18} aria-hidden="true" /><span>Bắt cạnh<small className="block font-normal text-muted">Căn theo tường phòng gần nhất</small></span></button>
     </div>
 
