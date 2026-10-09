@@ -11,6 +11,7 @@ interface AppSidebarProps {
   activeItem: string;
   items: SidebarItem[];
   contextLabel: string;
+  showSystemSummary?: boolean;
 }
 
 export const HomeIcon = () => (
@@ -40,6 +41,13 @@ export const DeviceIcon = () => (
     </svg>
   );
 
+export const TwinIcon = () => (
+    <svg aria-hidden="true" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4 8.5 12 4l8 4.5v7L12 20l-8-4.5v-7Z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 8.5 7.5 4 7.5-4M12 12.5V20" />
+    </svg>
+  );
+
 export const SceneIcon = () => (
     <svg aria-hidden="true" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
       <path strokeLinecap="round" strokeLinejoin="round" d="M5 4h14v5H5zM5 15h14v5H5zM9 9v6M15 9v6" />
@@ -59,7 +67,7 @@ export const AdminIcon = () => (
     </svg>
   );
 
-export const AppSidebar: React.FC<AppSidebarProps> = ({ activeItem, items, contextLabel }) => (
+export const AppSidebar: React.FC<AppSidebarProps> = ({ activeItem, items, contextLabel, showSystemSummary = true }) => (
   <aside className="app-sidebar fixed inset-y-0 left-0 z-30 hidden w-64 flex-col p-5 lg:flex">
     <div className="px-2 py-1">
       <BrandMark />
@@ -88,12 +96,12 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({ activeItem, items, conte
       })}
     </nav>
 
-    <div className="mt-auto rounded-2xl border border-line bg-white/80 p-4">
+    {showSystemSummary ? <div className="mt-auto rounded-2xl border border-line bg-white/80 p-4">
       <div className="flex items-center gap-2 text-sm font-semibold text-text">
         <span className="status-pulse h-2 w-2 rounded-full bg-success" />
         Hệ thống ổn định
       </div>
       <p className="mt-2 text-xs leading-5 text-muted">Nhà của bạn đang được kết nối an toàn.</p>
-    </div>
+    </div> : null}
   </aside>
 );

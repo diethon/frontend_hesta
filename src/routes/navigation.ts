@@ -16,6 +16,10 @@ export function readNavigationState(value: unknown): NavigationState {
   };
 }
 
+function isTwinReturnPath(value: unknown): value is `/home/${string}/digital-twin` {
+  return typeof value === 'string' && /^\/home\/[a-zA-Z0-9-]+\/digital-twin$/.test(value);
+}
+
 export function defaultRoute(user: UserResponse | null) {
   return user ? (user.platformRole === 'ADMIN' ? '/admin' : '/home') : '/login';
 }
@@ -38,6 +42,7 @@ export function loginDestination(user: UserResponse, search: string, state: Navi
   const token = invitationToken(search);
   if (token && state.handledInviteToken !== token) return '/join';
   if (state.returnTo === '/home') return state.returnTo;
+  if (isTwinReturnPath(state.returnTo)) return state.returnTo;
   if (state.returnTo === '/admin' && user.platformRole === 'ADMIN') return '/admin';
   if (state.returnTo?.match(/^\/homes\/[0-9a-f-]+\/(scenes|automation-rules)$/i)) return state.returnTo;
   return defaultRoute(user);
@@ -46,6 +51,7 @@ export function loginDestination(user: UserResponse, search: string, state: Navi
 function isSafeReturnPath(value: unknown): value is string {
   return typeof value === 'string' && (
     value === '/home' || value === '/admin' || value === '/join' ||
+    isTwinReturnPath(value) ||
     /^\/homes\/[0-9a-f-]+\/(scenes|automation-rules)$/i.test(value)
   );
 }

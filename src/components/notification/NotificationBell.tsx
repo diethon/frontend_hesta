@@ -9,6 +9,7 @@ import {
 import { selectNotificationState } from '../../store/notificationSelectors';
 import { selectCurrentHomeId, selectCurrentUser } from '../../store/selectors';
 import type { NotificationPriority, NotificationResponse, NotificationType } from '../../types/notification';
+import { notify } from '../ui/notify';
 
 const dateTimeFormatter = new Intl.DateTimeFormat('vi-VN', {
   dateStyle: 'short',
@@ -47,8 +48,6 @@ interface NotificationPanelViewProps {
   unreadCount: number;
   status: 'idle' | 'loading' | 'succeeded' | 'failed';
   error: string | null;
-  mutationError: string | null;
-  lastActionMessage: string | null;
   isLoadingMore: boolean;
   isLastPage: boolean;
   markingAll: boolean;
@@ -64,8 +63,6 @@ export function NotificationPanelView({
   unreadCount,
   status,
   error,
-  mutationError,
-  lastActionMessage,
   isLoadingMore,
   isLastPage,
   markingAll,
@@ -97,17 +94,6 @@ export function NotificationPanelView({
           {markingAll ? 'Đang xử lý…' : 'Đọc tất cả'}
         </button>
       </header>
-
-      {lastActionMessage ? (
-        <p aria-live="polite" className="border-b border-line bg-success-soft px-4 py-2 text-xs font-medium text-text">
-          {lastActionMessage}
-        </p>
-      ) : null}
-      {mutationError ? (
-        <p role="alert" className="border-b border-line bg-error-soft px-4 py-2 text-xs font-medium text-text">
-          {mutationError}
-        </p>
-      ) : null}
 
       <div className="custom-scrollbar max-h-96 overflow-y-auto">
         {isInitialLoading ? (
@@ -258,17 +244,29 @@ export function NotificationBell() {
           unreadCount={notificationState.unreadCount}
           status={notificationState.status}
           error={notificationState.error}
-          mutationError={notificationState.mutationError}
-          lastActionMessage={notificationState.lastActionMessage}
           isLoadingMore={notificationState.isLoadingMore}
           isLastPage={notificationState.last}
           markingAll={notificationState.markingAll}
           markingReadIds={notificationState.markingReadIds}
           onMarkRead={(notificationId) => {
             const notification = notificationState.items.find((item) => item.id === notificationId);
-            if (notification && !notification.isRead) void dispatch(markNotificationAsRead(notificationId));
+            if (!notification || notification.isRead) return;
+            void dispatch(markNotificationAsRead(notificationId)).then((action) => {
+              if (markNotificationAsRead.fulfilled.match(action)) notify.success('Đã đánh dấu thông báo là đã đọc');
+              else notify.error(action.payload ?? 'Không thể đánh dấu thông báo đã đọc.');
+            });
           }}
-          onMarkAllRead={() => void dispatch(markAllNotificationsAsRead(currentHomeId))}
+          onMarkAllRead={() => {
+            void dispatch(markAllNotificationsAsRead(currentHomeId)).then((action) => {
+              if (markAllNotificationsAsRead.fulfilled.match(action)) {
+                notify.success(action.payload.updatedCount > 0
+                  ? `Đã đánh dấu ${action.payload.updatedCount} thông báo là đã đọc`
+                  : 'Tất cả thông báo đã được đọc');
+              } else {
+                notify.error(action.payload ?? 'Không thể đánh dấu tất cả thông báo đã đọc.');
+              }
+            });
+          }}
           onLoadMore={() => {
             if (!user || notificationState.last || notificationState.isLoadingMore) return;
             void dispatch(loadNotifications({

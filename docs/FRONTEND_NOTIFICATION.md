@@ -1,4 +1,9 @@
-# HESTA Frontend Notification
+# Tính năng thông báo phía frontend HESTA
+
+Thông báo nhận theo thời gian thực hiện thêm một toast tạm thời theo hệ thống
+thiết kế HESTA sau khi lấy nội dung riêng tư thành công. Danh sách và trạng
+thái đã đọc/chưa đọc vẫn được lưu trong bảng thông báo; các thao tác đánh dấu
+đã đọc báo kết quả qua `react-hot-toast`.
 
 Tài liệu này mô tả kiến trúc, hợp đồng dữ liệu, luồng xử lý và cách kiểm thử
 tính năng thông báo ở HESTA Frontend.

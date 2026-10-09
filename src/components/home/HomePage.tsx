@@ -14,10 +14,12 @@ import {
   DeviceIcon,
   HomeIcon,
   PeopleIcon,
-  SceneIcon,
+  SceneIcon, TwinIcon,
 } from "../ui/AppSidebar";
 import { NotificationBell } from "../notification/NotificationBell";
 import { Link } from "react-router";
+import { notify } from '../ui/notify';
+import { UserAvatar } from '../ui/UserAvatar';
 
 interface HomePageProps {
   user: UserResponse;
@@ -112,12 +114,12 @@ export const HomePage: React.FC<HomePageProps> = ({
     setCreateLoading(true);
     try {
       await createHome(newHomeName.trim());
-      alert("Tạo nhà thành công!");
+      notify.success('Tạo nhà thành công', 'Bạn có thể mở Digital Twin để bắt đầu thiết kế sơ đồ.');
       setIsCreateModalOpen(false);
       setNewHomeName("");
       fetchHomes();
-    } catch (err: unknown) {
-      alert(getErrorMessage(err, "Lỗi khi tạo nhà"));
+    } catch (error: unknown) {
+      notify.error(getErrorMessage(error, 'Lỗi khi tạo nhà'));
     } finally {
       setCreateLoading(false);
     }
@@ -155,10 +157,13 @@ export const HomePage: React.FC<HomePageProps> = ({
             icon: <DeviceIcon />,
             onClick: () => {
               if (userHome) navigate(`/home/${userHome.homeId}/devices`);
-              else
-                alert(
-                  "Vui lòng tạo hoặc tham gia một ngôi nhà trước khi quản lý thiết bị.",
-                );
+              else notify.info('Hãy tạo hoặc tham gia một ngôi nhà trước khi quản lý thiết bị.');
+            },
+          },
+          {
+            id: 'twin', label: 'Digital Twin', icon: <TwinIcon />, onClick: () => {
+              if (userHome) navigate(`/home/${userHome.homeId}/digital-twin`);
+              else notify.info('Hãy tạo hoặc tham gia một ngôi nhà trước khi mở Digital Twin.');
             },
           },
           {
@@ -242,19 +247,12 @@ export const HomePage: React.FC<HomePageProps> = ({
                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                 className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border-2 border-line bg-primary shadow-soft transition-colors hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-surface"
               >
-                {user.avatarUrl ? (
-                  <img
-                    src={user.avatarUrl}
-                    alt={`Ảnh đại diện của ${user.fullName}`}
-                    width={40}
-                    height={40}
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <span className="text-white font-bold text-sm">
-                    {user.fullName.charAt(0).toUpperCase()}
-                  </span>
-                )}
+                <UserAvatar
+                  src={user.avatarUrl}
+                  name={user.fullName}
+                  size={40}
+                  fallbackClassName="text-sm font-bold text-white"
+                />
               </button>
 
               {isDropdownOpen && (
@@ -399,44 +397,26 @@ export const HomePage: React.FC<HomePageProps> = ({
             )}
           </div>
 
-          {/* Dashboard Grid */}
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-6">
-            <div
-              onClick={() => {
-                if (userHome) {
-                  navigate(`/home/${userHome.homeId}/devices`);
-                } else {
-                  alert(
-                    "Vui lòng chọn hoặc tham gia một Ngôi nhà trước khi quản lý thiết bị.",
-                  );
-                }
-              }}
-              className="surface-card group cursor-pointer p-6 transition hover:-translate-y-0.5 hover:border-primary md:col-span-3"
-            >
-              <div className="w-12 h-12 bg-cyan-500/10 text-cyan-400 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                <svg
-                  aria-hidden={true}
-                  className="w-6 h-6"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 01-2 2h-1a2 2 0 01-2-2v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
-                  />
-                </svg>
-              </div>
-              <h3 className="text-base font-semibold text-white mb-1">
-                Quản lý Thiết bị
-              </h3>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                Theo dõi và điều khiển các thiết bị thông minh (Đèn, Quạt, Cảm
-                biến) trong nhà.
-              </p>
+        {/* Dashboard Grid */}
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-6">
+          <div
+            onClick={() => {
+              if (userHome) {
+                navigate(`/home/${userHome.homeId}/devices`);
+              } else {
+                notify.info('Hãy tạo hoặc tham gia một ngôi nhà trước khi quản lý thiết bị.');
+              }
+            }}
+            className="surface-card group cursor-pointer p-6 transition hover:-translate-y-0.5 hover:border-primary md:col-span-3"
+          >
+            <div className="w-12 h-12 bg-cyan-500/10 text-cyan-400 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+              <svg aria-hidden={true} className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 01-2 2h-1a2 2 0 01-2-2v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+              </svg>
             </div>
+            <h3 className="text-base font-semibold text-white mb-1">Quản lý Thiết bị</h3>
+            <p className="text-xs text-slate-400 leading-relaxed">Theo dõi và điều khiển các thiết bị thông minh (Đèn, Quạt, Cảm biến) trong nhà.</p>
+          </div>
 
             <div className="surface-card group p-6 transition hover:-translate-y-0.5 hover:border-primary md:col-span-3">
               <div className="w-12 h-12 bg-blue-500/10 text-blue-400 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">

@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { getHomeMembers, updateMemberRole, removeMember, generateInvitation } from '../../services/homeApi';
 import type { HomeMember, InvitationResponse } from '../../services/homeApi';
 import { getErrorMessage } from '../../utils/errors';
+import { notify } from '../ui/notify';
+import { UserAvatar } from '../ui/UserAvatar';
 
 interface MemberManagementProps {
   homeId: string;
@@ -47,8 +49,9 @@ export const MemberManagement: React.FC<MemberManagementProps> = ({ homeId, curr
     try {
       await updateMemberRole(homeId, memberId, newRole);
       void fetchMembers();
+      notify.success('Đã cập nhật quyền thành viên');
     } catch (error: unknown) {
-      alert(getErrorMessage(error, 'Không thể thay đổi quyền'));
+      notify.error(getErrorMessage(error, 'Không thể thay đổi quyền'));
     }
   };
 
@@ -57,8 +60,9 @@ export const MemberManagement: React.FC<MemberManagementProps> = ({ homeId, curr
     try {
       await removeMember(homeId, memberId);
       void fetchMembers();
+      notify.success('Đã xóa thành viên khỏi nhà');
     } catch (error: unknown) {
-      alert(getErrorMessage(error, 'Không thể xóa thành viên'));
+      notify.error(getErrorMessage(error, 'Không thể xóa thành viên'));
     }
   };
 
@@ -70,8 +74,9 @@ export const MemberManagement: React.FC<MemberManagementProps> = ({ homeId, curr
     try {
       const data = await generateInvitation(homeId);
       setInvitation(data);
+      notify.success('Đã tạo liên kết mời');
     } catch (error: unknown) {
-      alert(getErrorMessage(error, 'Không thể tạo link mời'));
+      notify.error(getErrorMessage(error, 'Không thể tạo link mời'));
       setShowInviteModal(false);
     } finally {
       setInviteLoading(false);
@@ -85,13 +90,13 @@ export const MemberManagement: React.FC<MemberManagementProps> = ({ homeId, curr
     try {
       const data = await generateInvitation(homeId, inviteEmail.trim());
       if (data.emailSent) {
-        alert(`✅ Đã gửi lời mời tới email ${inviteEmail}`);
+        notify.success('Đã gửi lời mời', inviteEmail.trim());
       } else {
-        alert(`⚠️ Lời mời đã được tạo nhưng hệ thống email hiện không khả dụng.\n\nVui lòng copy link bên trên và gửi thủ công cho người thân.`);
+        notify.warning('Đã tạo lời mời nhưng chưa gửi được email', 'Bạn có thể sao chép liên kết để gửi thủ công.');
       }
       setInviteEmail('');
     } catch (error: unknown) {
-      alert(getErrorMessage(error, 'Không thể tạo lời mời'));
+      notify.error(getErrorMessage(error, 'Không thể tạo lời mời'));
     } finally {
       setInviteLoading(false);
     }
@@ -136,11 +141,13 @@ export const MemberManagement: React.FC<MemberManagementProps> = ({ homeId, curr
               <tr key={member.id} className="text-slate-300">
                 <td className="py-4 flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-slate-800 overflow-hidden flex items-center justify-center shrink-0 border border-slate-700">
-                    {member.avatarUrl ? (
-                      <img src={member.avatarUrl} alt={`Ảnh đại diện của ${member.fullName}`} width={40} height={40} loading="lazy" className="h-full w-full object-cover" />
-                    ) : (
-                      <span className="text-sm font-bold text-slate-400">{member.fullName.charAt(0)}</span>
-                    )}
+                    <UserAvatar
+                      src={member.avatarUrl}
+                      name={member.fullName}
+                      size={40}
+                      loading="lazy"
+                      fallbackClassName="text-sm font-bold text-slate-400"
+                    />
                   </div>
                   <div>
                     <div className="font-medium text-slate-200">{member.fullName}</div>
@@ -218,8 +225,9 @@ export const MemberManagement: React.FC<MemberManagementProps> = ({ homeId, curr
                       />
                       <button 
                         onClick={() => {
-                          navigator.clipboard.writeText(invitationUrl);
-                          alert("Đã copy link!");
+                          void navigator.clipboard.writeText(invitationUrl)
+                            .then(() => notify.success('Đã sao chép liên kết mời'))
+                            .catch(() => notify.error('Không thể sao chép liên kết. Vui lòng thử lại.'));
                         }}
                         className="px-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-medium transition-colors"
                       >

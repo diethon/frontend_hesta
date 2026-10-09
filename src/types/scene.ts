@@ -1,10 +1,6 @@
-export type SceneActionType =
-  | 'TURN_ON'
-  | 'TURN_OFF'
-  | 'SET_BRIGHTNESS'
-  | 'SET_TEMPERATURE'
-  | 'SET_SPEED'
-  | 'SET_STATE';
+﻿import type { DeviceAction } from './deviceVocabulary';
+
+export type SceneActionType = DeviceAction;
 
 export interface SceneActionRequest {
   targetDeviceId: string;

@@ -26,9 +26,13 @@ const defaultActionsByDeviceType: Record<string, string[]> = {
 
 export function getDeviceActions(device?: DeviceSummary): ActionOption[] {
   if (!device) return [];
-  const capabilities = device.capabilities ?? [];
-  const allowed = capabilities.length
-    ? capabilities.map((value) => value.trim().toUpperCase())
-    : (defaultActionsByDeviceType[device.deviceType?.toUpperCase() ?? ''] ?? []);
+  const capabilities = device.capabilities ?? {};
+  let allowed: string[] = [];
+  if (Object.keys(capabilities).length > 0) {
+    allowed = Object.values(capabilities).flat() as string[];
+  } else {
+    allowed = defaultActionsByDeviceType[device.deviceType?.toUpperCase() ?? ''] ?? [];
+  }
+  allowed = allowed.map((value) => value.trim().toUpperCase());
   return actionOptions.filter((option) => allowed.includes(option.code));
 }

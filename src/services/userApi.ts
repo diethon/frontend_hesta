@@ -16,10 +16,10 @@ export async function uploadAvatar(file: File): Promise<ApiResponse<UserResponse
   const formData = new FormData();
   formData.append('file', file);
 
+  // Let Axios/browser add the multipart boundary. Setting this header manually
+  // can produce an invalid request body on some browser/adapter combinations.
   const response = await apiClient.post('/users/me/avatar', formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data'
-    }
+    headers: { 'Content-Type': undefined },
   });
 
   return response.data;
