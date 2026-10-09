@@ -7,6 +7,7 @@ import { DeviceFilters } from './DeviceFilters';
 import { SceneBar } from './SceneBar';
 import {
   getDevicesByHome,
+  sendDeviceCommand,
   sendManualPowerCommand,
 } from '../../services/deviceApi';
 import { getHomeRooms } from '../../services/homeApi';
@@ -22,6 +23,12 @@ import { isAcDevice, isWideCard } from './deviceHelpers';
 // ──────────────────────────────────────────────────────────────────────
 // Category filter helpers
 // ──────────────────────────────────────────────────────────────────────
+
+const CATEGORY_TYPES: Record<string, string[]> = {
+  LIGHTS: ['LIGHT', 'LED_RGB', 'SMART_PLUG'],
+  CLIMATE: ['TEMP_HUMID_SENSOR', 'AIR_CONDITIONER'],
+  SECURITY: ['MOTION_SENSOR', 'SMOKE_SENSOR', 'CAMERA_AI', 'GATE', 'ROLLING_DOOR'],
+};
 
 
 
