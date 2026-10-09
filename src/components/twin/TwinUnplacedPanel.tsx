@@ -6,17 +6,22 @@ import { loadTwinSnapshot } from '../../store/twinSlice';
 import type { TwinLayoutGeometry } from '../../types/twinLayout';
 import { getErrorMessage } from '../../utils/errors';
 import { defaultRoom, nodeKey } from './layoutGeometry';
-import { PALETTE_MIME, placePaletteItem, type PaletteItem } from './layoutPalette';
+import { PALETTE_MIME, paletteGroup, placePaletteItem, type PaletteItem } from './layoutPalette';
 import { DeviceGlyph, RoomGlyph, SensorGlyph } from './TwinVisualIcon';
 import { notify } from '../ui/notify';
+import { roomDrafting, type TwinDraftingMetadata } from './twinDrafting';
+import { TWIN_WORLD_DEPTH, TWIN_WORLD_WIDTH } from './twin3dGeometry';
 
-export function TwinUnplacedPanel({ geometry, disabled, onChange, floor }: { geometry: TwinLayoutGeometry; disabled: boolean; onChange: (geometry: TwinLayoutGeometry) => void; floor?: number }) {
+export function TwinUnplacedPanel({ geometry, disabled, onChange, floor, drafting }: { geometry: TwinLayoutGeometry; disabled: boolean; onChange: (geometry: TwinLayoutGeometry) => void; floor?: number; drafting?: TwinDraftingMetadata }) {
   const [activeTab, setActiveTab] = useState<PaletteItem['kind']>('room');
   const [search, setSearch] = useState('');
   const [roomName, setRoomName] = useState('');
   const [creatingRoom, setCreatingRoom] = useState(false);
   const dispatch = useAppDispatch();
   const twin = useAppSelector((state) => state.twin);
+  const snap = drafting ? { grid: drafting.settings.gridSnap, edges: drafting.settings.edgeSnap,
+    stepX: (drafting.settings.gridMeters ?? .5) / TWIN_WORLD_WIDTH,
+    stepY: (drafting.settings.gridMeters ?? .5) / TWIN_WORLD_DEPTH } : undefined;
   const placedRooms = new Set(geometry.rooms.map((room) => room.roomId));
   const placedNodes = new Set(geometry.nodes.map(nodeKey));
   const items = [
@@ -24,7 +29,11 @@ export function TwinUnplacedPanel({ geometry, disabled, onChange, floor }: { geo
     ...twin.deviceIds.filter((id) => !placedNodes.has(`DEVICE:${id}`)).map((id) => ({ kind: 'DEVICE' as const, id, name: twin.devicesById[id].name, detail: 'Thiết bị', icon: <DeviceGlyph deviceType={twin.devicesById[id].deviceType} /> })),
     ...twin.sensorIds.filter((id) => !placedNodes.has(`SENSOR:${id}`)).map((id) => ({ kind: 'SENSOR' as const, id, name: `${twin.sensorsById[id].metricType} · ${twin.devicesById[twin.sensorsById[id].deviceId]?.name ?? 'Cảm biến'}`, detail: 'Cảm biến', icon: <SensorGlyph metricType={twin.sensorsById[id].metricType} /> })),
   ];
-  const filtered = items.filter((item) => item.kind === activeTab && item.name.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()));
+  const groupedItems = items.map((item) => {
+    const group = paletteGroup(item, twin.devicesById);
+    return { ...item, group, detail: group === 'SENSOR' && item.kind === 'DEVICE' ? 'Cảm biến' : item.detail };
+  });
+  const filtered = groupedItems.filter((item) => item.group === activeTab && item.name.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()));
   const handleCreateRoom = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const name = roomName.trim();
@@ -59,7 +68,7 @@ export function TwinUnplacedPanel({ geometry, disabled, onChange, floor }: { geo
     <div className="max-h-80 space-y-2 overflow-y-auto">
       {filtered.map((item) => <button key={item.id} type="button" disabled={disabled} draggable={!disabled} aria-label={`Đặt ${item.name}`}
         onDragStart={(event) => { event.dataTransfer.setData(PALETTE_MIME, JSON.stringify({ kind: item.kind, id: item.id })); event.dataTransfer.effectAllowed = 'copy'; }}
-        onClick={() => { const point = item.kind === 'room' ? defaultRoom(item.id, geometry.rooms.length, floor) : { x: 0.5, y: 0.5 }; onChange(placePaletteItem(geometry, item, point.x, point.y, floor)); }}
+        onClick={() => { const point = item.kind === 'room' ? defaultRoom(item.id, geometry.rooms.length, floor) : { x: 0.5, y: 0.5 }; onChange(placePaletteItem(geometry, item, point.x, point.y, floor, drafting ? (roomId) => roomDrafting(drafting, roomId).points : undefined, snap)); }}
         className="flex min-h-14 w-full items-center gap-3 rounded-lg border border-line bg-app p-2 text-left disabled:opacity-50">
         {item.icon}<span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold text-text">+ {item.name}</span><span className="block text-xs text-muted">{item.detail}</span></span><GripVertical size={16} aria-hidden="true" className="shrink-0 text-icon" />
       </button>)}

@@ -35,7 +35,7 @@ export function TwinContent() {
   const sensorIds = useAppSelector((state) => state.twin.unassignedSensorIds);
   return <div className="space-y-6">
     {roomIds.length ? roomIds.map((roomId) => <TwinRoomSection key={roomId} roomId={roomId} />)
-      : <section className="surface-card border-dashed p-8 text-center"><h2 className="font-semibold">Nhà chưa có phòng</h2><p className="mt-2 text-sm text-muted">Các thiết bị và cảm biến chưa gán phòng xuất hiện bên dưới.</p></section>}
+      : <section className="surface-card border-dashed p-8 text-center"><h2 className="font-semibold">Chưa có phòng</h2><p className="mt-2 text-sm text-muted">Hãy tạo phòng cho ngôi nhà trước khi thiết kế Digital Twin.</p></section>}
     <section aria-label="Chưa gán phòng" className="surface-card p-5 sm:p-6">
       <h2 className="text-xl font-semibold">Chưa gán phòng</h2>
       {deviceIds.length || sensorIds.length ? <NodeGroups deviceIds={deviceIds} sensorIds={sensorIds} />

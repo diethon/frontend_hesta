@@ -57,10 +57,12 @@ try {
   const click = async (text) => {
     const found = await evaluate(`(() => { const e = [...document.querySelectorAll('button,a')].find(e => (e.textContent.trim() === ${JSON.stringify(text)} || e.getAttribute('aria-label') === ${JSON.stringify(text)})); if (!e) return false; e.click(); return true; })()`);
     assert.ok(found, `Control exists: ${text}`); await delay(60);
+    if (text === 'Chỉnh sửa sơ đồ') await waitFor(`document.querySelector('button[aria-label^="Đổi kích thước"]') !== null`);
   };
   const fixtureOpen = (open) => evaluate(`document.querySelector('details').open = ${open}`);
   const inspect = async () => {
     await fixtureOpen(true); await click('Inspect geometry / requests');
+    await waitFor(`document.querySelector('details pre') !== null`);
     return evaluate(`JSON.parse(document.querySelector('details pre').textContent)`);
   };
   const field = async (label, value) => {
@@ -90,6 +92,8 @@ try {
   await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1100, deviceScaleFactor: 1, mobile: false });
   await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
   await send('Page.navigate', { url: process.env.TEST_LAYOUT_URL ?? 'http://127.0.0.1:5173/tests/twin-layout-preview.html' });
+  await waitFor(`document.querySelector('button[aria-label="Chế độ 2D"]') !== null`);
+  await click('Chế độ 2D');
   await waitFor(`document.querySelector('[data-node-key]') !== null`);
   check('desktop has no horizontal overflow', await evaluate('document.documentElement.scrollWidth <= innerWidth'));
   await screenshot('desktop-view');
@@ -97,6 +101,7 @@ try {
   await click('Phóng to sơ đồ');
   check('zoom enlarges canvas without editing geometry', await evaluate(`document.querySelector('.twin-canvas').getBoundingClientRect().width`) > canvasWidth * 1.2);
   await click('Đưa sơ đồ vừa màn hình');
+  await waitFor(`Math.abs(document.querySelector('.twin-canvas').getBoundingClientRect().width - ${canvasWidth}) < 2`);
   check('fit restores canvas to viewport', Math.abs(await evaluate(`document.querySelector('.twin-canvas').getBoundingClientRect().width`) - canvasWidth) < 2);
 
   const initial = await inspect();
@@ -109,7 +114,9 @@ try {
   check('real pointer drag moves draft room only', state.layout.draft.rooms[0].x !== initialRoom.x && state.layout.confirmed.rooms[0].x === initialRoom.x);
   const beforeResize = state.layout.draft.rooms[0].width;
   await fixtureOpen(false);
-  await drag(`[data-room-id="${initialRoom.roomId}"] button[aria-label^="Đổi kích thước"]`, -50, -40);
+  await drag(`[data-room-id="${initialRoom.roomId}"] button[aria-label^="Đổi kích thước"]`, -50, -40, async () => {
+    check('resize feedback uses normalized percentages and shows the original room ghost', await evaluate(`document.querySelector('output[aria-label="Kích thước phòng khi resize"]').textContent.includes('%') && !!document.querySelector('[data-twin-drag-ghost]')`));
+  });
   state = await inspect();
   check('real pointer resize changes draft dimensions', state.layout.draft.rooms[0].width < beforeResize);
   await fixtureOpen(false);
@@ -139,6 +146,7 @@ try {
   await fixtureOpen(false);
   const sensorSelector = `[data-node-key="SENSOR:${sensor.nodeId}"]`;
   await drag(sensorSelector, -45, -40, async () => {
+    check('node drag keeps a visible source ghost', await evaluate(`!!document.querySelector('[data-twin-drag-ghost] > div')`));
     const position = await evaluate(`document.querySelector(${JSON.stringify(sensorSelector)}).getAttribute('style')`);
     await click('Sensor → 30'); await click('Device → OFF'); await click('STALE');
     check('realtime during active pointer drag preserves preview geometry', position === await evaluate(`document.querySelector(${JSON.stringify(sensorSelector)}).getAttribute('style')`));
@@ -153,7 +161,8 @@ try {
   check('Save sends exactly one full PUT with expectedRevision', state.requests.filter((r) => r.method === 'put').length === 1 && state.requests.find((r) => r.method === 'put').body.expectedRevision === 3);
   check('successful save uses returned revision and clears dirty', state.layout.confirmed.revision === 4 && !state.layout.dirty && !state.layout.draft);
   const persisted = state.layout.confirmed;
-  await send('Page.reload'); await waitFor(`document.querySelector('[data-node-key]') !== null`);
+  const beforeReload = await evaluate('performance.timeOrigin');
+  await send('Page.reload'); await waitFor(`performance.timeOrigin !== ${beforeReload} && document.querySelector('button[aria-label="Chế độ 2D"]') !== null`); await click('Chế độ 2D'); await waitFor(`document.querySelector('[data-node-key]') !== null`);
   check('browser refresh restores persisted fixture geometry', JSON.stringify((await inspect()).layout.confirmed) === JSON.stringify(persisted));
   await click('Chỉnh sửa sơ đồ'); await fixtureOpen(false);
   await drag(sensorSelector, 10, 15);
@@ -176,8 +185,8 @@ try {
   await clickWithDialog('Home B', true);
   await waitFor(`document.body.textContent.includes('Không gian sống · Nhà B')`);
   check('home switch loads B without A geometry', (await inspect()).layout.confirmed.homeId === 'home-b' && !await evaluate(`document.querySelector('[data-node-key]') !== null`));
-  await click('Home A'); await waitFor(`document.querySelector('[data-node-key]') !== null`);
-  await click('Chỉnh sửa sơ đồ'); await fixtureOpen(false); await drag(sensorSelector, 10, 10);
+  await click('Home A'); await waitFor(`document.body.textContent.includes('Không gian sống · My Home')`); await click('Chế độ 2D'); await waitFor(`document.querySelector('[data-node-key]') !== null`);
+  await click('Chỉnh sửa sơ đồ'); await fixtureOpen(false); await drag(sensorSelector, 40, 40);
   await click('Simulate concurrent save'); await click('Lưu bố cục');
   await waitFor(`document.body.textContent.includes('phiên khác')`);
   check('conflict preserves work and offers explicit reload', (await inspect()).layout.dirty && await evaluate(`document.body.textContent.includes('Tải sơ đồ mới nhất')`));
@@ -195,7 +204,7 @@ try {
   await evaluate(`document.querySelector(${JSON.stringify(sensorSelector)}).click()`);
   await field('Ngang (%)', 60);
   state = await inspect();
-  check('mobile numeric controls edit normalized position', state.layout.draft.nodes.find((node) => node.nodeType === 'SENSOR').x === 0.6);
+  check('mobile numeric controls snap normalized position to the half-metre grid', state.layout.draft.nodes.find((node) => node.nodeType === 'SENSOR').x === 0.611);
   check('320px edit has no horizontal overflow', await evaluate('document.documentElement.scrollWidth <= innerWidth'));
   await screenshot('mobile-edit', true);
   await fixtureOpen(false);
@@ -209,8 +218,19 @@ try {
   check('touch pointercancel discards only the active gesture', JSON.stringify((await inspect()).layout.draft) === JSON.stringify(beforeTouch));
   await clickWithDialog('Hủy', true);
   await click('Empty fixture layout'); await click('Tải mới nhất');
-  await waitFor(`document.body.textContent.includes('Chưa có sơ đồ')`);
+  await waitFor(`document.querySelector('[data-geometry-source]')?.dataset.geometrySource === 'INFERRED'`);
   await click('Chỉnh sửa sơ đồ');
+  // The fallback is visibly inferred. Clear its placements through the editor before palette checks.
+  while (await evaluate(`!!document.querySelector('[data-room-id] > button')`)) {
+    await evaluate(`document.querySelector('[data-room-id] > button').click()`);
+    await delay(60); await click('Bỏ vị trí khỏi sơ đồ');
+  }
+  while (await evaluate(`!!document.querySelector('[data-node-key]')`)) {
+    await evaluate(`document.querySelector('[data-node-key]').click()`);
+    await delay(60); await click('Bỏ vị trí khỏi sơ đồ');
+  }
+  // Exact-coordinate zoom/header tests below explicitly use the free-placement option.
+  await click('Bắt lưới');
   await field('Tìm đối tượng chưa đặt', 'bed');
   check('palette search filters existing rooms', await evaluate(`!!document.querySelector('[aria-label="Đặt Bedroom"]') && !document.querySelector('[aria-label="Đặt Living Room"]')`));
   await field('Tìm đối tượng chưa đặt', 'no-match');
@@ -218,12 +238,13 @@ try {
   await field('Tìm đối tượng chưa đặt', '');
   await send('Emulation.setTouchEmulationEnabled', { enabled: false });
   await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1100, deviceScaleFactor: 1, mobile: false });
+  await waitFor(`document.querySelector('.twin-viewport').clientWidth > 600`);
   await click('Phóng to sơ đồ');
   const dropCanvas = await rect('.twin-canvas');
   const dropData = { items: [{ mimeType: 'application/x-hesta-twin-item', data: JSON.stringify({ kind: 'room', id: initialRoom.roomId }) }], dragOperationsMask: 1 };
   for (const type of ['dragEnter', 'dragOver', 'drop']) await send('Input.dispatchDragEvent', { type, x: dropCanvas.x + dropCanvas.width * 0.1, y: dropCanvas.y + 80, data: dropData });
   state = await inspect();
-  if (!state.layout.draft.rooms.length) console.log('Drop diagnostics', dropCanvas, state.layout.draft);
+  if (!state.layout.draft.rooms.length || Math.abs(state.layout.draft.rooms[0].x - 0.1) >= .002) console.log('Drop diagnostics', dropCanvas, state.layout.draft, await rect('.twin-canvas'));
   check('palette drop uses zoom-correct normalized coordinates', state.layout.draft.rooms.length === 1 && Math.abs(state.layout.draft.rooms[0].x - 0.1) < 0.002);
   await click('Đưa sơ đồ vừa màn hình');
   await click('Đặt Bedroom');
@@ -264,11 +285,40 @@ try {
   const referenceUrl = new URL(process.env.TEST_LAYOUT_URL ?? 'http://127.0.0.1:5173/tests/twin-layout-preview.html');
   referenceUrl.searchParams.set('reference', '1');
   await send('Page.navigate', { url: referenceUrl.href });
+  await waitFor(`document.querySelector('button[aria-label="Chế độ 2D"]') !== null`); await click('Chế độ 2D');
   await waitFor(`document.querySelectorAll('[data-room-id]').length === 4`);
   await click('Chỉnh sửa sơ đồ');
   await evaluate(`document.querySelector('[data-room-id] > button').click()`);
+  await click('Bắt lưới');
   check('reference layout renders four rooms and seven live nodes', await evaluate(`document.querySelectorAll('[data-node-key]').length === 7 && document.documentElement.scrollWidth <= innerWidth`));
   await screenshot('reference-four-rooms', true);
+  await click('Đưa sơ đồ vừa màn hình');
+  check('auto fit centers the room footprint and fills 70–85% of the viewport', await evaluate(`(() => {
+    const v = document.querySelector('.twin-viewport').getBoundingClientRect();
+    const rooms = [...document.querySelectorAll('[data-room-id]')].map(e => e.getBoundingClientRect());
+    const left = Math.min(...rooms.map(r => r.left)), right = Math.max(...rooms.map(r => r.right));
+    const top = Math.min(...rooms.map(r => r.top)), bottom = Math.max(...rooms.map(r => r.bottom));
+    const density = Math.max((right-left)/v.width, (bottom-top)/v.height);
+    return density >= .7 && density <= .85 && Math.abs((left+right)/2 - (v.left+v.right)/2) < 10 && Math.abs((top+bottom)/2 - (v.top+v.bottom)/2) < 10;
+  })()`));
+  const referenceState = await inspect();
+  const referenceRoom = referenceState.layout.draft.rooms[0];
+  const referenceNode = referenceState.layout.draft.nodes.find(node => node.nodeType === 'DEVICE' && node.roomId === referenceRoom.roomId);
+  const headerNodeSelector = `[data-node-key="DEVICE:${referenceNode.nodeId}"]`;
+  await fixtureOpen(false);
+  await evaluate(`document.querySelector(${JSON.stringify(headerNodeSelector)}).click()`);
+  await field('Ngang (%)', (referenceRoom.x + referenceRoom.width * .45) * 100);
+  await field('Dọc (%)', (referenceRoom.y + .015) * 100);
+  const headerState = await inspect();
+  check('header safe zone offsets the marker without changing its normalized anchor', Math.abs(headerState.layout.draft.nodes.find(node => node.nodeId === referenceNode.nodeId).y - (referenceRoom.y + .015)) < .001 && await evaluate(`document.querySelector(${JSON.stringify(headerNodeSelector)}).getBoundingClientRect().top >= document.querySelector('[data-room-id="${referenceRoom.roomId}"] [data-room-header]').getBoundingClientRect().bottom`));
+  check('2D marker remains compact when selected and room borders stay thin', await evaluate(`document.querySelector(${JSON.stringify(headerNodeSelector)}).getBoundingClientRect().width <= 40 && document.querySelector('[data-room-id] polygon').getAttribute('stroke-width') === '2'`));
+  await evaluate(`document.querySelector('.twin-viewport').scrollLeft += 20`);
+  const manualScroll = await evaluate(`document.querySelector('.twin-viewport').scrollLeft`);
+  await click('Sensor → 30');
+  check('realtime retains manual 2D pan rather than auto fitting again', manualScroll === await evaluate(`document.querySelector('.twin-viewport').scrollLeft`));
+  await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+  await waitFor('innerWidth === 390');
+  check('390px 2D has no horizontal page overflow', await evaluate('document.documentElement.scrollWidth <= innerWidth'));
   const errors = events.filter((event) => event.method === 'Runtime.exceptionThrown');
   check('browser reports no uncaught exceptions', errors.length === 0);
   await writeFile(resolve(evidence, 'browser-results.json'), JSON.stringify({ results, screenshots: ['desktop-view', 'desktop-shape-precise', 'desktop-edit-realtime', 'desktop-conflict', 'mobile-view', 'mobile-edit', 'reference-four-rooms'], errors }, null, 2));

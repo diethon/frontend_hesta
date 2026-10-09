@@ -29,20 +29,20 @@ Chiều rộng và chiều sâu phòng được tính trực tiếp từ `width`
 
 ## Kiến trúc cảnh 3D
 
-- `TwinLayoutEditor` quản lý lựa chọn xem 2D/3D cục bộ và chỉ tải mã 3D khi cần.
+- `TwinLayoutEditor` quản lý Overview / 2D Layout / 3D Live cục bộ. 3D Live mở mặc định, dùng geometry và metadata đã lưu; bản nháp được giữ riêng trong editor. Gói WebGL được lazy-load khi mở 3D.
 - `Twin3DView` cung cấp khung giao diện đáp ứng, số liệu tổng quan, trạng thái rỗng/dự phòng, số lượng đối tượng chưa đặt, bộ chọn tầng, điều khiển xếp chồng/tách tầng và bảng thông tin đối tượng được chọn.
 - `Twin3DCanvas` chỉ phụ trách kết xuất bằng React Three Fiber.
-- Mỗi phòng hiển thị sàn, tường không mái, họa tiết sàn, cửa sổ, cửa ra vào, đèn và nội thất ít đa giác được tạo theo quy tắc xác định. Tường hướng về camera hạ thấp khi người xem xoay cảnh để nội thất không bị che; chi tiết cửa trên tường đó được ẩn cùng góc nhìn. Tên phòng khách, phòng ngủ, bếp và phòng tắm đã biết sẽ có nội thất phù hợp; tên không nhận diện được sẽ dùng bố trí văn phòng trung tính.
+- Mỗi phòng hiển thị sàn, tường không mái, họa tiết sàn, cửa sổ, cửa ra vào, đèn và nội thất ít đa giác được tạo theo quy tắc xác định. Tường hướng về camera hạ thấp khi người xem xoay cảnh để nội thất không bị che; chi tiết cửa trên tường đó được ẩn cùng góc nhìn. Phòng khách, phòng ngủ, bếp, phòng tắm và phòng làm việc được nhận diện bằng tên tiếng Việt/Anh; phòng không nhận diện được dùng bàn/cây trung tính.
 - Ngôi nhà nằm trên bệ sân vườn nhỏ với cây, bụi cây, lối vào và một bóng nền nhẹ; các chi tiết này chỉ phục vụ hiển thị. Không chi tiết trang trí nào ảnh hưởng đến ranh giới bố cục gửi về backend.
 - `Bounds` căn khung theo phòng và marker, không tính sân vườn; nhà nhiều tầng có khoảng đệm camera lớn hơn để tầng dưới không bị cắt. Nút **Vừa ngôi nhà** áp dụng lại khung đó.
-- `PerspectiveCamera` và `OrbitControls` có giới hạn cho phép xoay, phóng to/thu nhỏ và dịch chuyển ngang trong phạm vi nhất định mà không đưa camera xuống dưới sàn.
+- `PerspectiveCamera` và `OrbitControls` cho xoay 360°, gần thẳng từ trên xuống, giới hạn thu phóng và giữ camera trên sàn. Toolbar `Twin3DCameraControls` cung cấp Phối cảnh / Từ trên / Mặt trước / Bên phải / Mặt sau / Bên trái cùng hai nút xoay 90°. Preset áp dụng cho phòng đang focus hoặc toàn nhà; xoay 90° giữ tâm và khoảng cách hiện tại. Chuyển góc/focus trong 500ms theo cung ngắn nhất, tránh đi xuyên tâm nhà. Kéo tay ngắt transition ngay và bỏ selected state của preset. Vừa ngôi nhà khôi phục khung toàn nhà; Reset góc nhìn khôi phục hướng isometric. Kéo trên nền không bỏ chọn phòng hoặc tự fit lại camera; tường cutaway chuyển chiều cao mượt. Mobile dùng một ngón xoay, hai ngón zoom/xoay. Pan tiếp tục khóa để giữ orientation. Camera chỉ invalidate khi chuyển động; delta đầu tiên sau idle không làm bỏ qua transition. Reduced motion bỏ transition và damping.
 - Ánh sáng bán cầu, ánh sáng môi trường, ánh sáng định hướng, đèn nhỏ tại chỗ và bóng tiếp xúc tạo nên góc nhìn đẳng trục sáng.
 - Nhãn phòng dùng `Html` của Drei cùng số lượng thiết bị/cảm biến thực tế trong phòng.
 - Component điểm đánh dấu thiết bị và cảm biến đăng ký trực tiếp với thực thể Redux đã chuẩn hóa tương ứng. Vì vậy, cập nhật thời gian thực chỉ thay đổi điểm đánh dấu bị ảnh hưởng, không sao chép dữ liệu vận hành hoặc thay đổi hình học.
 
 ## Xem trước nhà nhiều tầng
 
-Bộ dữ liệu kiểm thử frontend và dữ liệu mẫu backend cục bộ mô phỏng nhà ba tầng với tám phòng và 14 điểm đánh dấu vận hành đã đặt vị trí. **Toàn nhà** hiển thị toàn bộ công trình; **T1**, **T2** và **T3** chỉ hiển thị một tầng. **Tách tầng** tăng khoảng cách theo chiều dọc giữa các tầng để dễ xem nội dung, còn **Xếp chồng** đưa chúng về hình dáng ngôi nhà gọn hơn. Ở chế độ toàn nhà, mỗi tầng chỉ hiện một nhãn ngắn thay vì nhãn của từng phòng, tránh chữ chồng lên nhau khi các tên phòng có cùng vị trí chiếu.
+Bộ dữ liệu kiểm thử frontend và dữ liệu mẫu backend cục bộ mô phỏng nhà ba tầng với tám phòng và 14 điểm đánh dấu vận hành đã đặt vị trí. **Toàn nhà / T1 / T2 / T3** là các nút cố định trên toolbar phía trên canvas, cùng **Xếp chồng / Tách tầng** và selected state rõ ràng. Nhãn tầng không còn nổi giữa ngôi nhà. Toàn nhà ẩn nhãn phòng chưa được focus để giảm chồng chữ; xem riêng một tầng hiển thị đầy đủ tên phòng. Tách tầng chỉ thay đổi cao độ hiển thị.
 
 Độ cao mỗi tầng là hình học hiển thị được tính theo quy tắc xác định:
 
@@ -57,9 +57,19 @@ Bộ kết xuất dùng `frameloop="demand"`, giới hạn tỷ lệ điểm ả
 
 ## Trạng thái hoạt động và lựa chọn đối tượng
 
+Overview derive số phòng/thiết bị/cảm biến, ACTIVE/STALE/OFFLINE và tổng Unplaced từ `twinSlice` + confirmed layout; không thêm endpoint. 3D Live có hover/selected room, focus camera, inspector bên phải trên desktop và bên dưới trên mobile. Room inspector liệt kê đối tượng nghiệp vụ kể cả chưa đặt; field Phòng của Device/Sensor dùng `roomId` nghiệp vụ, tách với thao tác xem phòng chứa marker trên layout.
+
+`twinPresentation.ts` ánh xạ `deviceType`/`metricType` đã có và cung cấp fallback generic. LIGHT/LED_RGB, FAN, AC legacy và plug/remote có geometry nhẹ; `IR_REMOTE` dùng biểu tượng remote, không được suy ra TV/AC. Các metric TEMPERATURE, HUMIDITY, LIGHT/ILLUMINANCE, MOTION, AIR_QUALITY, CO2 và SMOKE có icon riêng; ID và casing dữ liệu không bị sửa.
+
+`currentState.power` chỉ được nhận diện khi là boolean hoặc chính xác ON/OFF. Thiết bị ONLINE + ACTIVE với power ON có đèn phát sáng nhẹ, FAN quay hoặc AC hiện airflow indicator. Không animate thiết bị offline theo state lịch sử. TV chưa có type trong Twin contract hiện tại, nên chưa thể làm screen emissive đúng dữ liệu; cần backend cung cấp loại appliance đích nếu muốn phân biệt TV/AC sau IR_REMOTE.
+
+Marker, giá trị inspector và health pulse một lần trong 240ms khi dữ liệu tương ứng đổi, tôn trọng `prefers-reduced-motion`. Không copy operational state, tạo STOMP client, polling hoặc GET snapshot theo event. Canvas giữ `frameloop="demand"`; FAN chỉ invalidate khi đang quay, camera lấy bounds từ Drei và nội suy tọa độ cầu trong các frame chuyển động. DPR/mobile shadow cập nhật khi viewport đổi. 2D giữ snap/grid/alignment hiện có và bổ sung ghost vị trí gốc cùng width/height theo phần trăm khi resize.
+
+Frontend không thêm dependency, GLTF, API hay thay đổi backend. Một lỗi build/lint có sẵn ở `DevicePage.tsx` được sửa bằng import service còn thiếu và bỏ ba cast `any` thừa.
+
 Điểm đánh dấu dùng các giá trị `ACTIVE`, `STALE` và `OFFLINE` hiện có. Ngoài màu sắc, chúng hiển thị ký hiệu `A`, `!` hoặc `×` và dòng trạng thái trong bảng thông tin, nên trạng thái hoạt động không chỉ được truyền đạt bằng màu. Khi chọn phòng, thiết bị hoặc cảm biến, bảng thông tin chỉ đọc sẽ mở ra. Chủ nhà quay lại trình chỉnh sửa 2D hiện có để thay đổi bố cục.
 
-Thiết bị mẫu chưa ghép cặp (`UNKNOWN`, chưa có `lastSeen`) dùng ký hiệu `M` và nhãn **Thiết bị mẫu · Chưa ghép nối** trong cảnh 3D để người xem không hiểu nhầm đó là thiết bị đang hoạt động.
+Thiết bị có trạng thái `UNKNOWN` vẫn hiển thị nguyên trạng thái và ký hiệu health thực từ backend. Frontend không suy ra thiết bị mẫu hay tình trạng ghép nối từ `lastSeen` null.
 
 ## Trạng thái rỗng, chưa đặt vị trí và dự phòng
 
@@ -86,7 +96,7 @@ Chọn **3D**, sau đó dùng **Toàn nhà / T3 / T2 / T1** và **Xếp chồng 
 4. Hiển thị bố cục 2D hiện có.
 5. Chọn **3D** trong phần đầu trang Digital Twin.
 6. So sánh các hình chữ nhật phòng với hình học phòng 3D không mái.
-7. Kéo để xoay cảnh và dùng bánh xe/trackpad để phóng to hoặc thu nhỏ.
+7. Kéo để xoay cảnh và dùng bánh xe/trackpad để phóng to hoặc thu nhỏ. Thử sáu góc nhìn nhanh, xoay trái/phải 90°, đổi góc khi đang focus phòng và kéo tay giữa transition.
 8. Chọn **Vừa ngôi nhà** để tính lại và đặt lại khung hình camera.
 9. Chọn nhãn nổi của một phòng rồi xem bảng thông tin và danh sách nút của phòng.
 10. Chọn điểm đánh dấu thiết bị rồi xem trạng thái hiện tại, kết nối, trạng thái hoạt động và thời điểm phản hồi cuối.
@@ -99,6 +109,12 @@ Chọn **3D**, sau đó dùng **Toàn nhà / T3 / T2 / T1** và **Xếp chồng 
 17. Dùng khung nhìn điện thoại/máy tính bảng và xác nhận cảnh vẫn tương tác được, bảng thông tin xếp phía dưới và trang không tràn ngang.
 
 ## Kiểm chứng tự động và trực quan
+
+Cải thiện camera tiếp theo ngày 01/10/2026: `npm test` đạt 102/102; lint, build và diff check đạt. Browser/WebGL đạt 47 kiểm tra, không có uncaught exception: đủ sáu preset, xoay 90° rồi quay ngược về cùng projection, reset isometric, giữ phòng chọn khi đổi góc/kéo, reduced motion và toolbar 320px. Test chờ projection ổn định qua các frame thực thay vì giả định software WebGL hoàn tất trong một khoảng chờ cố định. Đã xem ảnh desktop 1440px, góc từ trên và mobile 320px; test cũng kiểm tra 390px. Chưa đo FPS trên GPU/laptop thật; browser dùng fixture API và software WebGL. Build vẫn có cảnh báo chunk lớn hiện có.
+
+Đợt polish ngày 01/10/2026: `npm test` đạt 100/100; lint, build và diff check đạt. Browser/WebGL đạt 33 kiểm tra, editor 2D đạt 51 kiểm tra: camera focus/fit, marker compact, toolbar tầng, realtime không tăng REST/đổi geometry, reduced motion, header safe zone, fit 70–85%, manual pan không reset bởi realtime, ghost/resize, OWNER/MEMBER và mobile 390/320px. Ảnh được render lại trong các thư mục evidence; `mobile-390.png` dùng đúng 390px và có thêm `mobile-320.png`. Browser test dùng fixture API độc lập, chưa phải demo backend thật có xác thực. Build còn cảnh báo chunk lớn; gói 3D vẫn lazy-load riêng.
+
+Marker mặc định là icon 36px cùng health dot/ký hiệu A, ! hoặc ×, không có cột hình trụ hay pedestal. Tên/value chỉ hiện khi hover, focus bàn phím hoặc selected. Vật liệu tường, sàn và sân dùng token Twin riêng, giảm ánh sáng phủ để furniture có contrast rõ hơn. Shadow plane nhẹ dùng directional shadow map hiện có; không thêm postprocessing. Viền sàn accent và transition vật liệu khoảng 200ms làm rõ phòng hover/selected; các phòng khác giữ nội thất và chỉ giảm emphasis nhẹ.
 
 Chạy các bài kiểm tra hợp đồng không cần WebGL:
 

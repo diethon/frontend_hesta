@@ -8,7 +8,7 @@ import { SceneBar } from './SceneBar';
 import {
   getDevicesByHome,
   getDevicesByRoom,
-  sendManualPowerCommand,
+  sendDeviceCommand, sendManualPowerCommand,
   sendDeviceCommand,
 } from '../../services/deviceApi';
 import { getHomeRooms } from '../../services/homeApi';

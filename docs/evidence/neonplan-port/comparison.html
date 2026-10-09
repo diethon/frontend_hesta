@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="vi"><meta charset="utf-8"><title>NeonPlan / HESTA renderer comparison</title>
+<style>body{margin:0;padding:24px;background:#f5f7fa;color:#0f172a;font:14px system-ui}h1{margin:0 0 8px;font-size:24px}p{color:#64748b}.views{display:grid;grid-template-columns:1fr 1fr;gap:16px}figure{margin:0;background:white;border:1px solid #cbd5e1;border-radius:16px;overflow:hidden}figcaption{padding:12px;font-weight:600}img{width:100%;height:420px;object-fit:contain;background:#eef3f7}table{width:100%;border-collapse:collapse;margin-top:20px;background:white;border-radius:12px}th,td{text-align:left;padding:9px 12px;border-bottom:1px solid #e8edf2}small{color:#64748b}</style>
+<h1>Architectural Digital Twin · source comparison</h1><p>NeonPlan Day reference và screenshot HESTA từ renderer WebGL thật. Bố cục phòng khác nhau vì HESTA dùng layout của chính mình.</p>
+<div class="views"><figure><figcaption>NeonPlan 3D · MIT Day reference</figcaption><img src="neonplan-day-reference.jpg" alt="NeonPlan Day scene"></figure><figure><figcaption>HESTA · ported geometry / HESTA data</figcaption><img src="house-day-viewport.png" alt="HESTA architectural scene"></figure></div>
+<table><thead><tr><th>Tiêu chí</th><th>NeonPlan</th><th>HESTA</th></tr></thead><tbody>
+<tr><td>Camera / framing</td><td>Isometric, fit architectural bounds</td><td>Cùng góc orbit; fit house / floor / room / model; 70–85% chiều viewport giới hạn</td></tr>
+<tr><td>Walls / floors</td><td>Shared polygon walls, slab 0.2 m</td><td>Port cùng geometry, opening gaps và slab 0.2 m; height từ metadata HESTA</td></tr>
+<tr><td>Cutaway / room visibility</td><td>GPU standing/glass masks theo camera</td><td>Port shader và direction buckets; auto glass + explicit cut</td></tr>
+<tr><td>Furniture / markers</td><td>Built-in procedural models; important markers</td><td>Port bộ primitive miễn phí; model trước, marker khi cảnh báo/chọn/hover</td></tr>
+<tr><td>Lighting / shadows</td><td>Day theme, baked contact shadows, lamp illumination</td><td>Neutral Day materials, port contact occlusion, soft directional shadows và PointLights thực</td></tr>
+<tr><td>Floors / interactions</td><td>Architectural elevations, optional explode, floor previews</td><td>HOUSE mặc định, SINGLE FLOOR, EXPLODED chủ động; preview polygon phòng HESTA</td></tr>
+</tbody></table><p><small>Source: github.com/Mastershort/neonplan3d · bb5261d · Copyright (c) 2026 Mastershort, MIT. Screenshot reference: docs/images/view-day.jpg. Transport HESTA được mock trong browser suite; geometry/rendering là Three.js/R3F thực, không phải ảnh mockup.</small></p>
+</html>

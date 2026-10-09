@@ -55,6 +55,12 @@ loại và ID đối tượng.
 
 ## Trạng thái và hành vi giao diện
 
+Đợt polish 01/10/2026 giữ nguyên tọa độ và nghiệp vụ. Room có header riêng cho icon, tên và count thiết bị/cảm biến; marker 36px được offset về mặt hiển thị khi neo nằm gần header, còn `data-x/y`, pointer delta và PUT luôn dùng tọa độ thật. Viền normal/selected giữ 2px, tint phòng giảm saturation và furniture rõ hơn. Phòng quá nhỏ dùng header gọn, count vẫn đọc được trong inspector.
+
+`twin2dViewport.ts` tính bounds phòng và các node đã đặt nằm ngoài phòng. Canvas tự center/fit khoảng 82% viewport lúc mount và khi bấm **Vừa sơ đồ**, có giới hạn scale để tránh canvas khổng lồ với geometry rất nhỏ. Zoom và pan không sửa geometry; event realtime và chỉnh draft không tự fit lại. Fit cũng áp dụng cho từng preview tầng; scrollbar gutter ổn định và vị trí cuộn được cập nhật trước paint để kéo/thả sau zoom không bị lệch.
+
+Kiểm chứng đợt polish: 100 unit/integration tests và 51 browser checks 2D đạt; lint, build và diff check đạt. Browser dùng fixture, kiểm tra desktop, 390px và 320px, header safe zone, fit 70–85%, pan sau realtime, kéo/thả, Save/Cancel và OWNER/MEMBER.
+
 `twinSlice` tiếp tục là nơi lưu duy nhất cho dữ liệu vận hành: phòng, thiết bị,
 cảm biến, giá trị đo, trạng thái hiện tại, độ mới của dữ liệu và mốc thời gian.
 Slice `twinLayout` mới quản lý hình học/phiên bản đã xác nhận, bản nháp chỉ chứa

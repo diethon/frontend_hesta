@@ -83,8 +83,176 @@ async function ready() {
   return store;
 }
 const emit = (store, event) => store.dispatch(rt.realtimeEventReceived(parseRealtimeEvent(event)));
+const { executeTwinCommand } = loadSource('src/store/twinCommandSlice.ts');
+const { twinDeviceActions } = loadSource('src/services/deviceCommandService.ts');
+const { adaptTwinDevice, adaptTwinHouse, roomHeatmapReading } = loadSource('src/services/twinAdapter.ts');
+
+test('Twin Adapter preserves HESTA state and suppresses active effects on offline devices', () => {
+  const device = { ...deviceEvent.data, currentState: { power: 'ON', brightness: 80 } };
+  const view = adaptTwinDevice(device);
+  assert.equal(view.id, deviceId);
+  assert.equal(view.type, device.deviceType);
+  assert.equal(view.state, device.currentState);
+  assert.equal(view.powered, true);
+  assert.equal(adaptTwinDevice({ ...device, status: 'OFFLINE' }).powered, false);
+  assert.equal(adaptTwinDevice({ ...device, healthStatus: 'STALE' }).powered, false);
+  assert.equal(adaptTwinDevice({ ...device, currentState: null }).powered, false);
+});
+
+test('Twin controls derive actions only from declared capabilities, never guess from device type', () => {
+  assert.deepEqual(twinDeviceActions({ deviceType: 'LIGHT' }), []);
+  assert.deepEqual(twinDeviceActions({ capabilities: { POWER: ['turn_on', 'TURN_OFF'], LIGHT: ['TURN_ON', 'SET_BRIGHTNESS'] } }), ['TURN_ON', 'TURN_OFF', 'SET_BRIGHTNESS']);
+});
+
+test('Twin commands prevent duplicates, wait for ACK and do not overwrite confirmed runtime', async () => {
+  const store = await ready();
+  const previous = store.getState().twin;
+  let acknowledge;
+  apiClient.defaults.adapter = (config) => {
+    requests.push(config);
+    return new Promise((resolve) => { acknowledge = () => resolve(response(config, { command: { success: true, status: 'SUCCESS' } })); });
+  };
+  const task = store.dispatch(executeTwinCommand({ homeId, deviceId, command: { action: 'TURN_ON' } }));
+  await new Promise(setImmediate);
+  assert.equal(store.getState().twinCommand.byId[deviceId].pending, true);
+  assert.equal(store.getState().twin, previous);
+  const duplicate = await store.dispatch(executeTwinCommand({ homeId, deviceId, command: { action: 'TURN_OFF' } }));
+  assert.equal(duplicate.meta.condition, true);
+  assert.equal(requests.length, 2); // initial snapshot + one command
+  assert.equal(requests[1].url, `/devices/${deviceId}/commands`);
+  assert.deepEqual(JSON.parse(requests[1].data), { action: 'TURN_ON' });
+  emit(store, { ...deviceEvent, data: { ...deviceEvent.data, currentState: { power: 'OFF' }, lastSeen: later }, timestamp: later });
+  const confirmed = store.getState().twin;
+  acknowledge(); await task;
+  assert.equal(store.getState().twinCommand.byId[deviceId].acknowledged, true);
+  assert.equal(store.getState().twin, confirmed);
+  assert.deepEqual(store.getState().twin.devicesById[deviceId].currentState, { power: 'OFF' });
+});
+
+test('advanced Twin commands preserve backend parameter names and expose MQTT timeout', async () => {
+  const store = await ready();
+  const previous = store.getState().twin;
+  apiClient.defaults.adapter = async (config) => { requests.push(config); return response(config, { success: false, status: 'TIMEOUT', message: 'TIMEOUT_NO_ACK' }); };
+  await store.dispatch(executeTwinCommand({ homeId, deviceId, command: { action: 'SET_BRIGHTNESS', parameters: { level: 75 } } }));
+  assert.equal(requests[1].url, `/devices/${deviceId}/command`);
+  assert.deepEqual(JSON.parse(requests[1].data), { action: 'SET_BRIGHTNESS', parameters: { level: 75 } });
+  assert.equal(store.getState().twinCommand.byId[deviceId].pending, false);
+  assert.equal(store.getState().twinCommand.byId[deviceId].error, 'TIMEOUT_NO_ACK');
+  assert.equal(store.getState().twin, previous);
+});
+
+test('late command ACK after changing homes cannot restore feedback or device state', async () => {
+  const store = await ready();
+  let acknowledge;
+  apiClient.defaults.adapter = (config) => new Promise((resolve) => { acknowledge = () => resolve(response(config, { success: true, status: 'SUCCESS' })); });
+  const task = store.dispatch(executeTwinCommand({ homeId, deviceId, command: { action: 'SET_SPEED', parameters: { speed: 60 } } }));
+  await new Promise(setImmediate);
+  store.dispatch(currentHomeChanged('home-b')); store.dispatch(twin.twinOpened('home-b'));
+  acknowledge(); await task;
+  assert.deepEqual(store.getState().twinCommand.byId, {});
+  assert.equal(store.getState().twin.homeId, 'home-b');
+  assert.deepEqual(store.getState().twin.devicesById, {});
+});
+
+test('offline devices cannot send Twin commands', async () => {
+  const store = await ready();
+  emit(store, { ...deviceEvent, data: { ...deviceEvent.data, status: 'OFFLINE', lastSeen: later }, timestamp: later });
+  const task = await store.dispatch(executeTwinCommand({ homeId, deviceId, command: { action: 'TURN_ON' } }));
+  assert.equal(task.meta.condition, true);
+  assert.equal(requests.length, 1);
+});
+
+test('heatmap chooses latest active reading and never mixes CO2, AQI or incompatible units', () => {
+  const make = (metricType, latestValue, unit, healthStatus = 'ACTIVE', observedAt = later) => ({ ...sensorEvent.data, metricType, latestValue, unit, healthStatus, observedAt });
+  assert.equal(roomHeatmapReading([make('TEMPERATURE', 90, '°F')], 'temperature'), null);
+  assert.equal(roomHeatmapReading([make('TEMPERATURE', 28, '°C', 'STALE')], 'temperature'), null);
+  assert.deepEqual(roomHeatmapReading([make('TEMPERATURE', 25, '°C', 'ACTIVE', '2026-09-17T08:00:00Z'), make('TEMPERATURE', 30, '°C')], 'temperature'), { value: 30, unit: '°C', ratio: .7 });
+  assert.deepEqual(roomHeatmapReading([make('AIR_QUALITY', 30, 'AQI')], 'air-quality'), { value: 30, unit: 'AQI', ratio: .15 });
+  assert.equal(roomHeatmapReading([make('CO2', 1200, 'ppm')], 'air-quality'), null);
+  assert.deepEqual(roomHeatmapReading([make('CO2', 1200, 'ppm')], 'co2'), { value: 1200, unit: 'ppm', ratio: .5 });
+  assert.equal(roomHeatmapReading([make('TEMPERATURE', 30, '°C')], 'normal'), null);
+});
+
+test('Twin House Adapter keeps explicit room IDs, separates storeys and never scatters missing devices', () => {
+  const { createTwinDraftingMetadata } = loadSource('src/components/twin/twinDrafting.ts');
+  const geometry = { rooms: [
+    { roomId: 'living', x: .1, y: .1, width: .3, height: .3, floor: 1 },
+    { roomId: 'bedroom', x: .1, y: .1, width: .3, height: .3, floor: 2 },
+  ], nodes: [{ nodeType: 'DEVICE', nodeId: 'light', roomId: 'living', x: .2, y: .2 }] };
+  const model = adaptTwinHouse(homeId, geometry, createTwinDraftingMetadata(), ['light', 'missing-position'], [], 'all', true);
+  assert.deepEqual(model.floors.map((floor) => floor.rooms.map((room) => room.roomId)), [['living'], ['bedroom']]);
+  assert.equal(model.floors.flatMap((floor) => floor.nodes).length, 1);
+  assert.ok(model.floors[1].rooms[0].y > model.floors[0].rooms[0].y);
+  assert.equal(adaptTwinHouse(homeId, geometry, createTwinDraftingMetadata(), ['light'], [], 2, false).floors[0].nodes.length, 0);
+});
+
+test('wall geometry leaves actual door/window openings without negative or overlapping solids', () => {
+  const { wallSegments } = loadSource('src/components/twin/scene/wallGeometry.ts');
+  const opening = { center: 0, object: { kind: 'DOOR', width: 1, height: 2 } };
+  const segments = wallSegments(4, 2.5, [opening]);
+  assert.equal(segments.length, 3);
+  assert.ok(segments.every((part) => part.width > 0 && part.height > 0));
+  assert.equal(segments.find((part) => part.x === 0).y, 2.25);
+  const overlapped = wallSegments(4, 2.5, [opening, { ...opening, center: .25 }]);
+  assert.ok(overlapped.every((part) => part.width > 0 && part.height > 0));
+});
+
+test('new backend device types keep realtime state and use an extensible view model', async () => {
+  const store = await ready();
+  const event = { ...deviceEvent, data: { ...deviceEvent.data, deviceType: 'FUTURE_HESTA_DEVICE', lastSeen: later }, timestamp: later };
+  assert.equal(isTwinEvent(parseRealtimeEvent(event)), true);
+  emit(store, event);
+  assert.equal(adaptTwinDevice(store.getState().twin.devicesById[deviceId]).type, 'FUTURE_HESTA_DEVICE');
+  assert.equal(requests.length, 1);
+});
 const render = (store, id = homeId) => renderToString(React.createElement(Provider, { store },
-  React.createElement(MemoryRouter, null, React.createElement(DigitalTwinView, { homeId: id }))));
+  React.createElement(MemoryRouter, null, React.createElement(DigitalTwinView, { homeId: id, initialMode: 'overview' }))));
+
+const { DEVICE_TYPES } = loadSource('src/types/deviceVocabulary.ts');
+const currentDeviceTypes = Object.values(DEVICE_TYPES);
+
+test('GET twin retains every current device type, including node devices without rooms', async () => {
+  const result = structuredClone(snapshot);
+  result.unassignedDevices = currentDeviceTypes.map((deviceType, index) => ({
+    ...deviceEvent.data, deviceId: `current-device-${index}`, roomId: null, deviceType,
+  }));
+  apiClient.defaults.adapter = async (config) => { requests.push(config); return response(config, result); };
+  const store = await ready();
+  const state = store.getState().twin;
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].url, `/homes/${homeId}/twin`);
+  for (const [index, type] of currentDeviceTypes.entries()) {
+    const id = `current-device-${index}`;
+    assert.equal(state.devicesById[id].deviceType, type);
+    assert.ok(state.unassignedDeviceIds.includes(id));
+  }
+});
+
+test('realtime accepts every current device type without rewriting it or mixing sensor streams', async () => {
+  const store = await ready();
+  const sensors = structuredClone(store.getState().twin.sensorsById);
+  for (const type of currentDeviceTypes) {
+    const event = { ...deviceEvent, data: { ...deviceEvent.data, deviceType: type } };
+    assert.equal(isTwinEvent(event), true, type);
+    emit(store, event);
+    assert.equal(store.getState().twin.devicesById[deviceId].deviceType, type);
+  }
+  assert.deepEqual(store.getState().twin.sensorsById, sensors);
+  assert.equal(isTwinEvent({ ...deviceEvent, data: { ...deviceEvent.data, deviceType: 'INVALID_TYPE' } }), true); // generic renderer
+  assert.equal(isTwinEvent({ ...deviceEvent, data: { ...deviceEvent.data, deviceType: ' ' } }), false);
+});
+
+test('device icons in twin distinguish the current sensor, plug, remote and camera types', () => {
+  const { DeviceGlyph } = loadSource('src/components/twin/TwinVisualIcon.tsx');
+  const icons = {
+    LIGHT: 'lightbulb', LED_RGB: 'lightbulb', SMART_PLUG: 'plug-zap', IR_REMOTE: 'radio',
+    TEMP_HUMID_SENSOR: 'thermometer', MOTION_SENSOR: 'activity', SMOKE_SENSOR: 'flame', CAMERA_AI: 'camera',
+  };
+  for (const [deviceType, icon] of Object.entries(icons)) {
+    const html = renderToString(React.createElement(DeviceGlyph, { deviceType }));
+    assert.ok(html.includes(`lucide-${icon}`), deviceType);
+  }
+});
 
 test('backend snapshot normalizes rooms, devices and exact canonical sensor IDs; authenticated API uses code 1000', async () => {
   const store = await ready();
@@ -222,7 +390,7 @@ test('unassigned and nullable snapshot nodes, device movement and empty currentS
   apiClient.defaults.adapter = async (config) => response(config, data);
   const store = await ready();
   const html = render(store);
-  assert.match(html, /Nhà chưa có phòng/);
+  assert.match(html, /Chưa có phòng/);
   assert.match(html, /Chưa ghi nhận/);
   assert.match(html, /Chưa có dữ liệu/);
   assert.doesNotMatch(html, /undefined|null/);

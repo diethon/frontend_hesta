@@ -6,6 +6,7 @@ import { notificationReducer } from './notificationSlice';
 import { realtimeReducer } from './realtimeSlice';
 import { twinReducer } from './twinSlice';
 import { twinLayoutReducer } from './twinLayoutSlice';
+import { twinCommandReducer } from './twinCommandSlice';
 
 export function createAppStore() {
   const createdStore = configureStore({
@@ -16,6 +17,7 @@ export function createAppStore() {
       realtime: realtimeReducer,
       twin: twinReducer,
       twinLayout: twinLayoutReducer,
+      twinCommand: twinCommandReducer,
     },
   });
   createdStore.dispatch(sessionRestored(readStoredSession()));
