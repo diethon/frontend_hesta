@@ -2,7 +2,7 @@ import { createAsyncThunk, createSlice, type PayloadAction } from '@reduxjs/tool
 import { ApiError } from '../services/apiClient';
 import { getMyHomes, type HomeSummary } from '../services/homeApi';
 import { getTwinLayout, putTwinLayout } from '../services/twinLayoutApi';
-import type { TwinLayout, TwinLayoutGeometry } from '../types/twinLayout';
+import type { TwinArchitecture, TwinLayout, TwinLayoutGeometry } from '../types/twinLayout';
 import { geometryError, layoutRequest, sameGeometry } from '../components/twin/layoutGeometry';
 import { currentHomeChanged, currentHomeCleared } from './homeSlice';
 import { sessionEnded } from './authSlice';
@@ -14,6 +14,7 @@ export interface TwinLayoutState {
   confirmed: TwinLayout | null;
   draft: TwinLayoutGeometry | null;
   dirty: boolean;
+  metadataDirty: boolean;
   loading: boolean;
   saving: boolean;
   requestId: string | null;
@@ -23,7 +24,7 @@ export interface TwinLayoutState {
   error: LayoutFailure | null;
 }
 export const emptyLayoutState = (homeId: string | null = null): TwinLayoutState => ({
-  homeId, confirmed: null, draft: null, dirty: false, loading: false, saving: false,
+  homeId, confirmed: null, draft: null, dirty: false, metadataDirty: false, loading: false, saving: false,
   requestId: null, roleRequestId: null, role: null, roleError: null, error: null,
 });
 type ThunkConfig = { state: { twinLayout: TwinLayoutState }; rejectValue: LayoutFailure };
@@ -62,28 +63,38 @@ export const saveTwinLayout = createAsyncThunk<TwinLayout, string, ThunkConfig>(
   }, { condition: (homeId, { getState }) => {
     const state = getState().twinLayout;
     return state.homeId === homeId && state.role === 'OWNER' && !!state.draft && !!state.confirmed
-      && state.dirty && !state.loading && !state.saving && state.error?.kind !== 'conflict' && state.error?.kind !== 'forbidden';
+      && (state.dirty || state.metadataDirty) && !state.loading && !state.saving && state.error?.kind !== 'conflict' && state.error?.kind !== 'forbidden';
   } },
 );
 const slice = createSlice({
   name: 'twinLayout', initialState: emptyLayoutState(),
   reducers: {
-    layoutEditingStarted(state) {
+    layoutEditingStarted(state, action: PayloadAction<TwinLayoutGeometry | undefined>) {
       if (!state.confirmed || state.role !== 'OWNER' || state.loading || state.saving || state.draft) return;
-      const { rooms, nodes } = layoutRequest(state.confirmed, state.confirmed.revision);
-      state.draft = { rooms, nodes };
-      state.dirty = false;
+      const { rooms, nodes, architecture } = layoutRequest(action.payload ?? state.confirmed, state.confirmed.revision);
+      state.draft = { rooms, nodes, ...(architecture ? { architecture } : {}) };
+      state.dirty = !sameGeometry(state.draft, state.confirmed);
+      state.metadataDirty = false;
       state.error = null;
     },
     layoutDraftChanged(state, action: PayloadAction<TwinLayoutGeometry>) {
       if (!state.draft || !state.confirmed || state.saving || state.loading || state.role !== 'OWNER') return;
       if (geometryError(action.payload)) return;
-      state.draft = { rooms: action.payload.rooms, nodes: action.payload.nodes };
+      state.draft = { rooms: action.payload.rooms, nodes: action.payload.nodes, ...(state.draft.architecture ? { architecture: state.draft.architecture } : {}) };
       state.dirty = !sameGeometry(state.draft, state.confirmed);
+    },
+    layoutMetadataDirtyChanged(state, action: PayloadAction<boolean>) {
+      if (!state.draft || state.saving || state.loading || state.role !== 'OWNER') return;
+      state.metadataDirty = action.payload;
+    },
+    layoutArchitectureChanged(state, action: PayloadAction<TwinArchitecture>) {
+      if (!state.draft || state.saving || state.loading || state.role !== 'OWNER') return;
+      state.draft.architecture = action.payload;
+      state.metadataDirty = true;
     },
     layoutEditingCancelled(state) {
       if (state.saving || state.loading) return;
-      state.draft = null; state.dirty = false; state.error = null;
+      state.draft = null; state.dirty = false; state.metadataDirty = false; state.error = null;
     },
   },
   extraReducers: (builder) => builder
@@ -108,7 +119,7 @@ const slice = createSlice({
     .addMatcher((action) => loadTwinLayout.fulfilled.match(action) || saveTwinLayout.fulfilled.match(action), (state, action: ReturnType<typeof loadTwinLayout.fulfilled>) => {
       if (state.homeId !== action.meta.arg || state.requestId !== action.meta.requestId) return;
       state.confirmed = action.payload;
-      state.draft = null; state.dirty = false; state.loading = false; state.saving = false; state.requestId = null; state.error = null;
+      state.draft = null; state.dirty = false; state.metadataDirty = false; state.loading = false; state.saving = false; state.requestId = null; state.error = null;
     })
     .addMatcher((action) => loadTwinLayout.rejected.match(action) || saveTwinLayout.rejected.match(action), (state, action: ReturnType<typeof loadTwinLayout.rejected>) => {
       if (state.homeId !== action.meta.arg || state.requestId !== action.meta.requestId) return;
@@ -116,5 +127,5 @@ const slice = createSlice({
       if (!action.meta.aborted) state.error = action.payload ?? failure(new Error('Không thể tải hoặc lưu sơ đồ. Vui lòng thử lại.'));
     }),
 });
-export const { layoutEditingStarted, layoutDraftChanged, layoutEditingCancelled } = slice.actions;
+export const { layoutEditingStarted, layoutDraftChanged, layoutMetadataDirtyChanged, layoutArchitectureChanged, layoutEditingCancelled } = slice.actions;
 export const twinLayoutReducer = slice.reducer;
