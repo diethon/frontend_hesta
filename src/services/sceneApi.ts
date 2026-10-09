@@ -5,6 +5,7 @@ import { apiClient } from "./apiClient";
 import type {
   CreateSceneRequest,
   SceneActionRequest,
+  SceneActionType,
   SceneActionResponse,
   SceneResponse,
   SceneExecutionResponse,
@@ -17,6 +18,11 @@ export const getDevices = (homeId: string) =>
 export const getScenes = (homeId: string) =>
   featureRequest<SceneResponse[]>(`/homes/${homeId}/scenes`);
 const scenePath = (homeId: string) => `/homes/${homeId}/scenes`;
+
+export const getSceneActionTypes = async (homeId: string): Promise<SceneActionType[]> => {
+  const response = await apiClient.get(`${scenePath(homeId)}/action-types`);
+  return response.data.result;
+};
 
 export const listScenes = async (homeId: string): Promise<SceneResponse[]> => {
   const response = await apiClient.get(scenePath(homeId));
@@ -48,8 +54,8 @@ export const createScene = async (
 export const updateScene = async (
   homeId: string,
   sceneId: string,
-  request: UpdateSceneRequest,
-): Promise<SceneResponse> => {
+  request: UpdateSceneRequest,)
+  : Promise<SceneResponse> => {
   const response = await apiClient.put(
     `${scenePath(homeId)}/${sceneId}`,
     request,

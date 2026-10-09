@@ -24,6 +24,31 @@ test('Scene uses device capabilities but excludes commands unsupported by Scene'
   assert.deepEqual(getSceneDeviceActions(device('SOCKET', ['TOGGLE'])), []);
 });
 
+test('Scene maps backend state capabilities to actions for each paired device type', () => {
+  assert.deepEqual(getSceneDeviceActions(device('LIGHT', ['power', 'brightness', 'colorTemperature'])).map((option) => option.code),
+    ['TURN_ON', 'TURN_OFF', 'SET_BRIGHTNESS']);
+  assert.deepEqual(getSceneDeviceActions(device('AC', ['power', 'temperature', 'mode', 'fanSpeed'])).map((option) => option.code),
+    ['TURN_ON', 'TURN_OFF', 'SET_TEMPERATURE', 'SET_SPEED']);
+  assert.deepEqual(getSceneDeviceActions(device('FAN', ['power', 'speed'])).map((option) => option.code),
+    ['TURN_ON', 'TURN_OFF', 'SET_SPEED']);
+  assert.deepEqual(getSceneDeviceActions(device('SENSOR', ['temperature', 'battery'])), []);
+  assert.deepEqual(getSceneDeviceActions(device('LIGHT', ['temperature'])), []);
+});
+
+test('Scene only submits an action supported by the selected device', () => {
+  const light = device('LIGHT', ['power', 'brightness']);
+  const fan = device('FAN', ['power', 'speed']);
+  assert.throws(() => buildSceneActionInput({ deviceId: fan.id, action: 'SET_BRIGHTNESS', value: '60' }, 0, [light, fan]));
+  assert.deepEqual(buildSceneActionInput({ deviceId: fan.id, action: 'SET_SPEED', value: '60' }, 0, [light, fan]),
+    { targetDeviceId: fan.id, action: 'SET_SPEED', value: 60, order: 0 });
+});
+
+test('Scene only offers action types returned by the backend', () => {
+  const light = device('LIGHT', ['power', 'brightness']);
+  assert.deepEqual(getSceneDeviceActions(light, ['SET_BRIGHTNESS']).map((option) => option.code), ['SET_BRIGHTNESS']);
+  assert.throws(() => buildSceneActionInput({ deviceId: light.id, action: 'TURN_ON', value: '' }, 0, [light], ['SET_BRIGHTNESS']));
+});
+
 test('Scene sends null for no-value actions and typed values for light and AC', () => {
   const light = device('LIGHT');
   const ac = device('AC');
@@ -60,7 +85,7 @@ test('Scene editor restores actions in order with editable values', () => {
 });
 
 test('Scene toggle changes only enabled and leaves stored actions untouched', () => {
-  const scene = { name: 'Morning', description: 'Start the day', enabled: true, actions: [{ id: 'action-1' }] };
-  assert.deepEqual(sceneToggleInput(scene), { name: 'Morning', description: 'Start the day', enabled: false });
+  const scene = { name: 'Morning', icon: '☀️', description: 'Start the day', enabled: true, actions: [{ id: 'action-1' }] };
+  assert.deepEqual(sceneToggleInput(scene), { name: 'Morning', icon: '☀️', description: 'Start the day', enabled: false });
   assert.deepEqual(scene.actions, [{ id: 'action-1' }]);
 });
