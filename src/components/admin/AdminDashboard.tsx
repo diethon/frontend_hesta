@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router';
 import type { UserResponse } from '../../types/auth';
 import { NotificationBell } from '../notification/NotificationBell';
 import { ProfileModal } from '../profile/ProfileModal';
+import { AdminDeviceModal } from './AdminDeviceModal';
 import { AdminIcon, AppSidebar, HomeIcon } from '../ui/AppSidebar';
 import { UserAvatar } from '../ui/UserAvatar';
 
@@ -16,7 +17,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout, 
   const navigate = useNavigate();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isDeviceModalOpen, setIsDeviceModalOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -133,14 +136,25 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout, 
       {/* Main Content Dashboard */}
       <main id="main-content" className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8">
         {/* Welcome Banner */}
-        <div className="surface-card relative overflow-hidden p-6 lg:p-8">
-          <div className="absolute left-0 top-0 bottom-0 w-1/3 bg-amber-500/10 blur-2xl pointer-events-none" />
-          <p className="mb-2 text-sm font-semibold text-primary-hover">Quản trị hệ thống</p>
-          <h2 className="mb-2 text-2xl font-bold text-text sm:text-3xl">Xin chào, {user.fullName}</h2>
-          <p className="text-sm text-slate-300 max-w-2xl leading-relaxed">
-            Chào mừng bạn đến với trang quản trị cấp cao của HESTA Smart Home. 
-            Tại đây bạn có thể quản lý toàn bộ hệ thống, người dùng và thiết bị.
-          </p>
+        <div className="surface-card relative overflow-hidden p-6 lg:p-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <div className="absolute left-0 top-0 bottom-0 w-1/3 bg-amber-500/10 blur-2xl pointer-events-none" />
+            <p className="mb-2 text-sm font-semibold text-primary-hover">Quản trị hệ thống</p>
+            <h2 className="mb-2 text-2xl font-bold text-text sm:text-3xl">Xin chào, {user.fullName}</h2>
+            <p className="text-sm text-slate-300 max-w-2xl leading-relaxed">
+              Chào mừng bạn đến với trang quản trị cấp cao của HESTA Smart Home. 
+              Tại đây bạn có thể quản lý toàn bộ hệ thống, người dùng và thiết bị.
+            </p>
+          </div>
+          <button
+            onClick={() => setIsDeviceModalOpen(true)}
+            className="shrink-0 flex items-center gap-2 rounded-2xl bg-amber-500 px-5 py-3 text-sm font-bold text-slate-900 shadow-float hover:bg-amber-400 transition-all cursor-pointer"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Tạo Thiết Bị & In QR
+          </button>
         </div>
 
         {/* Dashboard Grid */}
@@ -197,6 +211,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout, 
           onProfileUpdate={onProfileUpdate}
         />
       ) : null}
+
+      {/* Admin Device Modal */}
+      <AdminDeviceModal
+        isOpen={isDeviceModalOpen}
+        onClose={() => setIsDeviceModalOpen(false)}
+      />
     </div>
+
   );
 };

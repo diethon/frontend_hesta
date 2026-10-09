@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Edit2, Check, Trash2, ShieldX, Clock, Cpu, MapPin, Tag, AlertTriangle, Activity } from 'lucide-react';
+import { X, Edit2, Check, Trash2, ShieldX, Clock, Tag, AlertTriangle, Activity } from 'lucide-react';
 import type { DeviceResponse, DeviceStateHistoryResponse, ManualOverrideRecord } from '../../types/device';
 import { 
   getDeviceHistory, 
@@ -70,7 +70,7 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
   const handleUpdateName = async () => {
     if (!device) return;
     if (!editName.trim()) {
-      notify('Tên thiết bị không được để trống', 'error');
+      notify.error('Tên thiết bị không được để trống');
       return;
     }
     
@@ -78,9 +78,9 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
       const updated = await updateDeviceConfig(device.id, { name: editName });
       onDeviceUpdated(updated);
       setIsEditingName(false);
-      notify('Đã cập nhật tên thiết bị', 'success');
+      notify.success('Đã cập nhật tên thiết bị');
     } catch (error) {
-      notify('Lỗi khi cập nhật tên thiết bị', 'error');
+      notify.error('Lỗi khi cập nhật tên thiết bị');
     }
   };
 
@@ -88,10 +88,10 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
     if (!device) return;
     try {
       await cancelDeviceAutomation(device.id);
-      notify('Đã hủy tự động hóa', 'success');
+      notify.success('Đã hủy tự động hóa');
       fetchHistory(device.id);
     } catch (error) {
-      notify('Lỗi khi hủy tự động hóa', 'error');
+      notify.error('Lỗi khi hủy tự động hóa');
     }
   };
 
@@ -100,11 +100,11 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
     if (window.confirm(`Bạn có chắc chắn muốn xóa thiết bị "${device.name}"?`)) {
       try {
         await removeDevice(device.id);
-        notify('Đã xóa thiết bị', 'success');
+        notify.success('Đã xóa thiết bị');
         onDeviceRemoved(device.id);
         onClose();
       } catch (error) {
-        notify('Lỗi khi xóa thiết bị', 'error');
+        notify.error('Lỗi khi xóa thiết bị');
       }
     }
   };

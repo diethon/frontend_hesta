@@ -7,7 +7,6 @@ import { DeviceFilters } from './DeviceFilters';
 import { SceneBar } from './SceneBar';
 import {
   getDevicesByHome,
-  getDevicesByRoom,
   sendManualPowerCommand,
   sendDeviceCommand,
 } from '../../services/deviceApi';
@@ -35,15 +34,13 @@ const filterByCategory = (devices: DeviceResponse[], category: string): DeviceRe
   if (category === 'ALL') return devices;
   if (category === 'OFFLINE') return devices.filter((d) => d.status === 'OFFLINE');
   if (category === 'LIGHTS') {
-    return devices.filter((d) => ['LIGHT', 'LED_RGB', 'SMART_PLUG'].includes(d.deviceType));
+    return devices.filter((d) => CATEGORY_TYPES.LIGHTS.includes(d.deviceType));
   }
   if (category === 'CLIMATE') {
     return devices.filter((d) => d.deviceType === 'TEMP_HUMID_SENSOR' || isAcDevice(d));
   }
   if (category === 'SECURITY') {
-    return devices.filter((d) =>
-      ['MOTION_SENSOR', 'SMOKE_SENSOR', 'CAMERA_AI', 'GATE', 'ROLLING_DOOR'].includes(d.deviceType)
-    );
+    return devices.filter((d) => CATEGORY_TYPES.SECURITY.includes(d.deviceType));
   }
   return devices;
 };
@@ -105,8 +102,9 @@ export const DevicePage: React.FC = () => {
   useEffect(() => {
     if (!realtimeEvents) return;
     const event = realtimeEvents;
-    if (event?.type === 'DEVICE_STATE_CHANGED' && event?.payload) {
-      const payload = event.payload as { id?: string; currentState?: Record<string, unknown>; status?: string };
+    const eventData = (event as { data?: unknown; payload?: unknown })?.data ?? (event as { payload?: unknown })?.payload;
+    if (event?.type === 'DEVICE_STATE_CHANGED' && eventData) {
+      const payload = eventData as { id?: string; currentState?: Record<string, unknown>; status?: string };
       if (payload.id) {
         setDevices((prev) =>
           prev.map((d) => {
