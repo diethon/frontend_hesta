@@ -7,9 +7,8 @@ import { DeviceFilters } from './DeviceFilters';
 import { SceneBar } from './SceneBar';
 import {
   getDevicesByHome,
-  getDevicesByRoom,
-  sendDeviceCommand, sendManualPowerCommand,
   sendDeviceCommand,
+  sendManualPowerCommand,
 } from '../../services/deviceApi';
 import { getHomeRooms } from '../../services/homeApi';
 import type { DeviceResponse } from '../../types/device';
@@ -25,11 +24,7 @@ import { isAcDevice, isWideCard } from './deviceHelpers';
 // Category filter helpers
 // ──────────────────────────────────────────────────────────────────────
 
-const CATEGORY_TYPES: Record<string, string[]> = {
-  LIGHTS: ['LIGHT', 'LED_RGB', 'SMART_PLUG'],
-  CLIMATE: ['TEMP_HUMID_SENSOR', 'AIR_CONDITIONER'],
-  SECURITY: ['MOTION_SENSOR', 'SMOKE_SENSOR', 'CAMERA_AI', 'GATE', 'ROLLING_DOOR'],
-};
+
 
 const filterByCategory = (devices: DeviceResponse[], category: string): DeviceResponse[] => {
   if (category === 'ALL') return devices;
@@ -83,7 +78,7 @@ export const DevicePage: React.FC = () => {
       if (saved) {
         try {
           setDeviceOrder(JSON.parse(saved));
-        } catch (e) {
+        } catch {
           setDeviceOrder([]);
         }
       }
@@ -105,29 +100,30 @@ export const DevicePage: React.FC = () => {
   useEffect(() => {
     if (!realtimeEvents) return;
     const event = realtimeEvents;
-    if (event?.type === 'DEVICE_STATE_CHANGED' && event?.payload) {
-      const payload = event.payload as { id?: string; currentState?: Record<string, unknown>; status?: string };
-      if (payload.id) {
+    if (event?.type === 'DEVICE_STATE_CHANGED' && event?.data) {
+      const data = event.data as { id?: string; deviceId?: string; currentState?: Record<string, unknown>; status?: string };
+      const targetId = data.id || data.deviceId || event.deviceId;
+      if (targetId) {
         setDevices((prev) =>
           prev.map((d) => {
-            if (d.id === payload.id) {
+            if (d.id === targetId) {
               return {
                 ...d,
-                currentState: payload.currentState ?? d.currentState,
-                status: (payload.status as DeviceResponse['status']) ?? d.status,
+                currentState: data.currentState ?? d.currentState,
+                status: (data.status as DeviceResponse['status']) ?? d.status,
               };
             }
             return d;
           }),
         );
         // Also update the open drawer
-        if (selectedDevice?.id === payload.id) {
+        if (selectedDevice?.id === targetId) {
           setSelectedDevice((prev) =>
             prev
               ? {
                   ...prev,
-                  currentState: payload.currentState ?? prev.currentState,
-                  status: (payload.status as DeviceResponse['status']) ?? prev.status,
+                  currentState: data.currentState ?? prev.currentState,
+                  status: (data.status as DeviceResponse['status']) ?? prev.status,
                 }
               : prev,
           );
