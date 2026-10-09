@@ -21,8 +21,11 @@ export interface DeviceResponse {
   nodeName?: string;
   name: string;
   deviceType: string;
+  model?: string;
+  serialNumber?: string;
   gpioPin?: number;
-  status: 'ONLINE' | 'OFFLINE' | 'ERROR' | 'UNKNOWN';
+  status: 'ONLINE' | 'OFFLINE' | 'ERROR' | 'UNKNOWN' | 'UNCLAIMED';
+
   currentState: DeviceState;
   capabilities?: Record<string, string[]>;
   icon?: string;

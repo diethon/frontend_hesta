@@ -24,21 +24,25 @@ import { isAcDevice, isWideCard } from './deviceHelpers';
 // Category filter helpers
 // ──────────────────────────────────────────────────────────────────────
 
+const CATEGORY_TYPES: Record<string, string[]> = {
+  LIGHTS: ['LIGHT', 'LED_RGB', 'SMART_PLUG'],
+  CLIMATE: ['TEMP_HUMID_SENSOR', 'AIR_CONDITIONER'],
+  SECURITY: ['MOTION_SENSOR', 'SMOKE_SENSOR', 'CAMERA_AI', 'GATE', 'ROLLING_DOOR'],
+};
+
 
 
 const filterByCategory = (devices: DeviceResponse[], category: string): DeviceResponse[] => {
   if (category === 'ALL') return devices;
   if (category === 'OFFLINE') return devices.filter((d) => d.status === 'OFFLINE');
   if (category === 'LIGHTS') {
-    return devices.filter((d) => ['LIGHT', 'LED_RGB', 'SMART_PLUG'].includes(d.deviceType));
+    return devices.filter((d) => CATEGORY_TYPES.LIGHTS.includes(d.deviceType));
   }
   if (category === 'CLIMATE') {
     return devices.filter((d) => d.deviceType === 'TEMP_HUMID_SENSOR' || isAcDevice(d));
   }
   if (category === 'SECURITY') {
-    return devices.filter((d) =>
-      ['MOTION_SENSOR', 'SMOKE_SENSOR', 'CAMERA_AI', 'GATE', 'ROLLING_DOOR'].includes(d.deviceType)
-    );
+    return devices.filter((d) => CATEGORY_TYPES.SECURITY.includes(d.deviceType));
   }
   return devices;
 };

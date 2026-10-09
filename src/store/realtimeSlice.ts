@@ -11,6 +11,7 @@ export type RealtimeConnectionStatus =
 interface RealtimeState {
   status: RealtimeConnectionStatus;
   activeHomeId: string | null;
+  lastEvent: RealtimeEvent | null;
   lastEventAt: string | null;
   lastEvent: RealtimeEvent | null;
   error: string | null;
@@ -19,6 +20,7 @@ interface RealtimeState {
 const initialState: RealtimeState = {
   status: 'disconnected',
   activeHomeId: null,
+  lastEvent: null,
   lastEventAt: null,
   lastEvent: null,
   error: null,
@@ -36,6 +38,7 @@ const realtimeSlice = createSlice({
       state.activeHomeId = action.payload;
     },
     realtimeEventReceived(state, action: PayloadAction<RealtimeEvent>) {
+      state.lastEvent = action.payload;
       state.lastEventAt = action.payload.timestamp;
       state.lastEvent = action.payload;
       state.error = null;
