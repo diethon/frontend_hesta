@@ -1,6 +1,8 @@
 import type { DeviceSummary } from '../../types/automation';
-import type { SceneResponse, SceneActionResponse, SceneActionRequest, SceneActionType, UpdateSceneRequest } from '../../types/scene';
+import type { SceneResponse, SceneActionResponse, SceneActionRequest, SceneActionType, UpdateSceneRequest, DeviceResponse } from '../../types/scene';
 import { actionOptions } from '../deviceActionOptions.ts';
+
+export type AnyDevice = DeviceSummary | DeviceResponse;
 
 export interface DraftSceneAction { deviceId: string; action: string; value: string }
 
@@ -23,18 +25,18 @@ const defaultActionsByDeviceType: Record<string, readonly SceneActionType[]> = {
   SOCKET: ['TURN_ON', 'TURN_OFF'],
 };
 
-export function getSceneDeviceActions(device?: DeviceSummary, allowedTypes: readonly SceneActionType[] = sceneActionCodes) {
+export function getSceneDeviceActions(device?: AnyDevice, allowedTypes: readonly SceneActionType[] = sceneActionCodes) {
   if (!device) return [];
   const deviceType = device.deviceType?.toUpperCase() ?? '';
   const actionsByAttribute = attributeActionsByDeviceType[deviceType] ?? {};
-  const capabilities = device.capabilities?.length ? device.capabilities : defaultActionsByDeviceType[deviceType] ?? [];
+  const capabilities = (device as any).capabilities?.length ? (device as any).capabilities : defaultActionsByDeviceType[deviceType] ?? [];
   const supported = new Set<SceneActionType>();
   for (const capability of capabilities) {
-    const normalized = capability.trim().toUpperCase();
+    const normalized = String(capability).trim().toUpperCase();
     if (sceneActionCodes.includes(normalized as SceneActionType)) {
       supported.add(normalized as SceneActionType);
     } else {
-      for (const action of actionsByAttribute[capability.trim().toLowerCase()] ?? []) supported.add(action);
+      for (const action of actionsByAttribute[String(capability).trim().toLowerCase()] ?? []) supported.add(action);
     }
   }
   return actionOptions.filter((option) => supported.has(option.code as SceneActionType) && allowedTypes.includes(option.code as SceneActionType));
@@ -52,7 +54,7 @@ export function sceneToggleInput(scene: SceneResponse): UpdateSceneRequest {
   return { name: scene.name, icon: scene.icon, description: scene.description, enabled: !scene.enabled };
 }
 
-export function buildSceneActionInput(item: DraftSceneAction, order: number, devices: DeviceSummary[], allowedTypes: readonly SceneActionType[] = sceneActionCodes): SceneActionRequest {
+export function buildSceneActionInput(item: DraftSceneAction, order: number, devices: AnyDevice[], allowedTypes: readonly SceneActionType[] = sceneActionCodes): SceneActionRequest {
   const device = devices.find((candidate) => candidate.id === item.deviceId);
   const option = getSceneDeviceActions(device, allowedTypes).find((candidate) => candidate.code === item.action);
   if (!device || !option) throw new Error(`Hành động ${order + 1} không phù hợp với thiết bị đã chọn.`);
