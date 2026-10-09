@@ -88,6 +88,15 @@ test('Scene CRUD methods match the backend routes and payloads', async () => {
   assert.ok(requests.every(({ headers }) => headers.get('Authorization') === 'Bearer scene-token'));
 });
 
+test('Scene action types are loaded from the backend enum endpoint', async () => {
+  await sceneApi.getSceneActionTypes('home-1');
+
+  assert.equal(requests.length, 1);
+  assert.equal(new URL(`${requests[0].baseURL}${requests[0].url}`).pathname,
+    '/api/v1/homes/home-1/scenes/action-types');
+  assert.equal(requests[0].headers.get('Authorization'), 'Bearer scene-token');
+});
+
 test('SceneAction methods match add, remove, and atomic reorder contracts', async () => {
   const action = { targetDeviceId: 'device-1', action: 'TURN_OFF', value: null, order: 0 };
   await sceneApi.addSceneAction('home-1', 'scene-1', action);

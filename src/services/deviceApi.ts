@@ -75,3 +75,68 @@ export const getDeviceOverrideHistory = async (deviceId: string): Promise<Manual
   const response = await apiClient.get(`/devices/${deviceId}/automation/overrides`);
   return response.data.result;
 };
+
+// ===== Air Conditioner API =====
+export const setAcPower = async (deviceId: string, power: boolean): Promise<DeviceCommandResult> => {
+  const response = await apiClient.post(`/devices/${deviceId}/air-conditioner/power?power=${power}`);
+  return response.data.result;
+};
+
+export const setAcTemperature = async (deviceId: string, temperature: number): Promise<DeviceCommandResult> => {
+  const response = await apiClient.post(`/devices/${deviceId}/air-conditioner/temperature?temperature=${temperature}`);
+  return response.data.result;
+};
+
+export const adjustAcTempUp = async (deviceId: string): Promise<DeviceCommandResult> => {
+  const response = await apiClient.post(`/devices/${deviceId}/air-conditioner/temperature-plus`);
+  return response.data.result;
+};
+
+export const adjustAcTempDown = async (deviceId: string): Promise<DeviceCommandResult> => {
+  const response = await apiClient.post(`/devices/${deviceId}/air-conditioner/temperature-minus`);
+  return response.data.result;
+};
+
+export const setAcFan = async (deviceId: string, fan: string): Promise<DeviceCommandResult> => {
+  const response = await apiClient.post(`/devices/${deviceId}/air-conditioner/fan?fan=${fan}`);
+  return response.data.result;
+};
+
+export const setAcMode = async (deviceId: string, mode: string): Promise<DeviceCommandResult> => {
+  const response = await apiClient.post(`/devices/${deviceId}/air-conditioner/mode?mode=${mode}`);
+  return response.data.result;
+};
+
+export const setAcSwing = async (deviceId: string, enabled: boolean): Promise<DeviceCommandResult> => {
+  const response = await apiClient.post(`/devices/${deviceId}/air-conditioner/swing?enabled=${enabled}`);
+  return response.data.result;
+};
+
+export const getAcState = async (deviceId: string): Promise<DeviceCommandResult> => {
+  const response = await apiClient.get(`/devices/${deviceId}/air-conditioner/state`);
+  return response.data.result;
+};
+
+// ===== Gate API =====
+export const openGate = async (deviceId: string, nodeId?: string): Promise<DeviceCommandResult> => {
+  const params = nodeId ? `?nodeId=${nodeId}` : '';
+  const response = await apiClient.post(`/devices/${deviceId}/gate/open${params}`);
+  return response.data.result;
+};
+
+export const closeGate = async (deviceId: string, nodeId?: string): Promise<DeviceCommandResult> => {
+  const params = nodeId ? `?nodeId=${nodeId}` : '';
+  const response = await apiClient.post(`/devices/${deviceId}/gate/close${params}`);
+  return response.data.result;
+};
+
+export const stopGate = async (deviceId: string, nodeId?: string): Promise<DeviceCommandResult> => {
+  const params = nodeId ? `?nodeId=${nodeId}` : '';
+  const response = await apiClient.post(`/devices/${deviceId}/gate/stop${params}`);
+  return response.data.result;
+};
+
+export const getGateState = async (deviceId: string): Promise<{ deviceId: string; state: string; currentState: Record<string, unknown> }> => {
+  const response = await apiClient.get(`/devices/${deviceId}/gate/state`);
+  return response.data.result;
+};
