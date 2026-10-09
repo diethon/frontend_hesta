@@ -1,4 +1,6 @@
 import type { TwinHealthStatus } from '../../types/twin';
+import { useTwinUpdateMotion } from './useTwinMotion';
+import { healthSymbols } from './twinPresentation';
 
 const healthStyles: Record<TwinHealthStatus, string> = {
   ACTIVE: 'border-success bg-success-soft',
@@ -10,7 +12,8 @@ const healthLabels: Record<TwinHealthStatus, string> = {
 };
 
 export function TwinHealthBadge({ healthStatus, compact = false }: { healthStatus: TwinHealthStatus; compact?: boolean }) {
-  return <span title={healthLabels[healthStatus]} className={`inline-flex items-center rounded-full border text-text ${compact ? 'px-1.5 py-0.5 text-[10px] leading-4' : 'px-2.5 py-1 text-xs'} font-semibold ${healthStyles[healthStatus]}`}>
-    {healthStatus}
+  const motionRef = useTwinUpdateMotion<HTMLSpanElement>(healthStatus);
+  return <span ref={motionRef} title={healthLabels[healthStatus]} className={`inline-flex items-center gap-1 rounded-full border text-text ${compact ? 'px-1.5 py-0.5 text-[10px] leading-4' : 'px-2.5 py-1 text-xs'} font-semibold ${healthStyles[healthStatus]}`}>
+    <span aria-hidden="true">{healthSymbols[healthStatus]}</span>{healthStatus}
   </span>;
 }

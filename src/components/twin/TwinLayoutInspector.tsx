@@ -1,12 +1,14 @@
 import { useAppSelector } from '../../store/hooks';
 import type { TwinLayoutGeometry, TwinLayoutSelection } from '../../types/twinLayout';
-import { clampRoom, moveLayoutNode, nodeKey, resizeRoom } from './layoutGeometry';
+import { clampRoom, moveLayoutNode, nodeKey, resizeRoom, snapRoom, snapPoint } from './layoutGeometry';
 import { TwinDeviceCard } from './TwinDeviceCard';
 import { TwinSensorCard } from './TwinSensorCard';
 import { TwinLayoutButton } from './TwinLayoutButton';
 import { DeviceGlyph, RoomGlyph, SensorGlyph } from './TwinVisualIcon';
 import { changeRoomDrafting, roomDrafting, type TwinDraftingMetadata, type TwinRoomDrafting } from './twinDrafting';
 import type { TwinDraftingMode } from './TwinDraftingToolbar';
+import { TwinObjectEditor } from './TwinObjectEditor';
+import { TWIN_WORLD_WIDTH, TWIN_WORLD_DEPTH } from './twin3dGeometry';
 
 export function TwinLayoutInspector({ geometry, drafting, mode, selection, editable, onChange, onDraftingChange }: {
   geometry: TwinLayoutGeometry;
@@ -29,9 +31,11 @@ export function TwinLayoutInspector({ geometry, drafting, mode, selection, edita
       const next = field === 'width' || field === 'height'
         ? resizeRoom(room, field === 'width' ? value : room.width, field === 'height' ? value : room.height)
         : clampRoom({ ...room, [field]: value });
-      onChange({ ...geometry, rooms: geometry.rooms.map((item) => item.roomId === room.roomId ? next : item) });
+      const snapped = snapRoom(next, geometry.rooms, { grid: drafting.settings.gridSnap, edges: drafting.settings.edgeSnap, stepX: (drafting.settings.gridMeters ?? .5) / TWIN_WORLD_WIDTH, stepY: (drafting.settings.gridMeters ?? .5) / TWIN_WORLD_DEPTH }, field === 'width' || field === 'height').room;
+      onChange({ ...geometry, rooms: geometry.rooms.map((item) => item.roomId === room.roomId ? snapped : item) });
     } else if (node) {
-      const next = moveLayoutNode(node, field === 'x' ? value : node.x, field === 'y' ? value : node.y, geometry.rooms,
+      const snapped = snapPoint(value, drafting.settings.gridSnap, (drafting.settings.gridMeters ?? .5) / (field === 'x' ? TWIN_WORLD_WIDTH : TWIN_WORLD_DEPTH));
+      const next = moveLayoutNode(node, field === 'x' ? snapped : node.x, field === 'y' ? snapped : node.y, geometry.rooms,
         (roomId) => roomDrafting(drafting, roomId).points);
       onChange({ ...geometry, nodes: geometry.nodes.map((item) => nodeKey(item) === nodeKey(node) ? next : item) });
     }
@@ -55,6 +59,8 @@ export function TwinLayoutInspector({ geometry, drafting, mode, selection, edita
     {node ? <p className="text-sm text-muted">Phòng hiển thị: {node.roomId ? roomsById[node.roomId]?.name ?? 'Không còn trong dữ liệu' : 'Ngoài các phòng'}</p> : null}
     {roomMeta ? <div className="flex items-center justify-between gap-3 rounded-xl bg-info-soft px-3 py-2"><span className="text-xs font-semibold text-text">Hình phòng</span><span className="text-xs font-semibold text-primary-hover">{{ RECTANGLE: 'Chữ nhật', L_SHAPE: 'Chữ L', U_SHAPE: 'Chữ U', CUSTOM: 'Tự vẽ' }[roomMeta.shape]}</span></div> : null}
     {editable ? <>
+      {room ? <TwinObjectEditor room={room} metadata={drafting} onChange={onDraftingChange} /> : null}
+      {node?.nodeType === 'DEVICE' ? <label className="block text-sm text-muted">Xoay thiết bị (°)<input type="number" step={15} value={drafting.nodeRotations?.[nodeKey(node)] ?? 0} onChange={(event) => { if (Number.isFinite(event.target.valueAsNumber)) onDraftingChange({ ...drafting, nodeRotations: { ...drafting.nodeRotations, [nodeKey(node)]: Math.round(event.target.valueAsNumber / 15) * 15 } }); }} className="mt-1 min-h-11 w-full rounded-xl border border-line bg-surface px-3 text-text" /></label> : null}
       <div className="grid grid-cols-2 gap-3">{fields.map((field) => <label key={field} className="min-w-0 text-sm text-muted">
         {labels[field]}<input type="number" min={field === 'width' || field === 'height' ? 0.1 : 0} max={100} step={0.1}
           value={Math.round((field === 'width' || field === 'height' ? room![field] : target[field]) * 1000) / 10}

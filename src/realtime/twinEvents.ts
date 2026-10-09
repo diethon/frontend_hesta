@@ -19,7 +19,7 @@ export function isTwinEvent(event: RealtimeEvent): event is TwinEvent {
   switch (event.type) {
     case 'DEVICE_STATE_CHANGED':
       return typeof data.name === 'string' && typeof data.deviceType === 'string'
-        && ['LIGHT', 'FAN', 'AC', 'SOCKET', 'SENSOR', 'LOCK', 'CAMERA', 'MICROPHONE'].includes(data.deviceType)
+        && data.deviceType.trim().length > 0
         && ['ONLINE', 'OFFLINE', 'ERROR', 'UNKNOWN'].includes(String(data.status))
         && nullableString(data.icon) && data.currentState !== undefined && nullableTime(data.lastSeen);
     case 'SENSOR_READING_UPDATED':

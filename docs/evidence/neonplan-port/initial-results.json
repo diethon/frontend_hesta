@@ -1,0 +1,31 @@
+{
+  "errors": [],
+  "console": [
+    {
+      "method": "Log.entryAdded",
+      "params": {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+          "timestamp": 1791090411920.596,
+          "url": "http://127.0.0.1:5173/favicon.ico",
+          "networkRequestId": "10296.87"
+        }
+      }
+    },
+    {
+      "method": "Log.entryAdded",
+      "params": {
+        "entry": {
+          "source": "network",
+          "level": "error",
+          "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+          "timestamp": 1791090411926.115,
+          "url": "http://127.0.0.1:5173/favicon.ico",
+          "networkRequestId": "10296.88"
+        }
+      }
+    }
+  ]
+}

@@ -10,6 +10,8 @@ export const TWIN_EDGE_SNAP_DISTANCE = 0.012;
 export interface TwinSnapOptions {
   grid: boolean;
   edges: boolean;
+  stepX?: number;
+  stepY?: number;
 }
 
 export interface TwinSnapGuides {
@@ -31,7 +33,7 @@ export function defaultRoom(roomId: string, count: number, floor?: number): Twin
   return { roomId, x: round(0.04 + (count % 2) * 0.48), y: round(0.04 + (Math.floor(count / 2) % 2) * 0.46), width: 0.44, height: 0.4, ...(floor ? { floor } : {}) };
 }
 
-const snapToGrid = (value: number) => round(Math.round(value / TWIN_GRID_STEP) * TWIN_GRID_STEP);
+const snapToGrid = (value: number, step = TWIN_GRID_STEP) => round(Math.round(value / step) * step);
 
 function nearestSnap(value: number, candidates: readonly number[]) {
   let nearest = value;
@@ -50,8 +52,8 @@ export function snapRoom(room: TwinRoomLayout, others: readonly TwinRoomLayout[]
   let next = clampRoom(room);
   const guides: TwinSnapGuides = { x: [], y: [] };
   if (options.grid) {
-    if (resize) next = resizeRoom(next, snapToGrid(next.width), snapToGrid(next.height));
-    else next = clampRoom({ ...next, x: snapToGrid(next.x), y: snapToGrid(next.y) });
+    if (resize) next = resizeRoom(next, snapToGrid(next.width, options.stepX), snapToGrid(next.height, options.stepY));
+    else next = clampRoom({ ...next, x: snapToGrid(next.x, options.stepX), y: snapToGrid(next.y, options.stepY) });
   }
   if (!options.edges) return { room: next, guides };
   const sameFloor = others.filter((other) => (other.floor ?? 1) === (next.floor ?? 1) && other.roomId !== next.roomId);
@@ -77,8 +79,8 @@ export function snapRoom(room: TwinRoomLayout, others: readonly TwinRoomLayout[]
   return { room: next, guides };
 }
 
-export function snapPoint(value: number, enabled: boolean) {
-  return clampCoordinate(enabled ? snapToGrid(value) : value);
+export function snapPoint(value: number, enabled: boolean, step = TWIN_GRID_STEP) {
+  return clampCoordinate(enabled ? snapToGrid(value, step) : value);
 }
 
 export function overlappingRoomIds(rooms: readonly TwinRoomLayout[]) {
@@ -132,6 +134,7 @@ export function layoutRequest(geometry: TwinLayoutGeometry, expectedRevision: nu
     expectedRevision,
     rooms: geometry.rooms.map(({ roomId, floor, x, y, width, height }) => ({ roomId, floor: floor ?? 1, x, y, width, height })),
     nodes: geometry.nodes.map(({ nodeType, nodeId, roomId, x, y }) => ({ nodeType, nodeId, roomId, x, y })),
+    ...(geometry.architecture ? { architecture: geometry.architecture } : {}),
   };
 }
 
