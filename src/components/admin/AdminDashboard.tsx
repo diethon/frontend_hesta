@@ -5,6 +5,7 @@ import { NotificationBell } from '../notification/NotificationBell';
 import { ProfileModal } from '../profile/ProfileModal';
 import { AdminIcon, AppSidebar, HomeIcon } from '../ui/AppSidebar';
 import { UserAvatar } from '../ui/UserAvatar';
+import { NodeDiagnosticsWidget } from './NodeDiagnosticsWidget';
 
 interface AdminDashboardProps {
   user: UserResponse;
@@ -143,48 +144,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout, 
           </p>
         </div>
 
-        {/* Dashboard Grid */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <div className="surface-card group p-6 transition hover:-translate-y-0.5 hover:border-primary">
-            <div className="w-12 h-12 bg-amber-500/10 text-amber-500 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-              <svg aria-hidden={true} className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-              </svg>
-            </div>
-            <h3 className="text-2xl font-bold text-white mb-1">124</h3>
-            <p className="text-xs text-slate-400">Tổng người dùng</p>
-          </div>
-
-          <div className="surface-card group p-6 transition hover:-translate-y-0.5 hover:border-primary">
-            <div className="w-12 h-12 bg-blue-500/10 text-blue-400 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-              <svg aria-hidden={true} className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-              </svg>
-            </div>
-            <h3 className="text-2xl font-bold text-white mb-1">892</h3>
-            <p className="text-xs text-slate-400">Thiết bị đang hoạt động</p>
-          </div>
-
-          <div className="surface-card group p-6 transition hover:-translate-y-0.5 hover:border-warning">
-            <div className="w-12 h-12 bg-rose-500/10 text-rose-400 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-              <svg aria-hidden={true} className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-            </div>
-            <h3 className="text-2xl font-bold text-white mb-1">3</h3>
-            <p className="text-xs text-slate-400">Cảnh báo hệ thống</p>
-          </div>
-          
-          <div className="surface-card group p-6 transition hover:-translate-y-0.5 hover:border-mint">
-            <div className="w-12 h-12 bg-emerald-500/10 text-emerald-400 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-              <svg aria-hidden={true} className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <h3 className="text-2xl font-bold text-white mb-1">99.9%</h3>
-            <p className="text-xs text-slate-400">Uptime Server</p>
-          </div>
-        </div>
+        {/* ── Live IoT Diagnostics & Hardware Health Monitor ── */}
+        <NodeDiagnosticsWidget />
       </main>
       </div>
 

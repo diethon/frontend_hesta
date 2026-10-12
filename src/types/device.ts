@@ -29,6 +29,8 @@ export interface DeviceResponse {
   digitalTwinX?: number;
   digitalTwinY?: number;
   digitalTwinZ?: number;
+  manualOverrideUntil?: string | null;
+  manualOverrideActive?: boolean;
   lastSeen?: string;
 }
 
@@ -59,7 +61,7 @@ export interface ManualCommandResponse {
 
 export interface ManualOverrideRecord {
   id: string;
-  action: 'OVERRIDE' | 'CANCEL';
+  action: 'OVERRIDE' | 'CANCEL' | 'RESUME';
   userId: string;
   occurredAt: string;
   expiresAt: string;

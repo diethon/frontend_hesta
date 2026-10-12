@@ -18,6 +18,7 @@ import { useRouteSession } from './useRouteSession';
 import { ScenePage } from '../components/scene/ScenePage';
 import { AutomationRulePage } from '../components/automation/AutomationRulePage';
 import { RecommendationsPage } from '../components/automation/RecommendationsPage';
+import { EnergyDashboardPage } from '../components/energy/EnergyDashboardPage';
 
 export function AppRoutes() {
   const { initialized, user, login, logout, updateUser } = useRouteSession();
@@ -85,6 +86,7 @@ export function AppRoutes() {
         <Route path="/homes/:homeId/automation-rules" element={<AutomationRulePage />} />
         <Route path="/homes/:homeId/recommendations" element={<RecommendationsPage />} />
         <Route path="/home/:homeId/devices" element={<DevicePage />} />
+        <Route path="/home/:homeId/energy" element={<EnergyDashboardPage />} />
         <Route path="/home/:homeId/digital-twin" element={<Suspense fallback={<p role="status" className="p-8 text-muted">Đang tải Digital Twin…</p>}><DigitalTwinPage /></Suspense>} />
         <Route element={<RequireAdmin initialized={initialized} user={user} />}>
           <Route path="/admin" element={<AdminDashboard user={user!} onLogout={logout} onProfileUpdate={updateUser} />} />

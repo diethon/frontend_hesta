@@ -3,7 +3,6 @@ import { Power, Minus, Plus, Wind, Thermometer, Droplets, Sun as SunIcon, Refres
 import type { DeviceResponse } from '../../../types/device';
 import { 
   setAcPower, 
-  setAcTemperature, 
   adjustAcTempUp, 
   adjustAcTempDown, 
   setAcMode, 

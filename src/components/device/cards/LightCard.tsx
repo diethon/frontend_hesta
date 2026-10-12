@@ -4,6 +4,7 @@ import { Lightbulb, Plug2, SunMedium, SlidersHorizontal, Power } from 'lucide-re
 import { sendDeviceCommand } from '../../../services/deviceApi';
 import { notify } from '../../ui/notify';
 import { getErrorMessage } from '../../../utils/errors';
+import { useOverrideCountdown } from '../useOverrideCountdown';
 
 interface LightCardProps {
   device: DeviceResponse;
@@ -35,6 +36,8 @@ export const LightCard: React.FC<LightCardProps> = ({
 
   const rawPower = device.currentState?.power;
   const isOn = rawPower === 'ON' || rawPower === true || rawPower === 'true';
+
+  const { isOverrideActive, formattedTime } = useOverrideCountdown(device.manualOverrideUntil);
 
   const [brightness, setBrightness] = useState<number>(
     typeof device.currentState?.brightness === 'number'
@@ -152,15 +155,25 @@ export const LightCard: React.FC<LightCardProps> = ({
             <h3 className="font-semibold text-[15px] leading-tight text-text truncate">
               {device.name}
             </h3>
-            <p className="text-xs text-muted truncate mt-0.5">
-              {isOffline
-                ? 'Không phản hồi'
-                : isOn
-                ? isPlug
-                  ? 'Đang cấp điện'
-                  : `${brightness}% · Đang bật`
-                : 'Đang tắt'}
-            </p>
+            <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+              <p className="text-xs text-muted truncate">
+                {isOffline
+                  ? 'Không phản hồi'
+                  : isOn
+                  ? isPlug
+                    ? 'Đang cấp điện'
+                    : `${brightness}% · Đang bật`
+                  : 'Đang tắt'}
+              </p>
+              {isOverrideActive && (
+                <span
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded-md bg-amber-100 text-amber-800 border border-amber-300 animate-pulse"
+                  title="Đang khóa tự động hóa trong 30 phút do thao tác thủ công"
+                >
+                  🔒 {formattedTime}
+                </span>
+              )}
+            </div>
           </div>
         </div>
 

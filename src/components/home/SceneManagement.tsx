@@ -49,6 +49,7 @@ import { SceneEditorModal } from '../scene/SceneEditorModal';
 import { SceneHistoryModal } from '../scene/SceneHistoryModal';
 import { SceneScheduleModal } from '../scene/SceneScheduleModal';
 import { detectSceneTheme, getDeviceTypeIcon } from '../scene/sceneConstants';
+import { notify } from '../ui/notify';
 
 interface SceneManagementProps {
   homeId: string;

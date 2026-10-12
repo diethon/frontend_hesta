@@ -5,6 +5,7 @@ import { DeviceDrawer } from './DeviceDrawer';
 import { StatusChips } from './StatusChips';
 import { DeviceFilters } from './DeviceFilters';
 import { SceneBar } from './SceneBar';
+import { DeviceGroupSection } from './DeviceGroupSection';
 import {
   getDevicesByHome,
   sendDeviceCommand,
@@ -13,7 +14,7 @@ import {
 import { getHomeRooms } from '../../services/homeApi';
 import type { DeviceResponse } from '../../types/device';
 import { getErrorMessage } from '../../utils/errors';
-import { AppSidebar, DeviceIcon, HomeIcon, TwinIcon } from '../ui/AppSidebar';
+import { AppSidebar, DeviceIcon, HomeIcon, TwinIcon, EnergyIcon } from '../ui/AppSidebar';
 import { NotificationBell } from '../notification/NotificationBell';
 import { currentHomeChanged, currentHomeCleared } from '../../store/homeSlice';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
@@ -418,6 +419,12 @@ export const DevicePage: React.FC = () => {
             onClick: () => window.scrollTo({ top: 0, behavior: 'smooth' }),
           },
           {
+            id: 'energy',
+            label: 'Tiêu thụ điện',
+            icon: <EnergyIcon />,
+            onClick: () => navigate(`/home/${homeId}/energy`),
+          },
+          {
             id: 'twin',
             label: 'Digital Twin',
             icon: <TwinIcon />,
@@ -487,6 +494,17 @@ export const DevicePage: React.FC = () => {
           <section aria-label="Kịch bản nhanh">
             <SceneBar onSceneActivate={handleSceneActivate} />
           </section>
+
+          {/* ───── Virtual Device Groups (Master Control) ───── */}
+          {homeId && (
+            <section aria-label="Nhóm thiết bị ảo">
+              <DeviceGroupSection
+                homeId={homeId}
+                availableDevices={devices}
+                onRefreshDevices={fetchDevices}
+              />
+            </section>
+          )}
 
           {/* ───── Status Summary Chips ───── */}
           <section aria-label="Thống kê thiết bị">

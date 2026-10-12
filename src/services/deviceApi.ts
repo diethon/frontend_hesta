@@ -71,6 +71,10 @@ export const cancelDeviceAutomation = async (deviceId: string): Promise<string> 
   return response.data.result;
 };
 
+export const resumeDeviceAutomation = async (deviceId: string): Promise<void> => {
+  await apiClient.post(`/devices/${deviceId}/automation/resume`);
+};
+
 export const getDeviceOverrideHistory = async (deviceId: string): Promise<ManualOverrideRecord[]> => {
   const response = await apiClient.get(`/devices/${deviceId}/automation/overrides`);
   return response.data.result;
@@ -139,4 +143,34 @@ export const stopGate = async (deviceId: string, nodeId?: string): Promise<Devic
 export const getGateState = async (deviceId: string): Promise<{ deviceId: string; state: string; currentState: Record<string, unknown> }> => {
   const response = await apiClient.get(`/devices/${deviceId}/gate/state`);
   return response.data.result;
+};
+
+export const exportDeviceHistoryCsv = async (deviceId: string, filename?: string): Promise<void> => {
+  const response = await apiClient.get(`/devices/${deviceId}/history/export`, {
+    responseType: 'blob',
+  });
+  const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8;' });
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', filename || `device_audit_${deviceId}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  link.parentNode?.removeChild(link);
+  window.URL.revokeObjectURL(url);
+};
+
+export const exportHomeDeviceHistoryCsv = async (homeId: string, filename?: string): Promise<void> => {
+  const response = await apiClient.get(`/homes/${homeId}/devices/history/export`, {
+    responseType: 'blob',
+  });
+  const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8;' });
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', filename || `home_audit_${homeId}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  link.parentNode?.removeChild(link);
+  window.URL.revokeObjectURL(url);
 };

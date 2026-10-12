@@ -67,6 +67,12 @@ export const AdminIcon = () => (
     </svg>
   );
 
+export const EnergyIcon = () => (
+    <svg aria-hidden="true" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+      <path strokeLinecap="round" strokeLinejoin="round" d="m3.75 13.5 10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75Z" />
+    </svg>
+  );
+
 export const AppSidebar: React.FC<AppSidebarProps> = ({ activeItem, items, contextLabel, showSystemSummary = true }) => (
   <aside className="app-sidebar fixed inset-y-0 left-0 z-30 hidden w-64 flex-col p-5 lg:flex">
     <div className="px-2 py-1">

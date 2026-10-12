@@ -40,7 +40,7 @@ import {
 } from './sceneActions';
 import { SchedulePanel } from '../ui/SchedulePanel';
 import { SceneIcon } from './SceneIcon';
-import { SCENE_PRESETS, detectSceneTheme, getDeviceTypeIcon, AVAILABLE_ICONS } from './sceneConstants';
+import { SCENE_PRESETS, detectSceneTheme, getDeviceTypeIcon } from './sceneConstants';
 
 export function ScenePage() {
   const { homeId = '', sceneId } = useParams();

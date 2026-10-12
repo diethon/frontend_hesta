@@ -1,13 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { X, Edit2, Check, Trash2, ShieldX, Clock, Cpu, MapPin, Tag, AlertTriangle, Activity } from 'lucide-react';
+import { useNavigate } from 'react-router';
+import { X, Edit2, Check, Trash2, ShieldX, Clock, Tag, AlertTriangle, Activity, Download, Zap, ChevronRight } from 'lucide-react';
 import type { DeviceResponse, DeviceStateHistoryResponse, ManualOverrideRecord } from '../../types/device';
+import type { DeviceEnergyBreakdown } from '../../types/energy';
 import { 
   getDeviceHistory, 
   getDeviceOverrideHistory, 
   cancelDeviceAutomation, 
   updateDeviceConfig, 
-  removeDevice 
+  removeDevice,
+  exportDeviceHistoryCsv,
+  resumeDeviceAutomation
 } from '../../services/deviceApi';
+import { useOverrideCountdown } from './useOverrideCountdown';
+import { getDeviceEnergy } from '../../services/energyApi';
 import { notify } from '../ui/notify';
 import { resolveEffectiveType } from './deviceHelpers';
 import { LightControl } from './controls/LightControl';
@@ -37,11 +43,27 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
   onColorChange,
   onBrightnessChange
 }) => {
+  const navigate = useNavigate();
   const [history, setHistory] = useState<DeviceStateHistoryResponse[]>([]);
   const [overrides, setOverrides] = useState<ManualOverrideRecord[]>([]);
   const [isEditingName, setIsEditingName] = useState(false);
   const [editName, setEditName] = useState('');
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [deviceEnergy, setDeviceEnergy] = useState<DeviceEnergyBreakdown | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const { isOverrideActive, formattedTime } = useOverrideCountdown(device?.manualOverrideUntil);
+
+  const handleResumeAutomation = async () => {
+    if (!device) return;
+    try {
+      await resumeDeviceAutomation(device.id);
+      notify('Đã khôi phục tự động hóa', 'success');
+      fetchHistory(device.id);
+      onDeviceUpdated({ ...device, manualOverrideUntil: null, manualOverrideActive: false });
+    } catch (error) {
+      notify('Lỗi khi khôi phục tự động hóa', 'error');
+    }
+  };
 
   useEffect(() => {
     if (isOpen && device) {
@@ -54,12 +76,14 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
   const fetchHistory = async (deviceId: string) => {
     setIsLoadingHistory(true);
     try {
-      const [histRes, overRes] = await Promise.all([
+      const [histRes, overRes, energyRes] = await Promise.all([
         getDeviceHistory(deviceId),
-        getDeviceOverrideHistory(deviceId)
+        getDeviceOverrideHistory(deviceId),
+        getDeviceEnergy(deviceId).catch(() => null)
       ]);
       setHistory(histRes);
       setOverrides(overRes);
+      if (energyRes) setDeviceEnergy(energyRes);
     } catch (error) {
       console.error('Failed to fetch history', error);
     } finally {
@@ -267,12 +291,75 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
             </div>
           </div>
 
+          {/* Energy Summary Widget */}
+          {deviceEnergy && (
+            <div className="surface-card p-4 gentle-rise border-amber-500/20 bg-amber-500/5" style={{ animationDelay: '120ms' }}>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-bold text-amber-700 flex items-center space-x-1.5">
+                  <Zap className="w-4 h-4 text-amber-600 fill-amber-500" />
+                  <span>Năng lượng tiêu thụ (30 ngày)</span>
+                </h3>
+                {device.homeId && (
+                  <button
+                    onClick={() => {
+                      onClose();
+                      navigate(`/home/${device.homeId}/energy`);
+                    }}
+                    className="text-xs text-amber-700 hover:text-amber-800 font-semibold flex items-center gap-0.5 transition-colors"
+                  >
+                    <span>Chi tiết</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+              <div className="grid grid-cols-3 gap-2 text-center pt-1">
+                <div className="p-2 rounded-xl bg-white/70 border border-amber-200/50">
+                  <p className="text-[10px] text-muted font-medium">Tiêu thụ</p>
+                  <p className="text-sm font-bold text-text">{(deviceEnergy.energyKwh ?? deviceEnergy.kwh ?? 0).toFixed(2)} <span className="text-[10px] font-normal text-muted">kWh</span></p>
+                </div>
+                <div className="p-2 rounded-xl bg-white/70 border border-amber-200/50">
+                  <p className="text-[10px] text-muted font-medium">Ước tính tiền</p>
+                  <p className="text-sm font-bold text-amber-600">{Math.round(deviceEnergy.estimatedCostVnd ?? deviceEnergy.costVnd ?? 0).toLocaleString('vi-VN')} <span className="text-[10px] font-normal text-muted">đ</span></p>
+                </div>
+                <div className="p-2 rounded-xl bg-white/70 border border-amber-200/50">
+                  <p className="text-[10px] text-muted font-medium">Công suất / Giờ</p>
+                  <p className="text-sm font-bold text-text">{deviceEnergy.ratedPowerWatts ?? deviceEnergy.wattage ?? 0}W <span className="text-[10px] font-normal text-muted">/ {(deviceEnergy.runtimeHours ?? deviceEnergy.totalOnHours ?? 0).toFixed(0)}h</span></p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* History Timeline */}
           <div className="surface-card p-4 gentle-rise" style={{ animationDelay: '150ms' }}>
-            <h3 className="text-sm font-bold text-text mb-3 flex items-center space-x-2">
-              <Activity className="w-4 h-4 text-icon" />
-              <span>Lịch sử hoạt động</span>
-            </h3>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-bold text-text flex items-center space-x-2">
+                <Activity className="w-4 h-4 text-icon" />
+                <span>Lịch sử hoạt động</span>
+              </h3>
+              {history.length > 0 && (
+                <button
+                  type="button"
+                  disabled={isExporting}
+                  onClick={async () => {
+                    if (!device) return;
+                    setIsExporting(true);
+                    try {
+                      await exportDeviceHistoryCsv(device.id, `lich_su_${device.name.replace(/\s+/g, '_')}.csv`);
+                      notify('Đã tải xuống file báo cáo CSV thành công', 'success');
+                    } catch (e) {
+                      notify('Lỗi khi xuất file báo cáo', 'error');
+                    } finally {
+                      setIsExporting(false);
+                    }
+                  }}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg border border-line bg-surface hover:bg-off-soft text-text transition-colors shadow-xs"
+                  title="Xuất file CSV báo cáo lịch sử hoạt động có chữ ký chứng từ"
+                >
+                  <Download className="w-3.5 h-3.5 text-primary" />
+                  <span>{isExporting ? 'Đang xuất...' : 'Xuất CSV'}</span>
+                </button>
+              )}
+            </div>
             
             {isLoadingHistory ? (
               <div className="flex justify-center p-4">
@@ -305,22 +392,43 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
           </div>
 
           {/* Overrides */}
-          {overrides.length > 0 && (
+          {(overrides.length > 0 || isOverrideActive) && (
             <div className="surface-card p-4 gentle-rise border-warning/30 bg-warning-soft/20" style={{ animationDelay: '200ms' }}>
-              <h3 className="text-sm font-bold text-warning-dark mb-3 flex items-center space-x-2">
-                <ShieldX className="w-4 h-4 text-warning" />
-                <span>Ghi đè tự động</span>
-              </h3>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-bold text-warning-dark flex items-center space-x-2">
+                  <ShieldX className="w-4 h-4 text-warning" />
+                  <span>Khóa ghi đè tự động</span>
+                </h3>
+                {isOverrideActive && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-bold rounded-full bg-amber-200 text-amber-900 border border-amber-300 animate-pulse">
+                    🔒 {formattedTime}
+                  </span>
+                )}
+              </div>
+
+              {isOverrideActive && (
+                <div className="mb-3 p-2.5 rounded-xl bg-white/80 border border-warning/40 flex items-center justify-between">
+                  <p className="text-xs text-muted">Đang ưu tiên người dùng (bỏ qua quy tắc tự động).</p>
+                  <button
+                    type="button"
+                    onClick={handleResumeAutomation}
+                    className="ml-2 px-2.5 py-1 text-xs font-bold rounded-lg bg-primary text-white hover:bg-primary-hover transition-colors shrink-0 shadow-xs"
+                  >
+                    Khôi phục ngay
+                  </button>
+                </div>
+              )}
+
               <div className="space-y-3">
                 {overrides.map(ov => (
                   <div key={ov.id} className="flex flex-col text-sm border-b border-line border-dashed pb-2 last:pb-0 last:border-0">
                     <div className="flex justify-between items-center mb-1">
-                      <span className="font-semibold text-text">{ov.action === 'OVERRIDE' ? 'Ghi đè' : 'Hủy'}</span>
+                      <span className="font-semibold text-text">{ov.action === 'RESUME' ? 'Khôi phục tự động' : ov.action === 'OVERRIDE' ? 'Ghi đè thủ công' : 'Hủy tự động'}</span>
                       <span className="text-xs text-muted">
                         {new Date(ov.occurredAt).toLocaleString('vi-VN')}
                       </span>
                     </div>
-                    <span className="text-xs text-muted">Đến: {new Date(ov.expiresAt).toLocaleString('vi-VN')}</span>
+                    {ov.action !== 'RESUME' && <span className="text-xs text-muted">Đến: {new Date(ov.expiresAt).toLocaleString('vi-VN')}</span>}
                   </div>
                 ))}
               </div>
