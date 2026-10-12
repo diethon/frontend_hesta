@@ -3,8 +3,9 @@ import type { DeviceResponse } from '../../../types/device';
 import { Lightbulb, Plug2, SunMedium, SlidersHorizontal, Power } from 'lucide-react';
 import { sendDeviceCommand } from '../../../services/deviceApi';
 import { notify } from '../../ui/notify';
-import { getErrorMessage } from '../../../utils/errors';
+import { getErrorMessage, isDuplicateCommandError } from '../../../utils/errors';
 import { useOverrideCountdown } from '../useOverrideCountdown';
+import { OverrideActionModal } from '../OverrideActionModal';
 
 interface LightCardProps {
   device: DeviceResponse;
@@ -38,6 +39,7 @@ export const LightCard: React.FC<LightCardProps> = ({
   const isOn = rawPower === 'ON' || rawPower === true || rawPower === 'true';
 
   const { isOverrideActive, formattedTime } = useOverrideCountdown(device.manualOverrideUntil);
+  const [isOverrideModalOpen, setIsOverrideModalOpen] = useState(false);
 
   const [brightness, setBrightness] = useState<number>(
     typeof device.currentState?.brightness === 'number'
@@ -74,7 +76,11 @@ export const LightCard: React.FC<LightCardProps> = ({
     try {
       await sendDeviceCommand(device.id, 'SET_BRIGHTNESS', { brightness });
     } catch (err) {
-      notify.error(getErrorMessage(err, 'Lỗi chỉnh độ sáng'));
+      if (isDuplicateCommandError(err)) {
+        notify.warning('Thiết bị đang thực thi lệnh trước, vui lòng không click liên tục.');
+      } else {
+        notify.error(getErrorMessage(err, 'Lỗi chỉnh độ sáng'));
+      }
     }
   };
 
@@ -93,7 +99,11 @@ export const LightCard: React.FC<LightCardProps> = ({
         onTogglePower(device.id, 'OFF');
       }
     } catch (err) {
-      notify.error(getErrorMessage(err, 'Lỗi đổi màu đèn'));
+      if (isDuplicateCommandError(err)) {
+        notify.warning('Thiết bị đang thực thi lệnh trước, vui lòng không click liên tục.');
+      } else {
+        notify.error(getErrorMessage(err, 'Lỗi đổi màu đèn'));
+      }
     }
   };
 
@@ -166,12 +176,17 @@ export const LightCard: React.FC<LightCardProps> = ({
                   : 'Đang tắt'}
               </p>
               {isOverrideActive && (
-                <span
-                  className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded-md bg-amber-100 text-amber-800 border border-amber-300 animate-pulse"
-                  title="Đang khóa tự động hóa trong 30 phút do thao tác thủ công"
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsOverrideModalOpen(true);
+                  }}
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded-md bg-amber-100 hover:bg-amber-200 text-amber-800 border border-amber-300 animate-pulse transition cursor-pointer"
+                  title="Đang khóa tự động hóa. Bấm để quản lý hoặc gia hạn"
                 >
                   🔒 {formattedTime}
-                </span>
+                </button>
               )}
             </div>
           </div>
@@ -280,6 +295,15 @@ export const LightCard: React.FC<LightCardProps> = ({
           </span>
         </div>
       )}
+
+      {/* Override Action Modal [PHO-043] */}
+      <OverrideActionModal
+        isOpen={isOverrideModalOpen}
+        onClose={() => setIsOverrideModalOpen(false)}
+        deviceId={device.id}
+        deviceName={device.name}
+        formattedTime={formattedTime}
+      />
     </article>
   );
 };

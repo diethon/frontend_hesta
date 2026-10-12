@@ -6,6 +6,8 @@ import { ProfileModal } from '../profile/ProfileModal';
 import { AdminIcon, AppSidebar, HomeIcon } from '../ui/AppSidebar';
 import { UserAvatar } from '../ui/UserAvatar';
 import { NodeDiagnosticsWidget } from './NodeDiagnosticsWidget';
+import { MqttSnifferConsole } from './MqttSnifferConsole';
+import { Activity, Terminal } from 'lucide-react';
 
 interface AdminDashboardProps {
   user: UserResponse;
@@ -15,6 +17,7 @@ interface AdminDashboardProps {
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout, onProfileUpdate }) => {
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState<'NODES' | 'MQTT'>('NODES');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -144,8 +147,37 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout, 
           </p>
         </div>
 
-        {/* ── Live IoT Diagnostics & Hardware Health Monitor ── */}
-        <NodeDiagnosticsWidget />
+        {/* ── Admin Sub-Navigation Tabs ── */}
+        <div className="flex items-center gap-2 border-b border-line pb-1">
+          <button
+            type="button"
+            onClick={() => setActiveTab('NODES')}
+            className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-bold rounded-xl transition shadow-xs ${
+              activeTab === 'NODES'
+                ? 'bg-primary text-white shadow-soft'
+                : 'bg-surface text-muted hover:text-text hover:bg-off-soft'
+            }`}
+          >
+            <Activity className="w-4 h-4" />
+            <span>Giám Sát Node &amp; Mạch Bảo Vệ</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('MQTT')}
+            className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-bold rounded-xl transition shadow-xs ${
+              activeTab === 'MQTT'
+                ? 'bg-primary text-white shadow-soft'
+                : 'bg-surface text-muted hover:text-text hover:bg-off-soft'
+            }`}
+          >
+            <Terminal className="w-4 h-4" />
+            <span>Live MQTT Packet Sniffer</span>
+          </button>
+        </div>
+
+        {/* ── Active Tab View ── */}
+        {activeTab === 'NODES' ? <NodeDiagnosticsWidget /> : <MqttSnifferConsole />}
       </main>
       </div>
 

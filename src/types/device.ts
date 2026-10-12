@@ -66,3 +66,25 @@ export interface ManualOverrideRecord {
   occurredAt: string;
   expiresAt: string;
 }
+
+export interface DeviceUptimeTimelinePoint {
+  hour: number;
+  state: 'ON' | 'OFF';
+}
+
+export interface DeviceUptimeResponse {
+  uptimePercent: number;
+  totalHours: number;
+  onHours: number;
+  offHours: number;
+  timelinePoints: DeviceUptimeTimelinePoint[];
+}
+
+export interface DeviceHealthResponse {
+  switchCycles: number;
+  maxRatedCycles: number;
+  healthPercent: number;
+  chatteringWarning: boolean;
+  safetyTripped: boolean;
+  lastCycleAt: string;
+}

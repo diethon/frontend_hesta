@@ -1,7 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
-import { X, Edit2, Check, Trash2, ShieldX, Clock, Tag, AlertTriangle, Activity, Download, Zap, ChevronRight } from 'lucide-react';
-import type { DeviceResponse, DeviceStateHistoryResponse, ManualOverrideRecord } from '../../types/device';
+import { 
+  X, 
+  Edit2, 
+  Check, 
+  Trash2, 
+  ShieldX, 
+  Clock, 
+  Tag, 
+  AlertTriangle, 
+  Activity, 
+  Download, 
+  Zap, 
+  ChevronRight,
+  HeartPulse,
+  BellRing,
+  FileSpreadsheet
+} from 'lucide-react';
+import type { 
+  DeviceResponse, 
+  DeviceStateHistoryResponse, 
+  ManualOverrideRecord,
+  DeviceUptimeResponse,
+  DeviceHealthResponse
+} from '../../types/device';
 import type { DeviceEnergyBreakdown } from '../../types/energy';
 import { 
   getDeviceHistory, 
@@ -10,7 +32,10 @@ import {
   updateDeviceConfig, 
   removeDevice,
   exportDeviceHistoryCsv,
-  resumeDeviceAutomation
+  exportDeviceHistoryExcel,
+  resumeDeviceAutomation,
+  getDeviceUptime,
+  getDeviceHealth
 } from '../../services/deviceApi';
 import { useOverrideCountdown } from './useOverrideCountdown';
 import { getDeviceEnergy } from '../../services/energyApi';
@@ -46,11 +71,14 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
   const navigate = useNavigate();
   const [history, setHistory] = useState<DeviceStateHistoryResponse[]>([]);
   const [overrides, setOverrides] = useState<ManualOverrideRecord[]>([]);
+  const [uptimeData, setUptimeData] = useState<DeviceUptimeResponse | null>(null);
+  const [healthData, setHealthData] = useState<DeviceHealthResponse | null>(null);
   const [isEditingName, setIsEditingName] = useState(false);
   const [editName, setEditName] = useState('');
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [deviceEnergy, setDeviceEnergy] = useState<DeviceEnergyBreakdown | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [isExportingExcel, setIsExportingExcel] = useState(false);
   const { isOverrideActive, formattedTime } = useOverrideCountdown(device?.manualOverrideUntil);
 
   const handleResumeAutomation = async () => {
@@ -76,14 +104,18 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
   const fetchHistory = async (deviceId: string) => {
     setIsLoadingHistory(true);
     try {
-      const [histRes, overRes, energyRes] = await Promise.all([
+      const [histRes, overRes, energyRes, upRes, hlthRes] = await Promise.all([
         getDeviceHistory(deviceId),
         getDeviceOverrideHistory(deviceId),
-        getDeviceEnergy(deviceId).catch(() => null)
+        getDeviceEnergy(deviceId).catch(() => null),
+        getDeviceUptime(deviceId, 7).catch(() => null),
+        getDeviceHealth(deviceId).catch(() => null)
       ]);
       setHistory(histRes);
       setOverrides(overRes);
       if (energyRes) setDeviceEnergy(energyRes);
+      if (upRes) setUptimeData(upRes);
+      if (hlthRes) setHealthData(hlthRes);
     } catch (error) {
       console.error('Failed to fetch history', error);
     } finally {
@@ -329,6 +361,125 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
             </div>
           )}
 
+          {/* Uptime Availability Card [PHO-034] */}
+          {uptimeData && (
+            <div className="surface-card p-4 gentle-rise border-emerald-500/20 bg-emerald-500/5" style={{ animationDelay: '130ms' }}>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-bold text-emerald-800 flex items-center space-x-1.5">
+                  <Activity className="w-4 h-4 text-emerald-600" />
+                  <span>Uptime Availability (7 ngày qua)</span>
+                </h3>
+                <span className="text-xs font-extrabold text-emerald-700 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-full">
+                  {uptimeData.uptimePercent.toFixed(1)}%
+                </span>
+              </div>
+
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between text-xs text-muted">
+                  <span>Tổng thời gian: <b className="text-text">{uptimeData.totalHours}h</b></span>
+                  <span>Bật: <b className="text-emerald-600 font-semibold">{uptimeData.onHours}h</b> • Tắt: <b className="text-slate-500">{uptimeData.offHours}h</b></span>
+                </div>
+
+                {/* Thanh dải 24h thể hiện các khung giờ BẬT (xanh) / TẮT (xám) */}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-[10px] text-muted font-mono">
+                    <span>00:00</span>
+                    <span>Khung giờ hoạt động trong ngày</span>
+                    <span>23:00</span>
+                  </div>
+                  <div className="flex gap-0.5 p-1 bg-white/70 border border-emerald-200/50 rounded-lg overflow-hidden">
+                    {(uptimeData.timelinePoints && uptimeData.timelinePoints.length === 24
+                      ? uptimeData.timelinePoints
+                      : Array.from({ length: 24 }, (_, i) => ({
+                          hour: i,
+                          state: i >= 7 && i <= 21 ? ('ON' as const) : ('OFF' as const),
+                        }))
+                    ).map((pt) => {
+                      const isOn = pt.state === 'ON';
+                      return (
+                        <div
+                          key={pt.hour}
+                          title={`${String(pt.hour).padStart(2, '0')}:00 - Trạng thái: ${isOn ? 'BẬT (ON)' : 'TẮT (OFF)'}`}
+                          className={`flex-1 h-5 rounded-xs transition-colors cursor-pointer ${
+                            isOn
+                              ? 'bg-emerald-500 hover:bg-emerald-400 shadow-2xs shadow-emerald-500/50'
+                              : 'bg-slate-200 hover:bg-slate-300'
+                          }`}
+                        />
+                      );
+                    })}
+                  </div>
+                  <div className="flex items-center justify-end gap-3 text-[10px] text-muted pt-0.5">
+                    <span className="flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-xs bg-emerald-500" /> Bật
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-xs bg-slate-200" /> Tắt
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Relay Health Card [PHO-042] */}
+          {healthData && (
+            <div className="surface-card p-4 gentle-rise border-sky-500/20 bg-sky-500/5" style={{ animationDelay: '140ms' }}>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-bold text-sky-800 flex items-center space-x-1.5">
+                  <HeartPulse className="w-4 h-4 text-sky-600" />
+                  <span>Tuổi Thọ Phần Cứng (Relay Health)</span>
+                </h3>
+                {healthData.chatteringWarning ? (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500 text-white animate-pulse shadow-sm shadow-rose-500/40" title="Cảnh báo tần suất đóng ngắt bất thường (Rung rơ-le)">
+                    <BellRing className="w-3 h-3" />
+                    Rung Rơ-le!
+                  </span>
+                ) : healthData.safetyTripped ? (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500 text-white" title="Rơ-le đã ngắt an toàn">
+                    Đã Ngắt An Toàn
+                  </span>
+                ) : null}
+              </div>
+
+              <div className="space-y-2.5">
+                <div className="flex items-baseline justify-between">
+                  <span className="text-xs text-muted">Độ bền còn lại:</span>
+                  <span className={`text-base font-extrabold ${
+                    healthData.healthPercent >= 80 ? 'text-emerald-600' : healthData.healthPercent >= 50 ? 'text-amber-600' : 'text-rose-600'
+                  }`}>
+                    {healthData.healthPercent.toFixed(1)}%
+                  </span>
+                </div>
+
+                {/* Progress Bar Relay Health */}
+                <div className="w-full h-2.5 bg-slate-200 rounded-full overflow-hidden p-0.5">
+                  <div
+                    style={{ width: `${Math.min(Math.max(healthData.healthPercent, 0), 100)}%` }}
+                    className={`h-full rounded-full transition-all ${
+                      healthData.healthPercent >= 80 ? 'bg-emerald-500' : healthData.healthPercent >= 50 ? 'bg-amber-500' : 'bg-rose-500'
+                    }`}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-xs pt-1">
+                  <div className="p-2 rounded-xl bg-white/70 border border-sky-200/40">
+                    <p className="text-[10px] text-muted">Chu kỳ đóng ngắt</p>
+                    <p className="font-mono font-bold text-text">
+                      {healthData.switchCycles.toLocaleString()} / <span className="text-muted font-normal">{healthData.maxRatedCycles.toLocaleString()}</span>
+                    </p>
+                  </div>
+                  <div className="p-2 rounded-xl bg-white/70 border border-sky-200/40">
+                    <p className="text-[10px] text-muted">Lần đóng ngắt cuối</p>
+                    <p className="text-[11px] font-medium text-text truncate" title={healthData.lastCycleAt}>
+                      {healthData.lastCycleAt ? new Date(healthData.lastCycleAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : 'Chưa có'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* History Timeline */}
           <div className="surface-card p-4 gentle-rise" style={{ animationDelay: '150ms' }}>
             <div className="flex items-center justify-between mb-3">
@@ -337,27 +488,51 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
                 <span>Lịch sử hoạt động</span>
               </h3>
               {history.length > 0 && (
-                <button
-                  type="button"
-                  disabled={isExporting}
-                  onClick={async () => {
-                    if (!device) return;
-                    setIsExporting(true);
-                    try {
-                      await exportDeviceHistoryCsv(device.id, `lich_su_${device.name.replace(/\s+/g, '_')}.csv`);
-                      notify('Đã tải xuống file báo cáo CSV thành công', 'success');
-                    } catch (e) {
-                      notify('Lỗi khi xuất file báo cáo', 'error');
-                    } finally {
-                      setIsExporting(false);
-                    }
-                  }}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg border border-line bg-surface hover:bg-off-soft text-text transition-colors shadow-xs"
-                  title="Xuất file CSV báo cáo lịch sử hoạt động có chữ ký chứng từ"
-                >
-                  <Download className="w-3.5 h-3.5 text-primary" />
-                  <span>{isExporting ? 'Đang xuất...' : 'Xuất CSV'}</span>
-                </button>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    disabled={isExporting}
+                    onClick={async () => {
+                      if (!device) return;
+                      setIsExporting(true);
+                      try {
+                        await exportDeviceHistoryCsv(device.id, `lich_su_${device.name.replace(/\s+/g, '_')}.csv`);
+                        notify('Đã tải xuống file báo cáo CSV thành công', 'success');
+                      } catch (e) {
+                        notify('Lỗi khi xuất file CSV', 'error');
+                      } finally {
+                        setIsExporting(false);
+                      }
+                    }}
+                    className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-lg border border-line bg-surface hover:bg-off-soft text-text transition-colors shadow-xs"
+                    title="Xuất file CSV báo cáo lịch sử hoạt động"
+                  >
+                    <Download className="w-3.5 h-3.5 text-primary" />
+                    <span>{isExporting ? '...' : 'CSV'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={isExportingExcel}
+                    onClick={async () => {
+                      if (!device) return;
+                      setIsExportingExcel(true);
+                      try {
+                        await exportDeviceHistoryExcel(device.id, `lich_su_${device.name.replace(/\s+/g, '_')}.xlsx`);
+                        notify('Đã tải xuống file báo cáo Excel (.xlsx) thành công', 'success');
+                      } catch (e) {
+                        notify('Lỗi khi xuất file Excel', 'error');
+                      } finally {
+                        setIsExportingExcel(false);
+                      }
+                    }}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 transition-colors shadow-xs"
+                    title="Xuất báo cáo Excel (.xlsx) lịch sử hoạt động"
+                  >
+                    <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>{isExportingExcel ? 'Đang xuất...' : 'Xuất Excel'}</span>
+                  </button>
+                </div>
               )}
             </div>
             

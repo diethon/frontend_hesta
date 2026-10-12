@@ -6,6 +6,8 @@ import type {
   DeviceUpdateRequest,
   ManualCommandResponse,
   ManualOverrideRecord,
+  DeviceUptimeResponse,
+  DeviceHealthResponse,
 } from '../types/device';
 
 export const getDevicesByHome = async (homeId: string): Promise<DeviceResponse[]> => {
@@ -173,4 +175,37 @@ export const exportHomeDeviceHistoryCsv = async (homeId: string, filename?: stri
   link.click();
   link.parentNode?.removeChild(link);
   window.URL.revokeObjectURL(url);
+};
+
+export const getDeviceUptime = async (deviceId: string, days = 7): Promise<DeviceUptimeResponse> => {
+  const response = await apiClient.get(`/devices/${deviceId}/analytics/uptime`, {
+    params: { days },
+  });
+  return response.data.result;
+};
+
+export const getDeviceHealth = async (deviceId: string): Promise<DeviceHealthResponse> => {
+  const response = await apiClient.get(`/devices/${deviceId}/health`);
+  return response.data.result;
+};
+
+export const exportDeviceHistoryExcel = async (deviceId: string, filename?: string): Promise<void> => {
+  const response = await apiClient.get(`/devices/${deviceId}/history/export/excel`, {
+    responseType: 'blob',
+  });
+  const blob = new Blob([response.data], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  });
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', filename || `device_history_${deviceId}.xlsx`);
+  document.body.appendChild(link);
+  link.click();
+  link.parentNode?.removeChild(link);
+  window.URL.revokeObjectURL(url);
+};
+
+export const extendDeviceAutomation = async (deviceId: string, hours = 1): Promise<void> => {
+  await apiClient.post(`/devices/${deviceId}/automation/extend`, { hours });
 };

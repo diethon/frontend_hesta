@@ -22,6 +22,24 @@ export interface NodeDiagnostics {
   totalCommands: number;
   successfulCommands: number;
   averageLatencyMs: number;
+  p95LatencyMs?: number;
+  latencyMetrics?: LatencyMetrics;
   lastPingAt?: string;
   lastTrippedAt?: string;
+}
+
+export interface LatencyMetrics {
+  minLatencyMs: number;
+  maxLatencyMs: number;
+  avgLatencyMs: number;
+  p95LatencyMs: number;
+}
+
+export interface MqttPacket {
+  id: string;
+  timestamp: string;
+  topic: string;
+  direction: 'INBOUND' | 'OUTBOUND';
+  qos: number;
+  payloadSummary: string;
 }

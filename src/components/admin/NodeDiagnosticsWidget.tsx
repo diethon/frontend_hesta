@@ -15,9 +15,96 @@ import {
   getDiagnosticsSummary,
   getNodeDiagnostics,
   resetNodeCircuitBreaker,
+  tripNodeCircuitBreaker,
   pingNode
 } from '../../services/diagnosticsApi';
 import { notify } from '../ui/notify';
+
+export const LatencyGaugeArc: React.FC<{ avgLatencyMs: number; p95LatencyMs?: number }> = ({
+  avgLatencyMs,
+  p95LatencyMs,
+}) => {
+  const maxVal = 150;
+  const clampedAvg = Math.min(Math.max(avgLatencyMs, 0), maxVal);
+  const p95 = p95LatencyMs ?? Math.round(avgLatencyMs * 1.35);
+
+  const needleAngle = 180 + (clampedAvg / maxVal) * 180;
+  const needleRad = (needleAngle * Math.PI) / 180;
+  const cx = 90;
+  const cy = 76;
+  const needleLen = 46;
+  const nx = cx + needleLen * Math.cos(needleRad);
+  const ny = cy + needleLen * Math.sin(needleRad);
+
+  const getGaugeTone = (val: number) => {
+    if (val < 50) return 'text-emerald-600';
+    if (val <= 100) return 'text-amber-600';
+    return 'text-rose-600';
+  };
+
+  return (
+    <div className="flex flex-col items-center justify-center">
+      <div className="relative w-44 h-20">
+        <svg viewBox="0 0 180 88" className="w-full h-full overflow-visible">
+          {/* Vùng xanh: < 50ms */}
+          <path
+            d="M 28 76 A 62 62 0 0 1 59 22.3"
+            fill="none"
+            stroke="#10b981"
+            strokeWidth="9"
+            strokeLinecap="round"
+          />
+          {/* Vùng vàng: 50-100ms */}
+          <path
+            d="M 63 20 A 62 62 0 0 1 117 20"
+            fill="none"
+            stroke="#f59e0b"
+            strokeWidth="9"
+          />
+          {/* Vùng đỏ: > 100ms */}
+          <path
+            d="M 121 22.3 A 62 62 0 0 1 152 76"
+            fill="none"
+            stroke="#ef4444"
+            strokeWidth="9"
+            strokeLinecap="round"
+          />
+
+          {/* Scale labels */}
+          <text x="26" y="86" fontSize="8" fill="#94a3b8" textAnchor="middle" fontWeight="bold">0</text>
+          <text x="90" y="11" fontSize="8" fill="#94a3b8" textAnchor="middle" fontWeight="bold">75ms</text>
+          <text x="154" y="86" fontSize="8" fill="#94a3b8" textAnchor="middle" fontWeight="bold">150+</text>
+
+          {/* Needle Pointer */}
+          <line
+            x1={cx}
+            y1={cy}
+            x2={nx}
+            y2={ny}
+            stroke="#1e293b"
+            strokeWidth="3.5"
+            strokeLinecap="round"
+            className="transition-all duration-300"
+          />
+          <circle cx={cx} cy={cy} r="5.5" fill="#0f172a" />
+          <circle cx={cx} cy={cy} r="2" fill="#ffffff" />
+        </svg>
+      </div>
+
+      <div className="text-center">
+        <div className="flex items-baseline justify-center gap-1">
+          <span className={`text-xl font-extrabold tracking-tight ${getGaugeTone(avgLatencyMs)}`}>
+            {avgLatencyMs}
+          </span>
+          <span className="text-xs font-semibold text-muted">ms (RTT)</span>
+        </div>
+        <div className="text-[11px] font-mono text-muted flex items-center justify-center gap-2 mt-0.5">
+          <span>Phân vị P95: <b className="text-text font-bold">{p95} ms</b></span>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export const NodeDiagnosticsWidget: React.FC = () => {
   const [summary, setSummary] = useState<DiagnosticsSummary | null>(null);
@@ -25,6 +112,7 @@ export const NodeDiagnosticsWidget: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [pingingId, setPingingId] = useState<string | null>(null);
   const [resettingId, setResettingId] = useState<string | null>(null);
+  const [trippingCode, setTrippingCode] = useState<string | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -71,6 +159,20 @@ export const NodeDiagnosticsWidget: React.FC = () => {
       notify(`Lỗi khôi phục circuit breaker cho ${nodeCode}`, 'error');
     } finally {
       setResettingId(null);
+    }
+  };
+
+  const handleTripCircuit = async (nodeCode: string) => {
+    setTrippingCode(nodeCode);
+    try {
+      const updated = await tripNodeCircuitBreaker(nodeCode);
+      setNodes((prev) => prev.map((n) => (n.nodeCode === nodeCode ? updated : n)));
+      notify(`Đã kích hoạt ngắt mạch (TRIP) cho node ${nodeCode}`, 'warning');
+      fetchData();
+    } catch {
+      notify(`Lỗi kích hoạt ngắt mạch cho node ${nodeCode}`, 'error');
+    } finally {
+      setTrippingCode(null);
     }
   };
 
@@ -165,21 +267,18 @@ export const NodeDiagnosticsWidget: React.FC = () => {
           </p>
         </div>
 
-        {/* Card 4: Network Reliability & Latency */}
-        <div className="surface-card group p-5 transition hover:-translate-y-0.5 hover:border-primary">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-bold text-muted uppercase tracking-wider">Độ Tin Cậy Mạng</span>
-            <div className="w-9 h-9 bg-amber-500/10 text-amber-500 rounded-xl flex items-center justify-center">
-              <Zap className="w-5 h-5" />
+        {/* Card 4: Network Reliability & Latency Gauge Arc [PHO-036] */}
+        <div className="surface-card group p-4 transition hover:-translate-y-0.5 hover:border-primary flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs font-bold text-muted uppercase tracking-wider">Độ Trễ RTT Gauge</span>
+            <div className="w-7 h-7 bg-amber-500/10 text-amber-500 rounded-lg flex items-center justify-center">
+              <Zap className="w-4 h-4" />
             </div>
           </div>
-          <div className="flex items-baseline gap-2">
-            <h3 className="text-2xl font-bold text-text">
-              {summary ? `${summary.systemReliabilityPct}%` : '99.4%'}
-            </h3>
-            <span className="text-xs font-semibold text-muted">~{summary?.averageLatencyMs ?? 28}ms</span>
-          </div>
-          <p className="text-xs text-muted mt-1">Độ trễ trung bình RTT</p>
+          <LatencyGaugeArc
+            avgLatencyMs={summary?.averageLatencyMs ?? 28}
+            p95LatencyMs={nodes[0]?.p95LatencyMs}
+          />
         </div>
       </div>
 
@@ -192,7 +291,7 @@ export const NodeDiagnosticsWidget: React.FC = () => {
               Giám Sát Sức Khỏe Phần Cứng &amp; Mạch Bảo Vệ (Circuit Breaker)
             </h2>
             <p className="text-xs text-muted mt-0.5">
-              Tự động cách ly node mất gói tin liên tiếp để chống nghẽn đường truyền; hỗ trợ Ping và Reset mạch trực tiếp.
+              Tự động cách ly node mất gói tin liên tiếp để chống nghẽn đường truyền; hỗ trợ Ping, Trip và Reset mạch trực tiếp.
             </p>
           </div>
           <button
@@ -231,6 +330,7 @@ export const NodeDiagnosticsWidget: React.FC = () => {
                 nodes.map((node) => {
                   const isPinging = pingingId === node.nodeId;
                   const isResetting = resettingId === node.nodeId;
+                  const isTripping = trippingCode === node.nodeCode;
 
                   return (
                     <tr key={node.nodeId} className="hover:bg-off-soft/30 transition-colors">
@@ -254,15 +354,20 @@ export const NodeDiagnosticsWidget: React.FC = () => {
                         {getCircuitBadge(node.circuitState)}
                       </td>
                       <td className="py-3.5 px-3 text-center">
-                        <span className={`font-mono font-semibold px-2 py-0.5 rounded text-[11px] ${
-                          node.averageLatencyMs < 40
-                            ? 'text-emerald-700 bg-emerald-50'
-                            : node.averageLatencyMs < 90
-                            ? 'text-amber-700 bg-amber-50'
-                            : 'text-rose-700 bg-rose-50'
-                        }`}>
-                          {node.averageLatencyMs} ms
-                        </span>
+                        <div className="inline-flex flex-col items-center">
+                          <span className={`font-mono font-semibold px-2 py-0.5 rounded text-[11px] ${
+                            node.averageLatencyMs < 50
+                              ? 'text-emerald-700 bg-emerald-50'
+                              : node.averageLatencyMs <= 100
+                              ? 'text-amber-700 bg-amber-50'
+                              : 'text-rose-700 bg-rose-50'
+                          }`}>
+                            {node.averageLatencyMs} ms
+                          </span>
+                          <span className="text-[10px] text-muted font-mono mt-0.5">
+                            P95: {node.p95LatencyMs ?? Math.round(node.averageLatencyMs * 1.35)}ms
+                          </span>
+                        </div>
                       </td>
                       <td className="py-3.5 px-3 text-center font-medium text-text">
                         {node.successfulCommands}/{node.totalCommands}
@@ -278,6 +383,18 @@ export const NodeDiagnosticsWidget: React.FC = () => {
                           >
                             <Send className={`w-3 h-3 ${isPinging ? 'animate-bounce' : ''}`} />
                             Ping
+                          </button>
+
+                          {/* Nút Giả lập ngắt mạch (Trip) [PHO-037] */}
+                          <button
+                            type="button"
+                            disabled={isTripping || node.circuitState === 'OPEN'}
+                            onClick={() => handleTripCircuit(node.nodeCode)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-lg border border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-600 hover:text-white transition-colors shadow-xs disabled:opacity-40"
+                            title="Giả lập ngắt mạch khẩn cấp (Trip Circuit Breaker)"
+                          >
+                            <ShieldAlert className={`w-3 h-3 ${isTripping ? 'animate-spin' : ''}`} />
+                            Trip
                           </button>
 
                           {node.circuitState !== 'CLOSED' && (

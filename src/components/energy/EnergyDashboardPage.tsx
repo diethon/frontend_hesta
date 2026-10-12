@@ -4,7 +4,20 @@ import { AppSidebar, DeviceIcon, HomeIcon, TwinIcon } from '../ui/AppSidebar';
 import { getHomeEnergyAnalytics } from '../../services/energyApi';
 import type { EnergyAnalyticsResponse, DeviceEnergyBreakdown, EnergyTimeSeriesPoint } from '../../types/energy';
 import { getErrorMessage } from '../../utils/errors';
-import { Zap, TrendingUp, AlertCircle, DollarSign, Clock, ArrowLeft, RefreshCw, Layers } from 'lucide-react';
+import { Zap, TrendingUp, AlertCircle, DollarSign, Clock, ArrowLeft, RefreshCw, Layers, PieChart } from 'lucide-react';
+
+const DONUT_COLORS = [
+  '#f59e0b', // Amber
+  '#06b6d4', // Cyan
+  '#10b981', // Emerald
+  '#8b5cf6', // Violet
+  '#f43f5e', // Rose
+  '#3b82f6', // Blue
+  '#ec4899', // Pink
+  '#14b8a6', // Teal
+  '#eab308', // Yellow
+  '#6366f1', // Indigo
+];
 
 export const EnergyDashboardPage: React.FC = () => {
   const { homeId } = useParams<{ homeId: string }>();
@@ -15,6 +28,7 @@ export const EnergyDashboardPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [hoveredPoint, setHoveredPoint] = useState<EnergyTimeSeriesPoint | null>(null);
+  const [hoveredBreakdown, setHoveredBreakdown] = useState<DeviceEnergyBreakdown | null>(null);
 
   const fetchEnergy = useCallback(async () => {
     if (!homeId) return;
@@ -307,6 +321,163 @@ export const EnergyDashboardPage: React.FC = () => {
                 );
               })}
             </div>
+          </div>
+
+          {/* Donut Chart & Breakdown Legend [PHO-033] */}
+          <div className="bg-slate-900/90 border border-slate-800 p-6 rounded-2xl space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-800/80 pb-4">
+              <div>
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                  <PieChart className="h-5 w-5 text-amber-400" />
+                  Biểu Đồ Tròn Tỷ Lệ Điện Năng Tiêu Thụ
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Phân bổ phần trăm điện năng giữa các thiết bị trong nhà ({period})
+                </p>
+              </div>
+              {hoveredBreakdown && (
+                <button
+                  type="button"
+                  onClick={() => setHoveredBreakdown(null)}
+                  className="text-xs text-slate-400 hover:text-white transition px-2 py-1 rounded-md bg-slate-800"
+                >
+                  Xóa chọn lọc
+                </button>
+              )}
+            </div>
+
+            {breakdown.length === 0 ? (
+              <p className="text-sm text-slate-500 py-8 text-center">
+                Chưa có dữ liệu tiêu thụ điện để vẽ biểu đồ tròn.
+              </p>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+                {/* Cột trái: SVG Donut Chart */}
+                <div className="lg:col-span-5 flex flex-col items-center justify-center relative">
+                  <div className="relative w-64 h-64 sm:w-72 sm:h-72">
+                    <svg viewBox="0 0 280 280" className="w-full h-full transform -rotate-90">
+                      {/* Vòng nền */}
+                      <circle
+                        cx="140"
+                        cy="140"
+                        r="90"
+                        fill="transparent"
+                        stroke="#1e293b"
+                        strokeWidth="32"
+                      />
+                      {/* Lát cắt của từng thiết bị */}
+                      {(() => {
+                        const totalKwhCalc = breakdown.reduce((sum, d) => sum + (d.kwh || 0), 0) || 1;
+                        const circumference = 2 * Math.PI * 90;
+                        let accumulated = 0;
+
+                        return breakdown.map((dev, idx) => {
+                          const pct = dev.percentage > 0 ? dev.percentage : (dev.kwh / totalKwhCalc) * 100;
+                          const sliceLen = (pct / 100) * circumference;
+                          const gap = breakdown.length > 1 ? 2.5 : 0;
+                          const dashLength = Math.max(sliceLen - gap, 0.5);
+                          const strokeDasharray = `${dashLength} ${circumference - dashLength}`;
+                          const strokeDashoffset = -accumulated;
+                          accumulated += sliceLen;
+
+                          const color = DONUT_COLORS[idx % DONUT_COLORS.length];
+                          const isHovered = hoveredBreakdown?.deviceId === dev.deviceId;
+
+                          return (
+                            <circle
+                              key={dev.deviceId}
+                              cx="140"
+                              cy="140"
+                              r="90"
+                              fill="transparent"
+                              stroke={color}
+                              strokeWidth={isHovered ? 40 : 32}
+                              strokeDasharray={strokeDasharray}
+                              strokeDashoffset={strokeDashoffset}
+                              strokeLinecap="round"
+                              className="transition-all duration-300 cursor-pointer"
+                              style={{
+                                opacity: hoveredBreakdown && !isHovered ? 0.4 : 1,
+                                filter: isHovered ? `drop-shadow(0 0 8px ${color})` : undefined,
+                              }}
+                              onMouseEnter={() => setHoveredBreakdown(dev)}
+                              onMouseLeave={() => setHoveredBreakdown(null)}
+                            />
+                          );
+                        });
+                      })()}
+                    </svg>
+
+                    {/* Tâm rỗng hiển thị thông số */}
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6 pointer-events-none">
+                      <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider truncate max-w-[130px]">
+                        {hoveredBreakdown ? hoveredBreakdown.deviceName : 'Tổng Tiêu Thụ'}
+                      </span>
+                      <div className="flex items-baseline gap-1 my-0.5">
+                        <span className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+                          {hoveredBreakdown ? hoveredBreakdown.kwh : (summary?.totalKwh ?? 0)}
+                        </span>
+                        <span className="text-xs font-bold text-amber-400">kWh</span>
+                      </div>
+                      <span className="text-xs font-semibold text-emerald-400 truncate max-w-[140px]">
+                        {hoveredBreakdown
+                          ? `${hoveredBreakdown.percentage}% (${formatCurrency(hoveredBreakdown.costVnd)})`
+                          : formatCurrency(summary?.estimatedCostVnd)}
+                      </span>
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-2">
+                    Rê chuột vào các lát cắt để xem chi tiết
+                  </p>
+                </div>
+
+                {/* Cột phải: Legend Chú Giải Thiết Bị */}
+                <div className="lg:col-span-7 space-y-2.5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-72 overflow-y-auto pr-1">
+                    {breakdown.map((dev, idx) => {
+                      const color = DONUT_COLORS[idx % DONUT_COLORS.length];
+                      const isHovered = hoveredBreakdown?.deviceId === dev.deviceId;
+
+                      return (
+                        <div
+                          key={dev.deviceId}
+                          onMouseEnter={() => setHoveredBreakdown(dev)}
+                          onMouseLeave={() => setHoveredBreakdown(null)}
+                          className={`p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-2 ${
+                            isHovered
+                              ? 'bg-slate-800/90 border-slate-600 shadow-md scale-[1.02]'
+                              : 'bg-slate-950/60 border-slate-800/80 hover:bg-slate-800/50'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <span
+                              className="w-3.5 h-3.5 rounded-full shrink-0 shadow-xs"
+                              style={{ backgroundColor: color }}
+                            />
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold text-white truncate">
+                                {dev.deviceName}
+                              </p>
+                              <p className="text-[10px] text-slate-400 truncate">
+                                {dev.roomName || dev.deviceType}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <span className="text-xs font-extrabold text-amber-400 font-mono block">
+                              {dev.percentage}%
+                            </span>
+                            <span className="text-[10px] text-slate-400 font-mono">
+                              {dev.kwh} kWh
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Device Breakdown List */}

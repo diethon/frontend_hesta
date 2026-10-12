@@ -21,8 +21,9 @@ import {
   setAcSwing,
 } from '../../../services/deviceApi';
 import { notify } from '../../ui/notify';
-import { getErrorMessage } from '../../../utils/errors';
+import { getErrorMessage, isDuplicateCommandError } from '../../../utils/errors';
 import { useOverrideCountdown } from '../useOverrideCountdown';
+import { OverrideActionModal } from '../OverrideActionModal';
 
 interface AcCardProps {
   device: DeviceResponse;
@@ -89,6 +90,7 @@ export const AcCard: React.FC<AcCardProps> = ({
   const isPowerOn = rawPower === 'ON' || rawPower === true || rawPower === 'true';
 
   const { isOverrideActive, formattedTime } = useOverrideCountdown(device.manualOverrideUntil);
+  const [isOverrideModalOpen, setIsOverrideModalOpen] = useState(false);
 
   const [power, setPower] = useState<boolean>(isPowerOn);
   const [temperature, setTemperature] = useState<number>(
@@ -150,7 +152,11 @@ export const AcCard: React.FC<AcCardProps> = ({
             currentState: { ...device.currentState, temperature: newTemp },
           });
         } catch (err) {
-          notify.error(getErrorMessage(err, 'Lỗi cài đặt nhiệt độ'));
+          if (isDuplicateCommandError(err)) {
+            notify.warning('Thiết bị đang thực thi lệnh trước, vui lòng không click liên tục.');
+          } else {
+            notify.error(getErrorMessage(err, 'Lỗi cài đặt nhiệt độ'));
+          }
         }
       }, 350);
     },
@@ -179,7 +185,11 @@ export const AcCard: React.FC<AcCardProps> = ({
       });
     } catch (err) {
       setPower(!nextPower);
-      notify.error(getErrorMessage(err, 'Lỗi cập nhật nguồn điều hòa'));
+      if (isDuplicateCommandError(err)) {
+        notify.warning('Thiết bị đang thực thi lệnh trước, vui lòng không click liên tục.');
+      } else {
+        notify.error(getErrorMessage(err, 'Lỗi cập nhật nguồn điều hòa'));
+      }
     } finally {
       setIsPowerBusy(false);
     }
@@ -199,7 +209,11 @@ export const AcCard: React.FC<AcCardProps> = ({
         currentState: { ...device.currentState, temperature: nextTemp },
       });
     } catch (err) {
-      notify.error(getErrorMessage(err, 'Lỗi giảm nhiệt độ'));
+      if (isDuplicateCommandError(err)) {
+        notify.warning('Thiết bị đang thực thi lệnh trước, vui lòng không click liên tục.');
+      } else {
+        notify.error(getErrorMessage(err, 'Lỗi giảm nhiệt độ'));
+      }
     }
   };
 
@@ -216,7 +230,11 @@ export const AcCard: React.FC<AcCardProps> = ({
         currentState: { ...device.currentState, temperature: nextTemp },
       });
     } catch (err) {
-      notify.error(getErrorMessage(err, 'Lỗi tăng nhiệt độ'));
+      if (isDuplicateCommandError(err)) {
+        notify.warning('Thiết bị đang thực thi lệnh trước, vui lòng không click liên tục.');
+      } else {
+        notify.error(getErrorMessage(err, 'Lỗi tăng nhiệt độ'));
+      }
     }
   };
 
@@ -236,7 +254,11 @@ export const AcCard: React.FC<AcCardProps> = ({
       });
     } catch (err) {
       setMode(oldMode);
-      notify.error(getErrorMessage(err, 'Lỗi đổi chế độ'));
+      if (isDuplicateCommandError(err)) {
+        notify.warning('Thiết bị đang thực thi lệnh trước, vui lòng không click liên tục.');
+      } else {
+        notify.error(getErrorMessage(err, 'Lỗi đổi chế độ'));
+      }
     }
   };
 
@@ -256,7 +278,11 @@ export const AcCard: React.FC<AcCardProps> = ({
       });
     } catch (err) {
       setFan(oldFan);
-      notify.error(getErrorMessage(err, 'Lỗi đổi tốc độ quạt'));
+      if (isDuplicateCommandError(err)) {
+        notify.warning('Thiết bị đang thực thi lệnh trước, vui lòng không click liên tục.');
+      } else {
+        notify.error(getErrorMessage(err, 'Lỗi đổi tốc độ quạt'));
+      }
     }
   };
 
@@ -276,7 +302,11 @@ export const AcCard: React.FC<AcCardProps> = ({
       });
     } catch (err) {
       setSwing(!nextSwing);
-      notify.error(getErrorMessage(err, 'Lỗi cài đặt đảo gió'));
+      if (isDuplicateCommandError(err)) {
+        notify.warning('Thiết bị đang thực thi lệnh trước, vui lòng không click liên tục.');
+      } else {
+        notify.error(getErrorMessage(err, 'Lỗi cài đặt đảo gió'));
+      }
     }
   };
 
@@ -417,12 +447,17 @@ export const AcCard: React.FC<AcCardProps> = ({
                   : 'Đã tắt nguồn'}
               </p>
               {isOverrideActive && (
-                <span
-                  className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded-md bg-amber-100 text-amber-800 border border-amber-300 animate-pulse"
-                  title="Đang khóa tự động hóa trong 30 phút do thao tác thủ công"
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsOverrideModalOpen(true);
+                  }}
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded-md bg-amber-100 hover:bg-amber-200 text-amber-800 border border-amber-300 animate-pulse transition cursor-pointer"
+                  title="Đang khóa tự động hóa. Bấm để quản lý hoặc gia hạn"
                 >
                   🔒 {formattedTime}
-                </span>
+                </button>
               )}
             </div>
           </div>
@@ -667,6 +702,15 @@ export const AcCard: React.FC<AcCardProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Override Action Modal [PHO-043] */}
+      <OverrideActionModal
+        isOpen={isOverrideModalOpen}
+        onClose={() => setIsOverrideModalOpen(false)}
+        deviceId={device.id}
+        deviceName={device.name}
+        formattedTime={formattedTime}
+      />
     </article>
   );
 };
