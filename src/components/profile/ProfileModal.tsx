@@ -125,13 +125,13 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
       <div role="dialog" aria-modal="true" aria-labelledby="profile-modal-title" className="auth-surface gentle-rise flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden overscroll-contain">
         
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-slate-800">
+        <div className="flex items-center justify-between p-6 border-b border-line">
           <h2 id="profile-modal-title" className="text-lg font-bold text-text">Hồ sơ cá nhân</h2>
           <button 
             type="button"
             aria-label="Đóng hồ sơ cá nhân"
             onClick={onClose}
-            className="text-slate-400 hover:text-white transition-colors p-1 rounded-lg hover:bg-slate-800"
+            className="text-muted hover:text-text hover:bg-sidebar-hover p-1 rounded-lg transition-colors"
           >
             <svg aria-hidden={true} className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -140,23 +140,23 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-slate-800">
+        <div className="flex border-b border-line">
           <button
             onClick={() => setActiveTab('info')}
-            className={`flex-1 py-4 text-sm font-medium transition-colors border-b-2 ${
+            className={`flex-1 py-4 text-sm font-semibold transition-colors border-b-2 ${
               activeTab === 'info' 
-                ? 'border-cyan-500 text-cyan-400' 
-                : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                ? 'border-primary text-primary' 
+                : 'border-transparent text-muted hover:text-text hover:bg-sidebar-hover/50'
             }`}
           >
             Thông tin cơ bản
           </button>
           <button
             onClick={() => setActiveTab('security')}
-            className={`flex-1 py-4 text-sm font-medium transition-colors border-b-2 ${
+            className={`flex-1 py-4 text-sm font-semibold transition-colors border-b-2 ${
               activeTab === 'security' 
-                ? 'border-cyan-500 text-cyan-400' 
-                : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                ? 'border-primary text-primary' 
+                : 'border-transparent text-muted hover:text-text hover:bg-sidebar-hover/50'
             }`}
           >
             Bảo mật
@@ -171,7 +171,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
             <form onSubmit={handleUpdateInfo} className="space-y-4 animate-in slide-in-from-right-4 duration-300">
               
               {infoError && (
-                <div role="alert" aria-live="polite" className="bg-rose-950/60 border border-rose-500/30 text-rose-300 px-4 py-3 rounded-xl text-xs flex items-center gap-2">
+                <div role="alert" aria-live="polite" className="bg-rose-500/10 border border-rose-500/30 text-rose-700 dark:text-rose-300 px-4 py-3 rounded-xl text-xs flex items-center gap-2">
                   <svg aria-hidden={true} className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
@@ -184,7 +184,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
                   type="button"
                   aria-label="Thay đổi ảnh đại diện"
                   disabled={isUploadingAvatar}
-                  className="relative w-20 h-20 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-white text-3xl font-bold shadow-lg shadow-cyan-500/20 mb-3 cursor-pointer group overflow-hidden"
+                  className="relative w-20 h-20 rounded-full bg-gradient-to-tr from-cyan-500 to-primary flex items-center justify-center text-white text-3xl font-bold shadow-lg shadow-primary/20 mb-3 cursor-pointer group overflow-hidden"
                   onClick={() => !isUploadingAvatar && fileInputRef.current?.click()}
                 >
                   <UserAvatar
@@ -205,14 +205,14 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
                   {/* Loading State Overlay */}
                   {isUploadingAvatar && (
                     <div className="absolute inset-0 bg-slate-900/80 flex items-center justify-center">
-                      <svg aria-hidden={true} className="animate-spin w-6 h-6 text-cyan-400" fill="none" viewBox="0 0 24 24">
+                      <svg aria-hidden={true} className="animate-spin w-6 h-6 text-primary" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                       </svg>
                     </div>
                   )}
                 </button>
-                <p className="text-xs text-slate-400">Nhấn vào để thay đổi ảnh</p>
+                <p className="text-xs text-muted">Nhấn vào để thay đổi ảnh</p>
                 <input 
                   type="file" 
                   accept="image/*" 
@@ -223,18 +223,18 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
               </div>
 
               <div>
-                <label htmlFor="profile-email" className="block text-xs font-medium text-slate-300 mb-1">Email (Không thể thay đổi)</label>
+                <label htmlFor="profile-email" className="block text-xs font-medium text-text mb-1">Email (Không thể thay đổi)</label>
                 <input
                   id="profile-email"
                   type="email"
                   value={user.email}
                   disabled
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-500 cursor-not-allowed"
+                  className="w-full bg-sidebar border border-line rounded-xl px-4 py-2.5 text-sm text-muted cursor-not-allowed"
                 />
               </div>
 
               <div>
-                <label htmlFor="profile-name" className="block text-xs font-medium text-slate-300 mb-1">Họ và tên <span className="text-rose-400">*</span></label>
+                <label htmlFor="profile-name" className="block text-xs font-medium text-text mb-1">Họ và tên <span className="text-error">*</span></label>
                 <input
                   id="profile-name"
                   type="text"
@@ -242,12 +242,12 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
                   onChange={(e) => setFullName(e.target.value)}
                   required
                   autoComplete="name"
-                  className="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 rounded-xl px-4 py-2.5 text-sm text-slate-100 outline-none transition"
+                  className="w-full bg-surface border border-line rounded-xl px-4 py-2.5 text-sm text-text focus:border-primary outline-none transition"
                 />
               </div>
 
               <div>
-                <label htmlFor="profile-phone" className="block text-xs font-medium text-slate-300 mb-1">Số điện thoại</label>
+                <label htmlFor="profile-phone" className="block text-xs font-medium text-text mb-1">Số điện thoại</label>
                 <input
                   id="profile-phone"
                   type="tel"
@@ -255,7 +255,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
                   onChange={(e) => setPhoneNumber(e.target.value)}
                   placeholder="Nhập số điện thoại…"
                   autoComplete="tel"
-                  className="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-600 outline-none transition"
+                  className="w-full bg-surface border border-line rounded-xl px-4 py-2.5 text-sm text-text placeholder-muted focus:border-primary outline-none transition"
                 />
               </div>
 
@@ -263,7 +263,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
                 <button
                   type="submit"
                   disabled={isUpdatingInfo}
-                  className="w-full py-2.5 px-4 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold text-sm rounded-xl transition shadow-lg shadow-cyan-500/25 active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="w-full py-2.5 px-4 bg-primary hover:bg-primary-hover text-white font-semibold text-sm rounded-xl transition shadow-xs active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {isUpdatingInfo ? (
                     <span className="flex items-center gap-2">
@@ -284,7 +284,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
             <form onSubmit={handleChangePassword} className="space-y-4 animate-in slide-in-from-right-4 duration-300">
               
               {securityError && (
-                <div role="alert" aria-live="polite" className="bg-rose-950/60 border border-rose-500/30 text-rose-300 px-4 py-3 rounded-xl text-xs flex items-center gap-2">
+                <div role="alert" aria-live="polite" className="bg-rose-500/10 border border-rose-500/30 text-rose-700 dark:text-rose-300 px-4 py-3 rounded-xl text-xs flex items-center gap-2">
                   <svg aria-hidden={true} className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
@@ -293,13 +293,13 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
               )}
 
               {user.provider === 'GOOGLE' && (
-                <div className="bg-blue-950/40 border border-blue-500/30 p-4 rounded-xl mb-4 text-xs text-blue-300">
+                <div className="bg-primary/10 border border-primary/30 p-4 rounded-xl mb-4 text-xs text-primary">
                   <p>Tài khoản của bạn được đăng nhập thông qua Google. Tính năng đổi mật khẩu có thể không khả dụng nếu bạn chưa từng đặt mật khẩu cục bộ.</p>
                 </div>
               )}
 
               <div>
-                <label htmlFor="current-password" className="block text-xs font-medium text-slate-300 mb-1">Mật khẩu hiện tại <span className="text-rose-400">*</span></label>
+                <label htmlFor="current-password" className="block text-xs font-medium text-text mb-1">Mật khẩu hiện tại <span className="text-error">*</span></label>
                 <input
                   id="current-password"
                   type="password"
@@ -308,12 +308,12 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
                   placeholder="••••••••"
                   required
                   autoComplete="current-password"
-                  className="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-600 outline-none transition"
+                  className="w-full bg-surface border border-line rounded-xl px-4 py-2.5 text-sm text-text placeholder-muted focus:border-primary outline-none transition"
                 />
               </div>
 
               <div>
-                <label htmlFor="new-password" className="block text-xs font-medium text-slate-300 mb-1">Mật khẩu mới <span className="text-rose-400">*</span></label>
+                <label htmlFor="new-password" className="block text-xs font-medium text-text mb-1">Mật khẩu mới <span className="text-error">*</span></label>
                 <input
                   id="new-password"
                   type="password"
@@ -322,12 +322,12 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
                   placeholder="••••••••"
                   required
                   autoComplete="new-password"
-                  className="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-600 outline-none transition"
+                  className="w-full bg-surface border border-line rounded-xl px-4 py-2.5 text-sm text-text placeholder-muted focus:border-primary outline-none transition"
                 />
               </div>
 
               <div>
-                <label htmlFor="confirm-new-password" className="block text-xs font-medium text-slate-300 mb-1">Xác nhận mật khẩu mới <span className="text-rose-400">*</span></label>
+                <label htmlFor="confirm-new-password" className="block text-xs font-medium text-text mb-1">Xác nhận mật khẩu mới <span className="text-error">*</span></label>
                 <input
                   id="confirm-new-password"
                   type="password"
@@ -336,7 +336,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
                   placeholder="••••••••"
                   required
                   autoComplete="new-password"
-                  className="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-600 outline-none transition"
+                  className="w-full bg-surface border border-line rounded-xl px-4 py-2.5 text-sm text-text placeholder-muted focus:border-primary outline-none transition"
                 />
               </div>
 
@@ -344,7 +344,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
                 <button
                   type="submit"
                   disabled={isChangingPassword}
-                  className="w-full py-2.5 px-4 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-semibold text-sm rounded-xl transition shadow-lg shadow-emerald-500/25 active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="w-full py-2.5 px-4 bg-primary hover:bg-primary-hover text-white font-semibold text-sm rounded-xl transition shadow-xs active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {isChangingPassword ? (
                     <span className="flex items-center gap-2">

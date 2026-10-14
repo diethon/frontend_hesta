@@ -1,4 +1,4 @@
-﻿import type { DeviceAction } from './deviceVocabulary';
+import type { DeviceAction } from './deviceVocabulary';
 
 export type SceneActionType = DeviceAction;
 
@@ -29,6 +29,7 @@ export interface SceneActionResponse {
   id: string;
   targetDeviceId: string;
   targetDeviceName: string;
+  targetDeviceType?: string;
   action: SceneActionType;
   value: unknown | null;
   order: number;

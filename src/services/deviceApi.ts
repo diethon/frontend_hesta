@@ -6,7 +6,40 @@ import type {
   DeviceUpdateRequest,
   ManualCommandResponse,
   ManualOverrideRecord,
+  DeviceUptimeResponse,
+  DeviceHealthResponse,
 } from '../types/device';
+
+export interface DevicePublicPreviewResponse {
+  deviceId: string;
+  name: string;
+  deviceType: string;
+  model?: string;
+  serialNumber?: string;
+  status: string;
+}
+
+export interface DeviceClaimRequest {
+  token: string;
+  homeId: string;
+  roomId: string;
+  name?: string;
+  nodeCode?: string;
+}
+
+export const resolveQrToken = async (token: string): Promise<DevicePublicPreviewResponse> => {
+  const prefix = 'syna://device/register?token=';
+  const cleanToken = token.startsWith(prefix) ? token.slice(prefix.length) : token.trim();
+  const response = await apiClient.get(`/devices/qr/${cleanToken}`);
+  return response.data.result;
+};
+
+export const claimDevice = async (deviceId: string, request: DeviceClaimRequest): Promise<DeviceResponse> => {
+  const response = await apiClient.post(`/devices/${deviceId}/claim`, request);
+  return response.data.result;
+};
+
+
 
 export const getDevicesByHome = async (homeId: string): Promise<DeviceResponse[]> => {
   const response = await apiClient.get(`/homes/${homeId}/devices`);
@@ -69,6 +102,10 @@ export const sendManualPowerCommand = async (deviceId: string, action: 'TURN_ON'
 export const cancelDeviceAutomation = async (deviceId: string): Promise<string> => {
   const response = await apiClient.post(`/devices/${deviceId}/automation/cancel`);
   return response.data.result;
+};
+
+export const resumeDeviceAutomation = async (deviceId: string): Promise<void> => {
+  await apiClient.post(`/devices/${deviceId}/automation/resume`);
 };
 
 export const getDeviceOverrideHistory = async (deviceId: string): Promise<ManualOverrideRecord[]> => {
@@ -141,6 +178,69 @@ export const getGateState = async (deviceId: string): Promise<{ deviceId: string
   return response.data.result;
 };
 
+export const exportDeviceHistoryCsv = async (deviceId: string, filename?: string): Promise<void> => {
+  const response = await apiClient.get(`/devices/${deviceId}/history/export`, {
+    responseType: 'blob',
+  });
+  const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8;' });
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', filename || `device_audit_${deviceId}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  link.parentNode?.removeChild(link);
+  window.URL.revokeObjectURL(url);
+};
+
+export const exportHomeDeviceHistoryCsv = async (homeId: string, filename?: string): Promise<void> => {
+  const response = await apiClient.get(`/homes/${homeId}/devices/history/export`, {
+    responseType: 'blob',
+  });
+  const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8;' });
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', filename || `home_audit_${homeId}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  link.parentNode?.removeChild(link);
+  window.URL.revokeObjectURL(url);
+};
+
+export const getDeviceUptime = async (deviceId: string, days = 7): Promise<DeviceUptimeResponse> => {
+  const response = await apiClient.get(`/devices/${deviceId}/analytics/uptime`, {
+    params: { days },
+  });
+  return response.data.result;
+};
+
+export const getDeviceHealth = async (deviceId: string): Promise<DeviceHealthResponse> => {
+  const response = await apiClient.get(`/devices/${deviceId}/health`);
+  return response.data.result;
+};
+
+export const exportDeviceHistoryExcel = async (deviceId: string, filename?: string): Promise<void> => {
+  const response = await apiClient.get(`/devices/${deviceId}/history/export/excel`, {
+    responseType: 'blob',
+  });
+  const blob = new Blob([response.data], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  });
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', filename || `device_history_${deviceId}.xlsx`);
+  document.body.appendChild(link);
+  link.click();
+  link.parentNode?.removeChild(link);
+  window.URL.revokeObjectURL(url);
+};
+
+export const extendDeviceAutomation = async (deviceId: string, hours = 1): Promise<void> => {
+  await apiClient.post(`/devices/${deviceId}/automation/extend`, { hours });
+};
+
 // ===== Admin Device Onboarding & QR API =====
 export interface AdminCreateDevicePayload {
   name: string;
@@ -178,4 +278,3 @@ export const adminRegenerateQr = async (deviceId: string): Promise<QrInfo> => {
   const response = await apiClient.post(`/admin/devices/${deviceId}/qr/regenerate`);
   return response.data.result;
 };
-

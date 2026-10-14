@@ -1,13 +1,44 @@
 import React, { useState, useEffect } from 'react';
-import { X, Edit2, Check, Trash2, ShieldX, Clock, Tag, AlertTriangle, Activity } from 'lucide-react';
-import type { DeviceResponse, DeviceStateHistoryResponse, ManualOverrideRecord } from '../../types/device';
+import { useNavigate } from 'react-router';
+import { 
+  X, 
+  Edit2, 
+  Check, 
+  Trash2, 
+  ShieldX, 
+  Clock, 
+  Tag, 
+  AlertTriangle, 
+  Activity, 
+  Download, 
+  Zap, 
+  ChevronRight,
+  HeartPulse,
+  BellRing,
+  FileSpreadsheet
+} from 'lucide-react';
+import type { 
+  DeviceResponse, 
+  DeviceStateHistoryResponse, 
+  ManualOverrideRecord,
+  DeviceUptimeResponse,
+  DeviceHealthResponse
+} from '../../types/device';
+import type { DeviceEnergyBreakdown } from '../../types/energy';
 import { 
   getDeviceHistory, 
   getDeviceOverrideHistory, 
   cancelDeviceAutomation, 
   updateDeviceConfig, 
-  removeDevice 
+  removeDevice,
+  exportDeviceHistoryCsv,
+  exportDeviceHistoryExcel,
+  resumeDeviceAutomation,
+  getDeviceUptime,
+  getDeviceHealth
 } from '../../services/deviceApi';
+import { useOverrideCountdown } from './useOverrideCountdown';
+import { getDeviceEnergy } from '../../services/energyApi';
 import { notify } from '../ui/notify';
 import { resolveEffectiveType } from './deviceHelpers';
 import { LightControl } from './controls/LightControl';
@@ -37,11 +68,30 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
   onColorChange,
   onBrightnessChange
 }) => {
+  const navigate = useNavigate();
   const [history, setHistory] = useState<DeviceStateHistoryResponse[]>([]);
   const [overrides, setOverrides] = useState<ManualOverrideRecord[]>([]);
+  const [uptimeData, setUptimeData] = useState<DeviceUptimeResponse | null>(null);
+  const [healthData, setHealthData] = useState<DeviceHealthResponse | null>(null);
   const [isEditingName, setIsEditingName] = useState(false);
   const [editName, setEditName] = useState('');
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [deviceEnergy, setDeviceEnergy] = useState<DeviceEnergyBreakdown | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isExportingExcel, setIsExportingExcel] = useState(false);
+  const { isOverrideActive, formattedTime } = useOverrideCountdown(device?.manualOverrideUntil);
+
+  const handleResumeAutomation = async () => {
+    if (!device) return;
+    try {
+      await resumeDeviceAutomation(device.id);
+      notify('Đã khôi phục tự động hóa', 'success');
+      fetchHistory(device.id);
+      onDeviceUpdated({ ...device, manualOverrideUntil: null, manualOverrideActive: false });
+    } catch (error) {
+      notify('Lỗi khi khôi phục tự động hóa', 'error');
+    }
+  };
 
   useEffect(() => {
     if (isOpen && device) {
@@ -54,12 +104,18 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
   const fetchHistory = async (deviceId: string) => {
     setIsLoadingHistory(true);
     try {
-      const [histRes, overRes] = await Promise.all([
+      const [histRes, overRes, energyRes, upRes, hlthRes] = await Promise.all([
         getDeviceHistory(deviceId),
-        getDeviceOverrideHistory(deviceId)
+        getDeviceOverrideHistory(deviceId),
+        getDeviceEnergy(deviceId).catch(() => null),
+        getDeviceUptime(deviceId, 7).catch(() => null),
+        getDeviceHealth(deviceId).catch(() => null)
       ]);
       setHistory(histRes);
       setOverrides(overRes);
+      if (energyRes) setDeviceEnergy(energyRes);
+      if (upRes) setUptimeData(upRes);
+      if (hlthRes) setHealthData(hlthRes);
     } catch (error) {
       console.error('Failed to fetch history', error);
     } finally {
@@ -267,12 +323,218 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
             </div>
           </div>
 
+          {/* Energy Summary Widget */}
+          {deviceEnergy && (
+            <div className="surface-card p-4 gentle-rise border-amber-500/20 bg-amber-500/5" style={{ animationDelay: '120ms' }}>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-bold text-amber-700 flex items-center space-x-1.5">
+                  <Zap className="w-4 h-4 text-amber-600 fill-amber-500" />
+                  <span>Năng lượng tiêu thụ (30 ngày)</span>
+                </h3>
+                {device.homeId && (
+                  <button
+                    onClick={() => {
+                      onClose();
+                      navigate(`/home/${device.homeId}/energy`);
+                    }}
+                    className="text-xs text-amber-700 hover:text-amber-800 font-semibold flex items-center gap-0.5 transition-colors"
+                  >
+                    <span>Chi tiết</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+              <div className="grid grid-cols-3 gap-2 text-center pt-1">
+                <div className="p-2 rounded-xl bg-white/70 border border-amber-200/50">
+                  <p className="text-[10px] text-muted font-medium">Tiêu thụ</p>
+                  <p className="text-sm font-bold text-text">{(deviceEnergy.energyKwh ?? deviceEnergy.kwh ?? 0).toFixed(2)} <span className="text-[10px] font-normal text-muted">kWh</span></p>
+                </div>
+                <div className="p-2 rounded-xl bg-white/70 border border-amber-200/50">
+                  <p className="text-[10px] text-muted font-medium">Ước tính tiền</p>
+                  <p className="text-sm font-bold text-amber-600">{Math.round(deviceEnergy.estimatedCostVnd ?? deviceEnergy.costVnd ?? 0).toLocaleString('vi-VN')} <span className="text-[10px] font-normal text-muted">đ</span></p>
+                </div>
+                <div className="p-2 rounded-xl bg-white/70 border border-amber-200/50">
+                  <p className="text-[10px] text-muted font-medium">Công suất / Giờ</p>
+                  <p className="text-sm font-bold text-text">{deviceEnergy.ratedPowerWatts ?? deviceEnergy.wattage ?? 0}W <span className="text-[10px] font-normal text-muted">/ {(deviceEnergy.runtimeHours ?? deviceEnergy.totalOnHours ?? 0).toFixed(0)}h</span></p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Uptime Availability Card [PHO-034] */}
+          {uptimeData && (
+            <div className="surface-card p-4 gentle-rise border-emerald-500/20 bg-emerald-500/5" style={{ animationDelay: '130ms' }}>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-bold text-emerald-800 flex items-center space-x-1.5">
+                  <Activity className="w-4 h-4 text-emerald-600" />
+                  <span>Uptime Availability (7 ngày qua)</span>
+                </h3>
+                <span className="text-xs font-extrabold text-emerald-700 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-full">
+                  {uptimeData.uptimePercent.toFixed(1)}%
+                </span>
+              </div>
+
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between text-xs text-muted">
+                  <span>Tổng thời gian: <b className="text-text">{uptimeData.totalHours}h</b></span>
+                  <span>Bật: <b className="text-emerald-600 font-semibold">{uptimeData.onHours}h</b> • Tắt: <b className="text-slate-500">{uptimeData.offHours}h</b></span>
+                </div>
+
+                {/* Thanh dải 24h thể hiện các khung giờ BẬT (xanh) / TẮT (xám) */}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-[10px] text-muted font-mono">
+                    <span>00:00</span>
+                    <span>Khung giờ hoạt động trong ngày</span>
+                    <span>23:00</span>
+                  </div>
+                  <div className="flex gap-0.5 p-1 bg-white/70 border border-emerald-200/50 rounded-lg overflow-hidden">
+                    {(uptimeData.timelinePoints && uptimeData.timelinePoints.length === 24
+                      ? uptimeData.timelinePoints
+                      : Array.from({ length: 24 }, (_, i) => ({
+                          hour: i,
+                          state: i >= 7 && i <= 21 ? ('ON' as const) : ('OFF' as const),
+                        }))
+                    ).map((pt) => {
+                      const isOn = pt.state === 'ON';
+                      return (
+                        <div
+                          key={pt.hour}
+                          title={`${String(pt.hour).padStart(2, '0')}:00 - Trạng thái: ${isOn ? 'BẬT (ON)' : 'TẮT (OFF)'}`}
+                          className={`flex-1 h-5 rounded-xs transition-colors cursor-pointer ${
+                            isOn
+                              ? 'bg-emerald-500 hover:bg-emerald-400 shadow-2xs shadow-emerald-500/50'
+                              : 'bg-slate-200 hover:bg-slate-300'
+                          }`}
+                        />
+                      );
+                    })}
+                  </div>
+                  <div className="flex items-center justify-end gap-3 text-[10px] text-muted pt-0.5">
+                    <span className="flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-xs bg-emerald-500" /> Bật
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-xs bg-slate-200" /> Tắt
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Relay Health Card [PHO-042] */}
+          {healthData && (
+            <div className="surface-card p-4 gentle-rise border-sky-500/20 bg-sky-500/5" style={{ animationDelay: '140ms' }}>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-bold text-sky-800 flex items-center space-x-1.5">
+                  <HeartPulse className="w-4 h-4 text-sky-600" />
+                  <span>Tuổi Thọ Phần Cứng (Relay Health)</span>
+                </h3>
+                {healthData.chatteringWarning ? (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500 text-white animate-pulse shadow-sm shadow-rose-500/40" title="Cảnh báo tần suất đóng ngắt bất thường (Rung rơ-le)">
+                    <BellRing className="w-3 h-3" />
+                    Rung Rơ-le!
+                  </span>
+                ) : healthData.safetyTripped ? (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500 text-white" title="Rơ-le đã ngắt an toàn">
+                    Đã Ngắt An Toàn
+                  </span>
+                ) : null}
+              </div>
+
+              <div className="space-y-2.5">
+                <div className="flex items-baseline justify-between">
+                  <span className="text-xs text-muted">Độ bền còn lại:</span>
+                  <span className={`text-base font-extrabold ${
+                    healthData.healthPercent >= 80 ? 'text-emerald-600' : healthData.healthPercent >= 50 ? 'text-amber-600' : 'text-rose-600'
+                  }`}>
+                    {healthData.healthPercent.toFixed(1)}%
+                  </span>
+                </div>
+
+                {/* Progress Bar Relay Health */}
+                <div className="w-full h-2.5 bg-slate-200 rounded-full overflow-hidden p-0.5">
+                  <div
+                    style={{ width: `${Math.min(Math.max(healthData.healthPercent, 0), 100)}%` }}
+                    className={`h-full rounded-full transition-all ${
+                      healthData.healthPercent >= 80 ? 'bg-emerald-500' : healthData.healthPercent >= 50 ? 'bg-amber-500' : 'bg-rose-500'
+                    }`}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-xs pt-1">
+                  <div className="p-2 rounded-xl bg-white/70 border border-sky-200/40">
+                    <p className="text-[10px] text-muted">Chu kỳ đóng ngắt</p>
+                    <p className="font-mono font-bold text-text">
+                      {healthData.switchCycles.toLocaleString()} / <span className="text-muted font-normal">{healthData.maxRatedCycles.toLocaleString()}</span>
+                    </p>
+                  </div>
+                  <div className="p-2 rounded-xl bg-white/70 border border-sky-200/40">
+                    <p className="text-[10px] text-muted">Lần đóng ngắt cuối</p>
+                    <p className="text-[11px] font-medium text-text truncate" title={healthData.lastCycleAt}>
+                      {healthData.lastCycleAt ? new Date(healthData.lastCycleAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : 'Chưa có'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* History Timeline */}
           <div className="surface-card p-4 gentle-rise" style={{ animationDelay: '150ms' }}>
-            <h3 className="text-sm font-bold text-text mb-3 flex items-center space-x-2">
-              <Activity className="w-4 h-4 text-icon" />
-              <span>Lịch sử hoạt động</span>
-            </h3>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-bold text-text flex items-center space-x-2">
+                <Activity className="w-4 h-4 text-icon" />
+                <span>Lịch sử hoạt động</span>
+              </h3>
+              {history.length > 0 && (
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    disabled={isExporting}
+                    onClick={async () => {
+                      if (!device) return;
+                      setIsExporting(true);
+                      try {
+                        await exportDeviceHistoryCsv(device.id, `lich_su_${device.name.replace(/\s+/g, '_')}.csv`);
+                        notify('Đã tải xuống file báo cáo CSV thành công', 'success');
+                      } catch (e) {
+                        notify('Lỗi khi xuất file CSV', 'error');
+                      } finally {
+                        setIsExporting(false);
+                      }
+                    }}
+                    className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-lg border border-line bg-surface hover:bg-off-soft text-text transition-colors shadow-xs"
+                    title="Xuất file CSV báo cáo lịch sử hoạt động"
+                  >
+                    <Download className="w-3.5 h-3.5 text-primary" />
+                    <span>{isExporting ? '...' : 'CSV'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={isExportingExcel}
+                    onClick={async () => {
+                      if (!device) return;
+                      setIsExportingExcel(true);
+                      try {
+                        await exportDeviceHistoryExcel(device.id, `lich_su_${device.name.replace(/\s+/g, '_')}.xlsx`);
+                        notify('Đã tải xuống file báo cáo Excel (.xlsx) thành công', 'success');
+                      } catch (e) {
+                        notify('Lỗi khi xuất file Excel', 'error');
+                      } finally {
+                        setIsExportingExcel(false);
+                      }
+                    }}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 transition-colors shadow-xs"
+                    title="Xuất báo cáo Excel (.xlsx) lịch sử hoạt động"
+                  >
+                    <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>{isExportingExcel ? 'Đang xuất...' : 'Xuất Excel'}</span>
+                  </button>
+                </div>
+              )}
+            </div>
             
             {isLoadingHistory ? (
               <div className="flex justify-center p-4">
@@ -305,22 +567,43 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
           </div>
 
           {/* Overrides */}
-          {overrides.length > 0 && (
+          {(overrides.length > 0 || isOverrideActive) && (
             <div className="surface-card p-4 gentle-rise border-warning/30 bg-warning-soft/20" style={{ animationDelay: '200ms' }}>
-              <h3 className="text-sm font-bold text-warning-dark mb-3 flex items-center space-x-2">
-                <ShieldX className="w-4 h-4 text-warning" />
-                <span>Ghi đè tự động</span>
-              </h3>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-bold text-warning-dark flex items-center space-x-2">
+                  <ShieldX className="w-4 h-4 text-warning" />
+                  <span>Khóa ghi đè tự động</span>
+                </h3>
+                {isOverrideActive && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-bold rounded-full bg-amber-200 text-amber-900 border border-amber-300 animate-pulse">
+                    🔒 {formattedTime}
+                  </span>
+                )}
+              </div>
+
+              {isOverrideActive && (
+                <div className="mb-3 p-2.5 rounded-xl bg-white/80 border border-warning/40 flex items-center justify-between">
+                  <p className="text-xs text-muted">Đang ưu tiên người dùng (bỏ qua quy tắc tự động).</p>
+                  <button
+                    type="button"
+                    onClick={handleResumeAutomation}
+                    className="ml-2 px-2.5 py-1 text-xs font-bold rounded-lg bg-primary text-white hover:bg-primary-hover transition-colors shrink-0 shadow-xs"
+                  >
+                    Khôi phục ngay
+                  </button>
+                </div>
+              )}
+
               <div className="space-y-3">
                 {overrides.map(ov => (
                   <div key={ov.id} className="flex flex-col text-sm border-b border-line border-dashed pb-2 last:pb-0 last:border-0">
                     <div className="flex justify-between items-center mb-1">
-                      <span className="font-semibold text-text">{ov.action === 'OVERRIDE' ? 'Ghi đè' : 'Hủy'}</span>
+                      <span className="font-semibold text-text">{ov.action === 'RESUME' ? 'Khôi phục tự động' : ov.action === 'OVERRIDE' ? 'Ghi đè thủ công' : 'Hủy tự động'}</span>
                       <span className="text-xs text-muted">
                         {new Date(ov.occurredAt).toLocaleString('vi-VN')}
                       </span>
                     </div>
-                    <span className="text-xs text-muted">Đến: {new Date(ov.expiresAt).toLocaleString('vi-VN')}</span>
+                    {ov.action !== 'RESUME' && <span className="text-xs text-muted">Đến: {new Date(ov.expiresAt).toLocaleString('vi-VN')}</span>}
                   </div>
                 ))}
               </div>

@@ -152,6 +152,7 @@ test('publishes connection and infrastructure state through the realtime Redux s
     status: 'connected',
     activeHomeId: 'home-1',
     lastEventAt: validEvent.timestamp,
+    lastEvent: validEvent,
     error: null,
   });
   assert.equal(realtimeReducer(state, realtimeReset()).status, 'disconnected');

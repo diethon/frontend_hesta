@@ -33,7 +33,7 @@ export function getSceneDeviceActions(device?: AnyDevice, allowedTypes: readonly
   const supported = new Set<SceneActionType>();
   for (const capability of capabilities) {
     const normalized = String(capability).trim().toUpperCase();
-    if (sceneActionCodes.includes(normalized as SceneActionType)) {
+    if ((sceneActionCodes as readonly string[]).includes(normalized)) {
       supported.add(normalized as SceneActionType);
     } else {
       for (const action of actionsByAttribute[String(capability).trim().toLowerCase()] ?? []) supported.add(action);

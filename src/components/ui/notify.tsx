@@ -11,10 +11,23 @@ function show(tone: ToastTone, message: string, detail?: string, id?: string) {
   });
 }
 
-export const notify = {
-  success: (message: string, detail?: string) => show('success', message, detail),
-  error: (message: string, detail?: string) => show('error', message, detail),
-  warning: (message: string, detail?: string) => show('warning', message, detail),
-  info: (message: string, detail?: string, id?: string) => show('info', message, detail, id),
-  dismissAll: () => toast.dismiss(),
-};
+interface NotifyFn {
+  (message: string, tone?: ToastTone, detail?: string): unknown;
+  success: (message: string, detail?: string) => unknown;
+  error: (message: string, detail?: string) => unknown;
+  warning: (message: string, detail?: string) => unknown;
+  info: (message: string, detail?: string, id?: string) => unknown;
+  dismissAll: () => void;
+}
+
+const notifyFn = ((message: string, tone: ToastTone = 'info', detail?: string) => {
+  return show(tone, message, detail);
+}) as NotifyFn;
+
+notifyFn.success = (message: string, detail?: string) => show('success', message, detail);
+notifyFn.error = (message: string, detail?: string) => show('error', message, detail);
+notifyFn.warning = (message: string, detail?: string) => show('warning', message, detail);
+notifyFn.info = (message: string, detail?: string, id?: string) => show('info', message, detail, id);
+notifyFn.dismissAll = () => toast.dismiss();
+
+export const notify = notifyFn;

@@ -1,10 +1,13 @@
 import React, { useCallback, useEffect, useState, useRef, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router';
+import { Plus } from 'lucide-react';
 import { DeviceCard } from './DeviceCard';
 import { DeviceDrawer } from './DeviceDrawer';
+import { AddDeviceModal } from './AddDeviceModal';
 import { StatusChips } from './StatusChips';
 import { DeviceFilters } from './DeviceFilters';
 import { SceneBar } from './SceneBar';
+import { DeviceGroupSection } from './DeviceGroupSection';
 import {
   getDevicesByHome,
   sendDeviceCommand,
@@ -13,7 +16,7 @@ import {
 import { getHomeRooms } from '../../services/homeApi';
 import type { DeviceResponse } from '../../types/device';
 import { getErrorMessage } from '../../utils/errors';
-import { AppSidebar, DeviceIcon, HomeIcon, TwinIcon } from '../ui/AppSidebar';
+import { AppSidebar, DeviceIcon, HomeIcon, TwinIcon, EnergyIcon } from '../ui/AppSidebar';
 import { NotificationBell } from '../notification/NotificationBell';
 import { currentHomeChanged, currentHomeCleared } from '../../store/homeSlice';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
@@ -65,6 +68,7 @@ export const DevicePage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [powerPendingId, setPowerPendingId] = useState<string | null>(null);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
   // ── Drawer state ──
   const [selectedDevice, setSelectedDevice] = useState<DeviceResponse | null>(null);
@@ -422,6 +426,12 @@ export const DevicePage: React.FC = () => {
             onClick: () => window.scrollTo({ top: 0, behavior: 'smooth' }),
           },
           {
+            id: 'energy',
+            label: 'Tiêu thụ điện',
+            icon: <EnergyIcon />,
+            onClick: () => navigate(`/home/${homeId}/energy`),
+          },
+          {
             id: 'twin',
             label: 'Digital Twin',
             icon: <TwinIcon />,
@@ -484,6 +494,15 @@ export const DevicePage: React.FC = () => {
                 <span>Tắt nhanh đèn ({activeCount})</span>
               </button>
             )}
+            <button
+              type="button"
+              onClick={() => setIsAddModalOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-primary hover:bg-primary-hover text-white text-xs sm:text-sm font-bold shadow-xs transition-all active:scale-95 cursor-pointer"
+              title="Ghép nối thiết bị mới qua Token hoặc QR Code"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Thêm Thiết Bị</span>
+            </button>
             <NotificationBell />
           </div>
 
@@ -491,6 +510,17 @@ export const DevicePage: React.FC = () => {
           <section aria-label="Kịch bản nhanh">
             <SceneBar onSceneActivate={handleSceneActivate} />
           </section>
+
+          {/* ───── Virtual Device Groups (Master Control) ───── */}
+          {homeId && (
+            <section aria-label="Nhóm thiết bị ảo">
+              <DeviceGroupSection
+                homeId={homeId}
+                availableDevices={devices}
+                onRefreshDevices={fetchDevices}
+              />
+            </section>
+          )}
 
           {/* ───── Status Summary Chips ───── */}
           <section aria-label="Thống kê thiết bị">
@@ -539,7 +569,7 @@ export const DevicePage: React.FC = () => {
               {error}
             </div>
           ) : sortedDevices.length === 0 ? (
-            <div className="surface-card border-dashed py-14 text-center text-muted space-y-3">
+            <div className="surface-card border-dashed py-14 text-center text-muted space-y-4">
               <p className="text-base font-medium">
                 {searchQuery
                   ? `Không tìm thấy thiết bị nào phù hợp với từ khóa "${searchQuery}".`
@@ -547,15 +577,25 @@ export const DevicePage: React.FC = () => {
                   ? 'Không có thiết bị nào trong danh mục này.'
                   : 'Chưa có thiết bị nào trong khu vực này.'}
               </p>
-              {searchQuery && (
+              <div className="flex items-center justify-center gap-3 flex-wrap">
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    className="px-4 py-2 rounded-xl bg-sidebar border border-line text-text text-xs font-bold hover:bg-sidebar-hover transition-colors shadow-xs cursor-pointer"
+                  >
+                    Xóa bộ lọc tìm kiếm
+                  </button>
+                )}
                 <button
                   type="button"
-                  onClick={() => setSearchQuery('')}
-                  className="px-4 py-1.5 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primary-hover transition-colors shadow-xs"
+                  onClick={() => setIsAddModalOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-white text-xs sm:text-sm font-bold hover:bg-primary-hover transition-colors shadow-xs cursor-pointer active:scale-95"
                 >
-                  Xóa bộ lọc tìm kiếm
+                  <Plus className="w-4 h-4" />
+                  <span>+ Ghép Nối Thiết Bị Mới</span>
                 </button>
-              )}
+              </div>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 grid-flow-dense gap-4 p-1">
@@ -603,6 +643,20 @@ export const DevicePage: React.FC = () => {
         onColorChange={handleColorChange}
         onBrightnessChange={handleBrightnessChange}
       />
+
+      {/* ───── Add Device Modal ───── */}
+      {homeId && (
+        <AddDeviceModal
+          isOpen={isAddModalOpen}
+          onClose={() => setIsAddModalOpen(false)}
+          homeId={homeId}
+          rooms={rooms}
+          selectedRoomId={selectedRoomId}
+          onSuccess={() => {
+            void fetchDevices();
+          }}
+        />
+      )}
     </div>
   );
 };
