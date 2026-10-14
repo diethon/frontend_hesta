@@ -6,6 +6,7 @@ import { ProfileModal } from '../profile/ProfileModal';
 import { AdminDeviceModal } from './AdminDeviceModal';
 import { AdminIcon, AppSidebar, HomeIcon } from '../ui/AppSidebar';
 import { UserAvatar } from '../ui/UserAvatar';
+import { Activity } from 'lucide-react';
 
 interface AdminDashboardProps {
   user: UserResponse;
@@ -39,7 +40,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout, 
         contextLabel="Quản trị nền tảng"
         items={[
           { id: 'home', label: 'Nhà của tôi', icon: <HomeIcon />, onClick: () => navigate('/home') },
-          { id: 'admin', label: 'Tổng quan hệ thống', icon: <AdminIcon />, onClick: () => window.scrollTo({ top: 0, behavior: 'smooth' }) },
+          { id: 'admin', label: 'Quản lý thiết bị & QR', icon: <AdminIcon />, onClick: () => window.scrollTo({ top: 0, behavior: 'smooth' }) },
+          { id: 'diagnostics', label: 'Chẩn đoán hạ tầng IoT', icon: <Activity className="w-5 h-5 text-primary" />, onClick: () => navigate('/admin/diagnostics') },
         ]}
       />
       <div className="lg:pl-64">
@@ -198,6 +200,28 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout, 
             <h3 className="text-2xl font-bold text-white mb-1">99.9%</h3>
             <p className="text-xs text-slate-400">Uptime Server</p>
           </div>
+        </div>
+
+        {/* Technical Diagnostics Shortcut Card */}
+        <div className="surface-card p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border border-primary/30 bg-gradient-to-r from-primary/10 via-surface to-surface">
+          <div className="space-y-1">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-primary/20 text-primary">
+              <Activity className="w-3.5 h-3.5" />
+              Hạ Tầng Phân Tán &amp; Giám Sát IoT
+            </div>
+            <h3 className="text-lg font-bold text-text">Trung Tâm Chẩn Đoán Kỹ Thuật Nền Tảng</h3>
+            <p className="text-xs text-muted max-w-xl">
+              Đồng hồ đo độ trễ MQTT RTT, cơ chế ngắt mạch bảo vệ Circuit Breaker và bảng điều khiển Live MQTT Packet Sniffer.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate('/admin/diagnostics')}
+            className="shrink-0 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary hover:bg-primary-hover text-white text-sm font-bold shadow-soft transition-all"
+          >
+            <span>Mở Bảng Chẩn Đoán</span>
+            <Activity className="w-4 h-4" />
+          </button>
         </div>
       </main>
       </div>
