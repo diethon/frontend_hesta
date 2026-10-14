@@ -240,3 +240,41 @@ export const exportDeviceHistoryExcel = async (deviceId: string, filename?: stri
 export const extendDeviceAutomation = async (deviceId: string, hours = 1): Promise<void> => {
   await apiClient.post(`/devices/${deviceId}/automation/extend`, { hours });
 };
+
+// ===== Admin Device Onboarding & QR API =====
+export interface AdminCreateDevicePayload {
+  name: string;
+  deviceType: string;
+  model?: string;
+  serialNumber: string;
+  localId?: string;
+  icon?: string;
+  capabilities?: Record<string, string[]>;
+}
+
+export interface QrInfo {
+  payload: string;
+  token: string;
+  expiresAt: string;
+  singleUse: boolean;
+}
+
+export interface AdminDeviceCreatedResponse {
+  device: DeviceResponse;
+  qr: QrInfo;
+}
+
+export const adminCreateDevice = async (payload: AdminCreateDevicePayload): Promise<AdminDeviceCreatedResponse> => {
+  const response = await apiClient.post('/admin/devices', payload);
+  return response.data.result;
+};
+
+export const adminGetDeviceQr = async (deviceId: string): Promise<QrInfo> => {
+  const response = await apiClient.get(`/admin/devices/${deviceId}/qr`);
+  return response.data.result;
+};
+
+export const adminRegenerateQr = async (deviceId: string): Promise<QrInfo> => {
+  const response = await apiClient.post(`/admin/devices/${deviceId}/qr/regenerate`);
+  return response.data.result;
+};
