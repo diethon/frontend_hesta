@@ -91,7 +91,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({ activeItem, items, conte
             onClick={item.onClick}
             className={`flex w-full items-center gap-3 rounded-2xl px-3.5 py-3 text-left text-sm font-semibold transition-colors active:translate-y-px ${
               active
-                ? 'bg-sidebar-active text-primary-hover'
+                ? 'bg-sidebar-active text-sky-800 font-bold border-r-4 border-primary shadow-xs'
                 : 'text-muted hover:bg-sidebar-hover hover:text-text'
             }`}
           >

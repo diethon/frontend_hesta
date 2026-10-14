@@ -14,7 +14,9 @@ import {
   DeviceIcon,
   HomeIcon,
   PeopleIcon,
-  SceneIcon, TwinIcon,
+  SceneIcon,
+  TwinIcon,
+  EnergyIcon,
 } from "../ui/AppSidebar";
 import { NotificationBell } from "../notification/NotificationBell";
 import { Link } from "react-router";
@@ -167,6 +169,15 @@ export const HomePage: React.FC<HomePageProps> = ({
             },
           },
           {
+            id: 'energy',
+            label: 'Tiêu thụ điện',
+            icon: <EnergyIcon />,
+            onClick: () => {
+              if (userHome) navigate('/home/' + userHome.homeId + '/energy');
+              else notify.info('Hãy tạo hoặc tham gia một ngôi nhà trước.');
+            },
+          },
+          {
             id: "scenes",
             label: "Kịch bản",
             icon: <SceneIcon />,
@@ -256,12 +267,12 @@ export const HomePage: React.FC<HomePageProps> = ({
               </button>
 
               {isDropdownOpen && (
-                <div className="gentle-rise absolute right-0 z-50 mt-2 w-56 rounded-2xl border border-line bg-white py-1 shadow-float">
-                  <div className="px-4 py-2 border-b border-slate-800">
+                <div className="gentle-rise absolute right-0 z-50 mt-2 w-56 rounded-2xl border border-line bg-surface py-1 shadow-float">
+                  <div className="px-4 py-2 border-b border-line">
                     <p className="truncate text-sm font-medium text-text">
                       {user.fullName}
                     </p>
-                    <p className="text-xs text-slate-400 truncate">
+                    <p className="text-xs text-muted truncate">
                       {user.email}
                     </p>
                   </div>
@@ -272,11 +283,11 @@ export const HomePage: React.FC<HomePageProps> = ({
                         setIsDropdownOpen(false);
                         setIsProfileModalOpen(true);
                       }}
-                      className="w-full text-left px-3 py-2 text-sm text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg transition-colors flex items-center gap-2"
+                      className="w-full text-left px-3 py-2 text-sm text-text hover:bg-sidebar-hover hover:text-primary-hover rounded-xl transition-colors flex items-center gap-2"
                     >
                       <svg
                         aria-hidden={true}
-                        className="w-4 h-4"
+                        className="w-4 h-4 text-icon"
                         fill="none"
                         viewBox="0 0 24 24"
                         stroke="currentColor"
@@ -291,10 +302,10 @@ export const HomePage: React.FC<HomePageProps> = ({
                       Hồ sơ & Bảo mật
                     </button>
 
-                    <button className="w-full text-left px-3 py-2 text-sm text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg transition-colors flex items-center gap-2">
+                    <button className="w-full text-left px-3 py-2 text-sm text-text hover:bg-sidebar-hover hover:text-primary-hover rounded-xl transition-colors flex items-center gap-2">
                       <svg
                         aria-hidden={true}
-                        className="w-4 h-4"
+                        className="w-4 h-4 text-icon"
                         fill="none"
                         viewBox="0 0 24 24"
                         stroke="currentColor"
@@ -316,10 +327,10 @@ export const HomePage: React.FC<HomePageProps> = ({
                     </button>
                   </div>
 
-                  <div className="border-t border-slate-800 p-1">
+                  <div className="border-t border-line p-1">
                     <button
                       onClick={onLogout}
-                      className="w-full text-left px-3 py-2 text-sm text-rose-400 hover:text-rose-300 hover:bg-rose-950/50 rounded-lg transition-colors flex items-center gap-2"
+                      className="w-full text-left px-3 py-2 text-sm text-error hover:bg-error-soft rounded-xl transition-colors flex items-center gap-2"
                     >
                       <svg
                         aria-hidden={true}
@@ -414,8 +425,8 @@ export const HomePage: React.FC<HomePageProps> = ({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 01-2 2h-1a2 2 0 01-2-2v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
               </svg>
             </div>
-            <h3 className="text-base font-semibold text-white mb-1">Quản lý Thiết bị</h3>
-            <p className="text-xs text-slate-400 leading-relaxed">Theo dõi và điều khiển các thiết bị thông minh (Đèn, Quạt, Cảm biến) trong nhà.</p>
+            <h3 className="text-base font-bold text-text mb-1">Quản lý Thiết bị</h3>
+            <p className="text-xs text-muted leading-relaxed">Theo dõi và điều khiển các thiết bị thông minh (Đèn, Quạt, Cảm biến) trong nhà.</p>
           </div>
 
             <div className="surface-card group p-6 transition hover:-translate-y-0.5 hover:border-primary md:col-span-3">
@@ -435,10 +446,10 @@ export const HomePage: React.FC<HomePageProps> = ({
                   />
                 </svg>
               </div>
-              <h3 className="text-base font-semibold text-white mb-1">
+              <h3 className="text-base font-bold text-text mb-1">
                 Kịch bản & Tự động hóa
               </h3>
-              <p className="text-xs text-slate-400 leading-relaxed">
+              <p className="text-xs text-muted leading-relaxed">
                 Kích hoạt các ngữ cảnh thông minh (Về nhà, Đi ngủ, Cảnh báo an
                 ninh).
               </p>
@@ -483,7 +494,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                   />
                 </svg>
               </div>
-              <h3 className="text-base font-semibold text-white mb-1">
+              <h3 className="text-base font-bold text-text mb-1">
                 Hồ sơ & Phân quyền
               </h3>
               <p className="text-xs text-slate-400 leading-relaxed">
@@ -527,17 +538,17 @@ export const HomePage: React.FC<HomePageProps> = ({
                   />
                 </svg>
               </div>
-              <h3 className="text-lg font-bold text-white mb-2">
+              <h3 className="text-lg font-bold text-text mb-2">
                 Bạn chưa tham gia Ngôi nhà nào
               </h3>
-              <p className="text-sm text-slate-400 mb-6">
+              <p className="text-sm text-muted mb-6">
                 Bạn cần có một Ngôi nhà để quản lý thiết bị và thành viên. Bạn
                 có thể tự tạo mới hoặc tham gia bằng mã mời.
               </p>
               <div className="flex items-center justify-center gap-4">
                 <button
                   onClick={() => setIsCreateModalOpen(true)}
-                  className="px-6 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white font-medium rounded-xl transition"
+                  className="px-6 py-2.5 bg-primary hover:bg-primary-hover text-white font-medium rounded-xl transition shadow-xs"
                 >
                   + Tạo nhà mới
                 </button>
@@ -555,7 +566,7 @@ export const HomePage: React.FC<HomePageProps> = ({
               aria-labelledby="create-home-title"
               className="auth-surface w-full max-w-sm overflow-hidden overscroll-contain"
             >
-              <div className="p-6 border-b border-slate-800 flex justify-between items-center">
+              <div className="p-6 border-b border-line flex justify-between items-center">
                 <h3
                   id="create-home-title"
                   className="text-lg font-bold text-text"
@@ -574,7 +585,7 @@ export const HomePage: React.FC<HomePageProps> = ({
               <form onSubmit={handleCreateHome} className="p-6">
                 <label
                   htmlFor="new-home-name"
-                  className="block text-sm font-medium text-slate-300 mb-2"
+                  className="block text-sm font-medium text-text mb-2"
                 >
                   Tên ngôi nhà của bạn
                 </label>
@@ -584,14 +595,14 @@ export const HomePage: React.FC<HomePageProps> = ({
                   placeholder="VD: Nhà của tôi, Tổ ấm…"
                   value={newHomeName}
                   onChange={(e) => setNewHomeName(e.target.value)}
-                  className="w-full bg-slate-950/50 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-600 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none mb-6"
+                  className="w-full bg-surface border border-line rounded-xl px-4 py-3 text-text placeholder-muted focus:border-primary outline-none mb-6"
                   maxLength={50}
                   autoComplete="off"
                 />
                 <button
                   type="submit"
                   disabled={createLoading}
-                  className="w-full py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl font-medium transition-colors"
+                  className="w-full py-2.5 bg-primary hover:bg-primary-hover text-white rounded-xl font-medium transition-colors shadow-xs"
                 >
                   {createLoading ? "Đang khởi tạo…" : "Xác nhận tạo mới"}
                 </button>

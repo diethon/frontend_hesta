@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
-import { AppSidebar, DeviceIcon, HomeIcon, TwinIcon } from '../ui/AppSidebar';
+import { AppSidebar, DeviceIcon, HomeIcon, TwinIcon, EnergyIcon } from '../ui/AppSidebar';
 import { getHomeEnergyAnalytics } from '../../services/energyApi';
 import type { EnergyAnalyticsResponse, DeviceEnergyBreakdown, EnergyTimeSeriesPoint } from '../../types/energy';
 import { getErrorMessage } from '../../utils/errors';
@@ -63,20 +63,20 @@ export const EnergyDashboardPage: React.FC = () => {
     switch (tier) {
       case 1:
       case 2:
-        return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30';
+        return 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30';
       case 3:
       case 4:
-        return 'bg-amber-500/10 text-amber-400 border-amber-500/30';
+        return 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30';
       case 5:
       case 6:
-        return 'bg-rose-500/10 text-rose-400 border-rose-500/30';
+        return 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/30';
       default:
-        return 'bg-slate-500/10 text-slate-400 border-slate-500/30';
+        return 'bg-slate-500/10 text-slate-700 dark:text-slate-400 border-slate-500/30';
     }
   };
 
   return (
-    <div className="app-shell min-h-screen bg-slate-950 text-slate-100">
+    <div className="app-shell min-h-screen text-text">
       <AppSidebar
         activeItem="energy"
         contextLabel="Không gian sống"
@@ -94,16 +94,16 @@ export const EnergyDashboardPage: React.FC = () => {
             onClick: () => navigate(`/home/${homeId}/devices`),
           },
           {
+            id: 'energy',
+            label: 'Tiêu thụ điện',
+            icon: <EnergyIcon />,
+            onClick: () => window.scrollTo({ top: 0, behavior: 'smooth' }),
+          },
+          {
             id: 'twin',
             label: 'Digital Twin',
             icon: <TwinIcon />,
             onClick: () => navigate(`/home/${homeId}/digital-twin`),
-          },
-          {
-            id: 'energy',
-            label: 'Tiêu Thụ Điện',
-            icon: <Zap className="h-5 w-5 text-amber-400" />,
-            onClick: () => window.scrollTo({ top: 0, behavior: 'smooth' }),
           },
         ]}
       />
@@ -111,35 +111,37 @@ export const EnergyDashboardPage: React.FC = () => {
       <main id="main-content" className="lg:pl-64">
         <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8">
           {/* Header */}
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-800 pb-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-line pb-5">
             <div className="flex items-center gap-4">
               <button
                 type="button"
                 onClick={() => navigate(`/home/${homeId}/devices`)}
-                className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-800 bg-slate-900 text-slate-300 transition-colors hover:bg-slate-800 hover:text-white"
+                className="flex h-10 w-10 items-center justify-center rounded-xl border border-line bg-sidebar text-icon transition-colors hover:bg-sidebar-hover hover:text-text"
                 title="Quay lại danh sách thiết bị"
               >
                 <ArrowLeft className="h-5 w-5" />
               </button>
               <div>
-                <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2.5">
-                  <span className="p-2 bg-amber-500/10 rounded-xl border border-amber-500/30 text-amber-400">
+                <h1 className="text-2xl font-bold tracking-tight text-text flex items-center gap-2.5">
+                  <span className="p-2 bg-amber-500/10 rounded-xl border border-amber-500/30 text-amber-500">
                     <Zap className="h-6 w-6" />
                   </span>
                   Phân Tích Điện Năng & Chi Phí EVN
                 </h1>
-                <p className="text-sm text-slate-400 mt-0.5">
+                <p className="text-sm text-muted mt-0.5">
                   Mô phỏng tích phân tiêu thụ thời gian thực & dự toán hóa đơn bậc thang
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 bg-slate-900 p-1 rounded-xl border border-slate-800">
+            <div className="flex items-center gap-2 bg-sidebar p-1 rounded-xl border border-line">
               <button
                 type="button"
                 onClick={() => setPeriod('24H')}
                 className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
-                  period === '24H' ? 'bg-amber-500 text-slate-950 font-bold shadow' : 'text-slate-400 hover:text-white'
+                  period === '24H'
+                    ? 'bg-amber-500 text-white font-bold shadow-xs'
+                    : 'text-muted hover:text-text'
                 }`}
               >
                 24 Giờ
@@ -148,7 +150,9 @@ export const EnergyDashboardPage: React.FC = () => {
                 type="button"
                 onClick={() => setPeriod('7D')}
                 className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
-                  period === '7D' ? 'bg-amber-500 text-slate-950 font-bold shadow' : 'text-slate-400 hover:text-white'
+                  period === '7D'
+                    ? 'bg-amber-500 text-white font-bold shadow-xs'
+                    : 'text-muted hover:text-text'
                 }`}
               >
                 7 Ngày
@@ -157,7 +161,9 @@ export const EnergyDashboardPage: React.FC = () => {
                 type="button"
                 onClick={() => setPeriod('30D')}
                 className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
-                  period === '30D' ? 'bg-amber-500 text-slate-950 font-bold shadow' : 'text-slate-400 hover:text-white'
+                  period === '30D'
+                    ? 'bg-amber-500 text-white font-bold shadow-xs'
+                    : 'text-muted hover:text-text'
                 }`}
               >
                 Tháng Này
@@ -166,7 +172,7 @@ export const EnergyDashboardPage: React.FC = () => {
                 type="button"
                 onClick={fetchEnergy}
                 disabled={loading}
-                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition"
+                className="p-1.5 text-muted hover:text-text rounded-lg hover:bg-sidebar-hover transition"
                 title="Làm mới dữ liệu"
               >
                 <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
@@ -175,7 +181,7 @@ export const EnergyDashboardPage: React.FC = () => {
           </div>
 
           {error && (
-            <div className="p-4 rounded-xl bg-rose-950/40 border border-rose-900/60 text-rose-300 text-sm flex items-center gap-2">
+            <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-700 dark:text-rose-300 text-sm flex items-center gap-2">
               <AlertCircle className="h-5 w-5 shrink-0" />
               {error}
             </div>
@@ -184,74 +190,74 @@ export const EnergyDashboardPage: React.FC = () => {
           {/* 4 KPI Summary Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Card 1: Tổng điện năng */}
-            <div className="bg-slate-900/90 border border-slate-800 p-5 rounded-2xl relative overflow-hidden">
+            <div className="surface-card p-5 rounded-2xl relative overflow-hidden shadow-soft border border-line">
               <div className="flex justify-between items-start">
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Điện Năng Tiêu Thụ</span>
-                <span className="p-2 bg-amber-500/10 text-amber-400 rounded-xl">
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted">Điện Năng Tiêu Thụ</span>
+                <span className="p-2 bg-amber-500/10 text-amber-500 rounded-xl">
                   <Zap className="h-4 w-4" />
                 </span>
               </div>
               <div className="mt-3 flex items-baseline gap-2">
-                <span className="text-3xl font-extrabold text-white">{summary?.totalKwh ?? 0}</span>
-                <span className="text-sm font-semibold text-amber-400">kWh</span>
+                <span className="text-3xl font-extrabold text-text">{summary?.totalKwh ?? 0}</span>
+                <span className="text-sm font-semibold text-amber-500">kWh</span>
               </div>
-              <div className="mt-2 text-xs text-slate-400 flex items-center gap-1.5">
-                <TrendingUp className="h-3.5 w-3.5 text-emerald-400" />
+              <div className="mt-2 text-xs text-muted flex items-center gap-1.5">
+                <TrendingUp className="h-3.5 w-3.5 text-emerald-600" />
                 <span>Hoạt động: {summary?.activeDeviceCount ?? 0}/{summary?.totalDeviceCount ?? 0} thiết bị</span>
               </div>
             </div>
 
             {/* Card 2: Tiền điện tạm tính */}
-            <div className="bg-slate-900/90 border border-slate-800 p-5 rounded-2xl relative overflow-hidden">
+            <div className="surface-card p-5 rounded-2xl relative overflow-hidden shadow-soft border border-line">
               <div className="flex justify-between items-start">
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Tiền Điện Tạm Tính</span>
-                <span className="p-2 bg-emerald-500/10 text-emerald-400 rounded-xl">
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted">Tiền Điện Tạm Tính</span>
+                <span className="p-2 bg-emerald-500/10 text-emerald-600 rounded-xl">
                   <DollarSign className="h-4 w-4" />
                 </span>
               </div>
               <div className="mt-3">
-                <span className="text-2xl font-extrabold text-emerald-400">{formatCurrency(summary?.estimatedCostVnd)}</span>
+                <span className="text-2xl font-extrabold text-emerald-600">{formatCurrency(summary?.estimatedCostVnd)}</span>
               </div>
               <div className="mt-2 flex items-center gap-2">
                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${getTierBadgeColor(summary?.currentTier)}`}>
                   EVN Bậc {summary?.currentTier ?? 1}
                 </span>
-                <span className="text-xs text-slate-400">Đã gồm VAT 8%</span>
+                <span className="text-xs text-muted">Đã gồm VAT 8%</span>
               </div>
             </div>
 
             {/* Card 3: Dự báo cả tháng */}
-            <div className="bg-slate-900/90 border border-slate-800 p-5 rounded-2xl relative overflow-hidden">
+            <div className="surface-card p-5 rounded-2xl relative overflow-hidden shadow-soft border border-line">
               <div className="flex justify-between items-start">
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Dự Báo Cuối Tháng</span>
-                <span className="p-2 bg-cyan-500/10 text-cyan-400 rounded-xl">
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted">Dự Báo Cuối Tháng</span>
+                <span className="p-2 bg-primary/10 text-primary rounded-xl">
                   <TrendingUp className="h-4 w-4" />
                 </span>
               </div>
               <div className="mt-3 flex items-baseline gap-2">
-                <span className="text-2xl font-extrabold text-white">{summary?.projectedMonthKwh ?? 0}</span>
-                <span className="text-sm font-semibold text-cyan-400">kWh</span>
+                <span className="text-2xl font-extrabold text-text">{summary?.projectedMonthKwh ?? 0}</span>
+                <span className="text-sm font-semibold text-primary">kWh</span>
               </div>
-              <div className="mt-2 text-xs text-slate-400">
-                Ước tính: <span className="font-semibold text-slate-200">{formatCurrency(summary?.projectedMonthCostVnd)}</span>
+              <div className="mt-2 text-xs text-muted">
+                Ước tính: <span className="font-semibold text-text">{formatCurrency(summary?.projectedMonthCostVnd)}</span>
               </div>
             </div>
 
             {/* Card 4: Cơ cấu Bậc Thang EVN */}
-            <div className="bg-slate-900/90 border border-slate-800 p-5 rounded-2xl relative overflow-hidden">
+            <div className="surface-card p-5 rounded-2xl relative overflow-hidden shadow-soft border border-line">
               <div className="flex justify-between items-start">
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Định Mức EVN</span>
-                <span className="p-2 bg-indigo-500/10 text-indigo-400 rounded-xl">
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted">Định Mức EVN</span>
+                <span className="p-2 bg-indigo-500/10 text-indigo-600 rounded-xl">
                   <Layers className="h-4 w-4" />
                 </span>
               </div>
               <div className="mt-3">
-                <div className="flex justify-between text-xs text-slate-300 font-semibold mb-1.5">
+                <div className="flex justify-between text-xs text-text font-semibold mb-1.5">
                   <span>Tiến độ Bậc {summary?.currentTier ?? 1}</span>
                   <span>{summary?.totalKwh ?? 0} kWh</span>
                 </div>
                 {/* 6-step progress bar */}
-                <div className="grid grid-cols-6 gap-1 h-2 bg-slate-800 rounded-full overflow-hidden p-0.5">
+                <div className="grid grid-cols-6 gap-1 h-2 bg-off-soft rounded-full overflow-hidden p-0.5 border border-line">
                   {[1, 2, 3, 4, 5, 6].map((tier) => (
                     <div
                       key={tier}
@@ -262,34 +268,34 @@ export const EnergyDashboardPage: React.FC = () => {
                             : tier <= 4
                             ? 'bg-amber-500'
                             : 'bg-rose-500'
-                          : 'bg-slate-800'
+                          : 'bg-off-soft'
                       }`}
                     />
                   ))}
                 </div>
               </div>
-              <div className="mt-3 text-[11px] text-slate-400 truncate">
+              <div className="mt-3 text-[11px] text-muted truncate">
                 Biểu giá sinh hoạt QĐ 2941/QĐ-BCT
               </div>
             </div>
           </div>
 
           {/* Time Series Bar Chart */}
-          <div className="bg-slate-900/90 border border-slate-800 p-6 rounded-2xl space-y-4">
+          <div className="surface-card p-5 sm:p-6 rounded-2xl space-y-4 border border-line shadow-soft">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
               <div>
-                <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                  <Clock className="h-5 w-5 text-amber-400" />
+                <h3 className="text-lg font-bold text-text flex items-center gap-2">
+                  <Clock className="h-5 w-5 text-amber-500" />
                   Biểu Đồ Phụ Tải Tiêu Thụ Điện Năng ({period})
                 </h3>
-                <p className="text-xs text-slate-400">Tích phân năng lượng theo từng mốc thời gian</p>
+                <p className="text-xs text-muted">Tích phân năng lượng theo từng mốc thời gian</p>
               </div>
 
               {hoveredPoint && (
-                <div className="text-xs px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-200 flex items-center gap-3">
+                <div className="text-xs px-3 py-1.5 rounded-lg bg-surface border border-line text-text flex items-center gap-3 shadow-xs">
                   <span>Mốc: <b>{hoveredPoint.label}</b></span>
-                  <span>Điện: <b className="text-amber-400">{hoveredPoint.kwh} kWh</b></span>
-                  <span>Tiền: <b className="text-emerald-400">{formatCurrency(hoveredPoint.costVnd)}</b></span>
+                  <span>Điện: <b className="text-amber-500">{hoveredPoint.kwh} kWh</b></span>
+                  <span>Tiền: <b className="text-emerald-600">{formatCurrency(hoveredPoint.costVnd)}</b></span>
                 </div>
               )}
             </div>
@@ -311,10 +317,10 @@ export const EnergyDashboardPage: React.FC = () => {
                       className={`w-full max-w-[28px] rounded-t-md transition-all duration-200 ${
                         isHovered
                           ? 'bg-amber-400 shadow-lg shadow-amber-500/30'
-                          : 'bg-gradient-to-t from-amber-600/60 to-amber-500/90 hover:from-amber-500 hover:to-amber-400'
+                          : 'bg-gradient-to-t from-amber-600/70 to-amber-500 hover:from-amber-500 hover:to-amber-400'
                       }`}
                     />
-                    <span className="text-[10px] text-slate-500 mt-2 font-mono truncate max-w-full text-center hidden sm:block">
+                    <span className="text-[10px] text-muted mt-2 font-mono truncate max-w-full text-center hidden sm:block">
                       {idx % (period === '24H' ? 3 : period === '7D' ? 1 : 5) === 0 ? point.label : ''}
                     </span>
                   </div>
@@ -323,15 +329,15 @@ export const EnergyDashboardPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Donut Chart & Breakdown Legend [PHO-033] */}
-          <div className="bg-slate-900/90 border border-slate-800 p-6 rounded-2xl space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-800/80 pb-4">
+          {/* Donut Chart & Breakdown Legend */}
+          <div className="surface-card p-5 sm:p-6 rounded-2xl space-y-6 border border-line shadow-soft">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-line pb-4">
               <div>
-                <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                  <PieChart className="h-5 w-5 text-amber-400" />
+                <h3 className="text-lg font-bold text-text flex items-center gap-2">
+                  <PieChart className="h-5 w-5 text-amber-500" />
                   Biểu Đồ Tròn Tỷ Lệ Điện Năng Tiêu Thụ
                 </h3>
-                <p className="text-xs text-slate-400">
+                <p className="text-xs text-muted">
                   Phân bổ phần trăm điện năng giữa các thiết bị trong nhà ({period})
                 </p>
               </div>
@@ -339,7 +345,7 @@ export const EnergyDashboardPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setHoveredBreakdown(null)}
-                  className="text-xs text-slate-400 hover:text-white transition px-2 py-1 rounded-md bg-slate-800"
+                  className="text-xs text-muted hover:text-text transition px-2.5 py-1 rounded-md bg-sidebar border border-line"
                 >
                   Xóa chọn lọc
                 </button>
@@ -347,7 +353,7 @@ export const EnergyDashboardPage: React.FC = () => {
             </div>
 
             {breakdown.length === 0 ? (
-              <p className="text-sm text-slate-500 py-8 text-center">
+              <p className="text-sm text-muted py-8 text-center">
                 Chưa có dữ liệu tiêu thụ điện để vẽ biểu đồ tròn.
               </p>
             ) : (
@@ -362,7 +368,8 @@ export const EnergyDashboardPage: React.FC = () => {
                         cy="140"
                         r="90"
                         fill="transparent"
-                        stroke="#1e293b"
+                        stroke="currentColor"
+                        className="text-line"
                         strokeWidth="32"
                       />
                       {/* Lát cắt của từng thiết bị */}
@@ -397,7 +404,7 @@ export const EnergyDashboardPage: React.FC = () => {
                               strokeLinecap="round"
                               className="transition-all duration-300 cursor-pointer"
                               style={{
-                                opacity: hoveredBreakdown && !isHovered ? 0.4 : 1,
+                                opacity: hoveredBreakdown && !isHovered ? 0.35 : 1,
                                 filter: isHovered ? `drop-shadow(0 0 8px ${color})` : undefined,
                               }}
                               onMouseEnter={() => setHoveredBreakdown(dev)}
@@ -410,23 +417,23 @@ export const EnergyDashboardPage: React.FC = () => {
 
                     {/* Tâm rỗng hiển thị thông số */}
                     <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6 pointer-events-none">
-                      <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider truncate max-w-[130px]">
+                      <span className="text-[11px] font-semibold text-muted uppercase tracking-wider truncate max-w-[130px]">
                         {hoveredBreakdown ? hoveredBreakdown.deviceName : 'Tổng Tiêu Thụ'}
                       </span>
                       <div className="flex items-baseline gap-1 my-0.5">
-                        <span className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+                        <span className="text-2xl sm:text-3xl font-extrabold text-text tracking-tight">
                           {hoveredBreakdown ? hoveredBreakdown.kwh : (summary?.totalKwh ?? 0)}
                         </span>
-                        <span className="text-xs font-bold text-amber-400">kWh</span>
+                        <span className="text-xs font-bold text-amber-500">kWh</span>
                       </div>
-                      <span className="text-xs font-semibold text-emerald-400 truncate max-w-[140px]">
+                      <span className="text-xs font-semibold text-emerald-600 truncate max-w-[140px]">
                         {hoveredBreakdown
                           ? `${hoveredBreakdown.percentage}% (${formatCurrency(hoveredBreakdown.costVnd)})`
                           : formatCurrency(summary?.estimatedCostVnd)}
                       </span>
                     </div>
                   </div>
-                  <p className="text-[11px] text-slate-400 mt-2">
+                  <p className="text-[11px] text-muted mt-2">
                     Rê chuột vào các lát cắt để xem chi tiết
                   </p>
                 </div>
@@ -445,8 +452,8 @@ export const EnergyDashboardPage: React.FC = () => {
                           onMouseLeave={() => setHoveredBreakdown(null)}
                           className={`p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-2 ${
                             isHovered
-                              ? 'bg-slate-800/90 border-slate-600 shadow-md scale-[1.02]'
-                              : 'bg-slate-950/60 border-slate-800/80 hover:bg-slate-800/50'
+                              ? 'bg-sidebar-hover border-primary/50 shadow-md scale-[1.02]'
+                              : 'bg-surface border-line hover:bg-sidebar-hover/60'
                           }`}
                         >
                           <div className="flex items-center gap-2.5 min-w-0">
@@ -455,19 +462,19 @@ export const EnergyDashboardPage: React.FC = () => {
                               style={{ backgroundColor: color }}
                             />
                             <div className="min-w-0">
-                              <p className="text-xs font-bold text-white truncate">
+                              <p className="text-xs font-bold text-text truncate">
                                 {dev.deviceName}
                               </p>
-                              <p className="text-[10px] text-slate-400 truncate">
+                              <p className="text-[10px] text-muted truncate">
                                 {dev.roomName || dev.deviceType}
                               </p>
                             </div>
                           </div>
                           <div className="text-right shrink-0">
-                            <span className="text-xs font-extrabold text-amber-400 font-mono block">
+                            <span className="text-xs font-extrabold text-amber-500 font-mono block">
                               {dev.percentage}%
                             </span>
-                            <span className="text-[10px] text-slate-400 font-mono">
+                            <span className="text-[10px] text-muted font-mono">
                               {dev.kwh} kWh
                             </span>
                           </div>
@@ -481,42 +488,42 @@ export const EnergyDashboardPage: React.FC = () => {
           </div>
 
           {/* Device Breakdown List */}
-          <div className="bg-slate-900/90 border border-slate-800 p-6 rounded-2xl space-y-4">
-            <h3 className="text-lg font-bold text-white flex items-center gap-2">
-              <Layers className="h-5 w-5 text-cyan-400" />
+          <div className="surface-card p-5 sm:p-6 rounded-2xl space-y-4 border border-line shadow-soft">
+            <h3 className="text-lg font-bold text-text flex items-center gap-2">
+              <Layers className="h-5 w-5 text-primary" />
               Cơ Cấu Tiêu Thụ Theo Từng Thiết Bị
             </h3>
 
             {breakdown.length === 0 ? (
-              <p className="text-sm text-slate-500 py-4 text-center">Chưa có thiết bị nào tiêu thụ điện trong khoảng thời gian này.</p>
+              <p className="text-sm text-muted py-4 text-center">Chưa có thiết bị nào tiêu thụ điện trong khoảng thời gian này.</p>
             ) : (
               <div className="space-y-3">
                 {breakdown.map((dev: DeviceEnergyBreakdown) => (
                   <div
                     key={dev.deviceId}
-                    className="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 hover:border-slate-700 transition space-y-2"
+                    className="p-4 rounded-xl bg-surface border border-line hover:border-primary/40 transition space-y-2 shadow-xs"
                   >
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 text-sm">
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-white">{dev.deviceName}</span>
-                        <span className="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-mono">
+                        <span className="font-bold text-text">{dev.deviceName}</span>
+                        <span className="text-xs px-2 py-0.5 rounded bg-off-soft text-text font-mono border border-line">
                           {dev.deviceType}
                         </span>
-                        <span className="text-xs text-slate-400">({dev.roomName})</span>
+                        <span className="text-xs text-muted">({dev.roomName})</span>
                       </div>
                       <div className="flex items-center gap-4 text-xs font-mono">
-                        <span className="text-slate-400">Công suất: <b>{dev.wattage}W</b></span>
-                        <span className="text-slate-400">Bật: <b>{dev.totalOnHours}h</b></span>
-                        <span className="text-amber-400 font-bold">{dev.kwh} kWh ({dev.percentage}%)</span>
-                        <span className="text-emerald-400 font-bold">{formatCurrency(dev.costVnd)}</span>
+                        <span className="text-muted">Công suất: <b>{dev.wattage}W</b></span>
+                        <span className="text-muted">Bật: <b>{dev.totalOnHours}h</b></span>
+                        <span className="text-amber-500 font-bold">{dev.kwh} kWh ({dev.percentage}%)</span>
+                        <span className="text-emerald-600 font-bold">{formatCurrency(dev.costVnd)}</span>
                       </div>
                     </div>
 
                     {/* Progress Bar for Device % */}
-                    <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+                    <div className="w-full h-2 bg-off-soft rounded-full overflow-hidden border border-line/40">
                       <div
                         style={{ width: `${Math.min(dev.percentage, 100)}%` }}
-                        className="h-full bg-gradient-to-r from-amber-500 to-cyan-500 rounded-full"
+                        className="h-full bg-gradient-to-r from-amber-500 to-primary rounded-full"
                       />
                     </div>
                   </div>

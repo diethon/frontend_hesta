@@ -10,6 +10,37 @@ import type {
   DeviceHealthResponse,
 } from '../types/device';
 
+export interface DevicePublicPreviewResponse {
+  deviceId: string;
+  name: string;
+  deviceType: string;
+  model?: string;
+  serialNumber?: string;
+  status: string;
+}
+
+export interface DeviceClaimRequest {
+  token: string;
+  homeId: string;
+  roomId: string;
+  name?: string;
+  nodeCode?: string;
+}
+
+export const resolveQrToken = async (token: string): Promise<DevicePublicPreviewResponse> => {
+  const prefix = 'syna://device/register?token=';
+  const cleanToken = token.startsWith(prefix) ? token.slice(prefix.length) : token.trim();
+  const response = await apiClient.get(`/devices/qr/${cleanToken}`);
+  return response.data.result;
+};
+
+export const claimDevice = async (deviceId: string, request: DeviceClaimRequest): Promise<DeviceResponse> => {
+  const response = await apiClient.post(`/devices/${deviceId}/claim`, request);
+  return response.data.result;
+};
+
+
+
 export const getDevicesByHome = async (homeId: string): Promise<DeviceResponse[]> => {
   const response = await apiClient.get(`/homes/${homeId}/devices`);
   return response.data.result;

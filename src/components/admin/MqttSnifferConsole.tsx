@@ -180,8 +180,8 @@ export const MqttSnifferConsole: React.FC = () => {
       </div>
 
       {/* ── Terminal Console Output Window ── */}
-      <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 font-mono text-xs overflow-hidden shadow-inner">
-        <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-3 text-[11px] text-slate-400">
+      <div className="rounded-2xl border border-[#1e293b] bg-[#0b1320] text-slate-200 p-4 font-mono text-xs overflow-hidden shadow-inner">
+        <div className="flex items-center justify-between border-b border-[#1e293b] pb-2 mb-3 text-[11px] text-slate-400">
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
             <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
@@ -215,8 +215,8 @@ export const MqttSnifferConsole: React.FC = () => {
                   onClick={() => setExpandedId(isExpanded ? null : pkt.id)}
                   className={`p-2.5 rounded-xl border transition-all cursor-pointer ${
                     isExpanded
-                      ? 'bg-slate-900 border-slate-700 shadow-md'
-                      : 'bg-slate-900/60 border-slate-800/80 hover:bg-slate-900 hover:border-slate-700'
+                      ? 'bg-[#111c2e] border-slate-600 shadow-md'
+                      : 'bg-[#111c2e] border-[#1e293b] hover:border-slate-600'
                   }`}
                 >
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -239,7 +239,7 @@ export const MqttSnifferConsole: React.FC = () => {
                       </span>
 
                       {/* QoS badge */}
-                      <span className="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-slate-800 text-slate-400 border border-slate-700">
+                      <span className="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-[#070d18] text-slate-400 border border-[#1e293b]">
                         QoS {pkt.qos ?? 0}
                       </span>
 
@@ -253,7 +253,7 @@ export const MqttSnifferConsole: React.FC = () => {
                     <button
                       type="button"
                       onClick={(e) => handleCopyPayload(pkt.id, pkt.payloadSummary, e)}
-                      className="inline-flex items-center gap-1 text-[11px] text-slate-400 hover:text-white px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 transition shrink-0 self-end sm:self-auto"
+                      className="inline-flex items-center gap-1 text-[11px] text-slate-400 hover:text-white px-2 py-0.5 rounded bg-[#070d18] hover:bg-slate-800 border border-[#1e293b] transition shrink-0 self-end sm:self-auto"
                       title="Sao chép nội dung payload"
                     >
                       {copiedId === pkt.id ? (
@@ -271,9 +271,9 @@ export const MqttSnifferConsole: React.FC = () => {
                   </div>
 
                   {/* Payload Summary preview */}
-                  <div className="mt-2 text-slate-300 text-[11px] bg-slate-950/80 p-2 rounded-lg border border-slate-800/80 overflow-x-auto">
+                  <div className="mt-2 text-[11px] bg-[#070d18] text-emerald-400 p-2.5 rounded-lg border border-[#1e293b] overflow-x-auto">
                     {isExpanded ? (
-                      <pre className="whitespace-pre-wrap font-mono text-emerald-300">
+                      <pre className="whitespace-pre-wrap font-mono text-emerald-400">
                         {(() => {
                           try {
                             return JSON.stringify(JSON.parse(pkt.payloadSummary), null, 2);
@@ -283,7 +283,7 @@ export const MqttSnifferConsole: React.FC = () => {
                         })()}
                       </pre>
                     ) : (
-                      <p className="truncate font-mono text-slate-400">
+                      <p className="truncate font-mono text-emerald-400/90">
                         {pkt.payloadSummary}
                       </p>
                     )}
