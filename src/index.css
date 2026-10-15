@@ -157,6 +157,18 @@
   --shadow-float: 0 20px 56px rgb(58 74 90 / 0.14);
 }
 
+/* Read at runtime by the 3D renderer, so emit even without a Tailwind utility. */
+@theme static {
+  --color-twin-demo-wall: #eee7dc;
+  --color-twin-demo-floor: #c7a684;
+  --color-twin-demo-sofa: #78949a;
+  --color-twin-demo-cushion: #e4c6a1;
+  --color-twin-demo-rug: #b7c7bf;
+  --color-twin-demo-brass: #b79863;
+  --color-twin-demo-night: #263747;
+  --color-twin-demo-warm: #ffd494;
+}
+
 :root {
   color: #3a4a5a;
   background: #f8fcff;
@@ -433,3 +445,16 @@ textarea:disabled {
 .scene-pill:active {
   transform: scale(0.97);
 }
+
+/* The mock apartment shares the product shell; evening lighting is scene-only. */
+.twin-demo-stage { height: clamp(29rem, 48vw, 43rem); background: var(--color-twin-demo-night); }
+.twin-demo-stage[data-daylight="true"] { background: var(--color-twin-scene); }
+.twin-demo-stage canvas { touch-action: none; }
+.twin-demo-range { min-height: 28px; accent-color: var(--color-primary-hover); cursor: pointer; }
+.twin-demo-hotspot { display: flex; min-width: 30px; min-height: 30px; align-items: center; gap: 8px; border: 1px solid var(--color-line); border-radius: 999px; background: var(--color-surface); padding: 7px; color: var(--color-text); box-shadow: var(--shadow-soft); white-space: nowrap; }
+.twin-demo-hotspot-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--color-off); }
+.twin-demo-hotspot.is-on .twin-demo-hotspot-dot { background: var(--color-twin-demo-warm); box-shadow: 0 0 8px var(--color-twin-demo-warm); }
+.twin-demo-hotspot.is-selected { border-color: var(--color-primary); }
+.twin-demo-hotspot-label { display: none; padding-right: 5px; font-size: 10px; font-weight: 600; }
+.twin-demo-hotspot:hover .twin-demo-hotspot-label, .twin-demo-hotspot:focus-visible .twin-demo-hotspot-label, .twin-demo-hotspot.is-selected .twin-demo-hotspot-label { display: block; }
+@media (max-width: 639px) { .twin-demo-stage { height: 29rem; } }
