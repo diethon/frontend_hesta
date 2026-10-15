@@ -132,14 +132,14 @@ export function TwinLayoutEditor({ homeId, initialMode = '3d' }: { homeId: strin
     void beginEditing();
   };
   return <section aria-label="Sơ đồ Digital Twin" className="min-w-0 space-y-5">
-    {confirmed ? <p role="status" data-geometry-source={source} className={`rounded-xl border p-3 text-sm ${source === 'INFERRED' ? 'border-warning bg-warning-soft text-text' : 'border-line bg-info-soft text-muted'}`}>{source === 'PERSISTED' ? 'Bố cục đã lưu. Phòng và thiết bị được đồng bộ từ ngôi nhà.' : source === 'INFERRED' ? 'Bố cục tự xếp từ phòng và thiết bị hiện có.' : 'Chưa có dữ liệu phòng để hiển thị.'}</p> : null}
+    {viewMode === '2d' && confirmed ? <p role="status" data-geometry-source={source} className={`rounded-xl border p-3 text-sm ${source === 'INFERRED' ? 'border-warning bg-warning-soft text-text' : 'border-line bg-info-soft text-muted'}`}>{source === 'PERSISTED' ? 'Bố cục đã lưu. Phòng và thiết bị được đồng bộ từ ngôi nhà.' : source === 'INFERRED' ? 'Bố cục tự xếp từ phòng và thiết bị hiện có.' : 'Chưa có dữ liệu phòng để hiển thị.'}</p> : null}
     <div className="flex flex-wrap items-center justify-between gap-4">
-      <div><h1 className="text-3xl font-bold tracking-tight text-text">Digital Twin</h1><p className="mt-2 text-sm text-muted">Trực quan hóa và quản lý bố cục ngôi nhà.</p></div>
+      <div><h1 className="text-3xl font-bold tracking-tight text-text">{viewMode === '3d' ? 'Không gian sống của bạn.' : 'Digital Twin'}</h1><p className="mt-2 text-sm text-muted">{viewMode === '3d' ? 'Khám phá từng phòng, chạm vào thiết bị và điều khiển ngôi nhà.' : 'Chọn tầng, căn chỉnh phòng và vị trí thiết bị có sẵn trong nhà.'}</p></div>
 
        <div className="flex flex-wrap items-center gap-2"><TwinViewSwitcher mode={viewMode} disabled={loading} onChange={setViewMode} />{viewMode === '3d' ? <TwinLayoutButton leadingIcon={<Pencil size={17} />} onClick={editIn2D}>{role === 'OWNER' ? 'Chỉnh sửa trong 2D' : 'Xem sơ đồ 2D'}</TwinLayoutButton> : null}{viewMode === '2d' && floorLevels.length > 1 ? <TwinFloorSelect floors={floorLevels} value={active2DFloor} allLabel="Tất cả tầng" ariaLabel="Chọn tầng trong sơ đồ 2D" onChange={(floor) => { setSelection(null); setSelected2DFloor(floor); }} /> : null}{viewMode === '2d' && draft ? <>
         <TwinLayoutButton disabled={blocked} onClick={cancel}>Hủy</TwinLayoutButton>
         <TwinLayoutButton variant="primary" leadingIcon={<Save size={18} />} disabled={!hasUnsavedChanges || blocked || role !== 'OWNER' || error?.kind === 'conflict' || error?.kind === 'forbidden'} onClick={() => void save()}>{saving ? 'Đang lưu…' : 'Lưu bố cục'}</TwinLayoutButton>
-      </> : confirmed ? <TwinLayoutButton disabled={blocked} onClick={reload}>Tải mới nhất</TwinLayoutButton> : null}</div>
+      </> : viewMode === '2d' && confirmed ? <TwinLayoutButton disabled={blocked} onClick={reload}>Tải mới nhất</TwinLayoutButton> : null}</div>
     </div>
     {viewMode === '2d' ? <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line">
       <div className="flex gap-4" aria-label="Chế độ sơ đồ">

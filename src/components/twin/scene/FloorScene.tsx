@@ -1,5 +1,5 @@
 import { memo, useEffect, useMemo, useRef } from 'react';
-import { Html } from '@react-three/drei';
+import { Html, RoundedBox } from '@react-three/drei';
 import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
 import { shallowEqual } from 'react-redux';
 import { DoubleSide, Group, MultiplyBlending, type Mesh, type Raycaster, type Intersection } from 'three';
@@ -23,6 +23,7 @@ import { TwinCutawayContext } from './TwinCutawayContext';
 import { themeMaterial, themeIndex, type TwinRendererTheme } from './rendererTheme';
 import { useTwinResource } from '../hooks/useTwinResource';
 import { resolveDeviceAppearance } from '../devices/deviceAppearance';
+import { roomBounds } from './cameraFraming';
 
 export interface FloorProps {
   floor: TwinFloorView; drafting: TwinDraftingMetadata; selection: TwinLayoutSelection | null;
@@ -33,6 +34,7 @@ export interface FloorProps {
 export const FloorScene = memo(function FloorScene({ floor, drafting, selection, targetElevation, mode, wallMode, markerMode, showLabels, palette, theme, heatmapMode, onSelect, onFocus }: FloorProps) {
   const names = useAppSelector((state) => Object.fromEntries(floor.rooms.map((room) => [room.roomId, state.twin.roomsById[room.roomId]?.name ?? ''])), shallowEqual);
   const architecture = useMemo(() => adaptTwinArchitecture(floor, drafting, names), [floor, drafting, names]);
+  const bounds = useMemo(() => roomBounds(floor.rooms), [floor.rooms]);
   const built = useMemo(() => buildFloorGeometry(architecture.floor, architecture.exteriorThickness, architecture.interiorThickness), [architecture]);
   const deviceTypes = useAppSelector((state) => JSON.stringify(floor.nodes.filter((node) => node.nodeType === 'DEVICE').map((node) => {
     const device = state.twin.devicesById[node.nodeId];
@@ -77,7 +79,10 @@ export const FloorScene = memo(function FloorScene({ floor, drafting, selection,
     if (Math.abs(targetElevation - elevation.current) > .001) invalidate();
     const target = controls && 'target' in controls ? controls.target as { x: number; z: number } : { x: 0, z: 0 };
     updateWallMasks(masks, built.buckets, camera.position.x - target.x, camera.position.z - target.z, wallMode);
-
+    if (theme === 'COZY' && wallMode === 'auto') {
+      masks.standing.value &= ~masks.glass.value;
+      masks.glass.value = 0;
+    }
   });
   const selectArchitecture = (event: ThreeEvent<MouseEvent>, focus: boolean) => {
     const hit = built.furnitureTris.find((range) => (event.faceIndex ?? -1) >= range.start && (event.faceIndex ?? -1) < range.end);
@@ -86,6 +91,7 @@ export const FloorScene = memo(function FloorScene({ floor, drafting, selection,
   };
   const raycast = useMemo(() => function(this: Mesh, raycaster: Raycaster, hits: Intersection[]) { architecturalRaycast.call(this, raycaster, hits, masks); }, [masks]);
   return <TwinCutawayContext.Provider value={cutaway}><group ref={group} name={floor.id} position={[0, targetElevation, 0]}>
+    {theme === 'COZY' ? <RoundedBox name="living-floor-plinth" position={[(bounds.min.x + bounds.max.x) / 2, -.19, (bounds.min.z + bounds.max.z) / 2]} args={[bounds.max.x - bounds.min.x + .16, .28, bounds.max.z - bounds.min.z + .16]} radius={.08} smoothness={2} castShadow receiveShadow><meshStandardMaterial color={palette.surface} roughness={.8} /></RoundedBox> : null}
     <mesh geometry={built.floor} material={materials.floor} receiveShadow castShadow />
     <mesh geometry={built.floor} material={pattern.material} raycast={() => undefined} />
     <mesh geometry={built.walls} material={materials.walls} customDepthMaterial={materials.depth} castShadow receiveShadow raycast={raycast} onClick={(event) => selectArchitecture(event, false)} onDoubleClick={(event) => selectArchitecture(event, true)} />

@@ -1,7 +1,7 @@
 import { Box3, Spherical, Vector3 } from 'three';
 import type { Twin3DShapedRoomGeometry } from '../twin3dGeometry';
 
-export const CAMERA_FILL = .95;
+export const CAMERA_FILL = .84;
 export const EXPLODE_GAP = 2.6;
 /** Architectural points only: scenery and labels never affect camera fit. */
 export function roomBounds(rooms: readonly Twin3DShapedRoomGeometry[]) {

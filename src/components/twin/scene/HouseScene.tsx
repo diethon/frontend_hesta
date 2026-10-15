@@ -44,6 +44,6 @@ export function HouseScene({ house, drafting, activeFloor, mode, wallMode, marke
     <directionalLight color={environment.sky} intensity={environment.fill} position={[9, 8, -10]} />
     <FitCamera rooms={rooms} room={focusRoom} node={focusNode} request={fitRequest} cameraRequest={cameraRequest} />
     {floors.map((floor) => <FloorScene key={floor.id} floor={floor} targetElevation={offsets.get(floor.id) ?? 0} mode={mode} wallMode={wallMode} markerMode={markerMode} drafting={drafting} selection={selection} compact={compact} showLabels={floors.length === 1 || mode === 'single'} palette={palette} theme={theme} heatmapMode={heatmapMode} onSelect={onSelect} onFocus={onFocus} />)}
-    <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[bounds.centerX, -.24, bounds.centerZ]} onClick={(event) => { if (event.delta <= 3) onSelect(null); }}><planeGeometry args={[bounds.width + 2, bounds.depth + 2]} /><meshStandardMaterial color={palette.ground} roughness={1} /></mesh>
+    <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[bounds.centerX, -.34, bounds.centerZ]} onClick={(event) => { if (event.delta <= 3) onSelect(null); }}><planeGeometry args={[bounds.width + 8, bounds.depth + 8]} />{theme === 'COZY' ? <shadowMaterial transparent opacity={.22} /> : <meshStandardMaterial color={palette.ground} roughness={1} />}</mesh>
   </>;
 }

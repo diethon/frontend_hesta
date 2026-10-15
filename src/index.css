@@ -458,3 +458,15 @@ textarea:disabled {
 .twin-demo-hotspot-label { display: none; padding-right: 5px; font-size: 10px; font-weight: 600; }
 .twin-demo-hotspot:hover .twin-demo-hotspot-label, .twin-demo-hotspot:focus-visible .twin-demo-hotspot-label, .twin-demo-hotspot.is-selected .twin-demo-hotspot-label { display: block; }
 @media (max-width: 639px) { .twin-demo-stage { height: 29rem; } }
+.twin-living-stage {
+  height: clamp(30rem, 48vw, 42rem);
+  background: var(--color-twin-demo-night);
+}
+
+.twin-living-stage canvas { touch-action: none; }
+.twin-living-device-list { max-height: 28rem; }
+.twin-control-range { accent-color: var(--color-primary); }
+
+@media (max-width: 639px) {
+  .twin-living-stage { height: 32rem; }
+}
