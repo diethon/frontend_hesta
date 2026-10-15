@@ -234,7 +234,13 @@ test('saved layout renders exact normalized room position/dimensions and device/
   const store = await ready(); const html = render(store);
   assert.deepEqual(store.getState().twinLayout.confirmed, saved);
   assert.match(html, /left:5%;top:5%;width:45%;height:40%/);
-  for (const node of saved.nodes) {
+  const runtime = store.getState().twin;
+  const { reconcileTwinGeometry } = loadSource('src/services/twinGeometrySource.ts');
+  const reconciled = reconcileTwinGeometry(saved, runtime.roomIds, [
+    ...runtime.deviceIds.map(id => ({ nodeType: 'DEVICE', nodeId: id, roomId: runtime.devicesById[id].roomId })),
+    ...runtime.sensorIds.map(id => ({ nodeType: 'SENSOR', nodeId: id, roomId: runtime.sensorsById[id].roomId })),
+  ]);
+  for (const node of reconciled.nodes) {
     assert.ok(html.includes(`data-node-key="${geo.nodeKey(node)}"`));
     assert.ok(html.includes(`data-x="${node.x}" data-y="${node.y}"`));
   }
@@ -408,13 +414,14 @@ test('Overview derives health and all unplaced objects from confirmed layout wit
   assert.strictEqual(selectTwinHealthCounts(store.getState()), counts);
 });
 
-test('empty Home never mounts an editor canvas and defaults to 3D Live', async () => {
+test('empty Home uses existing data only and defaults to 3D', async () => {
   const store = await ready();
   store.dispatch(twin.loadTwinSnapshot.pending('empty-home-request', homeId));
   store.dispatch(twin.loadTwinSnapshot.fulfilled({ ...snapshot, rooms: [], unassignedDevices: [], unassignedSensors: [] }, 'empty-home-request', homeId));
   const html = renderToString(React.createElement(Provider, { store }, React.createElement(TwinLayoutEditor, { homeId })));
   assert.match(html, /aria-label="Chế độ 3D" aria-pressed="true"/);
-  assert.match(html, /Hãy tạo phòng cho ngôi nhà/);
+  assert.match(html, /Digital Twin sử dụng phòng và thiết bị hiện có/);
+  assert.doesNotMatch(html, /Tạo phòng|twin-new-room-name/);
   assert.doesNotMatch(html, /data-room-id=|twin-3d-stage|twin-canvas /);
 });
 
@@ -621,11 +628,11 @@ test('serialization whitelists geometry and never stores pixels or runtime field
   assert.deepEqual(request, { expectedRevision: 3, rooms: saved.rooms, nodes: [saved.nodes[1]] });
 });
 
-test('unplaced palette derives rooms/devices/sensors; placing and removing only touch draft', async () => {
+test('room list derives existing rooms and devices without creating domain data', async () => {
   backendLayout = empty; const store = await ready(); edit(store);
   const html = render(store);
-  // Only the active room group is mounted; browser tests switch device/sensor groups.
-  for (const text of ['Chưa đặt', 'Living Room', 'Bedroom', 'Thiết bị', 'Cảm biến', 'Tìm đối tượng chưa đặt']) assert.ok(html.includes(text));
+  for (const text of ['Phòng và thiết bị', 'Living Room', 'Bedroom', 'Tìm phòng, thiết bị', 'Chưa căn chỉnh']) assert.ok(html.includes(text), text);
+  assert.doesNotMatch(html, /Tạo phòng|Đối tượng chưa đặt|Đặt từ bảng bên cạnh|Bỏ vị trí/);
   const runtime = store.getState().twin;
   change(store, { rooms: saved.rooms, nodes: [saved.nodes[0]] });
   assert.equal(store.getState().twinLayout.dirty, true);
@@ -655,6 +662,7 @@ for (const editing of [false, true]) {
   for (const kind of ['sensor', 'device', 'health']) test(`${kind} realtime updates rendered runtime and preserves ${editing ? 'draft' : 'confirmed'} geometry`, async () => {
     const store = await ready(); if (editing) { edit(store); moveRoom(store); }
     const before = store.getState().twinLayout;
+    const renderedBefore = render(store).match(/data-node-key="[^"]+" data-x="[^"]+" data-y="[^"]+"/g);
     const event = kind === 'sensor' ? { ...sensorEvent, data: { ...sensorEvent.data, latestValue: 30, observedAt: '2026-09-17T09:01:00Z' } }
       : kind === 'device' ? { ...deviceEvent, data: { ...deviceEvent.data, currentState: { power: 'OFF' } } }
       : { ...healthEvent, data: { ...healthEvent.data, healthStatus: 'STALE' } };
@@ -662,7 +670,7 @@ for (const editing of [false, true]) {
     assert.equal(store.getState().twinLayout, before);
     const html = render(store);
     assert.match(html, kind === 'sensor' ? /30 °C/ : kind === 'device' ? /OFF · ONLINE/ : /STALE/);
-    for (const node of saved.nodes) assert.ok(html.includes(`data-x="${node.x}" data-y="${node.y}"`));
+    assert.deepEqual(html.match(/data-node-key="[^"]+" data-x="[^"]+" data-y="[^"]+"/g), renderedBefore);
     assert.equal(puts().length, 0);
   });
 }
@@ -732,3 +740,76 @@ test('late Home A GET/PUT/role results cannot overwrite Home B or a newer Home A
   store.dispatch(sessionEnded()); assert.deepEqual(store.getState().twinLayout, layout.emptyLayoutState());
 });
 
+
+
+test('snapshot membership reconciles saved layouts, adds new devices and removes stale entries without mutating saved data', () => {
+  const { reconcileTwinGeometry } = loadSource('src/services/twinGeometrySource.ts');
+  const rooms = [{ roomId: 'living', floor: 2, x: .05, y: .05, width: .4, height: .4 }, { roomId: 'bedroom', floor: 3, x: .55, y: .05, width: .4, height: .4 }];
+  const original = { rooms, nodes: [
+    { nodeType: 'DEVICE', nodeId: 'lamp', roomId: 'living', x: .2, y: .2 },
+    { nodeType: 'DEVICE', nodeId: 'moved', roomId: 'living', x: .3, y: .3 },
+    { nodeType: 'DEVICE', nodeId: 'removed', roomId: 'bedroom', x: .7, y: .2 },
+  ] };
+  const before = structuredClone(original);
+  const membership = [
+    { nodeType: 'DEVICE', nodeId: 'lamp', roomId: 'living' },
+    { nodeType: 'DEVICE', nodeId: 'moved', roomId: 'bedroom' },
+    { nodeType: 'DEVICE', nodeId: 'new', roomId: 'living' },
+    { nodeType: 'SENSOR', nodeId: 'new:TEMP', roomId: 'living' },
+    { nodeType: 'DEVICE', nodeId: 'unassigned', roomId: null },
+  ];
+  const result = reconcileTwinGeometry(original, ['living', 'bedroom', 'office'], membership);
+  assert.deepEqual(original, before);
+  assert.deepEqual(result.rooms.slice(0, 2), rooms);
+  assert.equal(result.rooms[2].roomId, 'office');
+  assert.equal(result.nodes.length, 4);
+  assert.deepEqual(result.nodes.find(node => node.nodeId === 'lamp'), original.nodes[0]);
+  for (const node of result.nodes) assert.ok(geo.roomContainsPoint(result.rooms.find(room => room.roomId === node.roomId), node.x, node.y));
+  assert.equal(result.nodes.find(node => node.nodeId === 'moved').roomId, 'bedroom');
+  assert.deepEqual(reconcileTwinGeometry(result, ['living', 'bedroom', 'office'], membership), result);
+  assert.equal(geo.geometryError(result), null);
+});
+
+test('room movement and resize preserve relative marker positions and existing API coordinates', () => {
+  const room = { roomId: 'room', floor: 2, x: .1, y: .1, width: .4, height: .4 };
+  const node = { nodeType: 'DEVICE', nodeId: 'lamp', roomId: 'room', x: .2, y: .3 };
+  const original = { rooms: [room], nodes: [node] };
+  const moved = geo.updateRoomGeometry(original, { ...room, x: .3, y: .2, width: .6, height: .2 });
+  assert.deepEqual(moved.nodes[0], { ...node, x: .45, y: .3 });
+  assert.deepEqual(original.nodes[0], node);
+  assert.deepEqual(geo.layoutRequest(moved, 4).nodes, moved.nodes);
+  assert.deepEqual(geo.updateRoomGeometry(moved, room), original);
+});
+
+test('marker drag stays in its assigned room across overlap, floor and concave outlines', () => {
+  const room = { roomId: 'room', floor: 2, x: .1, y: .1, width: .8, height: .8 };
+  const node = { nodeType: 'DEVICE', nodeId: 'lamp', roomId: 'room', x: .2, y: .2 };
+  const rooms = [room, { ...room, roomId: 'overlap', floor: 3 }];
+  for (const shape of ['RECTANGLE', 'L_SHAPE', 'U_SHAPE']) {
+    const points = drafting.roomShapePoints(shape);
+    for (const [x, y] of [[-10, 10], [.85, .85], [.5, .8], [.5, .5]]) {
+      const moved = geo.positionNodeInRoom(node, x, y, rooms, () => points);
+      assert.equal(moved.roomId, 'room');
+      assert.ok(geo.roomContainsPoint(room, moved.x, moved.y, points), shape);
+      assert.equal(geo.geometryError({ rooms, nodes: [moved] }), null);
+    }
+  }
+  const unassigned = { ...node, roomId: null };
+  assert.deepEqual(geo.positionNodeInRoom(unassigned, .5, .5, rooms), unassigned);
+});
+
+test('unassigned devices stay in a separate list and new devices are automatically visible in 2D', async () => {
+  backendLayout = empty;
+  const store = await ready();
+  const html = renderToString(React.createElement(Provider, { store }, React.createElement(TwinLayoutEditor, { homeId, initialMode: '2d' })));
+  assert.match(html, /aria-label="Chế độ 2D" aria-pressed="true"/);
+  for (const room of snapshot.rooms) assert.ok(html.includes(`data-room-id="${room.roomId}"`));
+  for (const room of snapshot.rooms) for (const device of room.devices) assert.ok(html.includes(`data-node-key="DEVICE:${device.deviceId}"`));
+  const { TwinRoomPanel } = loadSource('src/components/twin/TwinRoomPanel.tsx');
+  const panel = renderToString(React.createElement(Provider, { store }, React.createElement(TwinRoomPanel, { geometry: empty, saved: empty, selection: null, onSelect() {} })));
+  if (snapshot.unassignedDevices.length) {
+    assert.match(panel, /Chưa có phòng/);
+    for (const device of snapshot.unassignedDevices) assert.ok(panel.includes(device.name));
+  }
+  assert.equal(puts().length, 0);
+});

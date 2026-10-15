@@ -2,11 +2,10 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEven
 import { useAppSelector } from '../../store/hooks';
 import type { TwinHealthStatus } from '../../types/twin';
 import type { TwinLayoutGeometry, TwinLayoutSelection, TwinNodeLayout, TwinRoomLayout } from '../../types/twinLayout';
-import { clampRoom, moveLayoutNode, nodeKey, overlappingRoomIds, resizeRoom, snapPoint, snapRoom, type TwinSnapGuides } from './layoutGeometry';
+import { clampRoom, positionNodeInRoom, updateRoomGeometry, nodeKey, overlappingRoomIds, resizeRoom, snapPoint, snapRoom, type TwinSnapGuides } from './layoutGeometry';
 import { DeviceGlyph, RoomGlyph, SensorGlyph } from './TwinVisualIcon';
 import { RoomFurnishing } from './TwinRoomFurnishing';
 import { roomKind } from './roomKind';
-import { PALETTE_MIME, placePaletteItem, type PaletteItem } from './layoutPalette';
 import { blueprintKey, changeRoomDrafting, polygonCss, roomDrafting, type TwinDraftingMetadata } from './twinDrafting';
 import { fitLayoutViewport, layoutViewportBounds, nodeDisplayPosition, roomHeaderHeight } from './twin2dViewport';
 import { healthSymbols } from './twinPresentation';
@@ -124,12 +123,18 @@ export function TwinCanvas({ geometry, drafting, editable, selection, onSelect, 
         drag.guides = snapped.guides;
         return candidate;
       });
-      commit.rooms = next.rooms.map((room) => room.roomId !== drag.selection.id ? room : snapRoom(room, drag.origin.rooms, snapOptions, drag.resize).room);
+      const nextRoom = next.rooms.find((room) => room.roomId === drag.selection.id)!;
+      const roomPoints = (roomId: string) => roomDrafting(drafting, roomId).points;
+      next.nodes = updateRoomGeometry(drag.origin, nextRoom, roomPoints).nodes;
+      const snappedRoom = snapRoom(nextRoom, drag.origin.rooms, snapOptions, drag.resize).room;
+      const committed = updateRoomGeometry(drag.origin, snappedRoom, roomPoints);
+      commit.rooms = committed.rooms;
+      commit.nodes = committed.nodes;
     } else {
-      next.nodes = drag.origin.nodes.map((node) => nodeKey(node) !== drag.selection.id ? node : moveLayoutNode(node,
+      next.nodes = drag.origin.nodes.map((node) => nodeKey(node) !== drag.selection.id ? node : positionNodeInRoom(node,
         node.x + dx, node.y + dy, drag.origin.rooms,
         (roomId) => roomDrafting(drafting, roomId).points));
-      commit.nodes = drag.origin.nodes.map((node) => nodeKey(node) !== drag.selection.id ? node : moveLayoutNode(node,
+      commit.nodes = drag.origin.nodes.map((node) => nodeKey(node) !== drag.selection.id ? node : positionNodeInRoom(node,
         snapPoint(node.x + dx, snapOptions.grid, snapOptions.stepX), snapPoint(node.y + dy, snapOptions.grid, snapOptions.stepY), drag.origin.rooms,
         (roomId) => roomDrafting(drafting, roomId).points));
     }
@@ -184,18 +189,7 @@ export function TwinCanvas({ geometry, drafting, editable, selection, onSelect, 
   const handlers = { onPointerMove: move, onPointerUp: (event: PointerEvent<HTMLButtonElement>) => finish(event), onPointerCancel: (event: PointerEvent<HTMLButtonElement>) => finish(event, true), onLostPointerCapture: (event: PointerEvent<HTMLButtonElement>) => finish(event, true) };
   const roomStyle = ({ x, y, width, height }: TwinRoomLayout) => ({ left: `${x * 100}%`, top: `${y * 100}%`, width: `${width * 100}%`, height: `${height * 100}%` });
   return <div ref={viewport} className={`twin-viewport relative overflow-auto rounded-xl border border-line bg-surface shadow-soft ${overview ? 'twin-2d-overview-viewport' : ''}`}><div className="relative" style={viewportSize.width ? { width: Math.max(viewportSize.width, fit.canvasWidth + fit.left), height: Math.max(viewportSize.height, fit.canvasHeight + fit.top) } : undefined}><div ref={canvas} aria-label={overview ? 'Tổng quan mặt bằng tầng' : 'Sơ đồ nhà 2D'} style={{ width: viewportSize.width ? fit.canvasWidth : '100%', height: viewportSize.height ? fit.canvasHeight : 'var(--twin-canvas-height)', left: fit.left, top: fit.top, backgroundImage: drafting.settings.gridSnap ? undefined : 'none', backgroundSize: `${snapOptions.stepX * 100}% ${snapOptions.stepY * 100}%` }}
-    onDragOver={(event) => { if (editable && event.dataTransfer.types.includes(PALETTE_MIME)) { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; } }}
-    onDrop={(event) => {
-      if (!editable || !canvas.current) return;
-      event.preventDefault();
-      let item: PaletteItem;
-      try { item = JSON.parse(event.dataTransfer.getData(PALETTE_MIME)); } catch { return; }
-      if (!item || typeof item.id !== 'string' || !(item.kind === 'room' ? roomsById[item.id] : item.kind === 'DEVICE' ? devicesById[item.id] : item.kind === 'SENSOR' ? sensorsById[item.id] : false)) return;
-      const bounds = canvas.current.getBoundingClientRect();
-      onChange(placePaletteItem(geometry, item, (event.clientX - bounds.left) / bounds.width, (event.clientY - bounds.top) / bounds.height, floor,
-        (roomId) => roomDrafting(drafting, roomId).points, snapOptions));
-      onSelect({ kind: item.kind === 'room' ? 'room' : 'node', id: item.kind === 'room' ? item.id : `${item.kind}:${item.id}` });
-  }} className="twin-canvas relative isolate overflow-hidden">
+    className="twin-canvas relative isolate overflow-hidden">
     {blueprint ? <img src={blueprint.dataUrl} alt="" aria-hidden="true" data-blueprint-underlay className="pointer-events-none absolute inset-0 h-full w-full object-fill" style={{ opacity: blueprint.opacity }} /> : null}
     {guides.x.map((coordinate) => <span key={`x-${coordinate}`} aria-hidden="true" className="pointer-events-none absolute inset-y-0 z-30 w-px bg-primary" style={{ left: `${coordinate * 100}%` }} />)}
     {guides.y.map((coordinate) => <span key={`y-${coordinate}`} aria-hidden="true" className="pointer-events-none absolute inset-x-0 z-30 h-px bg-primary" style={{ top: `${coordinate * 100}%` }} />)}
