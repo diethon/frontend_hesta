@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate, useSearchParams } from "react-router";
 import type { UserResponse } from "../../types/auth";
 import { ProfileModal } from "../profile/ProfileModal";
 import { MemberManagement } from "./MemberManagement";
@@ -8,16 +8,7 @@ import { getMyHomes, createHome } from "../../services/homeApi";
 import { currentHomeChanged, currentHomeCleared } from "../../store/homeSlice";
 import { useAppDispatch } from "../../store/hooks";
 import { getErrorMessage } from "../../utils/errors";
-import {
-  AdminIcon,
-  AppSidebar,
-  DeviceIcon,
-  HomeIcon,
-  PeopleIcon,
-  SceneIcon,
-  TwinIcon,
-  EnergyIcon,
-} from "../ui/AppSidebar";
+import { HomeSidebar } from "../ui/HomeSidebar";
 import { NotificationBell } from "../notification/NotificationBell";
 import { Link } from "react-router";
 import { notify } from '../ui/notify';
@@ -56,6 +47,9 @@ export const HomePage: React.FC<HomePageProps> = ({
   onProfileUpdate,
 }) => {
   const dispatch = useAppDispatch();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const requestedHomeId = searchParams.get("homeId");
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -89,7 +83,7 @@ export const HomePage: React.FC<HomePageProps> = ({
         if (!active) return;
         setHomesList(homes || []);
         setUserHome((selectedHome) =>
-          retainSelectedHome(homes || [], selectedHome),
+          retainSelectedHome(homes || [], homes?.find((home) => home.homeId === requestedHomeId) ?? selectedHome),
         );
       })
       .catch((error: unknown) => {
@@ -98,7 +92,12 @@ export const HomePage: React.FC<HomePageProps> = ({
     return () => {
       active = false;
     };
-  }, []);
+  }, [requestedHomeId]);
+
+  useEffect(() => {
+    if (!userHome || (location.hash !== "#scenes-section" && location.hash !== "#members-section")) return;
+    document.getElementById(location.hash.slice(1))?.scrollIntoView({ behavior: "smooth" });
+  }, [location.hash, location.key, userHome]);
 
   useEffect(() => {
     dispatch(currentHomeChanged(userHome?.homeId ?? null));
@@ -143,70 +142,7 @@ export const HomePage: React.FC<HomePageProps> = ({
 
   return (
     <div className="app-shell relative overflow-x-hidden">
-      <AppSidebar
-        activeItem="overview"
-        contextLabel="Không gian sống"
-        items={[
-          {
-            id: "overview",
-            label: "Tổng quan",
-            icon: <HomeIcon />,
-            onClick: () => window.scrollTo({ top: 0, behavior: "smooth" }),
-          },
-          {
-            id: "devices",
-            label: "Thiết bị",
-            icon: <DeviceIcon />,
-            onClick: () => {
-              if (userHome) navigate(`/home/${userHome.homeId}/devices`);
-              else notify.info('Hãy tạo hoặc tham gia một ngôi nhà trước khi quản lý thiết bị.');
-            },
-          },
-          {
-            id: 'twin', label: 'Digital Twin', icon: <TwinIcon />, onClick: () => {
-              if (userHome) navigate(`/home/${userHome.homeId}/digital-twin`);
-              else notify.info('Hãy tạo hoặc tham gia một ngôi nhà trước khi mở Digital Twin.');
-            },
-          },
-          {
-            id: 'energy',
-            label: 'Tiêu thụ điện',
-            icon: <EnergyIcon />,
-            onClick: () => {
-              if (userHome) navigate('/home/' + userHome.homeId + '/energy');
-              else notify.info('Hãy tạo hoặc tham gia một ngôi nhà trước.');
-            },
-          },
-          {
-            id: "scenes",
-            label: "Kịch bản",
-            icon: <SceneIcon />,
-            onClick: () =>
-              document
-                .getElementById("scenes-section")
-                ?.scrollIntoView({ behavior: "smooth" }),
-          },
-          {
-            id: "members",
-            label: "Thành viên",
-            icon: <PeopleIcon />,
-            onClick: () =>
-              document
-                .getElementById("members-section")
-                ?.scrollIntoView({ behavior: "smooth" }),
-          },
-          ...(user.platformRole === "ADMIN"
-            ? [
-                {
-                  id: "admin",
-                  label: "Quản trị hệ thống",
-                  icon: <AdminIcon />,
-                  onClick: () => navigate("/admin"),
-                },
-              ]
-            : []),
-        ]}
-      />
+      <HomeSidebar activeItem="overview" homeId={userHome?.homeId} />
       <div className="lg:pl-64">
         {/* Top Navbar */}
         <nav className="sticky top-0 z-20 flex items-center justify-between gap-2 border-b border-line bg-white/90 px-4 py-3 backdrop-blur-xl sm:px-6">

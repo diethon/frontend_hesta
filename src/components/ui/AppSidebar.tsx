@@ -74,7 +74,7 @@ export const EnergyIcon = () => (
   );
 
 export const AppSidebar: React.FC<AppSidebarProps> = ({ activeItem, items, contextLabel, showSystemSummary = true }) => (
-  <aside className="app-sidebar fixed inset-y-0 left-0 z-30 hidden w-64 flex-col p-5 lg:flex">
+  <aside className="app-sidebar fixed inset-y-0 left-0 z-30 hidden w-64 flex-col overflow-y-auto p-5 lg:flex">
     <div className="px-2 py-1">
       <BrandMark />
     </div>

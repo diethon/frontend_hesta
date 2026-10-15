@@ -117,6 +117,24 @@ test('session restoration happens before protected routes render', () => {
   assert.equal(redirects.length, 0);
 });
 
+test('home navigation keeps all menu entries and the same order on feature pages', () => {
+  const labels = ['Tổng quan', 'Thiết bị', 'Digital Twin', 'Tiêu thụ điện', 'Kịch bản', 'Thành viên'];
+  for (const account of [user, admin]) {
+    for (const path of ['/home', '/home/home-1/devices', '/home/home-1/energy']) {
+      const html = renderRoute(path, account);
+      const navigation = html.match(/<nav aria-label="Điều hướng chính"[^>]*>([\s\S]*?)<\/nav>/)?.[1];
+      assert.ok(navigation, `Main navigation missing on ${path}`);
+      let previousIndex = -1;
+      for (const label of labels) {
+        const index = navigation.indexOf(label);
+        assert.ok(index > previousIndex, `${label} missing or out of order on ${path}`);
+        previousIndex = index;
+      }
+      assert.equal(navigation.includes('Quản trị hệ thống'), account.platformRole === 'ADMIN');
+    }
+  }
+});
+
 test('login exposes an accessible password visibility control', () => {
   const html = renderRoute('/login');
   assert.match(html, /type="password"/);

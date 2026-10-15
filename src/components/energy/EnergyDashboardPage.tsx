@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
-import { AppSidebar, DeviceIcon, HomeIcon, TwinIcon, EnergyIcon } from '../ui/AppSidebar';
+import { HomeSidebar } from '../ui/HomeSidebar';
 import { getHomeEnergyAnalytics } from '../../services/energyApi';
 import type { EnergyAnalyticsResponse, DeviceEnergyBreakdown, EnergyTimeSeriesPoint } from '../../types/energy';
 import { getErrorMessage } from '../../utils/errors';
@@ -77,36 +77,7 @@ export const EnergyDashboardPage: React.FC = () => {
 
   return (
     <div className="app-shell min-h-screen text-text">
-      <AppSidebar
-        activeItem="energy"
-        contextLabel="Không gian sống"
-        items={[
-          {
-            id: 'home',
-            label: 'Tổng quan',
-            icon: <HomeIcon />,
-            onClick: () => navigate('/home'),
-          },
-          {
-            id: 'devices',
-            label: 'Thiết bị',
-            icon: <DeviceIcon />,
-            onClick: () => navigate(`/home/${homeId}/devices`),
-          },
-          {
-            id: 'energy',
-            label: 'Tiêu thụ điện',
-            icon: <EnergyIcon />,
-            onClick: () => window.scrollTo({ top: 0, behavior: 'smooth' }),
-          },
-          {
-            id: 'twin',
-            label: 'Digital Twin',
-            icon: <TwinIcon />,
-            onClick: () => navigate(`/home/${homeId}/digital-twin`),
-          },
-        ]}
-      />
+      <HomeSidebar activeItem="energy" homeId={homeId} />
 
       <main id="main-content" className="lg:pl-64">
         <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8">
