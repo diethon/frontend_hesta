@@ -22,6 +22,7 @@ import { makePatternTexture, patternMaterial } from '../neonplan/viewer/pattern'
 import { TwinCutawayContext } from './TwinCutawayContext';
 import { themeMaterial, themeIndex, type TwinRendererTheme } from './rendererTheme';
 import { useTwinResource } from '../hooks/useTwinResource';
+import { resolveDeviceAppearance } from '../devices/deviceAppearance';
 
 export interface FloorProps {
   floor: TwinFloorView; drafting: TwinDraftingMetadata; selection: TwinLayoutSelection | null;
@@ -33,14 +34,17 @@ export const FloorScene = memo(function FloorScene({ floor, drafting, selection,
   const names = useAppSelector((state) => Object.fromEntries(floor.rooms.map((room) => [room.roomId, state.twin.roomsById[room.roomId]?.name ?? ''])), shallowEqual);
   const architecture = useMemo(() => adaptTwinArchitecture(floor, drafting, names), [floor, drafting, names]);
   const built = useMemo(() => buildFloorGeometry(architecture.floor, architecture.exteriorThickness, architecture.interiorThickness), [architecture]);
-  const deviceTypes = useAppSelector((state) => JSON.stringify(floor.nodes.filter((node) => node.nodeType === 'DEVICE').map((node) => [node.nodeId, state.twin.devicesById[node.nodeId]?.deviceType ?? ''])));
+  const deviceTypes = useAppSelector((state) => JSON.stringify(floor.nodes.filter((node) => node.nodeType === 'DEVICE').map((node) => {
+    const device = state.twin.devicesById[node.nodeId];
+    return [node.nodeId, device ? resolveDeviceAppearance(device.deviceType, device.name).kind : ''];
+  })));
   const openingBindings = useMemo(() => {
     const result = new Map<string, typeof built.openings[number]>(), occupied = new Set<string>();
     const types = new Map<string, string>(JSON.parse(deviceTypes));
     for (const node of floor.nodes) {
       const type = types.get(node.nodeId);
-      if (!type || !['DOOR', 'WINDOW', 'CURTAIN', 'BLIND'].includes(type)) continue;
-      const opening = built.openings.filter((info) => info.opening.room_id === node.roomId && info.opening.type === (type === 'DOOR' ? 'door' : 'window') && !occupied.has(info.opening.id)).sort((a, b) => Math.hypot(a.start[0] + a.axis[0] * a.width / 2 - node.x, a.start[1] + a.axis[1] * a.width / 2 - node.z) - Math.hypot(b.start[0] + b.axis[0] * b.width / 2 - node.x, b.start[1] + b.axis[1] * b.width / 2 - node.z))[0];
+      if (!type || !['door', 'window', 'curtain'].includes(type)) continue;
+      const opening = built.openings.filter((info) => info.opening.room_id === node.roomId && info.opening.type === (type === 'door' ? 'door' : 'window') && !occupied.has(info.opening.id)).sort((a, b) => Math.hypot(a.start[0] + a.axis[0] * a.width / 2 - node.x, a.start[1] + a.axis[1] * a.width / 2 - node.z) - Math.hypot(b.start[0] + b.axis[0] * b.width / 2 - node.x, b.start[1] + b.axis[1] * b.width / 2 - node.z))[0];
       if (opening) { result.set(node.nodeId, opening); occupied.add(opening.opening.id); }
     }
     return result;
@@ -73,6 +77,7 @@ export const FloorScene = memo(function FloorScene({ floor, drafting, selection,
     if (Math.abs(targetElevation - elevation.current) > .001) invalidate();
     const target = controls && 'target' in controls ? controls.target as { x: number; z: number } : { x: 0, z: 0 };
     updateWallMasks(masks, built.buckets, camera.position.x - target.x, camera.position.z - target.z, wallMode);
+
   });
   const selectArchitecture = (event: ThreeEvent<MouseEvent>, focus: boolean) => {
     const hit = built.furnitureTris.find((range) => (event.faceIndex ?? -1) >= range.start && (event.faceIndex ?? -1) < range.end);
@@ -86,7 +91,7 @@ export const FloorScene = memo(function FloorScene({ floor, drafting, selection,
     <mesh geometry={built.walls} material={materials.walls} customDepthMaterial={materials.depth} castShadow receiveShadow raycast={raycast} onClick={(event) => selectArchitecture(event, false)} onDoubleClick={(event) => selectArchitecture(event, true)} />
     <mesh geometry={built.walls} material={materials.glassWalls} raycast={() => undefined} renderOrder={3} />
     <lineSegments geometry={built.lines} material={materials.lines} raycast={() => undefined} />
-    <mesh geometry={built.shadow} raycast={() => undefined}><meshBasicMaterial vertexColors blending={MultiplyBlending} transparent depthWrite={false} side={DoubleSide} polygonOffset polygonOffsetFactor={-1} /></mesh>
+    <mesh geometry={built.shadow} raycast={() => undefined}><meshBasicMaterial vertexColors blending={MultiplyBlending} premultipliedAlpha transparent depthWrite={false} side={DoubleSide} polygonOffset polygonOffsetFactor={-1} /></mesh>
     <mesh geometry={openings.frames} material={materials.frames} receiveShadow raycast={() => undefined} />
     <mesh geometry={openings.glass} material={materials.windowGlass} raycast={() => undefined} renderOrder={4} />
     <mesh geometry={openings.blinds} material={materials.blinds} raycast={() => undefined} />

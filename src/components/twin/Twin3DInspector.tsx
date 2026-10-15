@@ -10,6 +10,7 @@ import { roomFloorLevel } from './twin3dGeometry';
 import { TwinContent } from './TwinContent';
 import { DeviceControlPanel } from './DeviceControlPanel';
 import { summarizeState } from './twinPresentation';
+import { resolveDeviceAppearance } from './devices/deviceAppearance';
 
 export function Twin3DInspector({ geometry, selection, onSelect, onEdit2D, canEdit = false, onFocusRoom, onFitHome }: {
   geometry: TwinLayoutGeometry;
@@ -55,6 +56,7 @@ export function Twin3DInspector({ geometry, selection, onSelect, onEdit2D, canEd
   if (device) return <section aria-label={`Chi tiết thiết bị ${device.name}`} className="surface-card space-y-4 p-4">
     <div className="flex items-center gap-3"><DeviceGlyph deviceType={device.deviceType} /><div className="min-w-0"><h3 className="text-lg font-semibold text-text">{device.name}</h3><p className="mt-1 text-xs text-muted">{device.status} · {businessRoom?.name ?? 'Chưa gán phòng'}</p></div><TwinHealthBadge compact healthStatus={device.healthStatus} /></div>
     <DeviceControlPanel key={device.deviceId} deviceId={device.deviceId} />
+    <p className="rounded-xl bg-info-soft px-3 py-2 text-xs text-muted">Mô hình 3D · {resolveDeviceAppearance(device.deviceType, device.name).label}{resolveDeviceAppearance(device.deviceType, device.name).source === 'name' ? ' · Nhận diện theo tên' : ''}</p>
     <p className="break-words text-xs text-muted">{summarizeState(device.currentState)}</p>
     <p className="text-xs text-muted">Cập nhật · {device.lastSeen ? new Date(device.lastSeen).toLocaleString('vi-VN') : 'Chưa có dữ liệu'}</p>
     <p className="break-words text-sm text-muted">Phòng · {businessRoom?.name ?? 'Chưa gán phòng'}</p>

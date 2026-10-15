@@ -102,6 +102,74 @@ const saved = { homeId, revision: 3,
   ],
 };
 
+test('device appearance recognizes Vietnamese/English names and keeps authoritative device types', () => {
+  const { resolveDeviceAppearance } = loadSource('src/components/twin/devices/deviceAppearance.ts');
+  const cases = [
+    ['IR_REMOTE', 'Điều hòa phòng khách', 'ac', 'wall'],
+    ['IR_REMOTE', 'MÁY LẠNH PHÒNG NGỦ', 'ac', 'wall'],
+    ['IR_REMOTE', 'Air conditioner', 'ac', 'wall'],
+    ['IR_REMOTE', 'TV phòng khách', 'tv', 'wall'],
+    ['SMART_PLUG', 'Đèn cây cạnh sofa', 'floor-lamp', 'floor'],
+    ['LIGHT', 'Đèn bàn học', 'table-lamp', 'table'],
+    ['LIGHT', 'Den dau giuong', 'table-lamp', 'table'],
+    ['LIGHT', 'Đèn thả bàn ăn', 'pendant-light', 'ceiling'],
+    ['LIGHT', 'Đèn âm trần', 'ceiling-light', 'ceiling'],
+    ['LIGHT', 'Wall sconce', 'wall-light', 'wall'],
+    ['LED_RGB', 'Dải LED phòng khách', 'led-strip', 'wall'],
+    ['FAN', 'Quạt đứng phòng ngủ', 'standing-fan', 'floor'],
+    ['FAN', 'Ceiling fan', 'ceiling-fan', 'ceiling'],
+    ['UNKNOWN', 'Đèn bàn', 'table-lamp', 'table'],
+    ['MOTION_SENSOR', 'Cảm biến cạnh điều hòa', 'motion-sensor', 'wall'],
+    ['CAMERA_AI', 'Camera cửa sổ', 'camera', 'wall'],
+    ['AIR_CONDITIONER', 'Đèn bàn', 'ac', 'wall'],
+    ['SMOKE_SENSOR', 'Cảm biến khói', 'smoke-sensor', 'ceiling'],
+    ['SMART_PLUG', 'Ổ cắm số 1', 'plug', 'wall'],
+    ['IR_REMOTE', 'Bộ phát IR phòng khách', 'remote', 'table'],
+    ['UNKNOWN', 'Activity tracker phòng khách', 'generic', 'floor'],
+    ['UNKNOWN', '', 'generic', 'floor'],
+  ];
+  for (const [type, name, kind, mount] of cases) {
+    const result = resolveDeviceAppearance(type, name);
+    assert.equal(result.kind, kind, `${type}: ${name}`);
+    assert.equal(result.mount, mount, name);
+  }
+  assert.equal(resolveDeviceAppearance('IR_REMOTE', 'Điều hòa').source, 'name');
+  assert.equal(resolveDeviceAppearance('AIR_CONDITIONER', 'Điều hòa').source, 'type');
+  assert.equal(resolveDeviceAppearance('UNKNOWN', 'Không xác định').source, 'fallback');
+});
+
+test('name-selected models mount at the matching wall, ceiling, floor or table without changing persisted anchors', () => {
+  const { devicePlacement } = loadSource('src/components/twin/scene/devicePlacement.ts');
+  const node = { nodeId: 'bridge', nodeType: 'DEVICE', roomId: 'living', x: 0, y: 0, z: 0 };
+  const room = { x: 0, z: 0, wallHeight: 2.8, outline: [{ x: -2, z: -2 }, { x: 2, z: -2 }, { x: 2, z: 2 }, { x: -2, z: 2 }] };
+  const before = structuredClone(node);
+  const ac = devicePlacement(node, room, 'IR_REMOTE', 0, 'Điều hòa phòng khách');
+  assert.ok(Math.abs(ac.y - 2.35) < .001);
+  assert.ok(Math.abs(ac.x) > 1.8 || Math.abs(ac.z) > 1.8);
+  const floorLamp = devicePlacement(node, room, 'SMART_PLUG', 45, 'Đèn cây');
+  assert.deepEqual(floorLamp, { x: 0, y: 0, z: 0, rotation: Math.PI / 4 });
+  assert.equal(devicePlacement(node, room, 'LIGHT', 0, 'Đèn bàn').y, .72);
+  assert.ok(Math.abs(devicePlacement(node, room, 'LIGHT', 0, 'Đèn trần').y - 2.75) < .001);
+  assert.deepEqual(node, before);
+});
+
+test('name-based rendering preserves device identity, runtime state and the backend command contract', () => {
+  const { resolveDeviceAppearance } = loadSource('src/components/twin/devices/deviceAppearance.ts');
+  const { adaptTwinDevice } = loadSource('src/services/twinAdapter.ts');
+  const device = { ...deviceEvent.data, deviceType: 'IR_REMOTE', name: 'Điều hòa phòng khách', status: 'ONLINE', healthStatus: 'ACTIVE', currentState: { power: 'ON', temperature: 23, fan: 'HIGH' } };
+  const before = structuredClone(device);
+  const view = adaptTwinDevice(device);
+  assert.equal(resolveDeviceAppearance(view.type, view.name).kind, 'ac');
+  assert.equal(view.type, 'IR_REMOTE');
+  assert.equal(view.id, device.deviceId);
+  assert.deepEqual(device, before);
+  assert.equal(view.powered, true);
+  assert.equal(adaptTwinDevice({ ...device, status: 'OFFLINE' }).powered, false);
+  assert.equal(adaptTwinDevice({ ...device, currentState: { power: 'OFF' } }).powered, false);
+  const { twinDeviceActions } = loadSource('src/services/deviceCommandService.ts');
+  assert.deepEqual(twinDeviceActions({ ...device, capabilities: { IR_TRANSMIT: ['SEND_IR_CODE'] } }), ['SEND_IR_CODE']);
+});
+
 test('camera presets cover every side and overhead while staying above the floor', () => {
   assert.deepEqual(camera3d.cameraViews.map(view => view.id), ['isometric', 'top', 'front', 'right', 'back', 'left']);
   for (const view of camera3d.cameraViews) {
