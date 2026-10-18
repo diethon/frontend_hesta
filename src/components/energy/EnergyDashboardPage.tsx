@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
-import { AppSidebar, DeviceIcon, HomeIcon, TwinIcon, EnergyIcon } from '../ui/AppSidebar';
+import { AppSidebar, DeviceIcon, HomeIcon, TwinIcon, EnergyIcon, SceneIcon, AutomationIcon } from '../ui/AppSidebar';
 import { getHomeEnergyAnalytics } from '../../services/energyApi';
 import type { EnergyAnalyticsResponse, DeviceEnergyBreakdown, EnergyTimeSeriesPoint } from '../../types/energy';
 import { getErrorMessage } from '../../utils/errors';
@@ -104,6 +104,18 @@ export const EnergyDashboardPage: React.FC = () => {
             label: 'Digital Twin',
             icon: <TwinIcon />,
             onClick: () => navigate(`/home/${homeId}/digital-twin`),
+          },
+          {
+            id: 'scenes',
+            label: 'Kịch bản',
+            icon: <SceneIcon />,
+            onClick: () => navigate(`/homes/${homeId}/scenes`),
+          },
+          {
+            id: 'automations',
+            label: 'Tự động hóa',
+            icon: <AutomationIcon />,
+            onClick: () => navigate(`/homes/${homeId}/automation-rules`),
           },
         ]}
       />
