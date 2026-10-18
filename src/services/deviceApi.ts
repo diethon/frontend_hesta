@@ -278,3 +278,14 @@ export const adminRegenerateQr = async (deviceId: string): Promise<QrInfo> => {
   const response = await apiClient.post(`/admin/devices/${deviceId}/qr/regenerate`);
   return response.data.result;
 };
+
+export const getHomeDeviceCapabilities = async (homeId: string): Promise<import('../types/automation').HomeCapabilitiesResponse> => {
+  const response = await apiClient.get(`/homes/${homeId}/device-capabilities`);
+  return response.data.result;
+};
+
+export const getDeviceCapabilities = async (deviceId: string): Promise<import('../types/automation').DeviceCapabilityInfo> => {
+  const response = await apiClient.get(`/devices/${deviceId}/capabilities`);
+  return response.data.result;
+};
+

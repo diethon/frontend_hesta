@@ -6,7 +6,37 @@ export interface DeviceSummary {
   name: string;
   deviceType: string;
   status: string;
+  currentState?: Record<string, unknown>;
   capabilities?: Record<string, string[]>;
+  icon?: string;
+  supportedActions?: string[];
+  supportedAttributes?: string[];
+  sensor?: boolean;
+  actionable?: boolean;
+}
+
+export interface DeviceCapabilityInfo extends DeviceSummary {
+  supportedActions: string[];
+  supportedAttributes: string[];
+  sensor: boolean;
+  actionable: boolean;
+}
+
+export interface CapabilityGroup {
+  code: string;
+  label: string;
+  icon: string;
+  actions: string[];
+  deviceIds: string[];
+  deviceCount: number;
+}
+
+export interface HomeCapabilitiesResponse {
+  homeId: string;
+  devices: DeviceCapabilityInfo[];
+  capabilities: CapabilityGroup[];
+  actionTypes: string[];
+  sensorAttributes: string[];
 }
 
 export interface SceneActionInput {
