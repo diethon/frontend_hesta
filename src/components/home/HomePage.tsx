@@ -17,6 +17,7 @@ import {
   SceneIcon,
   TwinIcon,
   EnergyIcon,
+  AutomationIcon,
 } from "../ui/AppSidebar";
 import { NotificationBell } from "../notification/NotificationBell";
 import { Link } from "react-router";
@@ -181,10 +182,19 @@ export const HomePage: React.FC<HomePageProps> = ({
             id: "scenes",
             label: "Kịch bản",
             icon: <SceneIcon />,
-            onClick: () =>
-              document
-                .getElementById("scenes-section")
-                ?.scrollIntoView({ behavior: "smooth" }),
+            onClick: () => {
+              if (userHome) navigate(`/homes/${userHome.homeId}/scenes`);
+              else notify.info('Hãy tạo hoặc tham gia một ngôi nhà trước khi mở kịch bản.');
+            },
+          },
+          {
+            id: "automations",
+            label: "Tự động hóa",
+            icon: <AutomationIcon />,
+            onClick: () => {
+              if (userHome) navigate(`/homes/${userHome.homeId}/automation-rules`);
+              else notify.info('Hãy tạo hoặc tham gia một ngôi nhà trước khi mở tự động hóa.');
+            },
           },
           {
             id: "members",

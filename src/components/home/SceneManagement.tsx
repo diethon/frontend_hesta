@@ -27,6 +27,7 @@ import {
   createScene,
   deleteScene,
   executeScene,
+  getCachedScenes,
   getScene,
   getSceneActionTypes,
   listScenes,
@@ -44,12 +45,12 @@ import {
   type DraftSceneAction,
 } from '../scene/sceneActions';
 import { SceneCard } from '../scene/SceneCard';
-import { SceneIcon } from '../scene/SceneIcon';
 import { SceneEditorModal } from '../scene/SceneEditorModal';
 import { SceneHistoryModal } from '../scene/SceneHistoryModal';
 import { SceneScheduleModal } from '../scene/SceneScheduleModal';
-import { detectSceneTheme, getDeviceTypeIcon } from '../scene/sceneConstants';
+import { COLOR_PRESETS } from '../device/deviceMultiActionHelpers';
 import { notify } from '../ui/notify';
+import { ConfirmModal } from '../ui/ConfirmModal';
 
 interface SceneManagementProps {
   homeId: string;
@@ -64,11 +65,12 @@ export const SceneManagement: React.FC<SceneManagementProps> = ({
   currentUserRole,
 }) => {
   const isOwner = currentUserRole === 'OWNER';
-  const [scenes, setScenes] = useState<SceneResponse[]>([]);
+  const cached = useMemo(() => getCachedScenes(homeId), [homeId]);
+  const [scenes, setScenes] = useState<SceneResponse[]>(cached || []);
   const [devices, setDevices] = useState<DeviceResponse[]>([]);
   const [actionTypes, setActionTypes] = useState<SceneActionType[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [selectedId, setSelectedId] = useState<string | null>(cached?.[0]?.id ?? null);
+  const [loading, setLoading] = useState(!cached?.length);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -93,35 +95,40 @@ export const SceneManagement: React.FC<SceneManagementProps> = ({
   const [togglingSceneId, setTogglingSceneId] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
-    setLoading(true);
+    if (!cached?.length) setLoading(true);
     setError(null);
     try {
-      const [sceneData, deviceData, typeData] = await Promise.all([
-        listScenes(homeId),
-        getDevicesByHome(homeId),
-        getSceneActionTypes(homeId),
-      ]);
-      setScenes(sceneData);
-      setDevices(deviceData);
-      setActionTypes(typeData);
-      setActionDeviceId('');
-      setActionType('');
-      setActionValue('');
-      setSelectedId((current) =>
-        current && sceneData.some((scene) => scene.id === current)
-          ? current
-          : sceneData[0]?.id ?? null,
-      );
+      // 1. Fetch scenes quickly first
+      const sceneDataPromise = listScenes(homeId).then((data) => {
+        setScenes(data);
+        setSelectedId((current) =>
+          current && data.some((scene) => scene.id === current)
+            ? current
+            : data[0]?.id ?? null,
+        );
+        setLoading(false);
+        return data;
+      });
+
+      // 2. Fetch devices and action types in parallel
+      const metaPromise = Promise.all([
+        getDevicesByHome(homeId).catch(() => []),
+        getSceneActionTypes(homeId).catch(() => []),
+      ]).then(([deviceData, typeData]) => {
+        setDevices(deviceData);
+        setActionTypes(typeData);
+      });
+
+      await Promise.all([sceneDataPromise, metaPromise]);
     } catch (err) {
       setError(messageOf(err));
     } finally {
       setLoading(false);
     }
-  }, [homeId]);
+  }, [homeId, cached]);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => void loadData(), 0);
-    return () => window.clearTimeout(timer);
+    void loadData();
   }, [loadData]);
 
   const selectedScene = useMemo(
@@ -238,17 +245,26 @@ export const SceneManagement: React.FC<SceneManagementProps> = ({
     }
   };
 
-  const removeScene = async (scene: SceneResponse) => {
-    if (!window.confirm(`Xác nhận xóa kịch bản “${scene.name}”?`)) return;
-    setError(null);
+  const [deletingScene, setDeletingScene] = useState<SceneResponse | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
+  const handleConfirmDelete = async () => {
+    if (!deletingScene) return;
+    setDeleteLoading(true);
     try {
-      await deleteScene(homeId, scene.id);
-      const remaining = scenes.filter((item) => item.id !== scene.id);
-      setScenes(remaining);
-      setSelectedId(remaining[0]?.id ?? null);
-      notify.success('Đã xóa kịch bản', scene.name);
-    } catch (err) {
-      notify.error(messageOf(err));
+      await deleteScene(homeId, deletingScene.id);
+      setScenes((current) => current.filter((scene) => scene.id !== deletingScene.id));
+      if (selectedId === deletingScene.id) {
+        setSelectedId(scenes.find((s) => s.id !== deletingScene.id)?.id ?? null);
+      }
+      notify.success('Xóa kịch bản thành công', `Kịch bản "${deletingScene.name}" đã được xóa khỏi hệ thống.`);
+      setDeletingScene(null);
+    } catch (caught) {
+      const msg = caught instanceof Error ? caught.message : 'Không thể xóa kịch bản';
+      setError(msg);
+      notify.error('Xóa kịch bản thất bại', msg);
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -339,10 +355,10 @@ export const SceneManagement: React.FC<SceneManagementProps> = ({
           {isOwner && (
             <button
               onClick={openCreate}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary hover:bg-primary-hover active:scale-95 text-white rounded-2xl text-xs font-bold transition-all shadow-md shadow-primary/20"
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary hover:bg-primary-hover active:scale-95 text-white rounded-2xl text-xs font-bold transition-all shadow-md shadow-primary/20 cursor-pointer"
             >
               <Plus size={16} />
-              <span>+ Tạo kịch bản mới</span>
+              <span>Tạo kịch bản mới</span>
             </button>
           )}
         </div>
@@ -398,7 +414,11 @@ export const SceneManagement: React.FC<SceneManagementProps> = ({
             <span className="text-[11px] font-bold uppercase tracking-wider text-muted block">
               Tổng kịch bản
             </span>
-            <span className="text-xl font-extrabold text-text">{scenes.length}</span>
+            {loading && !scenes.length ? (
+              <span className="h-6 w-10 bg-sidebar rounded animate-pulse block mt-1" />
+            ) : (
+              <span className="text-xl font-extrabold text-text">{scenes.length}</span>
+            )}
           </div>
         </div>
 
@@ -410,7 +430,11 @@ export const SceneManagement: React.FC<SceneManagementProps> = ({
             <span className="text-[11px] font-bold uppercase tracking-wider text-muted block">
               Đang hoạt động
             </span>
-            <span className="text-xl font-extrabold text-emerald-600">{activeScenesCount}</span>
+            {loading && !scenes.length ? (
+              <span className="h-6 w-10 bg-sidebar rounded animate-pulse block mt-1" />
+            ) : (
+              <span className="text-xl font-extrabold text-emerald-600">{activeScenesCount}</span>
+            )}
           </div>
         </div>
 
@@ -422,7 +446,11 @@ export const SceneManagement: React.FC<SceneManagementProps> = ({
             <span className="text-[11px] font-bold uppercase tracking-wider text-muted block">
               Lệnh thiết bị
             </span>
-            <span className="text-xl font-extrabold text-text">{totalActionsCount}</span>
+            {loading && !scenes.length ? (
+              <span className="h-6 w-10 bg-sidebar rounded animate-pulse block mt-1" />
+            ) : (
+              <span className="text-xl font-extrabold text-text">{totalActionsCount}</span>
+            )}
           </div>
         </div>
 
@@ -434,7 +462,11 @@ export const SceneManagement: React.FC<SceneManagementProps> = ({
             <span className="text-[11px] font-bold uppercase tracking-wider text-muted block">
               1-Chạm sẵn sàng
             </span>
-            <span className="text-xl font-extrabold text-amber-600">{activeScenesCount}</span>
+            {loading && !scenes.length ? (
+              <span className="h-6 w-10 bg-sidebar rounded animate-pulse block mt-1" />
+            ) : (
+              <span className="text-xl font-extrabold text-amber-600">{activeScenesCount}</span>
+            )}
           </div>
         </div>
       </div>
@@ -456,7 +488,6 @@ export const SceneManagement: React.FC<SceneManagementProps> = ({
             {scenes
               .filter((s) => s.enabled)
               .map((scene) => {
-                const theme = detectSceneTheme(scene.name, scene.icon);
                 const isRunning = executingSceneId === scene.id;
                 const isDone = quickExecutedId === scene.id;
 
@@ -474,7 +505,11 @@ export const SceneManagement: React.FC<SceneManagementProps> = ({
                         : 'bg-surface hover:bg-sidebar text-text border-line hover:border-primary/40'
                     }`}
                   >
-                    <SceneIcon iconKey={scene.icon} name={scene.name} size="xs" />
+                    <span
+                      className={`w-2 h-2 rounded-full shrink-0 ${
+                        isDone || isRunning ? 'bg-white' : 'bg-primary'
+                      }`}
+                    />
                     <div>
                       <span className="block text-xs font-bold truncate max-w-[120px]">
                         {scene.name}
@@ -492,7 +527,7 @@ export const SceneManagement: React.FC<SceneManagementProps> = ({
                     ) : isDone ? (
                       <Check size={14} className="stroke-[3] text-white shrink-0 ml-1" />
                     ) : (
-                      <Play size={11} className={`fill-current shrink-0 ml-1 ${theme.textColor}`} />
+                      <Play size={11} className="fill-current shrink-0 ml-1 opacity-60" />
                     )}
                   </button>
                 );
@@ -593,10 +628,21 @@ export const SceneManagement: React.FC<SceneManagementProps> = ({
       </div>
 
       {/* Main Content Area */}
-      {loading ? (
-        <div className="py-20 text-center text-muted flex flex-col items-center justify-center">
-          <Loader2 size={32} className="animate-spin text-primary mb-3" />
-          <p className="text-sm font-semibold text-text">Đang tải danh sách kịch bản…</p>
+      {loading && !scenes.length ? (
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div
+              key={i}
+              className="rounded-2xl border border-line bg-surface p-5 animate-pulse space-y-3"
+            >
+              <div className="flex items-center justify-between">
+                <div className="h-4 w-32 bg-sidebar rounded" />
+                <div className="h-5 w-16 bg-sidebar rounded-full" />
+              </div>
+              <div className="h-3 w-48 bg-sidebar/60 rounded" />
+              <div className="h-10 bg-sidebar/40 rounded-xl mt-3" />
+            </div>
+          ))}
         </div>
       ) : filteredScenes.length === 0 ? (
         <div className="text-center py-16 px-4 rounded-3xl border border-dashed border-line bg-sidebar/20">
@@ -634,7 +680,7 @@ export const SceneManagement: React.FC<SceneManagementProps> = ({
               onExecute={handleExecuteScene}
               onToggle={handleToggleScene}
               onEdit={openEdit}
-              onDelete={removeScene}
+              onDelete={(sc) => setDeletingScene(sc)}
               onOpenHistory={(sc) => setHistoryScene(sc)}
               onOpenSchedule={(sc) => setScheduleScene(sc)}
             />
@@ -661,7 +707,11 @@ export const SceneManagement: React.FC<SceneManagementProps> = ({
                   }`}
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <SceneIcon iconKey={scene.icon} name={scene.name} size="sm" />
+                    <span
+                      className={`w-2.5 h-2.5 rounded-full shrink-0 ${
+                        isSelected ? 'bg-primary' : 'bg-muted'
+                      }`}
+                    />
                     <div className="min-w-0">
                       <span className="block font-bold text-sm text-text truncate">
                         {scene.name}
@@ -687,14 +737,11 @@ export const SceneManagement: React.FC<SceneManagementProps> = ({
             <div className="rounded-3xl border border-line bg-surface p-6 space-y-5 shadow-xs">
               {/* Scene Detail Header */}
               <div className="flex flex-wrap items-start justify-between gap-3 pb-4 border-b border-line">
-                <div className="flex items-center gap-3.5">
-                  <SceneIcon iconKey={selectedScene.icon} name={selectedScene.name} size="md" />
-                  <div>
-                    <h3 className="font-extrabold text-base text-text">{selectedScene.name}</h3>
-                    <p className="text-xs text-muted mt-0.5">
-                      {selectedScene.description || 'Chưa có phần mô tả.'}
-                    </p>
-                  </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-text">{selectedScene.name}</h3>
+                  <p className="text-xs text-muted mt-0.5">
+                    {selectedScene.description || 'Chưa có phần mô tả.'}
+                  </p>
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -741,7 +788,7 @@ export const SceneManagement: React.FC<SceneManagementProps> = ({
                         Sửa
                       </button>
                       <button
-                        onClick={() => void removeScene(selectedScene)}
+                        onClick={() => setDeletingScene(selectedScene)}
                         className="px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-xs font-bold text-rose-600 transition-colors border border-rose-200"
                       >
                         Xóa
@@ -767,8 +814,6 @@ export const SceneManagement: React.FC<SceneManagementProps> = ({
                 ) : (
                   <div className="space-y-2.5 relative before:absolute before:left-5 before:top-4 before:bottom-4 before:w-0.5 before:bg-line/80 before:-z-0">
                     {selectedScene.actions.map((action, index) => {
-                      const DevIcon = getDeviceTypeIcon(action.targetDeviceType);
-
                       return (
                         <div
                           key={action.id}
@@ -778,9 +823,6 @@ export const SceneManagement: React.FC<SceneManagementProps> = ({
                             <span className="flex items-center justify-center w-7 h-7 rounded-xl bg-primary/10 text-primary font-bold text-xs shrink-0 border border-primary/20">
                               {index + 1}
                             </span>
-                            <div className="w-8 h-8 rounded-xl bg-sidebar flex items-center justify-center text-primary shrink-0">
-                              <DevIcon size={16} />
-                            </div>
                             <div className="min-w-0">
                               <p className="truncate text-xs font-bold text-text">
                                 {action.targetDeviceName}
@@ -919,13 +961,48 @@ export const SceneManagement: React.FC<SceneManagementProps> = ({
                           />
                           <span className="text-xs font-bold text-muted">°C</span>
                         </div>
+                      ) : selectedAction?.valueKind === 'color' || actionType === 'SET_RGB' || actionType === 'SET_COLOR' ? (
+                        <div className="space-y-1.5">
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="color"
+                              value={actionValue?.startsWith('#') ? actionValue : '#ffc107'}
+                              onChange={(e) => setActionValue(e.target.value)}
+                              className="w-7 h-7 rounded-lg border border-line cursor-pointer p-0.5 bg-surface"
+                            />
+                            <span className="text-xs font-mono font-bold text-text uppercase">
+                              {actionValue || '#ffc107'}
+                            </span>
+                          </div>
+                          <div className="flex flex-wrap gap-1">
+                            {COLOR_PRESETS.map((c) => {
+                              const isSelected = (actionValue || '#ffc107').toLowerCase() === c.hex.toLowerCase();
+                              return (
+                                <button
+                                  key={c.hex}
+                                  type="button"
+                                  onClick={() => setActionValue(c.hex)}
+                                  className={`w-5 h-5 rounded-full border border-black/20 transition-transform hover:scale-110 cursor-pointer ${
+                                    isSelected ? 'ring-2 ring-primary ring-offset-1' : ''
+                                  }`}
+                                  style={{ backgroundColor: c.hex }}
+                                  title={c.label}
+                                />
+                              );
+                            })}
+                          </div>
+                        </div>
                       ) : (
                         <input
                           type="text"
                           value={actionValue}
-                          disabled={!selectedAction?.valueKind}
+                          disabled={!selectedAction?.valueKind || selectedAction.valueKind === 'none'}
                           onChange={(e) => setActionValue(e.target.value)}
-                          placeholder={selectedAction?.valueKind ? 'Giá trị...' : 'Không cần tham số'}
+                          placeholder={
+                            selectedAction?.valueKind && selectedAction.valueKind !== 'none'
+                              ? 'Giá trị...'
+                              : 'Không cần tham số'
+                          }
                           className="w-full rounded-xl border border-line bg-surface px-3 py-1.5 text-xs text-text focus:border-primary focus:outline-none disabled:opacity-50"
                         />
                       )}
@@ -936,10 +1013,10 @@ export const SceneManagement: React.FC<SceneManagementProps> = ({
                     <button
                       type="submit"
                       disabled={saving || !actionDeviceId || !actionType}
-                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary hover:bg-primary-hover text-white text-xs font-bold disabled:opacity-50 transition-all shadow-xs active:scale-95"
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary hover:bg-primary-hover text-white text-xs font-bold disabled:opacity-50 transition-all shadow-xs active:scale-95 cursor-pointer"
                     >
                       {saving && <Loader2 size={13} className="animate-spin" />}
-                      <span>{saving ? 'Đang thêm…' : '+ Thêm vào chuỗi lệnh'}</span>
+                      <span>{saving ? 'Đang thêm…' : 'Thêm vào chuỗi lệnh'}</span>
                     </button>
                   </div>
                 </form>
@@ -976,6 +1053,16 @@ export const SceneManagement: React.FC<SceneManagementProps> = ({
           onClose={() => setScheduleScene(null)}
         />
       )}
+
+      <ConfirmModal
+        isOpen={!!deletingScene}
+        title="Xóa kịch bản"
+        description={`Bạn có chắc chắn muốn xóa kịch bản "${deletingScene?.name || ''}" không? Hành động này không thể hoàn tác.`}
+        confirmText="Xóa kịch bản"
+        loading={deleteLoading}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeletingScene(null)}
+      />
     </section>
   );
 };
