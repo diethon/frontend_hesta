@@ -10,6 +10,9 @@ import {
   Loader2,
   AlertCircle,
   Check,
+  Palette,
+  Sun,
+  Thermometer,
 } from 'lucide-react';
 import type { SceneActionType, SceneResponse } from '../../types/scene';
 import {
@@ -374,10 +377,10 @@ export const SceneEditorModal: React.FC<SceneEditorModalProps> = ({
                 type="button"
                 onClick={handleAddAction}
                 disabled={devices.length === 0}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primary-hover active:scale-95 transition-all shadow-sm disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primary-hover active:scale-95 transition-all shadow-sm disabled:opacity-50 cursor-pointer"
               >
                 <Plus size={14} />
-                <span>+ Thêm hành động</span>
+                <span>Thêm hành động</span>
               </button>
             </div>
 
@@ -498,11 +501,58 @@ export const SceneEditorModal: React.FC<SceneEditorModalProps> = ({
                         </div>
                       </div>
 
-                      {/* Value Input (Percentage, Number, JSON) */}
+                      {/* 1. POWER (TURN_ON / TURN_OFF / TOGGLE) quick toggle buttons */}
+                      {(act.action === 'TURN_ON' || act.action === 'TURN_OFF' || act.action === 'TOGGLE') && (
+                        <div className="space-y-1.5 pt-2">
+                          <span className="text-[11px] font-bold text-muted uppercase tracking-wider block">
+                            Chế độ nguồn:
+                          </span>
+                          <div className="grid grid-cols-3 gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleChangeAction(index, 'TURN_ON')}
+                              className={`py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                                act.action === 'TURN_ON'
+                                  ? 'bg-emerald-600 text-white shadow-xs'
+                                  : 'bg-surface hover:bg-sidebar text-text border border-line'
+                              }`}
+                            >
+                              Bật nguồn (ON)
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleChangeAction(index, 'TURN_OFF')}
+                              className={`py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                                act.action === 'TURN_OFF'
+                                  ? 'bg-slate-700 text-white shadow-xs'
+                                  : 'bg-surface hover:bg-sidebar text-text border border-line'
+                              }`}
+                            >
+                              Tắt nguồn (OFF)
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleChangeAction(index, 'TOGGLE')}
+                              className={`py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                                act.action === 'TOGGLE'
+                                  ? 'bg-primary text-white shadow-xs'
+                                  : 'bg-surface hover:bg-sidebar text-text border border-line'
+                              }`}
+                            >
+                              Đảo bật/tắt
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 2. BRIGHTNESS / PERCENTAGE */}
                       {selectedOpt && selectedOpt.valueKind === 'percentage' && (
-                        <div className="pt-2 bg-sidebar/30 p-3 rounded-xl border border-line/60">
+                        <div className="pt-2 bg-sidebar/30 p-3 rounded-xl border border-line/60 space-y-2">
                           <div className="flex justify-between items-center text-xs font-bold text-text mb-1.5">
-                            <span>{selectedOpt.valueLabel || 'Mức độ điều chỉnh'}</span>
+                            <span className="flex items-center gap-1.5">
+                              <Sun size={14} className="text-amber-500" />
+                              <span>{selectedOpt.valueLabel || 'Mức độ điều chỉnh (%)'}</span>
+                            </span>
                             <span className="font-extrabold text-primary text-sm px-2 py-0.5 rounded-lg bg-primary/10 border border-primary/20">
                               {act.value || 0}%
                             </span>
@@ -526,13 +576,37 @@ export const SceneEditorModal: React.FC<SceneEditorModalProps> = ({
                               className="w-16 rounded-xl border border-line px-2 py-1.5 text-xs text-center font-bold bg-surface"
                             />
                           </div>
+                          {/* Quick presets for brightness */}
+                          <div className="flex flex-wrap gap-1.5 pt-1">
+                            {[
+                              { label: '25% (Ngủ)', val: '25' },
+                              { label: '50% (Dịu)', val: '50' },
+                              { label: '75% (Chuẩn)', val: '75' },
+                              { label: '100% (Sáng)', val: '100' },
+                            ].map((preset) => (
+                              <button
+                                key={preset.val}
+                                type="button"
+                                onClick={() => handleUpdateAction(index, { value: preset.val })}
+                                className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                                  act.value === preset.val
+                                    ? 'bg-amber-500 text-white'
+                                    : 'bg-surface hover:bg-sidebar text-text border border-line'
+                                }`}
+                              >
+                                {preset.label}
+                              </button>
+                            ))}
+                          </div>
                         </div>
                       )}
 
+                      {/* 3. TEMPERATURE / NUMBER */}
                       {selectedOpt && selectedOpt.valueKind === 'number' && (
                         <div className="pt-2 bg-sidebar/30 p-3 rounded-xl border border-line/60">
-                          <label className="block text-[11px] font-bold text-muted mb-1.5">
-                            {selectedOpt.valueLabel || 'Cài đặt nhiệt độ (°C)'}
+                          <label className="block text-[11px] font-bold text-muted mb-1.5 flex items-center gap-1.5">
+                            <Thermometer size={14} className="text-primary" />
+                            <span>{selectedOpt.valueLabel || 'Cài đặt nhiệt độ (°C)'}</span>
                           </label>
                           <div className="flex items-center gap-2 max-w-[220px]">
                             <button
@@ -566,6 +640,7 @@ export const SceneEditorModal: React.FC<SceneEditorModalProps> = ({
                         </div>
                       )}
 
+                      {/* 4. JSON */}
                       {selectedOpt && selectedOpt.valueKind === 'json' && (
                         <div className="pt-1">
                           <label className="block text-[11px] font-bold text-muted mb-1">
@@ -577,6 +652,81 @@ export const SceneEditorModal: React.FC<SceneEditorModalProps> = ({
                             placeholder='{"power": "ON"}'
                             rows={2}
                             className="w-full rounded-xl border border-line bg-surface p-2.5 text-xs font-mono text-text focus:border-primary focus:outline-none"
+                          />
+                        </div>
+                      )}
+
+                      {/* 5. COLOR (SET_RGB / SET_COLOR / valueKind === 'color') */}
+                      {(selectedOpt?.valueKind === 'color' || act.action === 'SET_RGB' || act.action === 'SET_COLOR') && (
+                        <div className="pt-2 bg-sidebar/30 p-3 rounded-xl border border-line/60 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <label className="text-[11px] font-bold text-muted flex items-center gap-1.5">
+                              <Palette size={14} className="text-primary" />
+                              <span>{selectedOpt?.valueLabel || 'Màu sắc RGB'}</span>
+                            </label>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="color"
+                                value={act.value?.startsWith('#') ? act.value : '#ffc107'}
+                                onChange={(e) => handleUpdateAction(index, { value: e.target.value })}
+                                className="w-7 h-7 rounded-lg border border-line cursor-pointer p-0.5 bg-surface"
+                              />
+                              <span className="text-xs font-mono font-bold text-text uppercase">
+                                {act.value || '#ffc107'}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap gap-1.5 pt-1">
+                            {[
+                              { label: 'Trắng ấm', hex: '#fff4e5' },
+                              { label: 'Vàng nắng', hex: '#ffc107' },
+                              { label: 'Cam hoàng hôn', hex: '#ff7043' },
+                              { label: 'Đỏ', hex: '#f44336' },
+                              { label: 'Xanh lá', hex: '#4caf50' },
+                              { label: 'Xanh băng', hex: '#00bcd4' },
+                              { label: 'Xanh dương', hex: '#2196f3' },
+                              { label: 'Tím', hex: '#9c27b0' },
+                              { label: 'Hồng', hex: '#e91e63' },
+                            ].map((preset) => {
+                              const isSelected = (act.value || '#ffc107').toLowerCase() === preset.hex.toLowerCase();
+                              return (
+                                <button
+                                  key={preset.hex}
+                                  type="button"
+                                  onClick={() => handleUpdateAction(index, { value: preset.hex })}
+                                  className={`px-2 py-1 rounded-lg text-[11px] font-medium border transition-all flex items-center gap-1.5 cursor-pointer ${
+                                    isSelected
+                                      ? 'border-primary bg-primary/10 text-primary font-bold shadow-2xs ring-1 ring-primary/40'
+                                      : 'border-line/70 bg-surface text-text hover:border-line'
+                                  }`}
+                                >
+                                  <span
+                                    className="w-3 h-3 rounded-full inline-flex items-center justify-center border border-black/10 shrink-0"
+                                    style={{ backgroundColor: preset.hex }}
+                                  >
+                                    {isSelected && <Check size={8} className="text-slate-800" />}
+                                  </span>
+                                  {preset.label}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 6. GENERAL TEXT (not color) */}
+                      {selectedOpt && selectedOpt.valueKind === 'text' && act.action !== 'SET_COLOR' && act.action !== 'SET_RGB' && (
+                        <div className="pt-1">
+                          <label className="block text-[11px] font-bold text-muted mb-1">
+                            {selectedOpt.valueLabel || 'Giá trị'}
+                          </label>
+                          <input
+                            required
+                            type="text"
+                            value={act.value}
+                            onChange={(e) => handleUpdateAction(index, { value: e.target.value })}
+                            className="w-full rounded-xl border border-line bg-surface px-3 py-2 text-xs font-semibold text-text focus:border-primary focus:outline-none"
+                            placeholder="Nhập giá trị..."
                           />
                         </div>
                       )}
