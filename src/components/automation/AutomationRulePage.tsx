@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { Link, useNavigate, useParams } from 'react-router';
+import { Link, useParams } from 'react-router';
 import {
   Play,
   Plus,
@@ -48,7 +48,7 @@ import {
   type DraftAction,
 } from './automationActions';
 import { SchedulePanel } from '../ui/SchedulePanel';
-import { AppSidebar, HomeIcon, DeviceIcon, SceneIcon, AutomationIcon } from '../ui/AppSidebar';
+import { AppSidebar } from '../ui/AppSidebar';
 import { getDeviceTypeIcon } from '../scene/sceneConstants';
 import { COLOR_PRESETS } from '../device/deviceMultiActionHelpers';
 import { ConfirmModal } from '../ui/ConfirmModal';
@@ -79,7 +79,6 @@ const conditionOperators = [
 
 export function AutomationRulePage() {
   const { homeId = '' } = useParams();
-  const navigate = useNavigate();
 
   const [rules, setRules] = useState<AutomationRule[]>([]);
   const [devices, setDevices] = useState<DeviceSummary[]>([]);
@@ -349,37 +348,11 @@ export function AutomationRulePage() {
       {/* ── SIDEBAR NAVIGATION ── */}
       <AppSidebar
         activeItem="automations"
-        contextLabel="Tự động hóa"
-        items={[
-          {
-            id: 'overview',
-            label: 'Tổng quan',
-            icon: <HomeIcon />,
-            onClick: () => navigate('/home'),
-          },
-          {
-            id: 'devices',
-            label: 'Thiết bị',
-            icon: <DeviceIcon />,
-            onClick: () => navigate(`/home/${homeId}/devices`),
-          },
-          {
-            id: 'scenes',
-            label: 'Kịch bản',
-            icon: <SceneIcon />,
-            onClick: () => navigate(`/homes/${homeId}/scenes`),
-          },
-          {
-            id: 'automations',
-            label: 'Tự động hóa',
-            icon: <AutomationIcon />,
-            onClick: () => navigate(`/homes/${homeId}/automation-rules`),
-          },
-        ]}
+        homeId={homeId}
       />
 
       {/* ── MAIN CONTENT WORKSPACE ── */}
-      <main className="min-w-0 flex-1 p-4 sm:p-6 lg:p-8 lg:pl-72 space-y-6 max-w-7xl mx-auto">
+      <main className="min-w-0 flex-1 p-4 sm:p-6 lg:p-8 lg:pl-64 space-y-6 max-w-7xl mx-auto">
         {/* Header Breadcrumbs & Quick Nav */}
         <header className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4">
           <div>

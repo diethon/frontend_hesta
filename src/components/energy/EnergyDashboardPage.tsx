@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
-import { AppSidebar, DeviceIcon, HomeIcon, TwinIcon, EnergyIcon, SceneIcon, AutomationIcon } from '../ui/AppSidebar';
+import { AppSidebar } from '../ui/AppSidebar';
 import { getHomeEnergyAnalytics } from '../../services/energyApi';
 import type { EnergyAnalyticsResponse, DeviceEnergyBreakdown, EnergyTimeSeriesPoint } from '../../types/energy';
 import { getErrorMessage } from '../../utils/errors';
@@ -79,45 +79,7 @@ export const EnergyDashboardPage: React.FC = () => {
     <div className="app-shell min-h-screen text-text">
       <AppSidebar
         activeItem="energy"
-        contextLabel="Không gian sống"
-        items={[
-          {
-            id: 'home',
-            label: 'Tổng quan',
-            icon: <HomeIcon />,
-            onClick: () => navigate('/home'),
-          },
-          {
-            id: 'devices',
-            label: 'Thiết bị',
-            icon: <DeviceIcon />,
-            onClick: () => navigate(`/home/${homeId}/devices`),
-          },
-          {
-            id: 'energy',
-            label: 'Tiêu thụ điện',
-            icon: <EnergyIcon />,
-            onClick: () => window.scrollTo({ top: 0, behavior: 'smooth' }),
-          },
-          {
-            id: 'twin',
-            label: 'Digital Twin',
-            icon: <TwinIcon />,
-            onClick: () => navigate(`/home/${homeId}/digital-twin`),
-          },
-          {
-            id: 'scenes',
-            label: 'Kịch bản',
-            icon: <SceneIcon />,
-            onClick: () => navigate(`/homes/${homeId}/scenes`),
-          },
-          {
-            id: 'automations',
-            label: 'Tự động hóa',
-            icon: <AutomationIcon />,
-            onClick: () => navigate(`/homes/${homeId}/automation-rules`),
-          },
-        ]}
+        homeId={homeId}
       />
 
       <main id="main-content" className="lg:pl-64">
