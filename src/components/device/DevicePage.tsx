@@ -16,7 +16,7 @@ import {
 import { getHomeRooms } from '../../services/homeApi';
 import type { DeviceResponse } from '../../types/device';
 import { getErrorMessage } from '../../utils/errors';
-import { AppSidebar, DeviceIcon, HomeIcon, TwinIcon, EnergyIcon } from '../ui/AppSidebar';
+import { AppSidebar, DeviceIcon, HomeIcon, TwinIcon, EnergyIcon, SceneIcon, AutomationIcon } from '../ui/AppSidebar';
 import { NotificationBell } from '../notification/NotificationBell';
 import { currentHomeChanged, currentHomeCleared } from '../../store/homeSlice';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
@@ -437,6 +437,18 @@ export const DevicePage: React.FC = () => {
             icon: <TwinIcon />,
             onClick: () => navigate(`/home/${homeId}/digital-twin`),
           },
+          {
+            id: 'scenes',
+            label: 'Kịch bản',
+            icon: <SceneIcon />,
+            onClick: () => navigate(`/homes/${homeId}/scenes`),
+          },
+          {
+            id: 'automations',
+            label: 'Tự động hóa',
+            icon: <AutomationIcon />,
+            onClick: () => navigate(`/homes/${homeId}/automation-rules`),
+          },
         ]}
       />
 
@@ -593,7 +605,7 @@ export const DevicePage: React.FC = () => {
                   className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-white text-xs sm:text-sm font-bold hover:bg-primary-hover transition-colors shadow-xs cursor-pointer active:scale-95"
                 >
                   <Plus className="w-4 h-4" />
-                  <span>+ Ghép Nối Thiết Bị Mới</span>
+                  <span>Ghép nối thiết bị mới</span>
                 </button>
               </div>
             </div>

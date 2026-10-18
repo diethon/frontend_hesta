@@ -219,74 +219,71 @@ export interface IconDefinition {
   key: string;
   label: string;
   icon: LucideIcon;
-  emojiFallback: string;
 }
 
 export const AVAILABLE_ICONS: IconDefinition[] = [
-  { key: 'home', label: 'Ngôi nhà', icon: Home, emojiFallback: '🏠' },
-  { key: 'sun', label: 'Buổi sáng', icon: Sun, emojiFallback: '☀️' },
-  { key: 'moon', label: 'Ban đêm', icon: Moon, emojiFallback: '🌙' },
-  { key: 'lightbulb', label: 'Đèn sáng', icon: Lightbulb, emojiFallback: '💡' },
-  { key: 'film', label: 'Xem phim', icon: Film, emojiFallback: '🎬' },
-  { key: 'coffee', label: 'Thư giãn', icon: Coffee, emojiFallback: '☕' },
-  { key: 'bed', label: 'Phòng ngủ', icon: Bed, emojiFallback: '🛏️' },
-  { key: 'shield', label: 'An ninh', icon: Shield, emojiFallback: '🛡️' },
-  { key: 'party', label: 'Tiệc tùng', icon: PartyPopper, emojiFallback: '🎉' },
-  { key: 'sparkles', label: 'Nổi bật', icon: Sparkles, emojiFallback: '✨' },
-  { key: 'tv', label: 'Tivi', icon: Tv, emojiFallback: '📺' },
-  { key: 'wind', label: 'Gió mát', icon: Wind, emojiFallback: '💨' },
-  { key: 'thermometer', label: 'Nhiệt độ', icon: Thermometer, emojiFallback: '❄️' },
-  { key: 'fan', label: 'Quạt', icon: Fan, emojiFallback: '🌀' },
-  { key: 'music', label: 'Âm nhạc', icon: Music, emojiFallback: '🎵' },
-  { key: 'briefcase', label: 'Làm việc', icon: Briefcase, emojiFallback: '💼' },
-  { key: 'book', label: 'Đọc sách', icon: BookOpen, emojiFallback: '📖' },
-  { key: 'utensils', label: 'Ăn uống', icon: Utensils, emojiFallback: '🍽️' },
-  { key: 'flame', label: 'Ấm áp', icon: Flame, emojiFallback: '🔥' },
-  { key: 'power', label: 'Nguồn', icon: Power, emojiFallback: '⚡' },
-  { key: 'lock', label: 'Khóa cửa', icon: Lock, emojiFallback: '🔒' },
-  { key: 'compass', label: 'Khám phá', icon: Compass, emojiFallback: '🧭' },
-  { key: 'smile', label: 'Hạnh phúc', icon: Smile, emojiFallback: '😊' },
+  { key: 'home', label: 'Ngôi nhà', icon: Home },
+  { key: 'sun', label: 'Buổi sáng', icon: Sun },
+  { key: 'moon', label: 'Ban đêm', icon: Moon },
+  { key: 'lightbulb', label: 'Đèn sáng', icon: Lightbulb },
+  { key: 'film', label: 'Xem phim', icon: Film },
+  { key: 'coffee', label: 'Thư giãn', icon: Coffee },
+  { key: 'bed', label: 'Phòng ngủ', icon: Bed },
+  { key: 'shield', label: 'An ninh', icon: Shield },
+  { key: 'party', label: 'Tiệc tùng', icon: PartyPopper },
+  { key: 'sparkles', label: 'Nổi bật', icon: Sparkles },
+  { key: 'tv', label: 'Tivi', icon: Tv },
+  { key: 'wind', label: 'Gió mát', icon: Wind },
+  { key: 'thermometer', label: 'Nhiệt độ', icon: Thermometer },
+  { key: 'fan', label: 'Quạt', icon: Fan },
+  { key: 'music', label: 'Âm nhạc', icon: Music },
+  { key: 'briefcase', label: 'Làm việc', icon: Briefcase },
+  { key: 'book', label: 'Đọc sách', icon: BookOpen },
+  { key: 'utensils', label: 'Ăn uống', icon: Utensils },
+  { key: 'flame', label: 'Ấm áp', icon: Flame },
+  { key: 'power', label: 'Nguồn', icon: Power },
+  { key: 'lock', label: 'Khóa cửa', icon: Lock },
+  { key: 'compass', label: 'Khám phá', icon: Compass },
+  { key: 'smile', label: 'Hạnh phúc', icon: Smile },
 ];
 
 /**
- * Returns the Lucide Icon or null if string is just an emoji
+ * Returns the Lucide Icon
  */
 export function getLucideIcon(iconKey?: string | null): LucideIcon {
   if (!iconKey) return Home;
   const normalized = iconKey.trim().toLowerCase();
 
   // Check direct key match
-  const found = AVAILABLE_ICONS.find(
-    (i) => i.key === normalized || i.emojiFallback === iconKey,
-  );
+  const found = AVAILABLE_ICONS.find((i) => i.key === normalized);
   if (found) return found.icon;
 
   // Keyword associations
-  if (normalized.includes('sun') || normalized.includes('sáng') || normalized === '☀️') return Sun;
-  if (normalized.includes('moon') || normalized.includes('tối') || normalized.includes('ngủ') || normalized === '🌙') return Moon;
-  if (normalized.includes('film') || normalized.includes('phim') || normalized === '🎬') return Film;
-  if (normalized.includes('coffee') || normalized.includes('cà phê') || normalized === '☕') return Coffee;
-  if (normalized.includes('shield') || normalized.includes('vệ') || normalized === '🛡️') return Shield;
-  if (normalized.includes('lock') || normalized.includes('khóa') || normalized === '🔒') return Lock;
-  if (normalized.includes('party') || normalized.includes('tiệc') || normalized === '🎉') return PartyPopper;
-  if (normalized.includes('bed') || normalized === '🛏️') return Bed;
-  if (normalized.includes('light') || normalized.includes('đèn') || normalized === '💡') return Lightbulb;
-  if (normalized.includes('cool') || normalized.includes('lạnh') || normalized === '❄️') return Thermometer;
-  if (normalized.includes('wind') || normalized.includes('quạt') || normalized === '🌀') return Fan;
-  if (normalized.includes('home') || normalized.includes('nhà') || normalized === '🏠') return Home;
+  if (normalized.includes('sun') || normalized.includes('sáng')) return Sun;
+  if (normalized.includes('moon') || normalized.includes('tối') || normalized.includes('ngủ')) return Moon;
+  if (normalized.includes('film') || normalized.includes('phim')) return Film;
+  if (normalized.includes('coffee') || normalized.includes('cà phê')) return Coffee;
+  if (normalized.includes('shield') || normalized.includes('vệ')) return Shield;
+  if (normalized.includes('lock') || normalized.includes('khóa')) return Lock;
+  if (normalized.includes('party') || normalized.includes('tiệc')) return PartyPopper;
+  if (normalized.includes('bed')) return Bed;
+  if (normalized.includes('light') || normalized.includes('đèn')) return Lightbulb;
+  if (normalized.includes('cool') || normalized.includes('lạnh')) return Thermometer;
+  if (normalized.includes('wind') || normalized.includes('quạt')) return Fan;
+  if (normalized.includes('home') || normalized.includes('nhà')) return Home;
 
   return Sparkles;
 }
 
 export function detectSceneTheme(name?: string, icon?: string | null): SceneThemeOption {
   const text = `${name ?? ''} ${icon ?? ''}`.toLowerCase();
-  if (text.includes('sáng') || text.includes('morning') || text.includes('sun') || text.includes('☀️')) return SCENE_THEMES.amber;
-  if (text.includes('ngủ') || text.includes('tối') || text.includes('night') || text.includes('moon') || text.includes('🌙')) return SCENE_THEMES.indigo;
-  if (text.includes('về') || text.includes('welcome') || text.includes('home') || text.includes('nhà') || text.includes('🏠')) return SCENE_THEMES.emerald;
+  if (text.includes('sáng') || text.includes('morning') || text.includes('sun')) return SCENE_THEMES.amber;
+  if (text.includes('ngủ') || text.includes('tối') || text.includes('night') || text.includes('moon')) return SCENE_THEMES.indigo;
+  if (text.includes('về') || text.includes('welcome') || text.includes('home') || text.includes('nhà')) return SCENE_THEMES.emerald;
   if (text.includes('rời') || text.includes('ra') || text.includes('away') || text.includes('leave') || text.includes('shield') || text.includes('khóa')) return SCENE_THEMES.rose;
-  if (text.includes('phim') || text.includes('movie') || text.includes('cinema') || text.includes('film') || text.includes('🎬')) return SCENE_THEMES.violet;
-  if (text.includes('thư giãn') || text.includes('relax') || text.includes('coffee') || text.includes('đọc sách') || text.includes('☕')) return SCENE_THEMES.cyan;
-  if (text.includes('tiệc') || text.includes('party') || text.includes('🎉')) return SCENE_THEMES.pink;
+  if (text.includes('phim') || text.includes('movie') || text.includes('cinema') || text.includes('film')) return SCENE_THEMES.violet;
+  if (text.includes('thư giãn') || text.includes('relax') || text.includes('coffee') || text.includes('đọc sách')) return SCENE_THEMES.cyan;
+  if (text.includes('tiệc') || text.includes('party')) return SCENE_THEMES.pink;
   return SCENE_THEMES.blue;
 }
 
