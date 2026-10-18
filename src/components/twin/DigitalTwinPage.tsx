@@ -1,9 +1,9 @@
 import { useEffect } from 'react';
-import { Link, useNavigate, useParams } from 'react-router';
+import { Link, useParams } from 'react-router';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { currentHomeChanged, currentHomeCleared } from '../../store/homeSlice';
 import { loadTwinSnapshot, twinClosed, twinOpened } from '../../store/twinSlice';
-import { AppSidebar, DeviceIcon, HomeIcon, TwinIcon, EnergyIcon } from '../ui/AppSidebar';
+import { AppSidebar } from '../ui/AppSidebar';
 import { TwinLayoutEditor } from './TwinLayoutEditor';
 import { loadLayoutRole, loadTwinLayout } from '../../store/twinLayoutSlice';
 import { useLayoutNavigationGuard } from './useLayoutNavigationGuard';
@@ -54,7 +54,6 @@ export function DigitalTwinPage() {
   useLayoutNavigationGuard();
   const { homeId = '' } = useParams<{ homeId: string }>();
   const dispatch = useAppDispatch();
-  const navigate = useNavigate();
   useEffect(() => {
     dispatch(currentHomeChanged(homeId));
     dispatch(twinOpened(homeId));
@@ -70,12 +69,7 @@ export function DigitalTwinPage() {
     };
   }, [dispatch, homeId]);
   return <div className="app-shell">
-    <AppSidebar activeItem="twin" contextLabel="Không gian sống" showSystemSummary={false} items={[
-      { id: 'home', label: 'Tổng quan', icon: <HomeIcon />, onClick: () => navigate('/home') },
-      { id: 'devices', label: 'Thiết bị', icon: <DeviceIcon />, onClick: () => navigate(`/home/${encodeURIComponent(homeId)}/devices`) },
-      { id: 'energy', label: 'Tiêu thụ điện', icon: <EnergyIcon />, onClick: () => navigate(`/home/${encodeURIComponent(homeId)}/energy`) },
-      { id: 'twin', label: 'Digital Twin', icon: <TwinIcon />, onClick: () => window.scrollTo({ top: 0, behavior: 'smooth' }) },
-    ]} />
+    <AppSidebar activeItem="twin" homeId={homeId} showSystemSummary={false} />
     <main id="main-content" className="lg:pl-64"><DigitalTwinView homeId={homeId} /></main>
   </div>;
 }

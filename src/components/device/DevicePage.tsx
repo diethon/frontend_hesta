@@ -16,8 +16,9 @@ import {
 import { getHomeRooms } from '../../services/homeApi';
 import type { DeviceResponse } from '../../types/device';
 import { getErrorMessage } from '../../utils/errors';
-import { AppSidebar, DeviceIcon, HomeIcon, TwinIcon, EnergyIcon, SceneIcon, AutomationIcon } from '../ui/AppSidebar';
+import { AppSidebar } from '../ui/AppSidebar';
 import { NotificationBell } from '../notification/NotificationBell';
+import { VoiceAssistantButton } from '../ui/VoiceAssistant';
 import { currentHomeChanged, currentHomeCleared } from '../../store/homeSlice';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { notify } from '../ui/notify';
@@ -411,45 +412,7 @@ export const DevicePage: React.FC = () => {
     <div className="app-shell">
       <AppSidebar
         activeItem="devices"
-        contextLabel="Không gian sống"
-        items={[
-          {
-            id: 'home',
-            label: 'Tổng quan',
-            icon: <HomeIcon />,
-            onClick: () => navigate('/home'),
-          },
-          {
-            id: 'devices',
-            label: 'Thiết bị',
-            icon: <DeviceIcon />,
-            onClick: () => window.scrollTo({ top: 0, behavior: 'smooth' }),
-          },
-          {
-            id: 'energy',
-            label: 'Tiêu thụ điện',
-            icon: <EnergyIcon />,
-            onClick: () => navigate(`/home/${homeId}/energy`),
-          },
-          {
-            id: 'twin',
-            label: 'Digital Twin',
-            icon: <TwinIcon />,
-            onClick: () => navigate(`/home/${homeId}/digital-twin`),
-          },
-          {
-            id: 'scenes',
-            label: 'Kịch bản',
-            icon: <SceneIcon />,
-            onClick: () => navigate(`/homes/${homeId}/scenes`),
-          },
-          {
-            id: 'automations',
-            label: 'Tự động hóa',
-            icon: <AutomationIcon />,
-            onClick: () => navigate(`/homes/${homeId}/automation-rules`),
-          },
-        ]}
+        homeId={homeId}
       />
 
       <main id="main-content" className="lg:pl-64">
@@ -515,6 +478,7 @@ export const DevicePage: React.FC = () => {
               <Plus className="w-4 h-4" />
               <span>Thêm Thiết Bị</span>
             </button>
+            <VoiceAssistantButton />
             <NotificationBell />
           </div>
 
