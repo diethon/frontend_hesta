@@ -1,5 +1,5 @@
-import { Component, useCallback, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
-import { Armchair, Box, Crosshair, House, LayoutDashboard, ListTree, Moon, RotateCcw, SlidersHorizontal, Sun, X } from 'lucide-react';
+import { Component, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { Armchair, Box, Crosshair, House, LayoutDashboard, ListTree, Moon, MousePointer2, RotateCcw, SlidersHorizontal, Sun, X } from 'lucide-react';
 import { useAppSelector } from '../../store/hooks';
 import type { TwinLayoutGeometry, TwinLayoutSelection } from '../../types/twinLayout';
 import type { TwinHeatmapMode } from '../../types/twinView';
@@ -39,10 +39,21 @@ export function Twin3DView({ geometry, drafting, role, onEdit2D }: { geometry: T
   const [cameraRequest, setCameraRequest] = useState<TwinCameraRequest>({ serial: 0, action: 'isometric' }), [activeView, setActiveView] = useState<TwinCameraView | null>('isometric');
   const [focusRoomId, setFocusRoomId] = useState<string | null>(null), [focusNodeKey, setFocusNodeKey] = useState<string | null>(null);
   const [activeFloor, setActiveFloor] = useState<number | 'all'>(() => layoutFloors(geometry.rooms)[0] ?? 'all'), [mode, setMode] = useState<TwinFloorMode>('single');
-  const [wallMode, setWallMode] = useState<TwinWallMode>('auto'), [markerMode, setMarkerMode] = useState<TwinMarkerMode>('none');
+  const [wallMode, setWallMode] = useState<TwinWallMode>('auto'), [markerMode, setMarkerMode] = useState<TwinMarkerMode>('important');
   const [theme, setTheme] = useState<TwinRendererTheme>('COZY');
   const [heatmapMode, setHeatmapMode] = useState<TwinHeatmapMode>('normal'), [treeOpen, setTreeOpen] = useState(false);
   const [ready, setReady] = useState(false), [sceneError, setSceneError] = useState<Error | null>(null);
+  const inspector = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (!selection || !window.matchMedia('(max-width: 1279px)').matches) return;
+    const frame = requestAnimationFrame(() => {
+      const panel = inspector.current;
+      if (panel && panel.getBoundingClientRect().top >= window.innerHeight) {
+        panel.scrollIntoView({ block: 'start', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' });
+      }
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [selection]);
   const supported = useMemo(() => supportsWebGL(), []);
   const compact = useSyncExternalStore(subscribeCompact, () => window.matchMedia('(max-width: 767px)').matches, () => true);
   const palette = useMemo(() => supported ? rendererPalette(readApartmentPalette(), theme) : null, [supported,theme]);
@@ -69,6 +80,12 @@ export function Twin3DView({ geometry, drafting, role, onEdit2D }: { geometry: T
     if (next?.kind === 'node') { focusSelection(next); return; }
     setSelection(next); setFocusRoomId(null); setFocusNodeKey(null);
   }, [focusSelection]);
+  // A single canvas click selects without moving its target out from under the
+  // pointer. Double-click alone requests camera focus, so native double-clicks work.
+  const selectInScene = useCallback((next: TwinLayoutSelection | null) => {
+    setSelection(next);
+    setTreeOpen(false);
+  }, []);
   const chooseFloor = (floor: number | 'all') => { setActiveFloor(floor); setMode(floor === 'all' ? 'house' : 'single'); setSelection(null); fitHome(); };
   const chooseMode = (next: TwinFloorMode) => { setMode(next); setActiveFloor(next === 'single' ? resolvedFloor === 'all' ? floors[0] : resolvedFloor : 'all'); setSelection(null); fitHome(); };
   if (!geometry.rooms.length) return <section aria-label="Chế độ 3D" className="surface-card p-8 text-center sm:p-12"><House className="mx-auto text-primary" size={32} /><h2 className="mt-4 text-xl font-semibold text-text">Chưa có sơ đồ nhà</h2><p className="mt-2 text-sm text-muted">Các phòng hiện có chưa được đặt lên Digital Twin.</p>{role === 'OWNER' ? <div className="mt-5 flex justify-center"><TwinLayoutButton variant="primary" leadingIcon={<LayoutDashboard size={18} />} onClick={onEdit2D}>Thiết kế sơ đồ</TwinLayoutButton></div> : <p className="mt-4 text-sm text-muted">Chủ nhà chưa thiết lập sơ đồ Digital Twin.</p>}<p className="mt-4 text-xs text-muted">Unplaced · {unplacedRooms} phòng · {unplaced.deviceIds.length} thiết bị · {unplaced.sensorIds.length} cảm biến</p><details className="mt-4 text-left"><summary className="cursor-pointer text-sm text-primary-hover">Đọc dữ liệu trực tiếp</summary><TwinContent /></details></section>;
@@ -85,10 +102,11 @@ export function Twin3DView({ geometry, drafting, role, onEdit2D }: { geometry: T
       <div className="min-w-0 space-y-4">
         <div className="twin-3d-stage twin-living-stage relative isolate min-w-0 overflow-hidden rounded-3xl border border-line shadow-soft" data-theme={theme} data-floor-mode={mode} data-wall-mode={wallMode} data-marker-mode={markerMode}>
           {!ready ? <div role="status" className="absolute inset-0 z-50 flex items-center justify-center bg-app text-sm text-muted">Đang dựng không gian của bạn…</div> : null}
-          <Twin3DErrorBoundary onError={setSceneError}><Twin3DCanvas geometry={geometry} drafting={drafting} activeFloor={resolvedFloor} mode={mode} wallMode={wallMode} markerMode={markerMode} selection={selection} fitRequest={fitRequest} cameraRequest={cameraRequest} focusRoomId={focusRoomId} focusNodeKey={focusNodeKey} compact={compact} palette={palette} theme={theme} heatmapMode={heatmapMode} onSelect={select} onFocus={focusSelection} onReady={handleReady} onCameraInteract={handleCameraInteract} /></Twin3DErrorBoundary>
+          <Twin3DErrorBoundary onError={setSceneError}><Twin3DCanvas geometry={geometry} drafting={drafting} activeFloor={resolvedFloor} mode={mode} wallMode={wallMode} markerMode={markerMode} selection={selection} fitRequest={fitRequest} cameraRequest={cameraRequest} focusRoomId={focusRoomId} focusNodeKey={focusNodeKey} compact={compact} palette={palette} theme={theme} heatmapMode={heatmapMode} onSelect={selectInScene} onFocus={focusSelection} onReady={handleReady} onCameraInteract={handleCameraInteract} /></Twin3DErrorBoundary>
           <div className="pointer-events-none absolute inset-x-0 top-0 z-40 flex flex-wrap items-start justify-between gap-3 p-4 sm:p-5">
             <div className="rounded-2xl border border-line bg-surface/95 px-4 py-3 shadow-soft"><p className="max-w-56 truncate text-sm font-semibold text-text">{home?.name ?? 'Ngôi nhà của bạn'}</p><p className="mt-1 text-xs text-muted">{mode === 'single' ? `Tầng ${resolvedFloor}` : 'Toàn cảnh'} <span className="mx-2 text-line">|</span> {onCount} thiết bị đang bật</p></div>
             <div aria-label="Ánh sáng không gian" className="pointer-events-auto flex rounded-xl border border-line bg-surface/95 p-1 shadow-soft">
+              <button type="button" aria-label="Hiện vị trí thiết bị và cảm biến" title="Hiện vị trí thiết bị và cảm biến" aria-pressed={markerMode === 'all'} onClick={() => setMarkerMode((value) => value === 'all' ? 'important' : 'all')} className={`flex h-10 w-10 items-center justify-center rounded-lg ${markerMode === 'all' ? 'bg-sidebar-active text-primary-hover' : 'text-muted hover:bg-sidebar-hover'}`}><MousePointer2 size={17} /></button>
               <button type="button" aria-label="Ban ngày" aria-pressed={theme === 'DAYLIGHT'} onClick={() => setTheme('DAYLIGHT')} className={`flex h-10 w-10 items-center justify-center rounded-lg ${theme === 'DAYLIGHT' ? 'bg-sidebar-active text-primary-hover' : 'text-muted hover:bg-sidebar-hover'}`}><Sun size={17} /></button>
               <button type="button" aria-label="Không gian ấm" aria-pressed={theme === 'COZY'} onClick={() => setTheme('COZY')} className={`flex h-10 w-10 items-center justify-center rounded-lg ${theme === 'COZY' ? 'bg-sidebar-active text-primary-hover' : 'text-muted hover:bg-sidebar-hover'}`}><Moon size={17} /></button>
               <button type="button" aria-label="Danh sách phòng và thiết bị" aria-expanded={treeOpen} onClick={() => setTreeOpen((open) => !open)} className="flex h-10 w-10 items-center justify-center rounded-lg text-muted hover:bg-sidebar-hover"><ListTree size={17} /></button>
@@ -96,7 +114,7 @@ export function Twin3DView({ geometry, drafting, role, onEdit2D }: { geometry: T
           </div>
           {treeOpen ? <div className="absolute bottom-20 right-3 top-28 z-40 w-64 max-w-full overflow-auto rounded-2xl shadow-float"><TwinSidebar geometry={visibleGeometry} selection={selection} onFocus={focusSelection} /></div> : null}
           <div className="pointer-events-none absolute inset-x-0 bottom-0 z-40 flex flex-wrap items-center justify-between gap-2 p-4 sm:p-5">
-            <span className="rounded-xl border border-line bg-surface/95 px-3 py-2 text-[11px] text-muted">Kéo để xoay · Cuộn để thu phóng · Chạm thiết bị để điều khiển</span>
+            <span className="rounded-xl border border-line bg-surface/95 px-3 py-2 text-[11px] text-muted">Chạm thiết bị để mở điều khiển · Nhấp đúp để xem gần · Kéo để xoay</span>
             <button type="button" aria-label="Reset góc nhìn" onClick={() => { fitHome(); changeCamera('isometric'); }} className="pointer-events-auto flex min-h-11 items-center gap-2 rounded-xl border border-line bg-surface/95 px-3 text-xs font-semibold text-text shadow-soft hover:bg-sidebar-hover"><RotateCcw size={15} />Góc nhìn gốc</button>
           </div>
         </div>
@@ -119,7 +137,7 @@ export function Twin3DView({ geometry, drafting, role, onEdit2D }: { geometry: T
         </details>
         {unplacedRooms + unplaced.deviceIds.length + unplaced.sensorIds.length ? <p className="px-1 text-xs text-muted">Chưa đặt: {unplacedRooms} phòng, {unplaced.deviceIds.length} thiết bị, {unplaced.sensorIds.length} cảm biến.</p> : null}
       </div>
-      <aside aria-label="Bảng điều khiển ngôi nhà" className="min-w-0 space-y-4">
+      <aside ref={inspector} aria-label="Bảng điều khiển ngôi nhà" className="min-w-0 space-y-4">
         {selection ? <div className="flex items-center justify-between px-1"><span className="text-xs font-semibold text-muted">Đang điều khiển</span><button type="button" aria-label="Đóng chi tiết" onClick={() => select(null)} className="flex h-9 w-9 items-center justify-center rounded-xl text-muted hover:bg-sidebar-hover"><X size={17} /></button></div> : null}
         <div className="twin-living-inspector"><Twin3DInspector geometry={visibleGeometry} selection={selection} onSelect={select} onEdit2D={onEdit2D} canEdit={role === 'OWNER'} onFocusRoom={focusRoom} onFitHome={fitHome} /></div>
         <TwinLivingDevices geometry={visibleGeometry} selection={selection} onSelect={select} />

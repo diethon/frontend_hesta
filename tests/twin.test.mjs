@@ -104,6 +104,13 @@ test('Twin controls derive actions only from declared capabilities, never guess 
   assert.deepEqual(twinDeviceActions({ capabilities: { POWER: ['turn_on', 'TURN_OFF'], LIGHT: ['TURN_ON', 'SET_BRIGHTNESS'] } }), ['TURN_ON', 'TURN_OFF', 'SET_BRIGHTNESS']);
 });
 
+test('Twin expands empty HESTA capability groups without expanding restricted action lists', () => {
+  assert.deepEqual(twinDeviceActions({ capabilities: { power: [], DOOR: [], COLOR: [] } }),
+    ['TURN_ON', 'TURN_OFF', 'TOGGLE', 'OPEN', 'CLOSE', 'STOP', 'SET_RGB', 'SET_COLOR']);
+  assert.deepEqual(twinDeviceActions({ capabilities: { POWER: ['TURN_OFF'], RGB: ['SET_RGB'], UNKNOWN: [], MODE: [' ', 'SET_MODE'] } }),
+    ['TURN_OFF', 'SET_RGB', 'SET_MODE']);
+});
+
 test('Twin commands prevent duplicates, wait for ACK and do not overwrite confirmed runtime', async () => {
   const store = await ready();
   const previous = store.getState().twin;

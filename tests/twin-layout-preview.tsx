@@ -21,7 +21,7 @@ import { referenceLayout, referenceSnapshot } from './twin-reference-fixture';
 import { multiFloorLayout, multiFloorSnapshot } from './twin-multifloor-fixture';
 
 const store = createAppStore();
-declare global { interface Window { __twinFixtureScene: () => unknown; __twinFixtureEmitDevice: (id: string, state: import('../src/types/twin').JsonValue) => void; } }
+declare global { interface Window { __twinFixtureScene: () => unknown; __twinFixtureEmitDevice: (id: string, state: import('../src/types/twin').JsonValue) => void; __twinFixtureRequests: () => readonly { method?: string; url?: string; body?: unknown }[]; __twinFixtureCommandFailure: boolean; } }
 let deviceEventIndex = 10;
 window.__twinFixtureEmitDevice = (id, currentState) => {
   const device = store.getState().twin.devicesById[id];
@@ -112,14 +112,23 @@ let role: 'OWNER' | 'MEMBER' = 'OWNER';
 let fail = false;
 let forbidden = false;
 const requests: { method?: string; url?: string; body?: unknown }[] = [];
+window.__twinFixtureRequests = () => requests;
+window.__twinFixtureCommandFailure = false;
 apiClient.defaults.adapter = async (config) => {
   requests.push({ method: config.method, url: config.url, body: config.data ? JSON.parse(config.data) : undefined });
   if (config.url?.startsWith('/devices/')) {
     const deviceId = decodeURIComponent(config.url.split('/')[2]);
     const snapshot = demo ? demoSnapshot : snapshotFixture.result;
     const device = [...snapshot.rooms.flatMap((room) => room.devices), ...snapshot.unassignedDevices].find((item) => item.deviceId === deviceId);
-    if (config.method === 'get') return { config, data: { code: 1000, result: device ? { id: deviceId, homeId, name: device.name, deviceType: device.deviceType, capabilities: { POWER: ['TURN_ON', 'TURN_OFF'], LIGHT: ['SET_BRIGHTNESS', 'SET_COLOR'] } } : null }, status: 200, statusText: 'OK', headers: {} };
+    const interactionCapabilities: Record<string, Record<string, string[]>> = {
+      'main-light': { POWER: [], BRIGHTNESS: [], RGB: ['SET_RGB'] },
+      door: { GATE: [] }, window: { DOOR: ['OPEN', 'CLOSE'] }, blind: { DOOR: ['OPEN', 'CLOSE', 'STOP'] },
+      fan: { POWER: [], SPEED: ['SET_SPEED'] }, camera: {}, tv: { POWER: ['TURN_ON', 'TURN_OFF'] },
+    };
+    const capabilities = query.has('interactions') ? interactionCapabilities[deviceId] ?? {} : { POWER: ['TURN_ON', 'TURN_OFF'], LIGHT: ['SET_BRIGHTNESS', 'SET_COLOR'] };
+    if (config.method === 'get') return { config, data: { code: 1000, result: device ? { id: deviceId, homeId, name: device.name, deviceType: device.deviceType, capabilities } : null }, status: 200, statusText: 'OK', headers: {} };
     await new Promise((resolve) => setTimeout(resolve, 500));
+    if (window.__twinFixtureCommandFailure) throw new Error('Thiết bị không xác nhận lệnh thử nghiệm.');
     return { config, data: { code: 1000, result: config.url.endsWith('/commands') ? { command: { success: true, status: 'SUCCESS' } } : { success: true, status: 'SUCCESS' } }, status: 200, statusText: 'OK', headers: {} };
   }
   if (config.url?.endsWith('/my-homes')) return { config, data: { code: 1000, result: [{ homeId, role }, { homeId: 'home-b', role }] }, status: 200, statusText: 'OK', headers: {} };

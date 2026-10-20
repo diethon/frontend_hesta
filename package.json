@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "test": "node --test tests/routing.test.mjs tests/realtime.test.mjs tests/sceneApi.test.mjs tests/notification.test.mjs tests/twin.test.mjs tests/twinLayout.test.mjs",
     "test:twin3d:browser": "node --experimental-websocket tests/twinArchitectural.browser.mjs",
+    "test:twin:interaction": "node --experimental-websocket tests/twinInteraction.browser.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

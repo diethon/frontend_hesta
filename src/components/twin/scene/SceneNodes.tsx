@@ -1,5 +1,5 @@
 import { memo, useState, type ReactNode } from 'react';
-import { Html } from '@react-three/drei';
+import { Html, useCursor } from '@react-three/drei';
 import { useAppSelector } from '../../../store/hooks';
 import type { TwinHealthStatus } from '../../../types/twin';
 import type { TwinLayoutSelection } from '../../../types/twinLayout';
@@ -19,6 +19,7 @@ interface MarkerProps {
 }
 function MarkerShell({ node, selected, healthStatus, pending, error, label, detail, children, visual, placement, palette, markerMode, onSelect, onFocus }: MarkerProps) {
   const [hovered, setHovered] = useState(false);
+  useCursor(hovered);
   const selection = { kind: 'node', id: `${node.nodeType}:${node.nodeId}` } as const;
   const important = healthStatus !== 'ACTIVE' || !!pending || !!error;
   const visible = selected || hovered || (markerMode !== 'none' && (important || markerMode === 'all'));
