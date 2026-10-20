@@ -15,20 +15,22 @@ import {
 } from '../../services/deviceApi';
 import { getHomeRooms } from '../../services/homeApi';
 import type { DeviceResponse } from '../../types/device';
-import { getErrorMessage } from '../../utils/errors';
+import { getErrorMessage, isDuplicateCommandError } from '../../utils/errors';
 import { AppSidebar, DeviceIcon, HomeIcon, TwinIcon, EnergyIcon } from '../ui/AppSidebar';
 import { NotificationBell } from '../notification/NotificationBell';
 import { currentHomeChanged, currentHomeCleared } from '../../store/homeSlice';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { notify } from '../ui/notify';
 import { isAcDevice, isWideCard } from './deviceHelpers';
+import { realtimeEventDispatcher } from '../../realtime/realtimeEvents';
+import type { RealtimeEvent } from '../../realtime/realtimeTypes';
 
 // ──────────────────────────────────────────────────────────────────────
 // Category filter helpers
 // ──────────────────────────────────────────────────────────────────────
 
 const CATEGORY_TYPES: Record<string, string[]> = {
-  LIGHTS: ['LIGHT', 'LED_RGB', 'SMART_PLUG'],
+  LIGHTS: ['LIGHT', 'LED_RGB', 'SMART_PLUG', 'LUX_SENSOR', 'LIGHT_SENSOR'],
   CLIMATE: ['TEMP_HUMID_SENSOR', 'AIR_CONDITIONER'],
   SECURITY: ['MOTION_SENSOR', 'SMOKE_SENSOR', 'CAMERA_AI', 'GATE', 'ROLLING_DOOR'],
 };
@@ -76,6 +78,7 @@ export const DevicePage: React.FC = () => {
 
   // ── Drag-and-drop ordering ──
   const [deviceOrder, setDeviceOrder] = useState<string[]>([]);
+  const [reorderingDeviceId, setReorderingDeviceId] = useState<string | null>(null);
   const dragItem = useRef<number | null>(null);
   const dragOverItem = useRef<number | null>(null);
 
@@ -105,40 +108,49 @@ export const DevicePage: React.FC = () => {
   }, [dispatch, homeId]);
 
   // ── Handle realtime device state changes ──
-  useEffect(() => {
-    if (!realtimeEvents) return;
-    const event = realtimeEvents;
-    if (event?.type === 'DEVICE_STATE_CHANGED' && event?.data) {
-      const data = event.data as { id?: string; deviceId?: string; currentState?: Record<string, unknown>; status?: string };
-      const targetId = data.id || data.deviceId || event.deviceId;
-      if (targetId) {
-        setDevices((prev) =>
-          prev.map((d) => {
-            if (d.id === targetId) {
-              return {
-                ...d,
-                currentState: data.currentState ?? d.currentState,
-                status: (data.status as DeviceResponse['status']) ?? d.status,
-              };
-            }
-            return d;
-          }),
-        );
-        // Also update the open drawer
-        if (selectedDevice?.id === targetId) {
-          setSelectedDevice((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  currentState: data.currentState ?? prev.currentState,
-                  status: (data.status as DeviceResponse['status']) ?? prev.status,
-                }
-              : prev,
-          );
+  const handleDeviceStateChanged = useCallback((event: RealtimeEvent<any>) => {
+    if (!event || event.type !== 'DEVICE_STATE_CHANGED' || !event.data) return;
+    const data = event.data as { id?: string; deviceId?: string; currentState?: Record<string, unknown>; status?: string };
+    const targetId = data.id || data.deviceId || event.deviceId;
+    if (!targetId) return;
+
+    setDevices((prev) =>
+      prev.map((d) => {
+        if (d.id === targetId) {
+          return {
+            ...d,
+            currentState: data.currentState ? { ...d.currentState, ...data.currentState } : d.currentState,
+            status: (data.status as DeviceResponse['status']) ?? d.status,
+          };
         }
+        return d;
+      }),
+    );
+
+    // Also update the open drawer
+    setSelectedDevice((prev) => {
+      if (prev && prev.id === targetId) {
+        return {
+          ...prev,
+          currentState: data.currentState ? { ...prev.currentState, ...data.currentState } : prev.currentState,
+          status: (data.status as DeviceResponse['status']) ?? prev.status,
+        };
       }
+      return prev;
+    });
+  }, []);
+
+  // Direct fast-path subscription via realtimeEventDispatcher (<1ms latency)
+  useEffect(() => {
+    return realtimeEventDispatcher.register('DEVICE_STATE_CHANGED', handleDeviceStateChanged);
+  }, [handleDeviceStateChanged]);
+
+  // Redux fallback subscription
+  useEffect(() => {
+    if (realtimeEvents) {
+      handleDeviceStateChanged(realtimeEvents);
     }
-  }, [realtimeEvents, selectedDevice?.id]);
+  }, [realtimeEvents, handleDeviceStateChanged]);
 
   // ── Fetch rooms ──
   const fetchRooms = useCallback(async () => {
@@ -152,9 +164,11 @@ export const DevicePage: React.FC = () => {
   }, [homeId]);
 
   // ── Fetch devices ──
-  const fetchDevices = useCallback(async () => {
+  const fetchDevices = useCallback(async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) {
+        setLoading(true);
+      }
       setError('');
       if (homeId) {
         const data = await getDevicesByHome(homeId);
@@ -163,7 +177,9 @@ export const DevicePage: React.FC = () => {
     } catch (err: unknown) {
       setError(getErrorMessage(err, 'Lỗi tải danh sách thiết bị'));
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   }, [homeId]);
 
@@ -180,17 +196,30 @@ export const DevicePage: React.FC = () => {
   // ── Toggle power (with 30-min automation override) ──
   const handleTogglePower = async (deviceId: string, currentPower: string) => {
     setPowerPendingId(deviceId);
-    try {
-      const action = currentPower === 'ON' ? 'TURN_OFF' : 'TURN_ON';
-      // Optimistic update
-      setDevices((prev) =>
-        prev.map((d) =>
-          d.id === deviceId
-            ? { ...d, currentState: { ...d.currentState, power: action === 'TURN_ON' ? 'ON' : 'OFF' } }
-            : d,
-        ),
-      );
+    const action = currentPower === 'ON' ? 'TURN_OFF' : 'TURN_ON';
+    const nextPower = action === 'TURN_ON' ? 'ON' : 'OFF';
 
+    // Optimistic update both devices list and selectedDevice
+    setDevices((prev) =>
+      prev.map((d) =>
+        d.id === deviceId
+          ? { ...d, currentState: { ...d.currentState, power: nextPower } }
+          : d,
+      ),
+    );
+    setSelectedDevice((prev) =>
+      prev && prev.id === deviceId
+        ? { ...prev, currentState: { ...prev.currentState, power: nextPower } }
+        : prev,
+    );
+
+    // 2. Optimistic Toast in 0ms: Thông báo hiển thị tức thì đồng bộ với nút bấm!
+    notify.success(
+      action === 'TURN_ON' ? 'Đã bật thiết bị' : 'Đã tắt thiết bị',
+      'Tự động hóa tạm dừng 30 phút',
+    );
+
+    try {
       const result = await sendManualPowerCommand(deviceId, action);
       if (!result.command.success) {
         // Rollback
@@ -201,18 +230,27 @@ export const DevicePage: React.FC = () => {
               : d,
           ),
         );
-        notify.error('Thiết bị không nhận lệnh.');
-      } else {
-        notify.success(
-          action === 'TURN_ON' ? 'Đã bật thiết bị' : 'Đã tắt thiết bị',
-          'Tự động hóa tạm dừng 30 phút',
+        setSelectedDevice((prev) =>
+          prev && prev.id === deviceId
+            ? { ...prev, currentState: { ...prev.currentState, power: currentPower } }
+            : prev,
         );
-        // Refresh to get confirmed state
-        await fetchDevices();
+        if (result.command.errorCode === 'COMMAND_IN_PROGRESS_DUPLICATE_REJECTED' || isDuplicateCommandError(result.command)) {
+          notify.warning('Thiết bị đang thực thi lệnh trước, vui lòng không click liên tục.');
+        } else {
+          notify.error(result.command.message || 'Thiết bị không nhận lệnh.');
+        }
+      } else {
+        // Refresh silently in background so UI never reloads or flashes skeleton
+        void fetchDevices(true);
       }
     } catch (caught) {
-      notify.error(getErrorMessage(caught, 'Không thể điều khiển thiết bị.'));
-      await fetchDevices(); // Rollback via refetch
+      if (isDuplicateCommandError(caught)) {
+        notify.warning('Thiết bị đang thực thi lệnh trước, vui lòng không click liên tục.');
+      } else {
+        notify.error(getErrorMessage(caught, 'Không thể điều khiển thiết bị.'));
+      }
+      void fetchDevices(true); // Rollback silently via refetch
     } finally {
       setPowerPendingId(null);
     }
@@ -220,32 +258,85 @@ export const DevicePage: React.FC = () => {
 
   // ── Color change (LED_RGB) ──
   const handleColorChange = async (deviceId: string, r: number, g: number, b: number) => {
+    const updatedStatePatch = {
+      power: 'ON',
+      r,
+      g,
+      b,
+      color: { r, g, b },
+    };
+
+    // Optimistic update immediately to both devices array and selectedDevice drawer
+    setDevices((prev) =>
+      prev.map((d) =>
+        d.id === deviceId
+          ? { ...d, currentState: { ...d.currentState, ...updatedStatePatch } }
+          : d,
+      ),
+    );
+    setSelectedDevice((prev) =>
+      prev && prev.id === deviceId
+        ? { ...prev, currentState: { ...prev.currentState, ...updatedStatePatch } }
+        : prev,
+    );
+
+    const targetDev = devices.find((d) => d.id === deviceId) || selectedDevice;
+    const currentBrightness = typeof targetDev?.currentState?.brightness === 'number'
+      ? targetDev.currentState.brightness
+      : 100;
+
     try {
-      await sendDeviceCommand(deviceId, 'SET_COLOR', { r, g, b, brightness: 100 });
-      setDevices((prev) =>
-        prev.map((d) =>
-          d.id === deviceId
-            ? { ...d, currentState: { ...d.currentState, color: { r, g, b }, power: 'ON' } }
-            : d,
-        ),
-      );
+      const res = await sendDeviceCommand(deviceId, 'SET_RGB', { r, g, b, brightness: currentBrightness });
+      if (res && !res.success) {
+        if (res.errorCode === 'COMMAND_IN_PROGRESS_DUPLICATE_REJECTED' || isDuplicateCommandError(res)) {
+          return;
+        }
+        if (res.errorCode === 'TIMEOUT_NO_ACK' || res.status === 'SUPERSEDED') {
+          return;
+        }
+        notify.error(res.message || 'Lỗi khi đổi màu');
+      }
     } catch (err) {
+      if (isDuplicateCommandError(err)) {
+        return;
+      }
       notify.error(getErrorMessage(err, 'Lỗi khi đổi màu'));
     }
   };
 
   // ── Brightness change (LED_RGB) ──
   const handleBrightnessChange = async (deviceId: string, brightness: number) => {
+    const updatedStatePatch = { brightness };
+
+    // Optimistic update immediately to both devices array and selectedDevice drawer
+    setDevices((prev) =>
+      prev.map((d) =>
+        d.id === deviceId
+          ? { ...d, currentState: { ...d.currentState, ...updatedStatePatch } }
+          : d,
+      ),
+    );
+    setSelectedDevice((prev) =>
+      prev && prev.id === deviceId
+        ? { ...prev, currentState: { ...prev.currentState, ...updatedStatePatch } }
+        : prev,
+    );
+
     try {
-      await sendDeviceCommand(deviceId, 'SET_BRIGHTNESS', { brightness });
-      setDevices((prev) =>
-        prev.map((d) =>
-          d.id === deviceId
-            ? { ...d, currentState: { ...d.currentState, brightness } }
-            : d,
-        ),
-      );
+      const res = await sendDeviceCommand(deviceId, 'SET_BRIGHTNESS', { brightness });
+      if (res && !res.success) {
+        if (res.errorCode === 'COMMAND_IN_PROGRESS_DUPLICATE_REJECTED' || isDuplicateCommandError(res)) {
+          return;
+        }
+        if (res.errorCode === 'TIMEOUT_NO_ACK' || res.status === 'SUPERSEDED') {
+          return;
+        }
+        notify.error(res.message || 'Lỗi khi chỉnh độ sáng');
+      }
     } catch (err) {
+      if (isDuplicateCommandError(err)) {
+        return;
+      }
       notify.error(getErrorMessage(err, 'Lỗi khi chỉnh độ sáng'));
     }
   };
@@ -288,11 +379,11 @@ export const DevicePage: React.FC = () => {
   }, [devices]);
 
   const activeCount = useMemo(() => {
-    return devices.filter(
-      (d) =>
-        d.status === 'ONLINE' &&
-        (d.currentState?.power === 'ON' || d.currentState?.power === true)
-    ).length;
+    return devices.filter((d) => {
+      if (d.status !== 'ONLINE') return false;
+      const p = d.currentState?.power;
+      return p === true || p === 'true' || p === 'ON' || p === 'on';
+    }).length;
   }, [devices]);
 
   const onlineCount = useMemo(() => {
@@ -300,11 +391,11 @@ export const DevicePage: React.FC = () => {
   }, [devices]);
 
   const handleTurnOffAllLights = async () => {
-    const onLights = devices.filter(
-      (d) =>
-        ['LIGHT', 'LED_RGB', 'SMART_PLUG'].includes(d.deviceType) &&
-        (d.currentState?.power === 'ON' || d.currentState?.power === true)
-    );
+    const onLights = devices.filter((d) => {
+      if (!['LIGHT', 'LED_RGB', 'SMART_PLUG'].includes(d.deviceType)) return false;
+      const p = d.currentState?.power;
+      return p === true || p === 'true' || p === 'ON' || p === 'on';
+    });
 
     if (onLights.length === 0) {
       notify.info('Không có đèn nào đang bật');
@@ -352,7 +443,16 @@ export const DevicePage: React.FC = () => {
     });
   }, [filteredDevices, deviceOrder]);
 
-  // ── Drag-and-drop handlers ──
+  // ── Drag-and-drop handlers (Enabled via double click) ──
+  const handleCardDoubleClick = (deviceId: string) => {
+    if (reorderingDeviceId === deviceId) {
+      setReorderingDeviceId(null);
+    } else {
+      setReorderingDeviceId(deviceId);
+      notify.info('Chế độ kéo thả đã kích hoạt', 'Nhấn giữ và kéo thẻ này để sắp xếp vị trí hiển thị');
+    }
+  };
+
   const handleDragStart = (e: React.DragEvent, index: number) => {
     dragItem.current = index;
     e.currentTarget.classList.add('opacity-50');
@@ -364,6 +464,7 @@ export const DevicePage: React.FC = () => {
 
   const handleDragEnd = (e: React.DragEvent) => {
     e.currentTarget.classList.remove('opacity-50');
+    setReorderingDeviceId(null);
     if (
       dragItem.current !== null &&
       dragOverItem.current !== null &&
@@ -543,7 +644,7 @@ export const DevicePage: React.FC = () => {
           />
 
           {/* ───── Device Grid ───── */}
-          {loading ? (
+          {loading && devices.length === 0 ? (
             <div
               className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 grid-flow-dense gap-4"
               aria-label="Đang tải thiết bị"
@@ -601,18 +702,47 @@ export const DevicePage: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 grid-flow-dense gap-4 p-1">
               {sortedDevices.map((device, index) => {
                 const wide = isWideCard(device);
+                const isDraggable = reorderingDeviceId === device.id;
                 return (
                   <div
                     key={device.id}
-                    draggable
-                    onDragStart={(e) => handleDragStart(e, index)}
-                    onDragEnter={() => handleDragEnter(index)}
+                    draggable={isDraggable}
+                    onDoubleClick={(e) => {
+                      e.stopPropagation();
+                      handleCardDoubleClick(device.id);
+                    }}
+                    onDragStart={(e) => {
+                      if (!isDraggable) {
+                        e.preventDefault();
+                        return;
+                      }
+                      handleDragStart(e, index);
+                    }}
+                    onDragEnter={() => {
+                      if (dragItem.current !== null) {
+                        handleDragEnter(index);
+                      }
+                    }}
                     onDragEnd={handleDragEnd}
-                    onDragOver={(e: React.DragEvent) => e.preventDefault()}
-                    className={`cursor-move transition-all ${
+                    onDragOver={(e: React.DragEvent) => {
+                      if (dragItem.current !== null) {
+                        e.preventDefault();
+                      }
+                    }}
+                    className={`transition-all select-none ${
                       wide ? 'col-span-1 sm:col-span-2' : 'col-span-1'
+                    } ${
+                      isDraggable
+                        ? 'cursor-grab active:cursor-grabbing ring-2 ring-primary ring-offset-2 rounded-2xl shadow-xl scale-[1.01] z-10'
+                        : ''
                     }`}
                   >
+                    {isDraggable && (
+                      <div className="mb-2 flex items-center justify-between px-2.5 py-1 rounded-xl bg-primary/10 border border-primary/20 text-primary text-[11px] font-semibold animate-pulse">
+                        <span>⚡ Kéo để đổi vị trí</span>
+                        <span className="text-[10px] text-muted opacity-80">(Double-click để hủy)</span>
+                      </div>
+                    )}
                     <DeviceCard
                       device={device}
                       powerPending={powerPendingId === device.id}
@@ -636,12 +766,13 @@ export const DevicePage: React.FC = () => {
           setIsDrawerOpen(false);
           setTimeout(() => setSelectedDevice(null), 300);
         }}
-        device={selectedDevice}
+        device={selectedDevice ? (devices.find((d) => d.id === selectedDevice.id) ?? selectedDevice) : null}
         onDeviceRemoved={handleDeviceRemoved}
         onDeviceUpdated={handleDeviceUpdated}
         onTogglePower={handleTogglePower}
         onColorChange={handleColorChange}
         onBrightnessChange={handleBrightnessChange}
+        isPowerPending={powerPendingId === selectedDevice?.id}
       />
 
       {/* ───── Add Device Modal ───── */}
