@@ -37,6 +37,7 @@ export const DeviceGroupSection: React.FC<DeviceGroupSectionProps> = ({
   const [isExpanded, setIsExpanded] = useState(false);
   const [executingGroupId, setExecutingGroupId] = useState<string | null>(null);
   const [groupFeedback, setGroupFeedback] = useState<Record<string, string>>({});
+  const [groupBrightness, setGroupBrightness] = useState<Record<string, number>>({});
 
   // Modal create group state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -291,17 +292,46 @@ export const DeviceGroupSection: React.FC<DeviceGroupSectionProps> = ({
                         </button>
                       </div>
 
-                      {/* Master Brightness Preset slider / button */}
-                      <div className="flex items-center gap-1.5 pt-1">
-                        <SunMedium className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                        <span className="text-[11px] text-muted font-medium shrink-0">Độ sáng:</span>
-                        <div className="flex items-center gap-1 flex-1">
-                          {[30, 60, 100].map((b) => (
+                      {/* Master Dimmer Slider & Presets */}
+                      <div className="space-y-1.5 pt-1">
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="flex items-center gap-1.5 text-muted font-medium">
+                            <SunMedium className="w-3.5 h-3.5 text-amber-500" />
+                            Master Dimmer
+                          </span>
+                          <span className="font-bold text-text">{groupBrightness[group.id] ?? 80}%</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="1"
+                          max="100"
+                          value={groupBrightness[group.id] ?? 80}
+                          disabled={isBusy}
+                          onChange={(e) => {
+                            const val = Number(e.target.value);
+                            setGroupBrightness((prev) => ({ ...prev, [group.id]: val }));
+                          }}
+                          onMouseUp={(e) => {
+                            const val = Number((e.target as HTMLInputElement).value);
+                            handleMasterBrightness(group.id, val);
+                          }}
+                          onTouchEnd={(e) => {
+                            const val = Number((e.target as HTMLInputElement).value);
+                            handleMasterBrightness(group.id, val);
+                          }}
+                          className="w-full h-1.5 bg-line rounded-lg appearance-none cursor-pointer accent-amber-500 disabled:opacity-50"
+                          title="Kéo để điều chỉnh độ sáng đồng loạt cho cả nhóm"
+                        />
+                        <div className="flex items-center gap-1">
+                          {[25, 50, 75, 100].map((b) => (
                             <button
                               key={b}
                               type="button"
                               disabled={isBusy}
-                              onClick={() => handleMasterBrightness(group.id, b)}
+                              onClick={() => {
+                                setGroupBrightness((prev) => ({ ...prev, [group.id]: b }));
+                                handleMasterBrightness(group.id, b);
+                              }}
                               className="flex-1 py-0.5 text-[10px] font-bold rounded-md border border-line bg-surface hover:bg-amber-50 hover:border-amber-200 hover:text-amber-800 text-text transition-colors"
                             >
                               {b}%
