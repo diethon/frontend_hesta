@@ -11,6 +11,7 @@ import { UnauthenticatedJoin } from '../components/home/UnauthenticatedJoin';
 import { DevicePage } from '../components/device/DevicePage';
 import { lazy, Suspense } from 'react';
 const DigitalTwinPage = lazy(() => import('../components/twin/DigitalTwinPage').then(module => ({ default: module.DigitalTwinPage })));
+const TwinDemoPage = lazy(() => import('../components/twin/demo/TwinDemoPage'));
 import type { AuthResponse } from '../types/auth';
 import { RequireAdmin, RequireAuth } from './RouteGuards';
 import { defaultRoute, invitationSearch, invitationToken, loginDestination, readNavigationState } from './navigation';
@@ -46,6 +47,7 @@ export function AppRoutes() {
 
   return (
     <Routes>
+      <Route path="/twin-demo" element={<Suspense fallback={<p role="status" className="p-8 text-muted">Đang mở căn hộ mẫu…</p>}><TwinDemoPage /></Suspense>} />
       <Route path="/login" element={
         <LoginForm
           onLoginSuccess={handleLoginSuccess}

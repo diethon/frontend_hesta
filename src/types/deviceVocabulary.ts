@@ -23,6 +23,9 @@ export type DeviceAction =
   | 'SET_BRIGHTNESS'
   | 'SET_TEMPERATURE'
   | 'SET_SPEED'
+  | 'OPEN'
+  | 'CLOSE'
+  | 'STOP'
   | 'SEND_IR_CODE'     // Gửi mã hồng ngoại 
   | 'SET_AI_MODE'      // Bật/Tắt chế độ cảnh báo Camera
   | 'SET_STATE';       // Gửi JSON State tổng hợp (Dành cho Scene)

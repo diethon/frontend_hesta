@@ -11,8 +11,26 @@ export function buildActionInput(item: DraftAction, order: number, devices: Devi
     return { sceneId: item.sceneId, action: 'EXECUTE_SCENE', parameters: {}, order };
   }
   const device = devices.find((candidate) => candidate.id === item.deviceId);
+  if (!device) throw new Error(`Hành động ${order + 1} chưa chọn thiết bị.`);
+
+  const rawAction = item.action.trim();
+  const rawValue = item.value.trim();
+
+  if (rawAction === 'SET_STATE') {
+    let parameters: Record<string, unknown> = {};
+    try {
+      parameters = (typeof item.value === 'object' ? item.value : JSON.parse(rawValue)) as Record<string, unknown>;
+    } catch {
+      throw new Error(`Dữ liệu của hành động ${order + 1} phải là JSON hợp lệ.`);
+    }
+    if (!parameters || typeof parameters !== 'object' || !Object.keys(parameters).length) {
+      throw new Error(`Dữ liệu của hành động ${order + 1} không được rỗng.`);
+    }
+    return { deviceId: device.id, action: 'SET_STATE', parameters, order };
+  }
+
   const option = getDeviceActions(device).find((candidate) => candidate.code === item.action);
-  if (!device || !option) throw new Error(`Hành động ${order + 1} không phù hợp với thiết bị đã chọn.`);
+  if (!option) throw new Error(`Hành động ${order + 1} không phù hợp với thiết bị đã chọn.`);
 
   const value = item.value.trim();
   let parameters: Record<string, unknown> = {};
@@ -22,6 +40,21 @@ export function buildActionInput(item: DraftAction, order: number, devices: Devi
       throw new Error(`${option.valueLabel} của hành động ${order + 1} không hợp lệ.`);
     }
     parameters = { [option.parameterKey]: number };
+  } else if (option.valueKind === 'color') {
+    const colorVal = value || option.defaultValue || '#ffc107';
+    parameters = { [option.parameterKey]: colorVal, hex: colorVal };
+    // Try to extract RGB components if hex
+    if (colorVal.startsWith('#') && (colorVal.length === 7 || colorVal.length === 4)) {
+      const clean = colorVal.replace('#', '');
+      const r = parseInt(clean.length === 3 ? clean[0] + clean[0] : clean.substring(0, 2), 16);
+      const g = parseInt(clean.length === 3 ? clean[1] + clean[1] : clean.substring(2, 4), 16);
+      const b = parseInt(clean.length === 3 ? clean[2] + clean[2] : clean.substring(4, 6), 16);
+      if (!Number.isNaN(r) && !Number.isNaN(g) && !Number.isNaN(b)) {
+        parameters.r = r;
+        parameters.g = g;
+        parameters.b = b;
+      }
+    }
   } else if (option.valueKind === 'text') {
     if (!value) throw new Error(`Vui lòng nhập ${option.valueLabel?.toLowerCase()} cho hành động ${order + 1}.`);
     parameters = { [option.parameterKey]: value };

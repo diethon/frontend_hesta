@@ -1,5 +1,30 @@
 import type { GeometrySource, TwinLayout, TwinLayoutGeometry } from '../types/twinLayout';
 import type { TwinHomeSnapshotResponse } from '../types/twin';
+import { nodeKey, positionNodeInRoom } from '../components/twin/layoutGeometry';
+import { draftingFromArchitecture, roomDrafting, type TwinDraftingMetadata } from '../components/twin/twinDrafting';
+
+export type TwinNodeRoom = { nodeType: 'DEVICE' | 'SENSOR'; nodeId: string; roomId: string | null };
+
+/** The snapshot owns membership; the saved layout only owns display positions. */
+export function reconcileTwinGeometry(layout: TwinLayoutGeometry | null, roomIds: readonly string[], nodeRooms: readonly TwinNodeRoom[], drafting?: TwinDraftingMetadata): TwinLayoutGeometry {
+  const inferred = inferTwinGeometry(roomIds, nodeRooms);
+  const savedRooms = new Map(layout?.rooms.map((room) => [room.roomId, room]));
+  const rooms = inferred.rooms.map((room) => savedRooms.get(room.roomId) ?? room);
+  const savedNodes = new Map(layout?.nodes.map((node) => [nodeKey(node), node]));
+  const counts = new Map<string, number>();
+  const metadata = drafting ?? draftingFromArchitecture(layout?.architecture);
+  const nodes = nodeRooms.flatMap((identity) => {
+    const room = rooms.find((item) => item.roomId === identity.roomId);
+    if (!room) return [];
+    const index = counts.get(room.roomId) ?? 0;
+    counts.set(room.roomId, index + 1);
+    const saved = savedNodes.get(nodeKey(identity));
+    const keepPosition = saved?.roomId === room.roomId;
+    const node = { ...identity, x: keepPosition ? saved.x : room.x + room.width * (.2 + index % 4 * .2), y: keepPosition ? saved.y : room.y + room.height * (.2 + Math.floor(index / 4) % 4 * .2) };
+    return [positionNodeInRoom(node, node.x, node.y, rooms, (id) => roomDrafting(metadata, id).points)];
+  });
+  return { rooms, nodes, ...(layout?.architecture ? { architecture: layout.architecture } : {}) };
+}
 
 /** Deterministic view geometry for existing room IDs; never creates a domain Room. */
 export function inferTwinGeometry(roomIds: readonly string[], nodeRooms: readonly { nodeType: 'DEVICE' | 'SENSOR'; nodeId: string; roomId: string | null }[]): TwinLayoutGeometry {

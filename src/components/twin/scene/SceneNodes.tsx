@@ -43,7 +43,7 @@ export const Twin3DDevice = memo(function Twin3DDevice({ node, room, opening, ro
   const pending = useAppSelector((state) => state.twinCommand.byId[node.nodeId]?.pending), device = useAppSelector((state) => state.twin.devicesById[node.nodeId]);
   const error = useAppSelector((state) => state.twinCommand.byId[node.nodeId]?.error);
   if (!device) return null;
-  const placement = opening ? { x: opening.start[0] + opening.axis[0] * opening.width / 2, y: 0, z: opening.start[1] + opening.axis[1] * opening.width / 2, rotation: 0 } : devicePlacement(node, room, device.deviceType, rotation);
+  const placement = opening ? { x: opening.start[0] + opening.axis[0] * opening.width / 2, y: 0, z: opening.start[1] + opening.axis[1] * opening.width / 2, rotation: 0 } : devicePlacement(node, room, device.deviceType, rotation, device.name);
   const localOpening = opening ? { ...opening, start: [opening.start[0] - placement.x, opening.start[1] - placement.z] as [number, number] } : undefined;
   return <MarkerShell node={node} selected={selected} pending={pending} error={!!error || device.status === 'ERROR'} healthStatus={device.healthStatus} label={device.name} detail={pending ? 'Đang chờ xác nhận…' : device.status} placement={placement} palette={palette} markerMode={markerMode} houseOverview={houseOverview} visual={<Twin3DDeviceVisual device={device} palette={palette} opening={localOpening} />} onSelect={onSelect} onFocus={onFocus}><DeviceGlyph deviceType={device.deviceType} size={15} /></MarkerShell>;
 });

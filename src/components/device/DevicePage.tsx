@@ -16,8 +16,9 @@ import {
 import { getHomeRooms } from '../../services/homeApi';
 import type { DeviceResponse } from '../../types/device';
 import { getErrorMessage, isDuplicateCommandError } from '../../utils/errors';
-import { AppSidebar, DeviceIcon, HomeIcon, TwinIcon, EnergyIcon } from '../ui/AppSidebar';
+import { HomeSidebar } from '../ui/HomeSidebar';
 import { NotificationBell } from '../notification/NotificationBell';
+import { VoiceAssistantButton } from '../ui/VoiceAssistant';
 import { currentHomeChanged, currentHomeCleared } from '../../store/homeSlice';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { notify } from '../ui/notify';
@@ -510,36 +511,7 @@ export const DevicePage: React.FC = () => {
 
   return (
     <div className="app-shell">
-      <AppSidebar
-        activeItem="devices"
-        contextLabel="Không gian sống"
-        items={[
-          {
-            id: 'home',
-            label: 'Tổng quan',
-            icon: <HomeIcon />,
-            onClick: () => navigate('/home'),
-          },
-          {
-            id: 'devices',
-            label: 'Thiết bị',
-            icon: <DeviceIcon />,
-            onClick: () => window.scrollTo({ top: 0, behavior: 'smooth' }),
-          },
-          {
-            id: 'energy',
-            label: 'Tiêu thụ điện',
-            icon: <EnergyIcon />,
-            onClick: () => navigate(`/home/${homeId}/energy`),
-          },
-          {
-            id: 'twin',
-            label: 'Digital Twin',
-            icon: <TwinIcon />,
-            onClick: () => navigate(`/home/${homeId}/digital-twin`),
-          },
-        ]}
-      />
+      <HomeSidebar activeItem="devices" homeId={homeId} />
 
       <main id="main-content" className="lg:pl-64">
         <div className="mx-auto max-w-7xl space-y-5 p-4 sm:p-6 lg:p-8">
@@ -604,6 +576,7 @@ export const DevicePage: React.FC = () => {
               <Plus className="w-4 h-4" />
               <span>Thêm Thiết Bị</span>
             </button>
+            <VoiceAssistantButton />
             <NotificationBell />
           </div>
 
@@ -694,7 +667,7 @@ export const DevicePage: React.FC = () => {
                   className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-white text-xs sm:text-sm font-bold hover:bg-primary-hover transition-colors shadow-xs cursor-pointer active:scale-95"
                 >
                   <Plus className="w-4 h-4" />
-                  <span>+ Ghép Nối Thiết Bị Mới</span>
+                  <span>Ghép nối thiết bị mới</span>
                 </button>
               </div>
             </div>
