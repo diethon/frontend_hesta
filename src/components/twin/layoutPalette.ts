@@ -9,6 +9,7 @@ export type PaletteItem = { kind: 'room' | 'DEVICE' | 'SENSOR'; id: string };
 
 const sensorDeviceTypes = new Set<TwinDeviceSnapshotResponse['deviceType']>([
   DEVICE_TYPES.TEMP_HUMID_SENSOR, DEVICE_TYPES.MOTION_SENSOR, DEVICE_TYPES.SMOKE_SENSOR,
+  DEVICE_TYPES.LUX_SENSOR, 'LIGHT_SENSOR',
   'SENSOR', // Compatibility with devices registered before the IoT refactor.
 ]);
 
