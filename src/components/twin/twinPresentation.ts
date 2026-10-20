@@ -11,7 +11,7 @@ export function deviceVisualKind(type: string) {
     case 'SMART_PLUG': case 'SOCKET': return 'plug';
     case 'LOCK': return 'lock';
     case 'IR_REMOTE': return 'remote';
-    case 'TEMP_HUMID_SENSOR': case 'SENSOR': return 'sensor';
+    case 'TEMP_HUMID_SENSOR': case 'LUX_SENSOR': case 'LIGHT_SENSOR': case 'SENSOR': return 'sensor';
     case 'MOTION_SENSOR': return 'motion';
     case 'SMOKE_SENSOR': return 'smoke';
     case 'CAMERA_AI': case 'CAMERA': return 'camera';
