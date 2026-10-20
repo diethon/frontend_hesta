@@ -15,6 +15,7 @@ import { type FoldMasks } from '../neonplan/viewer/fold';
 import { architectureMaterials, architecturalRaycast, disposeGeometries, updateWallMasks, type TwinWallMode, type TwinMarkerMode, type TwinFloorMode } from './architectureMaterials';
 import { RoomScene } from './RoomScene';
 import { Twin3DDevice, Twin3DSensor } from './SceneNodes';
+import { RoomMarkerCluster } from './RoomMarkerCluster';
 import { useReducedMotion } from '../useTwinMotion';
 import { GeoBuffer } from '../neonplan/viewer/geo';
 import { pushLampModel } from '../neonplan/viewer/lamps';
@@ -75,6 +76,8 @@ export const FloorScene = memo(function FloorScene({ floor, drafting, selection,
     }
     return result;
   }, [built, floor.nodes, deviceTypes]);
+  const roomNodeGroups = useMemo(() => floor.rooms.map((room) => ({ room, nodes: floor.nodes.filter((node) => node.roomId === room.roomId) })), [floor.rooms, floor.nodes]);
+  const unassignedNodes = useMemo(() => floor.nodes.filter((node) => !floor.rooms.some((room) => room.roomId === node.roomId)), [floor.rooms, floor.nodes]);
   const openings = useMemo(() => buildOpeningParts(built.openings.filter((info) => ![...openingBindings.values()].includes(info)), new Map(), architecture.floor.cut_height), [built, architecture, openingBindings]);
   const masks = useMemo<FoldMasks>(() => ({ standing: { value: 0xffff }, glass: { value: 0 } }), []);
   const themeUniform = useMemo(()=>({value:0}),[]);
@@ -130,10 +133,16 @@ export const FloorScene = memo(function FloorScene({ floor, drafting, selection,
     {rugs.map((rug) => <group key={rug.id} position={[rug.x, .02, rug.z]} rotation={[0, -rug.rotation * Math.PI / 180, 0]}><Block at={[0, 0, 0]} size={[rug.w, rug.h, rug.d]} radius={.1} color={interiorPalette.rug} /></group>)}
     {furniture.map((item) => <InteriorFurniture key={item.id} item={item} palette={interiorPalette} roomId={architecture.furnitureRooms.get(item.id)} onSelect={(id) => onSelect({ kind: 'room', id })} onFocus={(id) => onFocus({ kind: 'room', id })} />)}
     {architecture.floor.rooms.map((room) => <RoomScene key={room.id} room={room} selected={selection?.kind === 'room' && selection.id === room.id} showLabel={showLabels} palette={palette} heatmapMode={heatmapMode} onSelect={onSelect} onFocus={onFocus} />)}
-    {floor.nodes.map((node) => {
+    {roomNodeGroups.map(({ room, nodes }) => <RoomMarkerCluster key={room.roomId} room={room} nodes={nodes} selection={selection} markerMode={markerMode} onFocus={onFocus}>{nodes.map((node) => {
       const room = floor.rooms.find((r) => r.roomId === node.roomId), selected = selection?.kind === 'node' && selection.id === `${node.nodeType}:${node.nodeId}`;
       return node.nodeType === 'DEVICE'
         ? <Twin3DDevice key={`DEVICE:${node.nodeId}`} node={node} room={room} opening={openingBindings.get(node.nodeId)} rotation={drafting.nodeRotations?.[`DEVICE:${node.nodeId}`] ?? 0} selected={selected} markerMode={markerMode} houseOverview={mode === 'house' && !showLabels} palette={palette} onSelect={onSelect} onFocus={onFocus} />
+        : <Twin3DSensor key={`SENSOR:${node.nodeId}`} node={node} selected={selected} markerMode={markerMode} houseOverview={mode === 'house' && !showLabels} palette={palette} onSelect={onSelect} onFocus={onFocus} />;
+    })}</RoomMarkerCluster>)}
+    {unassignedNodes.map((node) => {
+      const selected = selection?.kind === 'node' && selection.id === `${node.nodeType}:${node.nodeId}`;
+      return node.nodeType === 'DEVICE'
+        ? <Twin3DDevice key={`DEVICE:${node.nodeId}`} node={node} rotation={drafting.nodeRotations?.[`DEVICE:${node.nodeId}`] ?? 0} selected={selected} markerMode={markerMode} houseOverview={mode === 'house' && !showLabels} palette={palette} onSelect={onSelect} onFocus={onFocus} />
         : <Twin3DSensor key={`SENSOR:${node.nodeId}`} node={node} selected={selected} markerMode={markerMode} houseOverview={mode === 'house' && !showLabels} palette={palette} onSelect={onSelect} onFocus={onFocus} />;
     })}
     {mode === 'exploded' ? <Html position={[Math.min(...architecture.floor.rooms.flatMap((room) => room.points.map((p) => p[0]))) - .5, .5, 0]} center zIndexRange={[10, 0]}><span data-twin-floor-label className="pointer-events-none whitespace-nowrap rounded-lg border border-line bg-surface/90 px-2 py-1 text-xs font-semibold text-muted">{floor.name}</span></Html> : null}

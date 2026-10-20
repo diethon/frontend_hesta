@@ -39,7 +39,14 @@ try {
       const task = pending.get(message.id); if (!task) return;
       pending.delete(message.id); clearTimeout(task.timeout);
       if (message.error) task.reject(new Error(JSON.stringify(message.error))); else task.resolve(message.result);
-    } else events.push(message);
+    } else {
+      events.push(message);
+      // Test navigation explicitly discards only this isolated fixture's draft.
+      // Preserve the production beforeunload guard and answer its native prompt.
+      if (message.method === 'Page.javascriptDialogOpening' && message.params.type === 'beforeunload') {
+        void send('Page.handleJavaScriptDialog', { accept: true });
+      }
+    }
   });
   const send = (method, params = {}) => new Promise((resolve, reject) => {
     const id = ++sequence;
@@ -52,17 +59,18 @@ try {
     return result.result.value;
   };
   const waitFor = async (expression) => {
-    for (let i = 0; i < 600; i++) { if (await evaluate(expression)) return; await delay(100); }
+    for (let i = 0; i < 600; i++) { if (await evaluate(`Boolean(${expression})`)) return; await delay(100); }
     console.error(await evaluate(`JSON.stringify({ text: document.body.innerText, floors: document.querySelectorAll('[data-twin-floor-label]').length, markers: document.querySelectorAll('.twin-3d-stage button[data-world-y]').length })`));
     console.error(JSON.stringify(events.filter(e => e.method==='Runtime.exceptionThrown' || e.method==='Log.entryAdded').slice(-8)));
     throw new Error(`Timed out: ${expression}`);
   };
   const click = async (text) => {
-    const found = await evaluate(`(() => { const e = [...document.querySelectorAll('button,a')].find(e => e.textContent.trim() === ${JSON.stringify(text)} || e.getAttribute('aria-label') === ${JSON.stringify(text)}); if (!e) return false; e.click(); return true; })()`);
+    const found = await evaluate(`(() => { const e = [...document.querySelectorAll('button,a,summary')].find(e => e.textContent.trim() === ${JSON.stringify(text)} || e.getAttribute('aria-label') === ${JSON.stringify(text)}); if (!e) return false; e.click(); return true; })()`);
     assert.ok(found, `Control exists: ${text}`); await delay(120);
   };
   const screenshot = async (name, fullPage = true) => {
     await evaluate('window.scrollTo(0, 0)');
+    await evaluate('window.__twinFixtureFlushFrame()');
     const metrics = await send('Page.getLayoutMetrics');
     const { data } = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: fullPage,
       ...(fullPage ? { clip: { x: 0, y: 0, width: metrics.cssContentSize.width, height: metrics.cssContentSize.height, scale: 1 } } : {}),
@@ -74,8 +82,10 @@ try {
   const scene = () => evaluate('window.__twinFixtureScene()');
   const settle = () => evaluate(`new Promise((resolve,reject) => { let last='', stable=0, ticks=0; const rounded=values=>values?.map(v=>Math.round(v*10000)); const tick=()=>{const scene=window.__twinFixtureScene(); const value=scene && JSON.stringify({camera:rounded(scene.camera),target:rounded(scene.target),floors:scene.floors.map(f=>Math.round(f.y*1000))}); stable=value===last?stable+1:0;last=value;if(stable>=6)resolve();else if(++ticks>200)reject(new Error('Camera did not settle: '+value));else setTimeout(tick,120);};tick();})`);
   const clickNode = async id => {
-    await waitFor(`document.querySelector('.twin-3d-marker[data-node-id="${id}"]') !== null`);
-    await evaluate(`document.querySelector('.twin-3d-marker[data-node-id="${id}"]').click()`);
+    // Distant room clusters deliberately replace individual DOM badges; devices
+    // remain accessible through the real room-scoped sidebar.
+    await waitFor(`document.querySelector('.twin-3d-marker[data-node-id="${id}"]') || [...document.querySelectorAll('button')].some(b=>b.getAttribute('aria-label')==='Chọn thiết bị '+window.__twinFixtureScene().devices['${id}'].name)`);
+    await evaluate(`(()=>{const marker=document.querySelector('.twin-3d-marker[data-node-id="${id}"]');const row=[...document.querySelectorAll('button')].find(b=>b.getAttribute('aria-label')==='Chọn thiết bị '+window.__twinFixtureScene().devices['${id}'].name);(marker||row).click()})()`);
   };
   await Promise.all([send('Page.enable'), send('Runtime.enable'), send('Log.enable')]);
   await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1050, deviceScaleFactor: 1, mobile: false });
@@ -83,7 +93,10 @@ try {
   await waitFor(`window.__twinFixtureScene?.()?.deviceModels.length === 13`);
   await settle();
   check('bright Daylight renderer is the default', await evaluate(`document.querySelector('.twin-3d-stage').dataset.theme==='DAYLIGHT'`));
+  check('desktop uses real house explorer scene and control columns', await evaluate(`!!document.querySelector('[aria-label="House Explorer"]') && !!document.querySelector('[aria-label="Bảng điều khiển thông minh"]') && !!document.querySelector('[aria-label="Thống kê ngôi nhà"]')`));
+  check('sensor history is never replaced with fabricated charts', await evaluate(`document.querySelectorAll('[aria-label="Thống kê ngôi nhà"] canvas,[aria-label="Thống kê ngôi nhà"] svg polyline').length===0`));
   await screenshot('desktop-overview');
+  if (!process.env.TWIN_DASHBOARD_ONLY) {
   const snapshotCount = (await scene()).snapshotRequests;
   const cameraBefore = (await scene()).camera;
   const lamp = (await scene()).deviceModels.find((item) => item.id === 'DEVICE:main-light');
@@ -96,8 +109,10 @@ try {
   check('empty POWER group still exposes power control', await evaluate(`!!document.querySelector('[aria-label="Điều khiển thiết bị"] button[aria-label="Tắt"]:not(:disabled)')`));
   await evaluate(`window.__twinFixtureEmitDevice('main-light', {power:'OFF',brightness:35,r:40,g:90,b:180})`);
   await waitFor(`!!document.querySelector('[aria-label="Điều khiển thiết bị"] button[aria-label="Bật"]')`);
+  await evaluate('window.__twinFixtureCommandHold=true');
   await click('Bật');
   check('command locks duplicate controls while awaiting ACK', await evaluate(`document.querySelector('[aria-label="Điều khiển thiết bị"] button[aria-label="Bật"]').disabled`));
+  await evaluate('window.__twinFixtureCommandHold=false');
   await waitFor(`document.querySelector('[aria-label="Điều khiển thiết bị"]').textContent.includes('Thiết bị đã xác nhận')`);
   check('power goes through existing manual command endpoint', await evaluate(`window.__twinFixtureRequests().some(r=>r.method==='post' && r.url==='/devices/main-light/commands' && r.body.action==='TURN_ON')`));
   check('ACK alone does not change confirmed OFF state', (await scene()).devices['main-light'].currentState.power === 'OFF');
@@ -183,18 +198,71 @@ try {
   await click('Đóng chi tiết');
   await send('Emulation.setDeviceMetricsOverride', {width:768,height:1024,deviceScaleFactor:1,mobile:false});
   await settle();
-  await evaluate(`document.querySelector('[aria-label="Thiết bị trong không gian"] button').click()`);
+  await click('Mở điều khiển thông minh');
+  await evaluate(`document.querySelector('dialog[open] button[aria-label^="Chọn thiết bị "]').click()`);
   await waitFor(`!!document.querySelector('[aria-label="Điều khiển thiết bị"]')`);
   await waitFor(`(()=>{const p=document.querySelector('[aria-label="Điều khiển thiết bị"]');if(!p?.querySelector('input[type="color"]'))return false;const b=p.getBoundingClientRect();return b.top>=0&&b.top<window.innerHeight-80})()`);
   check('tablet selection brings control panel into view', await evaluate(`(()=>{const b=document.querySelector('[aria-label="Điều khiển thiết bị"]').getBoundingClientRect();return b.top>=0&&b.top<window.innerHeight-80})()`));
   check('tablet has no horizontal page overflow', await evaluate(`document.documentElement.scrollWidth <= window.innerWidth+1`));
+  check('tablet controls use a native modal drawer', await evaluate(`!!document.querySelector('dialog[open].twin-panel-right')`));
   await screenshot('tablet-interactions');
   await send('Emulation.setDeviceMetricsOverride', {width:320,height:860,deviceScaleFactor:1,mobile:false});
   await delay(600);
   check('320px layout keeps room navigation and controls within the page', await evaluate(`document.documentElement.scrollWidth <= window.innerWidth+1`));
   await screenshot('mobile-interactions');
+  await send('Input.dispatchKeyEvent', {type:'keyDown',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});
+  await send('Input.dispatchKeyEvent', {type:'keyUp',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});
+  await waitFor(`document.querySelector('dialog[open]')===null`);
+  check('mobile bottom sheet closes with Escape', await evaluate(`document.querySelector('dialog[open]')===null`));
+  }
+  await send('Emulation.setDeviceMetricsOverride', {width:1440,height:1050,deviceScaleFactor:1,mobile:false});
+  if (!process.env.TWIN_INTERACTION_ONLY) {
+  const multiFloorUrl = new URL(testUrl); multiFloorUrl.search='?multifloor=1&interactions=1'; multiFloorUrl.hash='';
+  await send('Page.navigate',{url:multiFloorUrl.href});
+  await waitFor(`window.__twinFixtureScene?.()?.floors.length===3`); await settle();
+  check('whole-house default preserves three actual layout storeys', await evaluate(`document.querySelector('.twin-3d-stage').dataset.floorMode==='house'`));
+  await screenshot('premium-whole-house');
+  await click('Xem tầng 2'); await waitFor(`window.__twinFixtureScene().floors.length===1`); await settle();
+  check('House Explorer selects and fits the actual second floor', (await scene()).floors[0].name.endsWith(':floor:2'));
+  await screenshot('premium-single-floor');
+  const floorFraming = (await scene()).extent;
+  check('single floor fills 70–85 percent of the limiting viewport axis', Math.max(floorFraming.width, floorFraming.height)>=.7 && Math.max(floorFraming.width, floorFraming.height)<=.85);
+  const direction = snapshot => {
+    const offset = snapshot.camera.map((value,i) => value-snapshot.target[i]);
+    const length = Math.hypot(...offset);
+    return offset.map(value => value/length);
+  };
+  const floorDirection = direction(await scene()), floorTarget = (await scene()).target;
+  for (const theme of ['BLUEPRINT', 'NIGHT', 'DAYLIGHT']) {
+    await evaluate(`(()=>{const s=document.querySelector('select[aria-label="Ánh sáng mô hình 3D"]');s.value='${theme}';s.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+    await waitFor(`document.querySelector('.twin-3d-stage').dataset.theme==='${theme}'`);
+    await delay(400);
+    await settle();
+    const themed = await scene();
+    // Full-page capture can briefly resize the viewport. Radius may refit to
+    // that aspect; the user's viewing direction and focal point must remain.
+    check(`${theme} preserves camera view and framing`, direction(themed).every((value,i)=>Math.abs(value-floorDirection[i])<.001) && themed.target.every((value,i)=>Math.abs(value-floorTarget[i])<.01) && Math.max(themed.extent.width,themed.extent.height)>=.7 && Math.max(themed.extent.width,themed.extent.height)<=.86);
+    check(`${theme} changes only the renderer environment`, await evaluate(`getComputedStyle(document.querySelector('.twin-premium-dashboard')).backgroundColor==='rgb(245, 248, 252)'`));
+    await screenshot('premium-theme-'+theme.toLowerCase());
+  }
+  await click('Cả ngôi nhà'); await waitFor(`window.__twinFixtureScene().floors.length===3`); await settle();
+  const houseSpacing=(await scene()).floors.map(f=>f.y).sort((a,b)=>a-b);
+  await click('Hiển thị nâng cao'); await click('Tách tầng'); await settle();
+  const explodedSpacing=(await scene()).floors.map(f=>f.y).sort((a,b)=>a-b);
+  check('exploded mode separates storeys only when explicitly requested', explodedSpacing[2]-explodedSpacing[0]>houseSpacing[2]-houseSpacing[0]);
+  await screenshot('premium-exploded');
+  await click('Cả ngôi nhà'); await settle();
+  await click('Hiện vị trí thiết bị và cảm biến');
+  for (let i=0;i<4;i++) await click('Thu nhỏ mô hình');
+  await settle();
+  await waitFor(`document.querySelectorAll('[data-twin-marker-cluster]').length>0`);
+  check('distant markers cluster by actual room', await evaluate(`document.querySelectorAll('[data-twin-marker-cluster]').length>0`));
+  await screenshot('premium-marker-clusters');
+  await evaluate(`document.querySelector('[data-twin-marker-cluster]').click()`); await settle();
+  check('room cluster remains actionable and focuses the room', await evaluate(`document.querySelector('.twin-3d-stage').dataset.floorMode==='single'`));
+  }
   const errors = events.filter((event) => event.method === 'Runtime.exceptionThrown');
   check('no uncaught browser exceptions', errors.length === 0);
-  await writeFile(resolve(evidence, 'results.json'), JSON.stringify({results,errors,note:'Isolated real WebGL browser with mocked HESTA REST/WebSocket transport; no hardware commands.'},null,2));
+  await writeFile(resolve(evidence, process.env.TWIN_DASHBOARD_ONLY ? 'dashboard-results.json' : 'results.json'), JSON.stringify({results,errors,note:'Isolated real WebGL browser with mocked HESTA REST/WebSocket transport; no hardware commands.'},null,2));
   await send('Browser.close');
 } finally { socket?.close(); chrome.kill(); }

@@ -27,6 +27,7 @@ function loadSource(path) {
     fileName: filename,
   });
   const sourceRequire = (name) => {
+    if (name.endsWith('.css')) return {};
     if (!name.startsWith('.')) return require(name);
     const base = resolve(dirname(filename), name);
     const dependencyPath = ['.ts', '.tsx'].map((extension) => base + extension).find(existsSync);

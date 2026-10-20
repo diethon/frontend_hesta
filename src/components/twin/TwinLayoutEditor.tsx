@@ -20,9 +20,11 @@ import { notify } from '../ui/notify';
 import { createTwinDraftingMetadata, draftingFromArchitecture, roomDrafting, loadTwinDrafting, sameTwinDrafting, type TwinDraftingMetadata } from './twinDrafting';
 import { reconcileTwinGeometry, twinGeometrySource } from '../../services/twinGeometrySource';
 
+import type { TwinRendererTheme } from './scene/rendererTheme';
+
 const Twin3DView = lazy(() => import('./Twin3DView').then((module) => ({ default: module.Twin3DView })));
 
-export function TwinLayoutEditor({ homeId, initialMode = '3d' }: { homeId: string; initialMode?: TwinViewMode }) {
+export function TwinLayoutEditor({ homeId, initialMode = '3d', rendererTheme, onRendererThemeChange }: { homeId: string; initialMode?: TwinViewMode; rendererTheme?: TwinRendererTheme; onRendererThemeChange?: (theme: TwinRendererTheme) => void }) {
   const state = useAppSelector((root) => root.twinLayout);
   const roomCount = useAppSelector((root) => root.twin.roomIds.length);
   const roomIds = useAppSelector((root) => root.twin.roomIds);
@@ -134,7 +136,7 @@ export function TwinLayoutEditor({ homeId, initialMode = '3d' }: { homeId: strin
   return <section aria-label="Sơ đồ Digital Twin" className="min-w-0 space-y-5">
     {viewMode === '2d' && confirmed ? <p role="status" data-geometry-source={source} className={`rounded-xl border p-3 text-sm ${source === 'INFERRED' ? 'border-warning bg-warning-soft text-text' : 'border-line bg-info-soft text-muted'}`}>{source === 'PERSISTED' ? 'Bố cục đã lưu. Phòng và thiết bị được đồng bộ từ ngôi nhà.' : source === 'INFERRED' ? 'Bố cục tự xếp từ phòng và thiết bị hiện có.' : 'Chưa có dữ liệu phòng để hiển thị.'}</p> : null}
     <div className="flex flex-wrap items-center justify-between gap-4">
-      <div><h1 className="text-3xl font-bold tracking-tight text-text">{viewMode === '3d' ? 'Không gian sống của bạn.' : 'Digital Twin'}</h1><p className="mt-2 text-sm text-muted">{viewMode === '3d' ? 'Khám phá từng phòng, chạm vào thiết bị và điều khiển ngôi nhà.' : 'Chọn tầng, căn chỉnh phòng và vị trí thiết bị có sẵn trong nhà.'}</p></div>
+      <div><h1 className="text-2xl font-semibold tracking-tight text-text">{viewMode === '3d' ? 'Không gian sống của bạn.' : 'Digital Twin'}</h1><p className="mt-2 text-sm text-muted">{viewMode === '3d' ? 'Khám phá từng phòng, chạm vào thiết bị và điều khiển ngôi nhà.' : 'Chọn tầng, căn chỉnh phòng và vị trí thiết bị có sẵn trong nhà.'}</p></div>
 
        <div className="flex flex-wrap items-center gap-2"><TwinViewSwitcher mode={viewMode} disabled={loading} onChange={setViewMode} />{viewMode === '3d' ? <TwinLayoutButton leadingIcon={<Pencil size={17} />} onClick={editIn2D}>{role === 'OWNER' ? 'Chỉnh sửa trong 2D' : 'Xem sơ đồ 2D'}</TwinLayoutButton> : null}{viewMode === '2d' && floorLevels.length > 1 ? <TwinFloorSelect floors={floorLevels} value={active2DFloor} allLabel="Tất cả tầng" ariaLabel="Chọn tầng trong sơ đồ 2D" onChange={(floor) => { setSelection(null); setSelected2DFloor(floor); }} /> : null}{viewMode === '2d' && draft ? <>
         <TwinLayoutButton disabled={blocked} onClick={cancel}>Hủy</TwinLayoutButton>
@@ -160,7 +162,7 @@ export function TwinLayoutEditor({ homeId, initialMode = '3d' }: { homeId: strin
     {loading ? <p role="status" className="rounded-xl bg-info-soft p-4 text-sm">Đang tải sơ đồ…</p> : null}
     {viewMode === 'overview' ? <TwinOverview geometry={confirmedGeometry} /> : null}
     {!roomCount && viewMode !== 'overview' ? <section className="surface-card space-y-4 p-8 text-center"><h2 className="text-xl font-semibold">Chưa có phòng</h2><p className="mt-2 text-sm text-muted">Digital Twin sử dụng phòng và thiết bị hiện có của ngôi nhà. Khi có dữ liệu, hãy đồng bộ lại để căn chỉnh bố cục.</p><TwinRoomPanel geometry={geometry} saved={confirmed} selection={selection} onSelect={setSelection} /></section> : null}
-    {roomCount > 0 && confirmed && viewMode === '3d' ? <Suspense fallback={<div role="status" className="surface-card p-8 text-center text-sm text-muted">Đang tải trình xem 3D…</div>}><Twin3DView geometry={confirmedGeometry} drafting={confirmedDrafting} role={role} onEdit2D={editIn2D} /></Suspense> : null}
+    {roomCount > 0 && confirmed && viewMode === '3d' ? <Suspense fallback={<div role="status" className="surface-card p-8 text-center text-sm text-muted">Đang tải trình xem 3D…</div>}><Twin3DView geometry={confirmedGeometry} drafting={confirmedDrafting} role={role} onEdit2D={editIn2D} rendererTheme={rendererTheme} onRendererThemeChange={onRendererThemeChange} /></Suspense> : null}
      {roomCount > 0 && geometry && viewMode === '2d' ? <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_21rem]">
        <div className="min-w-0 space-y-3">
         {draft ? <TwinDraftingToolbar metadata={drafting} selection={selection} floor={active2DFloor === 'all' ? floorLevels[0] ?? 1 : active2DFloor} disabled={!editable} mode={draftingMode} onModeChange={setDraftingMode} onChange={changeDrafting} /> : null}
