@@ -75,4 +75,3 @@ export function TwinControlSidebar(props: TwinControlSidebarProps) {
     <footer className="flex flex-wrap gap-2 border-t border-line p-4"><TwinLayoutButton onClick={onFitHome}>Vừa ngôi nhà</TwinLayoutButton><TwinLayoutButton onClick={props.onEdit2D}>{props.canEdit ? 'Chỉnh sửa sơ đồ' : 'Xem sơ đồ 2D'}</TwinLayoutButton></footer>
   </section>;
 }
-
