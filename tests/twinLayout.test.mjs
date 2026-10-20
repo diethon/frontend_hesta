@@ -74,7 +74,7 @@ test('editor groups physical sensor types under sensors even without readings an
   state.sensorsById = {};
   state.sensorIds = [];
   const { DEVICE_TYPES } = loadSource('src/types/deviceVocabulary.ts');
-  const sensorTypes = [DEVICE_TYPES.TEMP_HUMID_SENSOR, DEVICE_TYPES.MOTION_SENSOR, DEVICE_TYPES.SMOKE_SENSOR, 'SENSOR'];
+  const sensorTypes = [DEVICE_TYPES.TEMP_HUMID_SENSOR, DEVICE_TYPES.MOTION_SENSOR, DEVICE_TYPES.SMOKE_SENSOR, DEVICE_TYPES.LUX_SENSOR, 'LIGHT_SENSOR', 'SENSOR'];
   const deviceTypes = [
     ...Object.values(DEVICE_TYPES).filter((type) => !sensorTypes.includes(type)),
     'FAN', 'AC', 'SOCKET', 'LOCK', 'CAMERA', 'MICROPHONE',
