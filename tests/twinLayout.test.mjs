@@ -102,6 +102,74 @@ const saved = { homeId, revision: 3,
   ],
 };
 
+test('device appearance recognizes Vietnamese/English names and keeps authoritative device types', () => {
+  const { resolveDeviceAppearance } = loadSource('src/components/twin/devices/deviceAppearance.ts');
+  const cases = [
+    ['IR_REMOTE', 'Điều hòa phòng khách', 'ac', 'wall'],
+    ['IR_REMOTE', 'MÁY LẠNH PHÒNG NGỦ', 'ac', 'wall'],
+    ['IR_REMOTE', 'Air conditioner', 'ac', 'wall'],
+    ['IR_REMOTE', 'TV phòng khách', 'tv', 'wall'],
+    ['SMART_PLUG', 'Đèn cây cạnh sofa', 'floor-lamp', 'floor'],
+    ['LIGHT', 'Đèn bàn học', 'table-lamp', 'table'],
+    ['LIGHT', 'Den dau giuong', 'table-lamp', 'table'],
+    ['LIGHT', 'Đèn thả bàn ăn', 'pendant-light', 'ceiling'],
+    ['LIGHT', 'Đèn âm trần', 'ceiling-light', 'ceiling'],
+    ['LIGHT', 'Wall sconce', 'wall-light', 'wall'],
+    ['LED_RGB', 'Dải LED phòng khách', 'led-strip', 'wall'],
+    ['FAN', 'Quạt đứng phòng ngủ', 'standing-fan', 'floor'],
+    ['FAN', 'Ceiling fan', 'ceiling-fan', 'ceiling'],
+    ['UNKNOWN', 'Đèn bàn', 'table-lamp', 'table'],
+    ['MOTION_SENSOR', 'Cảm biến cạnh điều hòa', 'motion-sensor', 'wall'],
+    ['CAMERA_AI', 'Camera cửa sổ', 'camera', 'wall'],
+    ['AIR_CONDITIONER', 'Đèn bàn', 'ac', 'wall'],
+    ['SMOKE_SENSOR', 'Cảm biến khói', 'smoke-sensor', 'ceiling'],
+    ['SMART_PLUG', 'Ổ cắm số 1', 'plug', 'wall'],
+    ['IR_REMOTE', 'Bộ phát IR phòng khách', 'remote', 'table'],
+    ['UNKNOWN', 'Activity tracker phòng khách', 'generic', 'floor'],
+    ['UNKNOWN', '', 'generic', 'floor'],
+  ];
+  for (const [type, name, kind, mount] of cases) {
+    const result = resolveDeviceAppearance(type, name);
+    assert.equal(result.kind, kind, `${type}: ${name}`);
+    assert.equal(result.mount, mount, name);
+  }
+  assert.equal(resolveDeviceAppearance('IR_REMOTE', 'Điều hòa').source, 'name');
+  assert.equal(resolveDeviceAppearance('AIR_CONDITIONER', 'Điều hòa').source, 'type');
+  assert.equal(resolveDeviceAppearance('UNKNOWN', 'Không xác định').source, 'fallback');
+});
+
+test('name-selected models mount at the matching wall, ceiling, floor or table without changing persisted anchors', () => {
+  const { devicePlacement } = loadSource('src/components/twin/scene/devicePlacement.ts');
+  const node = { nodeId: 'bridge', nodeType: 'DEVICE', roomId: 'living', x: 0, y: 0, z: 0 };
+  const room = { x: 0, z: 0, wallHeight: 2.8, outline: [{ x: -2, z: -2 }, { x: 2, z: -2 }, { x: 2, z: 2 }, { x: -2, z: 2 }] };
+  const before = structuredClone(node);
+  const ac = devicePlacement(node, room, 'IR_REMOTE', 0, 'Điều hòa phòng khách');
+  assert.ok(Math.abs(ac.y - 2.35) < .001);
+  assert.ok(Math.abs(ac.x) > 1.8 || Math.abs(ac.z) > 1.8);
+  const floorLamp = devicePlacement(node, room, 'SMART_PLUG', 45, 'Đèn cây');
+  assert.deepEqual(floorLamp, { x: 0, y: 0, z: 0, rotation: Math.PI / 4 });
+  assert.equal(devicePlacement(node, room, 'LIGHT', 0, 'Đèn bàn').y, .72);
+  assert.ok(Math.abs(devicePlacement(node, room, 'LIGHT', 0, 'Đèn trần').y - 2.75) < .001);
+  assert.deepEqual(node, before);
+});
+
+test('name-based rendering preserves device identity, runtime state and the backend command contract', () => {
+  const { resolveDeviceAppearance } = loadSource('src/components/twin/devices/deviceAppearance.ts');
+  const { adaptTwinDevice } = loadSource('src/services/twinAdapter.ts');
+  const device = { ...deviceEvent.data, deviceType: 'IR_REMOTE', name: 'Điều hòa phòng khách', status: 'ONLINE', healthStatus: 'ACTIVE', currentState: { power: 'ON', temperature: 23, fan: 'HIGH' } };
+  const before = structuredClone(device);
+  const view = adaptTwinDevice(device);
+  assert.equal(resolveDeviceAppearance(view.type, view.name).kind, 'ac');
+  assert.equal(view.type, 'IR_REMOTE');
+  assert.equal(view.id, device.deviceId);
+  assert.deepEqual(device, before);
+  assert.equal(view.powered, true);
+  assert.equal(adaptTwinDevice({ ...device, status: 'OFFLINE' }).powered, false);
+  assert.equal(adaptTwinDevice({ ...device, currentState: { power: 'OFF' } }).powered, false);
+  const { twinDeviceActions } = loadSource('src/services/deviceCommandService.ts');
+  assert.deepEqual(twinDeviceActions({ ...device, capabilities: { IR_TRANSMIT: ['SEND_IR_CODE'] } }), ['SEND_IR_CODE']);
+});
+
 test('camera presets cover every side and overhead while staying above the floor', () => {
   assert.deepEqual(camera3d.cameraViews.map(view => view.id), ['isometric', 'top', 'front', 'right', 'back', 'left']);
   for (const view of camera3d.cameraViews) {
@@ -234,7 +302,13 @@ test('saved layout renders exact normalized room position/dimensions and device/
   const store = await ready(); const html = render(store);
   assert.deepEqual(store.getState().twinLayout.confirmed, saved);
   assert.match(html, /left:5%;top:5%;width:45%;height:40%/);
-  for (const node of saved.nodes) {
+  const runtime = store.getState().twin;
+  const { reconcileTwinGeometry } = loadSource('src/services/twinGeometrySource.ts');
+  const reconciled = reconcileTwinGeometry(saved, runtime.roomIds, [
+    ...runtime.deviceIds.map(id => ({ nodeType: 'DEVICE', nodeId: id, roomId: runtime.devicesById[id].roomId })),
+    ...runtime.sensorIds.map(id => ({ nodeType: 'SENSOR', nodeId: id, roomId: runtime.sensorsById[id].roomId })),
+  ]);
+  for (const node of reconciled.nodes) {
     assert.ok(html.includes(`data-node-key="${geo.nodeKey(node)}"`));
     assert.ok(html.includes(`data-x="${node.x}" data-y="${node.y}"`));
   }
@@ -408,13 +482,14 @@ test('Overview derives health and all unplaced objects from confirmed layout wit
   assert.strictEqual(selectTwinHealthCounts(store.getState()), counts);
 });
 
-test('empty Home never mounts an editor canvas and defaults to 3D Live', async () => {
+test('empty Home uses existing data only and defaults to 3D', async () => {
   const store = await ready();
   store.dispatch(twin.loadTwinSnapshot.pending('empty-home-request', homeId));
   store.dispatch(twin.loadTwinSnapshot.fulfilled({ ...snapshot, rooms: [], unassignedDevices: [], unassignedSensors: [] }, 'empty-home-request', homeId));
   const html = renderToString(React.createElement(Provider, { store }, React.createElement(TwinLayoutEditor, { homeId })));
   assert.match(html, /aria-label="Chế độ 3D" aria-pressed="true"/);
-  assert.match(html, /Hãy tạo phòng cho ngôi nhà/);
+  assert.match(html, /Digital Twin sử dụng phòng và thiết bị hiện có/);
+  assert.doesNotMatch(html, /Tạo phòng|twin-new-room-name/);
   assert.doesNotMatch(html, /data-room-id=|twin-3d-stage|twin-canvas /);
 });
 
@@ -621,11 +696,11 @@ test('serialization whitelists geometry and never stores pixels or runtime field
   assert.deepEqual(request, { expectedRevision: 3, rooms: saved.rooms, nodes: [saved.nodes[1]] });
 });
 
-test('unplaced palette derives rooms/devices/sensors; placing and removing only touch draft', async () => {
+test('room list derives existing rooms and devices without creating domain data', async () => {
   backendLayout = empty; const store = await ready(); edit(store);
   const html = render(store);
-  // Only the active room group is mounted; browser tests switch device/sensor groups.
-  for (const text of ['Chưa đặt', 'Living Room', 'Bedroom', 'Thiết bị', 'Cảm biến', 'Tìm đối tượng chưa đặt']) assert.ok(html.includes(text));
+  for (const text of ['Phòng và thiết bị', 'Living Room', 'Bedroom', 'Tìm phòng, thiết bị', 'Chưa căn chỉnh']) assert.ok(html.includes(text), text);
+  assert.doesNotMatch(html, /Tạo phòng|Đối tượng chưa đặt|Đặt từ bảng bên cạnh|Bỏ vị trí/);
   const runtime = store.getState().twin;
   change(store, { rooms: saved.rooms, nodes: [saved.nodes[0]] });
   assert.equal(store.getState().twinLayout.dirty, true);
@@ -655,6 +730,7 @@ for (const editing of [false, true]) {
   for (const kind of ['sensor', 'device', 'health']) test(`${kind} realtime updates rendered runtime and preserves ${editing ? 'draft' : 'confirmed'} geometry`, async () => {
     const store = await ready(); if (editing) { edit(store); moveRoom(store); }
     const before = store.getState().twinLayout;
+    const renderedBefore = render(store).match(/data-node-key="[^"]+" data-x="[^"]+" data-y="[^"]+"/g);
     const event = kind === 'sensor' ? { ...sensorEvent, data: { ...sensorEvent.data, latestValue: 30, observedAt: '2026-09-17T09:01:00Z' } }
       : kind === 'device' ? { ...deviceEvent, data: { ...deviceEvent.data, currentState: { power: 'OFF' } } }
       : { ...healthEvent, data: { ...healthEvent.data, healthStatus: 'STALE' } };
@@ -662,7 +738,7 @@ for (const editing of [false, true]) {
     assert.equal(store.getState().twinLayout, before);
     const html = render(store);
     assert.match(html, kind === 'sensor' ? /30 °C/ : kind === 'device' ? /OFF · ONLINE/ : /STALE/);
-    for (const node of saved.nodes) assert.ok(html.includes(`data-x="${node.x}" data-y="${node.y}"`));
+    assert.deepEqual(html.match(/data-node-key="[^"]+" data-x="[^"]+" data-y="[^"]+"/g), renderedBefore);
     assert.equal(puts().length, 0);
   });
 }
@@ -732,3 +808,147 @@ test('late Home A GET/PUT/role results cannot overwrite Home B or a newer Home A
   store.dispatch(sessionEnded()); assert.deepEqual(store.getState().twinLayout, layout.emptyLayoutState());
 });
 
+
+
+test('snapshot membership reconciles saved layouts, adds new devices and removes stale entries without mutating saved data', () => {
+  const { reconcileTwinGeometry } = loadSource('src/services/twinGeometrySource.ts');
+  const rooms = [{ roomId: 'living', floor: 2, x: .05, y: .05, width: .4, height: .4 }, { roomId: 'bedroom', floor: 3, x: .55, y: .05, width: .4, height: .4 }];
+  const original = { rooms, nodes: [
+    { nodeType: 'DEVICE', nodeId: 'lamp', roomId: 'living', x: .2, y: .2 },
+    { nodeType: 'DEVICE', nodeId: 'moved', roomId: 'living', x: .3, y: .3 },
+    { nodeType: 'DEVICE', nodeId: 'removed', roomId: 'bedroom', x: .7, y: .2 },
+  ] };
+  const before = structuredClone(original);
+  const membership = [
+    { nodeType: 'DEVICE', nodeId: 'lamp', roomId: 'living' },
+    { nodeType: 'DEVICE', nodeId: 'moved', roomId: 'bedroom' },
+    { nodeType: 'DEVICE', nodeId: 'new', roomId: 'living' },
+    { nodeType: 'SENSOR', nodeId: 'new:TEMP', roomId: 'living' },
+    { nodeType: 'DEVICE', nodeId: 'unassigned', roomId: null },
+  ];
+  const result = reconcileTwinGeometry(original, ['living', 'bedroom', 'office'], membership);
+  assert.deepEqual(original, before);
+  assert.deepEqual(result.rooms.slice(0, 2), rooms);
+  assert.equal(result.rooms[2].roomId, 'office');
+  assert.equal(result.nodes.length, 4);
+  assert.deepEqual(result.nodes.find(node => node.nodeId === 'lamp'), original.nodes[0]);
+  for (const node of result.nodes) assert.ok(geo.roomContainsPoint(result.rooms.find(room => room.roomId === node.roomId), node.x, node.y));
+  assert.equal(result.nodes.find(node => node.nodeId === 'moved').roomId, 'bedroom');
+  assert.deepEqual(reconcileTwinGeometry(result, ['living', 'bedroom', 'office'], membership), result);
+  assert.equal(geo.geometryError(result), null);
+});
+
+test('room movement and resize preserve relative marker positions and existing API coordinates', () => {
+  const room = { roomId: 'room', floor: 2, x: .1, y: .1, width: .4, height: .4 };
+  const node = { nodeType: 'DEVICE', nodeId: 'lamp', roomId: 'room', x: .2, y: .3 };
+  const original = { rooms: [room], nodes: [node] };
+  const moved = geo.updateRoomGeometry(original, { ...room, x: .3, y: .2, width: .6, height: .2 });
+  assert.deepEqual(moved.nodes[0], { ...node, x: .45, y: .3 });
+  assert.deepEqual(original.nodes[0], node);
+  assert.deepEqual(geo.layoutRequest(moved, 4).nodes, moved.nodes);
+  assert.deepEqual(geo.updateRoomGeometry(moved, room), original);
+});
+
+test('marker drag stays in its assigned room across overlap, floor and concave outlines', () => {
+  const room = { roomId: 'room', floor: 2, x: .1, y: .1, width: .8, height: .8 };
+  const node = { nodeType: 'DEVICE', nodeId: 'lamp', roomId: 'room', x: .2, y: .2 };
+  const rooms = [room, { ...room, roomId: 'overlap', floor: 3 }];
+  for (const shape of ['RECTANGLE', 'L_SHAPE', 'U_SHAPE']) {
+    const points = drafting.roomShapePoints(shape);
+    for (const [x, y] of [[-10, 10], [.85, .85], [.5, .8], [.5, .5]]) {
+      const moved = geo.positionNodeInRoom(node, x, y, rooms, () => points);
+      assert.equal(moved.roomId, 'room');
+      assert.ok(geo.roomContainsPoint(room, moved.x, moved.y, points), shape);
+      assert.equal(geo.geometryError({ rooms, nodes: [moved] }), null);
+    }
+  }
+  const unassigned = { ...node, roomId: null };
+  assert.deepEqual(geo.positionNodeInRoom(unassigned, .5, .5, rooms), unassigned);
+});
+
+test('unassigned devices stay in a separate list and new devices are automatically visible in 2D', async () => {
+  backendLayout = empty;
+  const store = await ready();
+  const html = renderToString(React.createElement(Provider, { store }, React.createElement(TwinLayoutEditor, { homeId, initialMode: '2d' })));
+  assert.match(html, /aria-label="Chế độ 2D" aria-pressed="true"/);
+  for (const room of snapshot.rooms) assert.ok(html.includes(`data-room-id="${room.roomId}"`));
+  for (const room of snapshot.rooms) for (const device of room.devices) assert.ok(html.includes(`data-node-key="DEVICE:${device.deviceId}"`));
+  const { TwinRoomPanel } = loadSource('src/components/twin/TwinRoomPanel.tsx');
+  const panel = renderToString(React.createElement(Provider, { store }, React.createElement(TwinRoomPanel, { geometry: empty, saved: empty, selection: null, onSelect() {} })));
+  if (snapshot.unassignedDevices.length) {
+    assert.match(panel, /Chưa có phòng/);
+    for (const device of snapshot.unassignedDevices) assert.ok(panel.includes(device.name));
+  }
+  assert.equal(puts().length, 0);
+});
+
+test('demo furniture keeps the saved world footprint, rotation and explicit mounting height', () => {
+  const { interiorTransform } = loadSource('src/components/twin/interior/interiorLayout.ts');
+  const { furnitureFootprint } = loadSource('src/components/twin/neonplan/model.ts');
+  const { Euler, Matrix4, Quaternion, Vector3 } = require('three');
+  for (const rotation of [0, 35, 90, -120]) {
+    const item = { id: 'saved-sofa', type: 'sofa', x: 5, z: -3, w: 2.5, d: .95, h: 1.1, rotation, mount_y: .42 };
+    const before = structuredClone(item), transform = interiorTransform(item);
+    const matrix = new Matrix4().compose(new Vector3(...transform.position), new Quaternion().setFromEuler(new Euler(...transform.rotation)), new Vector3(...transform.scale));
+    const actual = [-1.53, 1.53].flatMap((x) => [-.69, .69].map((z) => new Vector3(x, 0, z).applyMatrix4(matrix)));
+    const footprint = furnitureFootprint(item);
+    for (const p of actual) {
+      assert.ok(footprint.some(([x, z]) => Math.hypot(x - p.x, z - p.z) < 1e-8));
+      assert.equal(p.y, .42);
+    }
+    assert.deepEqual(item, before);
+  }
+});
+
+test('illustrative rugs stay within their actual room and do not change saved furniture', () => {
+  const { interiorRugs } = loadSource('src/components/twin/interior/interiorLayout.ts');
+  const { furnitureFootprint, pointInPolygon } = loadSource('src/components/twin/neonplan/model.ts');
+  const room = { id: 'concave', name: 'Room', floor_material: 'wood', points: [[0, 0], [5, 0], [5, 2], [2, 2], [2, 5], [0, 5]] };
+  const furniture = [
+    { id: 'inside', type: 'bed', x: 1, z: 3.5, w: 1.2, d: 1.5, h: .9, rotation: 0 },
+    { id: 'edge', type: 'bed', x: 1.4, z: 1.4, w: 1.2, d: 1.2, h: .9, rotation: 0 },
+  ];
+  const before = structuredClone({ room, furniture });
+  const rugs = interiorRugs(room, furniture);
+  assert.deepEqual(rugs.map((rug) => rug.id), ['inside:rug']);
+  for (const rug of rugs) for (const p of furnitureFootprint(rug)) assert.ok(pointInPolygon(p, room.points));
+  assert.deepEqual({ room, furniture }, before);
+});
+
+test('device focus follows its mounted world model and ignores airflow and click targets', () => {
+  const { nodeFocusBounds } = loadSource('src/components/twin/scene/cameraFraming.ts');
+  const { BoxGeometry, Group, Mesh, MeshBasicMaterial } = require('three');
+  const root = new Group(); root.position.set(3, 5, -2);
+  const visual = new Group(); visual.name = 'model:ac'; visual.rotation.y = Math.PI / 2;
+  const body = new Mesh(new BoxGeometry(1.4, .4, .3), new MeshBasicMaterial());
+  const airflow = new Group(); airflow.name = 'device-airflow';
+  const mist = new Mesh(new BoxGeometry(20, 20, 20), new MeshBasicMaterial());
+  airflow.add(mist); visual.add(body, airflow); root.add(visual);
+  const hitTarget = new Mesh(new BoxGeometry(40, 40, 40), new MeshBasicMaterial({ transparent: true, opacity: 0 }));
+  root.add(hitTarget);
+  const box = nodeFocusBounds(root);
+  assert.ok(Math.abs(box.min.x - 2.85) < 1e-6 && Math.abs(box.max.x - 3.15) < 1e-6);
+  assert.ok(Math.abs(box.min.y - 4.8) < 1e-6 && Math.abs(box.max.y - 5.2) < 1e-6);
+  assert.ok(Math.abs(box.min.z + 2.7) < 1e-6 && Math.abs(box.max.z + 1.3) < 1e-6);
+  for (const mesh of [body, mist, hitTarget]) { mesh.geometry.dispose(); mesh.material.dispose(); }
+});
+
+test('device focus keeps a useful existing angle and approaches wall devices from the front without a full turn', () => {
+  const { nodeFocusAngles } = loadSource('src/components/twin/scene/cameraFraming.ts');
+  const { Group } = require('three');
+  const root = new Group(), visual = new Group();
+  visual.name = 'model:ac'; visual.userData.modelMount = 'wall'; root.add(visual);
+  assert.deepEqual(nodeFocusAngles(root, .3, 1.05), { theta: .3, phi: 1.05 });
+  for (const facing of [0, Math.PI / 2, -Math.PI + .1]) {
+    visual.rotation.y = facing;
+    for (const start of [-Math.PI + .05, 0, Math.PI - .05, 8 * Math.PI]) {
+      const result = nodeFocusAngles(root, start, .2);
+      const offset = Math.atan2(Math.sin(result.theta - facing), Math.cos(result.theta - facing));
+      assert.ok(Math.abs(offset) <= .50001);
+      assert.ok(Math.abs(result.theta - start) <= Math.PI);
+      assert.ok(result.phi >= .9 && result.phi <= 1.2);
+    }
+  }
+  visual.userData.modelMount = 'floor';
+  assert.equal(nodeFocusAngles(root, 2.4, 1.05).theta, 2.4);
+});

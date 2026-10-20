@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
-import { AppSidebar } from '../ui/AppSidebar';
+import { HomeSidebar } from '../ui/HomeSidebar';
 import { getHomeEnergyAnalytics } from '../../services/energyApi';
 import type { EnergyAnalyticsResponse, DeviceEnergyBreakdown, EnergyTimeSeriesPoint } from '../../types/energy';
 import { getErrorMessage } from '../../utils/errors';
@@ -77,10 +77,7 @@ export const EnergyDashboardPage: React.FC = () => {
 
   return (
     <div className="app-shell min-h-screen text-text">
-      <AppSidebar
-        activeItem="energy"
-        homeId={homeId}
-      />
+      <HomeSidebar activeItem="energy" homeId={homeId} />
 
       <main id="main-content" className="lg:pl-64">
         <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8">

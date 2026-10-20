@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate, useSearchParams } from "react-router";
 import type { UserResponse } from "../../types/auth";
 import { ProfileModal } from "../profile/ProfileModal";
 import { MemberManagement } from "./MemberManagement";
@@ -8,7 +8,7 @@ import { getMyHomes, createHome } from "../../services/homeApi";
 import { currentHomeChanged, currentHomeCleared } from "../../store/homeSlice";
 import { useAppDispatch } from "../../store/hooks";
 import { getErrorMessage } from "../../utils/errors";
-import { AppSidebar } from "../ui/AppSidebar";
+import { HomeSidebar } from "../ui/HomeSidebar";
 import { NotificationBell } from "../notification/NotificationBell";
 import { VoiceAssistantButton } from "../ui/VoiceAssistant";
 import { Link } from "react-router";
@@ -48,6 +48,9 @@ export const HomePage: React.FC<HomePageProps> = ({
   onProfileUpdate,
 }) => {
   const dispatch = useAppDispatch();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const requestedHomeId = searchParams.get("homeId");
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -81,7 +84,7 @@ export const HomePage: React.FC<HomePageProps> = ({
         if (!active) return;
         setHomesList(homes || []);
         setUserHome((selectedHome) =>
-          retainSelectedHome(homes || [], selectedHome),
+          retainSelectedHome(homes || [], homes?.find((home) => home.homeId === requestedHomeId) ?? selectedHome),
         );
       })
       .catch((error: unknown) => {
@@ -90,7 +93,12 @@ export const HomePage: React.FC<HomePageProps> = ({
     return () => {
       active = false;
     };
-  }, []);
+  }, [requestedHomeId]);
+
+  useEffect(() => {
+    if (!userHome || (location.hash !== "#scenes-section" && location.hash !== "#members-section")) return;
+    document.getElementById(location.hash.slice(1))?.scrollIntoView({ behavior: "smooth" });
+  }, [location.hash, location.key, userHome]);
 
   useEffect(() => {
     dispatch(currentHomeChanged(userHome?.homeId ?? null));
@@ -144,16 +152,7 @@ export const HomePage: React.FC<HomePageProps> = ({
 
   return (
     <div className="app-shell relative overflow-x-hidden">
-      <AppSidebar
-        activeItem="overview"
-        homeId={userHome?.homeId}
-        isAdmin={user.platformRole === "ADMIN"}
-        onMembersClick={() =>
-          document
-            .getElementById("members-section")
-            ?.scrollIntoView({ behavior: "smooth" })
-        }
-      />
+      <HomeSidebar activeItem="overview" homeId={userHome?.homeId} />
       <div className="lg:pl-64">
         {/* Top Navbar */}
         <nav className="sticky top-0 z-20 flex items-center justify-between gap-2 border-b border-line bg-white/90 px-4 py-3 backdrop-blur-xl sm:px-6">

@@ -2,7 +2,7 @@ import { memo, useEffect, useMemo, useRef } from 'react';
 import { Html } from '@react-three/drei';
 import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
 import { shallowEqual } from 'react-redux';
-import { DoubleSide, Group, MultiplyBlending, type Mesh, type Raycaster, type Intersection } from 'three';
+import { Color, DoubleSide, Group, MultiplyBlending, type Mesh, type Raycaster, type Intersection } from 'three';
 import { useAppSelector } from '../../../store/hooks';
 import type { TwinFloorView, TwinHeatmapMode } from '../../../types/twinView';
 import type { TwinLayoutSelection } from '../../../types/twinLayout';
@@ -22,6 +22,12 @@ import { makePatternTexture, patternMaterial } from '../neonplan/viewer/pattern'
 import { TwinCutawayContext } from './TwinCutawayContext';
 import { themeMaterial, themeIndex, type TwinRendererTheme } from './rendererTheme';
 import { useTwinResource } from '../hooks/useTwinResource';
+import { resolveDeviceAppearance } from '../devices/deviceAppearance';
+import { ApartmentFoundation } from '../interior/ApartmentFoundation';
+import { Block } from '../interior/ApartmentInterior';
+import { readApartmentPalette } from '../interior/apartmentPalette';
+import { InteriorFurniture } from '../interior/InteriorFurniture';
+import { hasApartmentModel, interiorRugs } from '../interior/interiorLayout';
 
 export interface FloorProps {
   floor: TwinFloorView; drafting: TwinDraftingMetadata; selection: TwinLayoutSelection | null;
@@ -32,15 +38,39 @@ export interface FloorProps {
 export const FloorScene = memo(function FloorScene({ floor, drafting, selection, targetElevation, mode, wallMode, markerMode, showLabels, palette, theme, heatmapMode, onSelect, onFocus }: FloorProps) {
   const names = useAppSelector((state) => Object.fromEntries(floor.rooms.map((room) => [room.roomId, state.twin.roomsById[room.roomId]?.name ?? ''])), shallowEqual);
   const architecture = useMemo(() => adaptTwinArchitecture(floor, drafting, names), [floor, drafting, names]);
-  const built = useMemo(() => buildFloorGeometry(architecture.floor, architecture.exteriorThickness, architecture.interiorThickness), [architecture]);
-  const deviceTypes = useAppSelector((state) => JSON.stringify(floor.nodes.filter((node) => node.nodeType === 'DEVICE').map((node) => [node.nodeId, state.twin.devicesById[node.nodeId]?.deviceType ?? ''])));
+  const interiorPalette = useMemo(() => {
+    const p = readApartmentPalette(palette);
+    return theme === 'BLUEPRINT' || theme === 'NIGHT' ? { ...p, wall: palette.wall, sofa: palette.fabricAccent, cushion: palette.fabric, rug: palette.rug } : p;
+  }, [palette, theme]);
+  const furniture = useMemo(() => architecture.floor.furniture.filter((item) => hasApartmentModel(item.type)), [architecture]);
+  const rugs = useMemo(() => architecture.floor.rooms.flatMap((room) => interiorRugs(room, furniture.filter((item) => architecture.furnitureRooms.get(item.id) === room.id))), [architecture, furniture]);
+  const built = useMemo(() => buildFloorGeometry({ ...architecture.floor, furniture: architecture.floor.furniture.filter((item) => !hasApartmentModel(item.type)) }, architecture.exteriorThickness, architecture.interiorThickness), [architecture]);
+  useEffect(() => {
+    const p = readApartmentPalette();
+    const walls = built.walls.getAttribute('color'), floorColors = built.floor.getAttribute('color');
+    const wallColor = new Color(p.wall);
+    // Only architectural vertices are recoloured; unsupported authored objects retain their materials.
+    const firstFurniture = built.furnitureTris.length ? built.furnitureTris[0].start * 3 : walls.count;
+    for (let i = 0; i < firstFurniture; i++) walls.setXYZ(i, wallColor.r, wallColor.g, wallColor.b);
+    for (const range of built.roomTris) {
+      const room = architecture.floor.rooms.find((item) => item.id === range.roomId);
+      const color = new Color(room?.floor_material === 'tiles' ? p.wall : p.floor);
+      for (let i = range.start * 3; i < range.end * 3; i++) floorColors.setXYZ(i, color.r, color.g, color.b);
+    }
+    walls.needsUpdate = true;
+    floorColors.needsUpdate = true;
+  }, [architecture, built]);
+  const deviceTypes = useAppSelector((state) => JSON.stringify(floor.nodes.filter((node) => node.nodeType === 'DEVICE').map((node) => {
+    const device = state.twin.devicesById[node.nodeId];
+    return [node.nodeId, device ? resolveDeviceAppearance(device.deviceType, device.name).kind : ''];
+  })));
   const openingBindings = useMemo(() => {
     const result = new Map<string, typeof built.openings[number]>(), occupied = new Set<string>();
     const types = new Map<string, string>(JSON.parse(deviceTypes));
     for (const node of floor.nodes) {
       const type = types.get(node.nodeId);
-      if (!type || !['DOOR', 'WINDOW', 'CURTAIN', 'BLIND'].includes(type)) continue;
-      const opening = built.openings.filter((info) => info.opening.room_id === node.roomId && info.opening.type === (type === 'DOOR' ? 'door' : 'window') && !occupied.has(info.opening.id)).sort((a, b) => Math.hypot(a.start[0] + a.axis[0] * a.width / 2 - node.x, a.start[1] + a.axis[1] * a.width / 2 - node.z) - Math.hypot(b.start[0] + b.axis[0] * b.width / 2 - node.x, b.start[1] + b.axis[1] * b.width / 2 - node.z))[0];
+      if (!type || !['door', 'window', 'curtain'].includes(type)) continue;
+      const opening = built.openings.filter((info) => info.opening.room_id === node.roomId && info.opening.type === (type === 'door' ? 'door' : 'window') && !occupied.has(info.opening.id)).sort((a, b) => Math.hypot(a.start[0] + a.axis[0] * a.width / 2 - node.x, a.start[1] + a.axis[1] * a.width / 2 - node.z) - Math.hypot(b.start[0] + b.axis[0] * b.width / 2 - node.x, b.start[1] + b.axis[1] * b.width / 2 - node.z))[0];
       if (opening) { result.set(node.nodeId, opening); occupied.add(opening.opening.id); }
     }
     return result;
@@ -48,14 +78,14 @@ export const FloorScene = memo(function FloorScene({ floor, drafting, selection,
   const openings = useMemo(() => buildOpeningParts(built.openings.filter((info) => ![...openingBindings.values()].includes(info)), new Map(), architecture.floor.cut_height), [built, architecture, openingBindings]);
   const masks = useMemo<FoldMasks>(() => ({ standing: { value: 0xffff }, glass: { value: 0 } }), []);
   const themeUniform = useMemo(()=>({value:0}),[]);
-  const materials = useMemo(() => { const values=architectureMaterials(masks); Object.values(values).forEach(m=>themeMaterial(m,themeUniform)); return values; }, [masks,themeUniform]);
+  const materials = useMemo(() => { const values=architectureMaterials(masks); values.lines.opacity = .16; Object.values(values).forEach(m=>themeMaterial(m,themeUniform)); return values; }, [masks,themeUniform]);
   useEffect(()=>{themeUniform.value=themeIndex(theme);},[theme,themeUniform]);
   const cutaway = useMemo(() => ({ masks, cutHeight: architecture.floor.cut_height, themeUniform }), [masks, architecture.floor.cut_height, themeUniform]);
   const patternTexture=useTwinResource('floor-pattern-atlas',makePatternTexture);
   const pattern = useMemo(() => ({texture:patternTexture, material:patternMaterial(patternTexture)}), [patternTexture]);
   const lamps = useMemo(() => {
     const buffer = new GeoBuffer();
-    architecture.floor.furniture.filter((f) => f.type.startsWith('lamp_')).forEach((f) => pushLampModel(buffer, { x: f.x, z: f.z, lamp: 'floor', size: [f.w, f.d, f.h], rotation: f.rotation }, architecture.floor.height, 0xdacdb9));
+    architecture.floor.furniture.filter((f) => f.type.startsWith('lamp_') && !hasApartmentModel(f.type)).forEach((f) => pushLampModel(buffer, { x: f.x, z: f.z, lamp: 'floor', size: [f.w, f.d, f.h], rotation: f.rotation }, architecture.floor.height, 0xdacdb9));
     return buffer.geometry();
   }, [architecture]);
   const group = useRef<Group>(null), elevation = useRef(targetElevation);
@@ -73,6 +103,11 @@ export const FloorScene = memo(function FloorScene({ floor, drafting, selection,
     if (Math.abs(targetElevation - elevation.current) > .001) invalidate();
     const target = controls && 'target' in controls ? controls.target as { x: number; z: number } : { x: 0, z: 0 };
     updateWallMasks(masks, built.buckets, camera.position.x - target.x, camera.position.z - target.z, wallMode);
+    if ((theme === 'COZY' || theme === 'DAYLIGHT') && wallMode === 'auto') {
+      masks.standing.value &= ~masks.glass.value;
+      built.buckets.forEach((normal, index) => { if (!normal) masks.standing.value &= ~(1 << index); });
+      masks.glass.value = 0;
+    }
   });
   const selectArchitecture = (event: ThreeEvent<MouseEvent>, focus: boolean) => {
     const hit = built.furnitureTris.find((range) => (event.faceIndex ?? -1) >= range.start && (event.faceIndex ?? -1) < range.end);
@@ -81,16 +116,19 @@ export const FloorScene = memo(function FloorScene({ floor, drafting, selection,
   };
   const raycast = useMemo(() => function(this: Mesh, raycaster: Raycaster, hits: Intersection[]) { architecturalRaycast.call(this, raycaster, hits, masks); }, [masks]);
   return <TwinCutawayContext.Provider value={cutaway}><group ref={group} name={floor.id} position={[0, targetElevation, 0]}>
+    <ApartmentFoundation rooms={architecture.floor.rooms} holes={built.holes} color={interiorPalette.wall} />
     <mesh geometry={built.floor} material={materials.floor} receiveShadow castShadow />
     <mesh geometry={built.floor} material={pattern.material} raycast={() => undefined} />
     <mesh geometry={built.walls} material={materials.walls} customDepthMaterial={materials.depth} castShadow receiveShadow raycast={raycast} onClick={(event) => selectArchitecture(event, false)} onDoubleClick={(event) => selectArchitecture(event, true)} />
     <mesh geometry={built.walls} material={materials.glassWalls} raycast={() => undefined} renderOrder={3} />
     <lineSegments geometry={built.lines} material={materials.lines} raycast={() => undefined} />
-    <mesh geometry={built.shadow} raycast={() => undefined}><meshBasicMaterial vertexColors blending={MultiplyBlending} transparent depthWrite={false} side={DoubleSide} polygonOffset polygonOffsetFactor={-1} /></mesh>
+    <mesh geometry={built.shadow} raycast={() => undefined}><meshBasicMaterial vertexColors blending={MultiplyBlending} premultipliedAlpha transparent depthWrite={false} side={DoubleSide} polygonOffset polygonOffsetFactor={-1} /></mesh>
     <mesh geometry={openings.frames} material={materials.frames} receiveShadow raycast={() => undefined} />
     <mesh geometry={openings.glass} material={materials.windowGlass} raycast={() => undefined} renderOrder={4} />
     <mesh geometry={openings.blinds} material={materials.blinds} raycast={() => undefined} />
     <mesh geometry={lamps} castShadow><meshStandardMaterial vertexColors roughness={.75} /></mesh>
+    {rugs.map((rug) => <group key={rug.id} position={[rug.x, .02, rug.z]} rotation={[0, -rug.rotation * Math.PI / 180, 0]}><Block at={[0, 0, 0]} size={[rug.w, rug.h, rug.d]} radius={.1} color={interiorPalette.rug} /></group>)}
+    {furniture.map((item) => <InteriorFurniture key={item.id} item={item} palette={interiorPalette} roomId={architecture.furnitureRooms.get(item.id)} onSelect={(id) => onSelect({ kind: 'room', id })} onFocus={(id) => onFocus({ kind: 'room', id })} />)}
     {architecture.floor.rooms.map((room) => <RoomScene key={room.id} room={room} selected={selection?.kind === 'room' && selection.id === room.id} showLabel={showLabels} palette={palette} heatmapMode={heatmapMode} onSelect={onSelect} onFocus={onFocus} />)}
     {floor.nodes.map((node) => {
       const room = floor.rooms.find((r) => r.roomId === node.roomId), selected = selection?.kind === 'node' && selection.id === `${node.nodeType}:${node.nodeId}`;

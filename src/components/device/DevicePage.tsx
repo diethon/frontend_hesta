@@ -16,7 +16,7 @@ import {
 import { getHomeRooms } from '../../services/homeApi';
 import type { DeviceResponse } from '../../types/device';
 import { getErrorMessage } from '../../utils/errors';
-import { AppSidebar } from '../ui/AppSidebar';
+import { HomeSidebar } from '../ui/HomeSidebar';
 import { NotificationBell } from '../notification/NotificationBell';
 import { VoiceAssistantButton } from '../ui/VoiceAssistant';
 import { currentHomeChanged, currentHomeCleared } from '../../store/homeSlice';
@@ -410,10 +410,7 @@ export const DevicePage: React.FC = () => {
 
   return (
     <div className="app-shell">
-      <AppSidebar
-        activeItem="devices"
-        homeId={homeId}
-      />
+      <HomeSidebar activeItem="devices" homeId={homeId} />
 
       <main id="main-content" className="lg:pl-64">
         <div className="mx-auto max-w-7xl space-y-5 p-4 sm:p-6 lg:p-8">

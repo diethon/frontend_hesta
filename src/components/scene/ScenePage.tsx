@@ -33,7 +33,7 @@ import {
   updateScene,
 } from '../../services/sceneApi';
 import type { SceneActionType, SceneExecutionResponse, SceneResponse } from '../../types/scene';
-import { AppSidebar } from '../ui/AppSidebar';
+import { HomeSidebar } from '../ui/HomeSidebar';
 import type { DeviceSummary } from '../../types/automation';
 import {
   buildSceneActionInput,
@@ -1370,7 +1370,7 @@ function FeatureShell({
 }) {
   return (
     <div className="app-shell relative min-h-screen text-text">
-      <AppSidebar activeItem="scenes" homeId={homeId} />
+      <HomeSidebar activeItem="scenes" homeId={homeId} />
       <main className="min-w-0 flex-1 p-4 sm:p-7 lg:pl-64 space-y-6 max-w-7xl mx-auto transition-colors">
         <header className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4">
           <div>

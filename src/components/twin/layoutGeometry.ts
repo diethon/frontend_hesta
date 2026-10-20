@@ -114,6 +114,39 @@ export function moveLayoutNode(node: TwinNodeLayout, x: number, y: number, rooms
   return { ...node, ...point, roomId: target?.roomId ?? null };
 }
 
+/** Keep the domain room identity; dragging a marker never reassigns a device. */
+export function positionNodeInRoom(node: TwinNodeLayout, x: number, y: number, rooms: readonly TwinRoomLayout[], roomPoints?: (roomId: string) => readonly TwinDraftPoint[]): TwinNodeLayout {
+  const room = rooms.find((item) => item.roomId === node.roomId);
+  if (!room) return node;
+  const points = roomPoints?.(room.roomId);
+  const point = { x: clampCoordinate(Math.max(room.x, Math.min(room.x + room.width, x))), y: clampCoordinate(Math.max(room.y, Math.min(room.y + room.height, y))) };
+  if (roomContainsPoint(room, point.x, point.y, points)) return { ...node, ...point };
+  // Concave rooms need an interior point, not just a bounding-box clamp.
+  let nearest = node;
+  let distance = Infinity;
+  for (let row = 1; row < 40; row += 1) {
+    for (let col = 1; col < 40; col += 1) {
+      const candidate = { x: round(room.x + room.width * col / 40), y: round(room.y + room.height * row / 40) };
+      const nextDistance = (candidate.x - point.x) ** 2 + (candidate.y - point.y) ** 2;
+      if (nextDistance < distance && roomContainsPoint(room, candidate.x, candidate.y, points)) {
+        nearest = { ...node, ...candidate };
+        distance = nextDistance;
+      }
+    }
+  }
+  return nearest;
+}
+
+/** Persist canvas coordinates, but preserve each marker's relative room position. */
+export function updateRoomGeometry(geometry: TwinLayoutGeometry, nextRoom: TwinRoomLayout, roomPoints?: (roomId: string) => readonly TwinDraftPoint[]): TwinLayoutGeometry {
+  const previous = geometry.rooms.find((room) => room.roomId === nextRoom.roomId);
+  if (!previous) return geometry;
+  const rooms = geometry.rooms.map((room) => room.roomId === nextRoom.roomId ? nextRoom : room);
+  return { ...geometry, rooms, nodes: geometry.nodes.map((node) => node.roomId !== nextRoom.roomId ? node : positionNodeInRoom(node,
+    nextRoom.x + (node.x - previous.x) / previous.width * nextRoom.width,
+    nextRoom.y + (node.y - previous.y) / previous.height * nextRoom.height, rooms, roomPoints)) };
+}
+
 export function geometryError(geometry: TwinLayoutGeometry): string | null {
   const coordinate = (value: number) => Number.isFinite(value) && value >= 0 && value <= 1 && round(value) === value;
   if (new Set(geometry.rooms.map((room) => room.roomId)).size !== geometry.rooms.length

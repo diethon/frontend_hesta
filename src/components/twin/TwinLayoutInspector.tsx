@@ -1,9 +1,8 @@
 import { useAppSelector } from '../../store/hooks';
 import type { TwinLayoutGeometry, TwinLayoutSelection } from '../../types/twinLayout';
-import { clampRoom, moveLayoutNode, nodeKey, resizeRoom, snapRoom, snapPoint } from './layoutGeometry';
+import { clampRoom, positionNodeInRoom, updateRoomGeometry, nodeKey, resizeRoom, snapRoom, snapPoint } from './layoutGeometry';
 import { TwinDeviceCard } from './TwinDeviceCard';
 import { TwinSensorCard } from './TwinSensorCard';
-import { TwinLayoutButton } from './TwinLayoutButton';
 import { DeviceGlyph, RoomGlyph, SensorGlyph } from './TwinVisualIcon';
 import { changeRoomDrafting, roomDrafting, type TwinDraftingMetadata, type TwinRoomDrafting } from './twinDrafting';
 import type { TwinDraftingMode } from './TwinDraftingToolbar';
@@ -32,10 +31,10 @@ export function TwinLayoutInspector({ geometry, drafting, mode, selection, edita
         ? resizeRoom(room, field === 'width' ? value : room.width, field === 'height' ? value : room.height)
         : clampRoom({ ...room, [field]: value });
       const snapped = snapRoom(next, geometry.rooms, { grid: drafting.settings.gridSnap, edges: drafting.settings.edgeSnap, stepX: (drafting.settings.gridMeters ?? .5) / TWIN_WORLD_WIDTH, stepY: (drafting.settings.gridMeters ?? .5) / TWIN_WORLD_DEPTH }, field === 'width' || field === 'height').room;
-      onChange({ ...geometry, rooms: geometry.rooms.map((item) => item.roomId === room.roomId ? snapped : item) });
+      onChange(updateRoomGeometry(geometry, snapped, (roomId) => roomDrafting(drafting, roomId).points));
     } else if (node) {
       const snapped = snapPoint(value, drafting.settings.gridSnap, (drafting.settings.gridMeters ?? .5) / (field === 'x' ? TWIN_WORLD_WIDTH : TWIN_WORLD_DEPTH));
-      const next = moveLayoutNode(node, field === 'x' ? snapped : node.x, field === 'y' ? snapped : node.y, geometry.rooms,
+      const next = positionNodeInRoom(node, field === 'x' ? snapped : node.x, field === 'y' ? snapped : node.y, geometry.rooms,
         (roomId) => roomDrafting(drafting, roomId).points);
       onChange({ ...geometry, nodes: geometry.nodes.map((item) => nodeKey(item) === nodeKey(node) ? next : item) });
     }
@@ -56,7 +55,7 @@ export function TwinLayoutInspector({ geometry, drafting, mode, selection, edita
   return <section aria-label="Đối tượng đang chọn" className="surface-card space-y-4 p-4 sm:p-5">
     <div className="flex items-center gap-3"><span className="flex h-11 w-11 items-center justify-center rounded-xl bg-info-soft">{room ? <RoomGlyph name={roomName} size={22} /> : device ? <DeviceGlyph deviceType={device.deviceType} size={22} /> : <SensorGlyph metricType={sensor?.metricType ?? ''} size={22} />}</span><div className="min-w-0"><p className="text-xs font-semibold uppercase tracking-wider text-muted">Đối tượng đang chọn</p><h3 className="truncate font-semibold text-text">{room ? roomName : device?.name ?? sensor?.metricType ?? 'Đối tượng'}</h3><p className="text-xs text-muted">{room ? 'Room' : node?.nodeType === 'DEVICE' ? device?.deviceType : 'Sensor'}</p></div></div>
     <label className="block text-sm text-muted">Tên<input readOnly value={room ? roomName : device?.name ?? sensor?.metricType ?? 'Đối tượng'} className="mt-1 min-h-11 w-full rounded-lg border border-line bg-app px-3 text-text" /></label>
-    {node ? <p className="text-sm text-muted">Phòng hiển thị: {node.roomId ? roomsById[node.roomId]?.name ?? 'Không còn trong dữ liệu' : 'Ngoài các phòng'}</p> : null}
+    {node ? <p className="text-sm text-muted">Phòng được gán: {node.roomId ? roomsById[node.roomId]?.name ?? 'Không còn trong dữ liệu' : 'Chưa có phòng'}</p> : null}
     {roomMeta ? <div className="flex items-center justify-between gap-3 rounded-xl bg-info-soft px-3 py-2"><span className="text-xs font-semibold text-text">Hình phòng</span><span className="text-xs font-semibold text-primary-hover">{{ RECTANGLE: 'Chữ nhật', L_SHAPE: 'Chữ L', U_SHAPE: 'Chữ U', CUSTOM: 'Tự vẽ' }[roomMeta.shape]}</span></div> : null}
     {editable ? <>
       {room ? <TwinObjectEditor room={room} metadata={drafting} onChange={onDraftingChange} /> : null}
@@ -81,11 +80,7 @@ export function TwinLayoutInspector({ geometry, drafting, mode, selection, edita
           </label>)}
         </div>
       </fieldset> : null}
-      <TwinLayoutButton variant="danger" onClick={() => onChange(room ? {
-        rooms: geometry.rooms.filter((item) => item.roomId !== room.roomId),
-        nodes: geometry.nodes.map((item) => item.roomId === room.roomId ? { ...item, roomId: null } : item),
-      } : { ...geometry, nodes: geometry.nodes.filter((item) => nodeKey(item) !== nodeKey(node!)) })}>Bỏ vị trí khỏi sơ đồ</TwinLayoutButton>
-      <p className="text-xs text-muted">Chỉ thay đổi vị trí hiển thị. Các phòng, thiết bị và cảm biến vẫn được giữ trong nhà.</p>
+      <p className="text-xs text-muted">Thiết bị luôn nằm trong phòng đã được gán. Di chuyển hoặc đổi kích thước phòng sẽ đưa thiết bị đi theo.</p>
     </> : null}
     {node?.nodeType === 'DEVICE' ? <TwinDeviceCard deviceId={node.nodeId} /> : node ? <TwinSensorCard sensorId={node.nodeId} /> : null}
   </section>;
