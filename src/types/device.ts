@@ -35,6 +35,7 @@ export interface DeviceResponse {
   manualOverrideUntil?: string | null;
   manualOverrideActive?: boolean;
   lastSeen?: string;
+  settings?: Record<string, any>;
 }
 
 export interface DeviceUpdateRequest {
@@ -44,6 +45,7 @@ export interface DeviceUpdateRequest {
   digitalTwinX?: number;
   digitalTwinY?: number;
   digitalTwinZ?: number;
+  settings?: Record<string, any>;
 }
 
 export interface DeviceStateHistoryResponse {
@@ -58,7 +60,7 @@ export interface DeviceStateHistoryResponse {
 }
 
 export interface ManualCommandResponse {
-  command: { success: boolean; status: string; message?: string; acknowledgedState?: DeviceState };
+  command: { commandId?: string; success: boolean; status: string; errorCode?: string; message?: string; acknowledgedState?: DeviceState; latencyMs?: number };
   overrideUntil: string;
 }
 
@@ -73,6 +75,8 @@ export interface ManualOverrideRecord {
 export interface DeviceUptimeTimelinePoint {
   hour: number;
   state: 'ON' | 'OFF';
+  timestamp?: string;
+  durationSeconds?: number;
 }
 
 export interface DeviceUptimeResponse {
