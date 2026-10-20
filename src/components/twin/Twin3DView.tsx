@@ -1,5 +1,5 @@
 import { Component, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
-import { Armchair, Box, Crosshair, House, LayoutDashboard, ListTree, Moon, MousePointer2, RotateCcw, SlidersHorizontal, Sun, X } from 'lucide-react';
+import { Box, Crosshair, House, LayoutDashboard, ListTree, Moon, MousePointer2, RotateCcw, SlidersHorizontal, Sun, View, X, ZoomIn, ZoomOut } from 'lucide-react';
 import { useAppSelector } from '../../store/hooks';
 import type { TwinLayoutGeometry, TwinLayoutSelection } from '../../types/twinLayout';
 import type { TwinHeatmapMode } from '../../types/twinView';
@@ -19,6 +19,7 @@ import { TwinSidebar } from './TwinSidebar';
 import { TwinFloorNavigation } from './TwinFloorNavigation';
 import type { TwinFloorMode, TwinWallMode, TwinMarkerMode } from './scene/architectureMaterials';
 import { TwinLivingDevices } from './TwinLivingDevices';
+import { TwinRoomNavigation } from './TwinRoomNavigation';
 import { knownPower } from './twinPresentation';
 
 const subscribeCompact = (callback: () => void) => { const media = window.matchMedia('(max-width: 767px)'); media.addEventListener('change', callback); return () => media.removeEventListener('change', callback); };
@@ -34,13 +35,12 @@ export function Twin3DView({ geometry, drafting, role, onEdit2D }: { geometry: T
   const deviceIds = useAppSelector((state) => state.twin.deviceIds), roomIds = useAppSelector((state) => state.twin.roomIds), sensorIds = useAppSelector((state) => state.twin.sensorIds);
   const home = useAppSelector((state) => state.twin.home);
   const devicesById = useAppSelector((state) => state.twin.devicesById);
-  const roomsById = useAppSelector((state) => state.twin.roomsById);
   const [selection, setSelection] = useState<TwinLayoutSelection | null>(null), [fitRequest, setFitRequest] = useState(0);
   const [cameraRequest, setCameraRequest] = useState<TwinCameraRequest>({ serial: 0, action: 'isometric' }), [activeView, setActiveView] = useState<TwinCameraView | null>('isometric');
   const [focusRoomId, setFocusRoomId] = useState<string | null>(null), [focusNodeKey, setFocusNodeKey] = useState<string | null>(null);
   const [activeFloor, setActiveFloor] = useState<number | 'all'>(() => layoutFloors(geometry.rooms)[0] ?? 'all'), [mode, setMode] = useState<TwinFloorMode>('single');
   const [wallMode, setWallMode] = useState<TwinWallMode>('auto'), [markerMode, setMarkerMode] = useState<TwinMarkerMode>('important');
-  const [theme, setTheme] = useState<TwinRendererTheme>('COZY');
+  const [theme, setTheme] = useState<TwinRendererTheme>('DAYLIGHT');
   const [heatmapMode, setHeatmapMode] = useState<TwinHeatmapMode>('normal'), [treeOpen, setTreeOpen] = useState(false);
   const [ready, setReady] = useState(false), [sceneError, setSceneError] = useState<Error | null>(null);
   const inspector = useRef<HTMLElement>(null);
@@ -96,9 +96,9 @@ export function Twin3DView({ geometry, drafting, role, onEdit2D }: { geometry: T
         {floors.map((floor) => <button key={floor} type="button" aria-label={`Xem tầng ${floor}`} aria-pressed={mode === 'single' && resolvedFloor === floor} onClick={() => chooseFloor(floor)} className={`min-h-11 shrink-0 rounded-xl px-5 text-xs font-semibold transition-colors ${mode === 'single' && resolvedFloor === floor ? 'bg-sidebar-active text-primary-hover' : 'text-muted hover:bg-sidebar-hover'}`}>Tầng {floor}</button>)}
         <button type="button" aria-pressed={mode !== 'single'} onClick={() => chooseFloor('all')} className={`flex min-h-11 shrink-0 items-center gap-2 rounded-xl px-4 text-xs font-semibold ${mode !== 'single' ? 'bg-sidebar-active text-primary-hover' : 'text-muted hover:bg-sidebar-hover'}`}><House size={15} />Cả ngôi nhà</button>
       </div>
-      <p className="text-xs text-muted">{activeRooms.length} phòng <span className="mx-2 text-line">/</span> {activeDevices.length} thiết bị</p>
+      <p className="flex items-center gap-2 text-xs text-muted"><span className="h-1.5 w-1.5 rounded-full bg-success" aria-hidden="true" /><strong className="font-semibold text-text">{onCount} đang bật</strong><span className="mx-1 text-line">/</span>{activeRooms.length} phòng · {activeDevices.length} thiết bị</p>
     </div>
-    <div className="grid min-w-0 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
+    <div className="twin-living-layout grid min-w-0 items-start gap-4">
       <div className="min-w-0 space-y-4">
         <div className="twin-3d-stage twin-living-stage relative isolate min-w-0 overflow-hidden rounded-3xl border border-line shadow-soft" data-theme={theme} data-floor-mode={mode} data-wall-mode={wallMode} data-marker-mode={markerMode}>
           {!ready ? <div role="status" className="absolute inset-0 z-50 flex items-center justify-center bg-app text-sm text-muted">Đang dựng không gian của bạn…</div> : null}
@@ -114,16 +114,17 @@ export function Twin3DView({ geometry, drafting, role, onEdit2D }: { geometry: T
           </div>
           {treeOpen ? <div className="absolute bottom-20 right-3 top-28 z-40 w-64 max-w-full overflow-auto rounded-2xl shadow-float"><TwinSidebar geometry={visibleGeometry} selection={selection} onFocus={focusSelection} /></div> : null}
           <div className="pointer-events-none absolute inset-x-0 bottom-0 z-40 flex flex-wrap items-center justify-between gap-2 p-4 sm:p-5">
-            <span className="rounded-xl border border-line bg-surface/95 px-3 py-2 text-[11px] text-muted">Chạm thiết bị để mở điều khiển · Nhấp đúp để xem gần · Kéo để xoay</span>
-            <button type="button" aria-label="Reset góc nhìn" onClick={() => { fitHome(); changeCamera('isometric'); }} className="pointer-events-auto flex min-h-11 items-center gap-2 rounded-xl border border-line bg-surface/95 px-3 text-xs font-semibold text-text shadow-soft hover:bg-sidebar-hover"><RotateCcw size={15} />Góc nhìn gốc</button>
+            <span className="hidden rounded-xl border border-line bg-surface/95 px-3 py-2 text-[11px] text-muted sm:block">Chạm để điều khiển · Nhấp đúp để xem gần</span>
+            <div className="pointer-events-auto ml-auto flex items-center gap-1 rounded-xl border border-line bg-surface/95 p-1 shadow-soft">
+              <button type="button" aria-label="Thu nhỏ mô hình" onClick={() => changeCamera('zoom-out')} className="flex h-10 w-10 items-center justify-center rounded-lg text-muted hover:bg-sidebar-hover"><ZoomOut size={17} /></button>
+              <button type="button" aria-label="Phóng to mô hình" onClick={() => changeCamera('zoom-in')} className="flex h-10 w-10 items-center justify-center rounded-lg text-muted hover:bg-sidebar-hover"><ZoomIn size={17} /></button>
+              <span className="mx-1 h-5 w-px bg-line" aria-hidden="true" />
+              <button type="button" aria-label="Góc nhìn từ trên" aria-pressed={activeView === 'top'} onClick={() => changeCamera('top')} className="flex h-10 w-10 items-center justify-center rounded-lg text-muted hover:bg-sidebar-hover"><View size={17} /></button>
+              <button type="button" aria-label="Reset góc nhìn" onClick={() => { fitHome(); changeCamera('isometric'); }} className="flex h-10 items-center gap-2 rounded-lg px-3 text-xs font-semibold text-text hover:bg-sidebar-hover"><RotateCcw size={15} /><span className="hidden sm:inline">Góc nhìn gốc</span></button>
+            </div>
           </div>
         </div>
-        <section aria-label="Chọn không gian" className="surface-card p-4 sm:p-5">
-          <div className="mb-3 flex items-center justify-between"><h3 className="text-sm font-semibold text-text">Không gian của bạn</h3><span className="text-xs text-muted">Chọn phòng để xem gần hơn</span></div>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            {activeRooms.map((room) => <button type="button" key={room.roomId} aria-pressed={selection?.kind === 'room' && selection.id === room.roomId} onClick={() => focusSelection({ kind: 'room', id: room.roomId })} className={`flex min-h-24 flex-col items-start justify-center gap-2 rounded-2xl border p-4 text-left transition-colors ${selection?.kind === 'room' && selection.id === room.roomId ? 'border-primary bg-info-soft text-primary-hover' : 'border-line bg-app text-muted hover:bg-sidebar-hover'}`}><Armchair size={20} /><strong className="text-xs font-semibold text-text">{roomsById[room.roomId]?.name ?? 'Phòng'}</strong><span className="text-[11px] text-muted">{activeDevices.filter((device) => device.roomId === room.roomId).length} thiết bị · Tầng {room.floor ?? 1}</span></button>)}
-          </div>
-        </section>
+        <TwinRoomNavigation rooms={activeRooms} selection={selection} onSelect={focusSelection} />
         <details className="surface-card p-4">
           <summary className="flex min-h-7 cursor-pointer items-center gap-2 text-xs font-semibold text-muted"><SlidersHorizontal size={15} />Hiển thị nâng cao</summary>
           <div className="mt-4 space-y-3">

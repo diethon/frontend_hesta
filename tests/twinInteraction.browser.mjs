@@ -82,6 +82,8 @@ try {
   await send('Page.navigate', { url: testUrl });
   await waitFor(`window.__twinFixtureScene?.()?.deviceModels.length === 13`);
   await settle();
+  check('bright Daylight renderer is the default', await evaluate(`document.querySelector('.twin-3d-stage').dataset.theme==='DAYLIGHT'`));
+  await screenshot('desktop-overview');
   const snapshotCount = (await scene()).snapshotRequests;
   const cameraBefore = (await scene()).camera;
   const lamp = (await scene()).deviceModels.find((item) => item.id === 'DEVICE:main-light');
@@ -158,6 +160,10 @@ try {
   check('tablet selection brings control panel into view', await evaluate(`(()=>{const b=document.querySelector('[aria-label="Bảng điều khiển ngôi nhà"]').getBoundingClientRect();return b.top>=-10&&b.top<window.innerHeight})()`));
   check('tablet has no horizontal page overflow', await evaluate(`document.documentElement.scrollWidth <= window.innerWidth+1`));
   await screenshot('tablet-interactions');
+  await send('Emulation.setDeviceMetricsOverride', {width:320,height:860,deviceScaleFactor:1,mobile:false});
+  await delay(600);
+  check('320px layout keeps room navigation and controls within the page', await evaluate(`document.documentElement.scrollWidth <= window.innerWidth+1`));
+  await screenshot('mobile-interactions');
   const errors = events.filter((event) => event.method === 'Runtime.exceptionThrown');
   check('no uncaught browser exceptions', errors.length === 0);
   await writeFile(resolve(evidence, 'results.json'), JSON.stringify({results,errors,note:'Isolated real WebGL browser with mocked HESTA REST/WebSocket transport; no hardware commands.'},null,2));

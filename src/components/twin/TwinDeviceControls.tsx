@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
 import { actionOptions, type ActionOption } from '../deviceActionOptions';
 import { TwinLayoutButton } from './TwinLayoutButton';
 
@@ -19,12 +19,12 @@ function ValueControl({ option, initialValue, disabled, onExecute }: ControlProp
   const numeric = option.valueKind === 'number' || option.valueKind === 'percentage';
   const valid = numeric ? value.trim() !== '' && Number.isFinite(Number(value))
     && (option.valueKind !== 'percentage' || (Number(value) >= 0 && Number(value) <= 100)) : value.trim() !== '';
-  return <form className="space-y-2" onSubmit={(event) => {
+  return <form className="twin-control-form space-y-2" onSubmit={(event) => {
     event.preventDefault();
     if (valid && !disabled) onExecute(option.code, { [parameterKey]: numeric ? Number(value) : value.trim() });
   }}>
     <label className="block text-xs font-semibold text-muted">{option.valueLabel}
-      {option.valueKind === 'percentage' ? <span className="mt-3 flex items-center gap-3"><input disabled={disabled} type="range" min={0} max={100} step={1} value={value} onChange={(event) => setValue(event.target.value)} className="twin-control-range min-h-11 min-w-0 flex-1 cursor-pointer disabled:opacity-40" /><output className="min-w-10 text-right text-sm text-text">{value}%</output></span> : <input disabled={disabled} type={numeric ? 'number' : 'text'} step={numeric ? 'any' : undefined} value={value} onChange={(event) => setValue(event.target.value)} className="mt-2 min-h-12 w-full rounded-xl border border-line bg-surface px-3 text-sm text-text" />}
+      {option.valueKind === 'percentage' ? <span className="mt-2 flex items-center gap-3"><input disabled={disabled} type="range" min={0} max={100} step={1} value={value} style={{ '--twin-range-progress': `${Math.max(0, Math.min(100, Number(value) || 0))}%` } as CSSProperties} onChange={(event) => setValue(event.target.value)} className="twin-control-range min-h-11 min-w-0 flex-1 cursor-pointer disabled:opacity-40" /><output className="min-w-12 rounded-lg bg-info-soft px-2 py-1.5 text-right text-sm font-semibold text-text">{value}%</output></span> : <input disabled={disabled} type={numeric ? 'number' : 'text'} step={numeric ? 'any' : undefined} value={value} onChange={(event) => setValue(event.target.value)} className="mt-2 min-h-12 w-full rounded-xl border border-line bg-surface px-3 text-sm text-text" />}
     </label>
     <TwinLayoutButton disabled={disabled || !valid} type="submit">{option.label}</TwinLayoutButton>
   </form>;
@@ -32,11 +32,11 @@ function ValueControl({ option, initialValue, disabled, onExecute }: ControlProp
 
 function ColorControl({ action, initialValue, disabled, onExecute }: ControlProps & { action: string; initialValue: string }) {
   const [color, setColor] = useState(initialValue);
-  return <form className="space-y-2" onSubmit={(event) => {
+  return <form className="twin-control-form space-y-2" onSubmit={(event) => {
     event.preventDefault();
     if (!disabled) onExecute(action, { r: parseInt(color.slice(1, 3), 16), g: parseInt(color.slice(3, 5), 16), b: parseInt(color.slice(5, 7), 16) });
   }}>
-    <label className="flex min-h-11 items-center justify-between gap-3 text-xs font-semibold text-muted">Màu đèn<input type="color" aria-label="Chọn màu đèn" disabled={disabled} value={color} onChange={(event) => setColor(event.target.value)} /></label>
+    <label className="flex min-h-11 items-center justify-between gap-3 text-xs font-semibold text-muted">Màu đèn<span className="flex items-center gap-2"><span className="text-xs font-medium uppercase text-muted">{color}</span><input className="twin-color-control" type="color" aria-label="Chọn màu đèn" disabled={disabled} value={color} onChange={(event) => setColor(event.target.value)} /></span></label>
     <TwinLayoutButton disabled={disabled} type="submit">Áp dụng màu đèn</TwinLayoutButton>
   </form>;
 }

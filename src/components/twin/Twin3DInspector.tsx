@@ -33,11 +33,9 @@ export function Twin3DInspector({ geometry, selection, onSelect, onEdit2D, canEd
     return id ? state.twin.roomsById[id] : undefined;
   });
 
-  if (!selection) return <section aria-label="Chi tiết 3D" className="surface-card p-5">
-    <div className="flex items-center gap-3"><span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-info-soft text-primary-hover"><MousePointer2 size={21} aria-hidden="true" /></span><div><h3 className="font-semibold text-text">Ngôi nhà trong tầm tay</h3><p className="mt-1 text-xs leading-5 text-muted">Chọn một thiết bị trong mô hình hoặc danh sách bên dưới.</p></div></div>
-    <p className="mt-4 text-sm leading-6 text-muted">Bật đèn, đổi sắc màu và điều chỉnh không gian ngay tại đây khi thiết bị hỗ trợ.</p>
-    <details className="mt-4 min-w-0"><summary className="cursor-pointer text-sm font-semibold text-primary-hover">Đọc tất cả dữ liệu trực tiếp</summary><div className="mt-3"><TwinContent /></div></details>
-    <TwinLayoutButton leadingIcon={<Box size={18} />} onClick={onEdit2D}>{canEdit ? 'Chỉnh sửa trong 2D' : 'Xem sơ đồ 2D'}</TwinLayoutButton>
+  if (!selection) return <section aria-label="Chi tiết 3D" className="surface-card p-4">
+    <div className="flex items-start gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-info-soft text-primary-hover"><MousePointer2 size={18} aria-hidden="true" /></span><div><h3 className="text-sm font-semibold text-text">Chạm để kết nối</h3><p className="mt-1 text-xs leading-5 text-muted">Chọn thiết bị trong ngôi nhà để mở điều khiển. Nhấp đúp để xem gần hơn.</p></div></div>
+    <details className="mt-3 min-w-0 border-t border-line pt-3"><summary className="cursor-pointer text-xs font-medium text-muted">Xem dữ liệu thiết bị và cảm biến</summary><div className="mt-3"><TwinContent /></div></details>
   </section>;
 
   if (room) {
@@ -54,10 +52,12 @@ export function Twin3DInspector({ geometry, selection, onSelect, onEdit2D, canEd
   }
 
   if (device) return <section aria-label={`Chi tiết thiết bị ${device.name}`} className="surface-card space-y-4 p-4">
-    <div className="flex items-center gap-3"><DeviceGlyph deviceType={device.deviceType} /><div className="min-w-0"><h3 className="text-lg font-semibold text-text">{device.name}</h3><p className="mt-1 text-xs text-muted">{device.status} · {businessRoom?.name ?? 'Chưa gán phòng'}</p></div><TwinHealthBadge compact healthStatus={device.healthStatus} /></div>
+    <div className="border-b border-line pb-4"><div className="flex items-center gap-3"><DeviceGlyph deviceType={device.deviceType} /><div className="min-w-0 flex-1"><h3 className="break-words text-base font-semibold text-text">{device.name}</h3><p className="mt-1 text-xs text-muted">{businessRoom?.name ?? 'Chưa gán phòng'}</p></div></div>
+      <p className="mt-3 flex items-center gap-1.5 text-xs text-muted"><span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${device.status === 'ERROR' ? 'bg-error' : device.status !== 'ONLINE' ? 'bg-off' : device.healthStatus === 'ACTIVE' ? 'bg-success' : 'bg-warning'}`} />{device.status === 'ERROR' ? 'Thiết bị báo lỗi' : device.status !== 'ONLINE' ? 'Ngoại tuyến' : device.healthStatus === 'ACTIVE' ? 'Trực tuyến' : 'Dữ liệu đã cũ'}</p>
+    </div>
     <DeviceControlPanel key={device.deviceId} deviceId={device.deviceId} presentation="embedded" />
-    <p className="rounded-xl bg-info-soft px-3 py-2 text-xs text-muted">Mô hình 3D · {resolveDeviceAppearance(device.deviceType, device.name).label}{resolveDeviceAppearance(device.deviceType, device.name).source === 'name' ? ' · Nhận diện theo tên' : ''}</p>
     <details className="rounded-xl bg-app p-3"><summary className="cursor-pointer text-xs font-semibold text-muted">Thông tin thiết bị</summary><div className="mt-3 space-y-3"><p className="break-words text-xs text-muted">{summarizeState(device.currentState)}</p>
+    <p className="text-xs text-muted">{resolveDeviceAppearance(device.deviceType, device.name).label}</p>
     <p className="text-xs text-muted">Cập nhật · {device.lastSeen ? new Date(device.lastSeen).toLocaleString('vi-VN') : 'Chưa có dữ liệu'}</p>
     <p className="break-words text-sm text-muted">Phòng · {businessRoom?.name ?? 'Chưa gán phòng'}</p></div></details>
     {nodeLayout?.roomId ? <TwinLayoutButton onClick={() => onSelect({ kind: 'room', id: nodeLayout.roomId! })}>Xem phòng chứa marker</TwinLayoutButton> : null}

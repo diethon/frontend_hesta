@@ -46,3 +46,11 @@ git -C D:\FPTU\Capstone\Resources\hesta_frontend switch <existing-branch>
 ```
 
 Do not use `checkout -f` or `reset --hard` to resolve an uncommitted-change warning. Commit any subsequent work before switching. Backend, frontend and mobile are independent repositories, so switching one does not switch the others. A clean working tree prevents this patch from blocking checkout; it does not guarantee compatibility with every older branch or prevent future merge conflicts.
+
+## Visual refinement
+
+The real Twin now opens in Daylight with the existing architectural materials and soft shadows. A narrower desktop control column gives the scene more space; compact horizontal room navigation replaces the tall room cards. Device rows use appliance-specific icons and a small accessible status indicator. Zoom and top view are available directly on the canvas.
+
+Control sliders use the shared HESTA colors, show the selected percentage and remain keyboard-operable. The RGB field shows its draft color and keeps the explicit Apply action. Technical model details stay under device information. No API, authorization, layout persistence or realtime behavior changed.
+
+The refined view was checked in real Chromium at desktop, tablet and 320px widths: 23 browser checks passed alongside the 134 unit tests. Screenshots are available in `.tmp/twin-interaction-evidence/desktop-overview.png`, `desktop-selected-light.png`, `tablet-interactions.png` and `mobile-interactions.png`.

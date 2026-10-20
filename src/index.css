@@ -668,8 +668,8 @@ textarea:disabled {
 }
 
 .twin-living-stage {
-  height: clamp(30rem, 48vw, 42rem);
-  background: var(--color-twin-demo-night);
+  height: clamp(32rem, 64vh, 46rem);
+  background: var(--color-twin-scene);
 }
 
 .twin-living-stage canvas {
@@ -677,11 +677,89 @@ textarea:disabled {
 }
 
 .twin-living-device-list {
-  max-height: 28rem;
+  max-height: 22rem;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line) transparent;
 }
 
 .twin-control-range {
-  accent-color: var(--color-primary);
+  appearance: none;
+  background: transparent;
+}
+
+.twin-control-range::-webkit-slider-runnable-track {
+  height: .375rem;
+  border-radius: 1rem;
+  background: linear-gradient(to right, var(--color-primary) var(--twin-range-progress, 0%), var(--color-line) var(--twin-range-progress, 0%));
+}
+
+.twin-control-range::-webkit-slider-thumb {
+  appearance: none;
+  width: 1.125rem;
+  height: 1.125rem;
+  margin-top: -.375rem;
+  border: 3px solid var(--color-surface);
+  border-radius: 50%;
+  background: var(--color-primary);
+  box-shadow: 0 0 0 1px var(--color-line);
+}
+
+.twin-control-range::-moz-range-track {
+  height: .375rem;
+  border-radius: 1rem;
+  background: var(--color-line);
+}
+
+.twin-control-range::-moz-range-progress {
+  height: .375rem;
+  border-radius: 1rem;
+  background: var(--color-primary);
+}
+
+.twin-control-range::-moz-range-thumb {
+  width: .875rem;
+  height: .875rem;
+  border: 3px solid var(--color-surface);
+  border-radius: 50%;
+  background: var(--color-primary);
+}
+
+.twin-control-form > button {
+  width: 100%;
+  justify-content: center;
+  border-color: transparent;
+  background: var(--color-app);
+  font-size: .75rem;
+}
+
+.twin-control-form > button:hover:not(:disabled) {
+  background: var(--color-sidebar-hover);
+}
+
+.twin-color-control {
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: .25rem;
+  border: 1px solid var(--color-line);
+  border-radius: .75rem;
+  background: var(--color-surface);
+  cursor: pointer;
+}
+
+.twin-color-control::-webkit-color-swatch-wrapper {
+  padding: .125rem;
+}
+
+.twin-color-control::-webkit-color-swatch,
+.twin-color-control::-moz-color-swatch {
+  border: 0;
+  border-radius: .375rem;
+}
+
+@media (min-width: 1280px) {
+  .twin-living-layout {
+    grid-template-columns: minmax(0, 1fr) 19rem;
+  }
 }
 
 @media (max-width: 639px) {
