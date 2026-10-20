@@ -152,16 +152,6 @@ export const HomePage: React.FC<HomePageProps> = ({
 
   return (
     <div className="app-shell relative overflow-x-hidden">
-      <AppSidebar
-        activeItem="overview"
-        homeId={userHome?.homeId}
-        isAdmin={user.platformRole === "ADMIN"}
-        onMembersClick={() =>
-          document
-            .getElementById("members-section")
-            ?.scrollIntoView({ behavior: "smooth" })
-        }
-      />
       <HomeSidebar activeItem="overview" homeId={userHome?.homeId} />
       <div className="lg:pl-64">
         {/* Top Navbar */}

@@ -118,10 +118,11 @@ test('session restoration happens before protected routes render', () => {
 });
 
 test('home navigation keeps all menu entries and the same order on feature pages', () => {
-  const labels = ['Tổng quan', 'Thiết bị', 'Digital Twin', 'Tiêu thụ điện', 'Kịch bản', 'Thành viên'];
+  const labels = ['Tổng quan', 'Thiết bị', 'Digital Twin', 'Tiêu thụ điện', 'Kịch bản', 'Tự động hóa', 'Thành viên'];
   for (const account of [user, admin]) {
-    for (const path of ['/home', '/home/home-1/devices', '/home/home-1/energy']) {
+    for (const path of ['/home', '/home/home-1/devices', '/home/home-1/energy', '/homes/home-1/scenes', '/homes/home-1/automation-rules', '/homes/home-1/recommendations']) {
       const html = renderRoute(path, account);
+      assert.equal((html.match(/<nav aria-label="Điều hướng chính"/g) ?? []).length, 1, `Expected one sidebar on ${path}`);
       const navigation = html.match(/<nav aria-label="Điều hướng chính"[^>]*>([\s\S]*?)<\/nav>/)?.[1];
       assert.ok(navigation, `Main navigation missing on ${path}`);
       let previousIndex = -1;

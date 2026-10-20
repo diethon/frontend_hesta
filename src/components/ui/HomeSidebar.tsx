@@ -1,10 +1,10 @@
 import { useNavigate } from 'react-router';
 import { useAppSelector } from '../../store/hooks';
 import { notify } from './notify';
-import { AdminIcon, AppSidebar, DeviceIcon, EnergyIcon, HomeIcon, PeopleIcon, SceneIcon, TwinIcon } from './AppSidebar';
+import { AdminIcon, AppSidebar, AutomationIcon, DeviceIcon, EnergyIcon, HomeIcon, PeopleIcon, SceneIcon, TwinIcon } from './AppSidebar';
 
 interface HomeSidebarProps {
-  activeItem: 'overview' | 'devices' | 'twin' | 'energy';
+  activeItem: 'overview' | 'devices' | 'twin' | 'energy' | 'scenes' | 'automations';
   homeId?: string;
   showSystemSummary?: boolean;
 }
@@ -13,8 +13,8 @@ export function HomeSidebar({ activeItem, homeId, showSystemSummary }: HomeSideb
   const navigate = useNavigate();
   const isAdmin = useAppSelector((state) => state.auth.user?.platformRole === 'ADMIN');
   const overview = homeId ? `/home?homeId=${encodeURIComponent(homeId)}` : '/home';
-  const openPage = (page: string) => {
-    if (homeId) navigate(`/home/${encodeURIComponent(homeId)}/${page}`);
+  const openPage = (page: string, routePrefix = 'home') => {
+    if (homeId) navigate(`/${routePrefix}/${encodeURIComponent(homeId)}/${page}`);
     else notify.info('Hãy tạo hoặc tham gia một ngôi nhà trước.');
   };
   const openOverview = (section?: string) => {
@@ -28,7 +28,8 @@ export function HomeSidebar({ activeItem, homeId, showSystemSummary }: HomeSideb
     { id: 'devices', label: 'Thiết bị', icon: <DeviceIcon />, onClick: () => openPage('devices') },
     { id: 'twin', label: 'Digital Twin', icon: <TwinIcon />, onClick: () => openPage('digital-twin') },
     { id: 'energy', label: 'Tiêu thụ điện', icon: <EnergyIcon />, onClick: () => openPage('energy') },
-    { id: 'scenes', label: 'Kịch bản', icon: <SceneIcon />, onClick: () => openOverview('scenes-section') },
+    { id: 'scenes', label: 'Kịch bản', icon: <SceneIcon />, onClick: () => openPage('scenes', 'homes') },
+    { id: 'automations', label: 'Tự động hóa', icon: <AutomationIcon />, onClick: () => openPage('automation-rules', 'homes') },
     { id: 'members', label: 'Thành viên', icon: <PeopleIcon />, onClick: () => openOverview('members-section') },
     ...(isAdmin ? [{ id: 'admin', label: 'Quản trị hệ thống', icon: <AdminIcon />, onClick: () => navigate('/admin') }] : []),
   ]} />;

@@ -1,6 +1,4 @@
 import React from 'react';
-import { useNavigate } from 'react-router';
-import { notify } from './notify';
 
 export type SidebarItem = {
   id: string;
@@ -11,12 +9,9 @@ export type SidebarItem = {
 
 export interface AppSidebarProps {
   activeItem: string;
-  items?: SidebarItem[];
-  homeId?: string;
+  items: SidebarItem[];
   contextLabel?: string;
   showSystemSummary?: boolean;
-  onMembersClick?: () => void;
-  isAdmin?: boolean;
 }
 
 export const HomeIcon = () => (
@@ -87,128 +82,9 @@ export const AutomationIcon = () => (
 export const AppSidebar: React.FC<AppSidebarProps> = ({
   activeItem,
   items,
-  homeId,
   contextLabel = 'Không gian sống',
   showSystemSummary = true,
-  onMembersClick,
-  isAdmin = false,
 }) => {
-  const navigate = useNavigate();
-
-  const defaultItems: SidebarItem[] = [
-    {
-      id: 'overview',
-      label: 'Tổng quan',
-      icon: <HomeIcon />,
-      onClick: () => {
-        if (activeItem === 'overview' || activeItem === 'home') {
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        } else {
-          navigate('/home');
-        }
-      },
-    },
-    {
-      id: 'devices',
-      label: 'Thiết bị',
-      icon: <DeviceIcon />,
-      onClick: () => {
-        if (activeItem === 'devices') {
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        } else if (homeId) {
-          navigate(`/home/${encodeURIComponent(homeId)}/devices`);
-        } else {
-          notify.info('Hãy tạo hoặc tham gia một ngôi nhà trước khi quản lý thiết bị.');
-        }
-      },
-    },
-    {
-      id: 'twin',
-      label: 'Digital Twin',
-      icon: <TwinIcon />,
-      onClick: () => {
-        if (activeItem === 'twin') {
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        } else if (homeId) {
-          navigate(`/home/${encodeURIComponent(homeId)}/digital-twin`);
-        } else {
-          notify.info('Hãy tạo hoặc tham gia một ngôi nhà trước khi mở Digital Twin.');
-        }
-      },
-    },
-    {
-      id: 'energy',
-      label: 'Tiêu thụ điện',
-      icon: <EnergyIcon />,
-      onClick: () => {
-        if (activeItem === 'energy') {
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        } else if (homeId) {
-          navigate(`/home/${encodeURIComponent(homeId)}/energy`);
-        } else {
-          notify.info('Hãy tạo hoặc tham gia một ngôi nhà trước.');
-        }
-      },
-    },
-    {
-      id: 'scenes',
-      label: 'Kịch bản',
-      icon: <SceneIcon />,
-      onClick: () => {
-        if (activeItem === 'scenes') {
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        } else if (homeId) {
-          navigate(`/homes/${encodeURIComponent(homeId)}/scenes`);
-        } else {
-          notify.info('Hãy tạo hoặc tham gia một ngôi nhà trước khi mở kịch bản.');
-        }
-      },
-    },
-    {
-      id: 'automations',
-      label: 'Tự động hóa',
-      icon: <AutomationIcon />,
-      onClick: () => {
-        if (activeItem === 'automations') {
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        } else if (homeId) {
-          navigate(`/homes/${encodeURIComponent(homeId)}/automation-rules`);
-        } else {
-          notify.info('Hãy tạo hoặc tham gia một ngôi nhà trước khi mở tự động hóa.');
-        }
-      },
-    },
-    {
-      id: 'members',
-      label: 'Thành viên',
-      icon: <PeopleIcon />,
-      onClick: () => {
-        if (onMembersClick) {
-          onMembersClick();
-        } else {
-          const el = document.getElementById('members-section');
-          if (el) {
-            el.scrollIntoView({ behavior: 'smooth' });
-          } else {
-            navigate('/home#members-section');
-          }
-        }
-      },
-    },
-    ...(isAdmin
-      ? [
-          {
-            id: 'admin',
-            label: 'Quản trị hệ thống',
-            icon: <AdminIcon />,
-            onClick: () => navigate('/admin'),
-          },
-        ]
-      : []),
-  ];
-
-  const navigationItems = items || defaultItems;
-
   const isItemActive = (itemId: string) => {
     if (itemId === activeItem) return true;
     if (
@@ -221,19 +97,14 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
   };
 
   return (
-    <aside className="app-sidebar fixed inset-y-0 left-0 z-30 hidden w-64 flex-col p-5 lg:flex">
+    <aside className="app-sidebar fixed inset-y-0 left-0 z-30 hidden w-64 flex-col overflow-y-auto p-5 lg:flex">
       <div className="px-2 py-1">
         <BrandMark />
       </div>
-export const AppSidebar: React.FC<AppSidebarProps> = ({ activeItem, items, contextLabel, showSystemSummary = true }) => (
-  <aside className="app-sidebar fixed inset-y-0 left-0 z-30 hidden w-64 flex-col overflow-y-auto p-5 lg:flex">
-    <div className="px-2 py-1">
-      <BrandMark />
-    </div>
 
       <div className="mt-8 px-3 text-xs font-semibold text-muted">{contextLabel}</div>
       <nav aria-label="Điều hướng chính" className="mt-3 space-y-1.5">
-        {navigationItems.map((item) => {
+        {items.map((item) => {
           const active = isItemActive(item.id);
           return (
             <button

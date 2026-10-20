@@ -410,36 +410,7 @@ export const DevicePage: React.FC = () => {
 
   return (
     <div className="app-shell">
-      <AppSidebar
-        activeItem="devices"
-        contextLabel="Không gian sống"
-        items={[
-          {
-            id: 'home',
-            label: 'Tổng quan',
-            icon: <HomeIcon />,
-            onClick: () => navigate('/home'),
-          },
-          {
-            id: 'devices',
-            label: 'Thiết bị',
-            icon: <DeviceIcon />,
-            onClick: () => window.scrollTo({ top: 0, behavior: 'smooth' }),
-          },
-          {
-            id: 'energy',
-            label: 'Tiêu thụ điện',
-            icon: <EnergyIcon />,
-            onClick: () => navigate(`/home/${homeId}/energy`),
-          },
-          {
-            id: 'twin',
-            label: 'Digital Twin',
-            icon: <TwinIcon />,
-            onClick: () => navigate(`/home/${homeId}/digital-twin`),
-          },
-        ]}
-      />
+      <HomeSidebar activeItem="devices" homeId={homeId} />
 
       <main id="main-content" className="lg:pl-64">
         <div className="mx-auto max-w-7xl space-y-5 p-4 sm:p-6 lg:p-8">

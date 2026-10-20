@@ -1,11 +1,9 @@
 import { useEffect } from 'react';
 import { Link, useParams } from 'react-router';
-import { Link, useParams } from 'react-router';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { currentHomeChanged, currentHomeCleared } from '../../store/homeSlice';
 import { loadTwinSnapshot, twinClosed, twinOpened } from '../../store/twinSlice';
 import { HomeSidebar } from '../ui/HomeSidebar';
-import { AppSidebar } from '../ui/AppSidebar';
 import { TwinLayoutEditor } from './TwinLayoutEditor';
 import { loadLayoutRole, loadTwinLayout } from '../../store/twinLayoutSlice';
 import { useLayoutNavigationGuard } from './useLayoutNavigationGuard';
@@ -72,7 +70,6 @@ export function DigitalTwinPage() {
   }, [dispatch, homeId]);
   return <div className="app-shell">
     <HomeSidebar activeItem="twin" homeId={homeId} showSystemSummary={false} />
-    <AppSidebar activeItem="twin" homeId={homeId} showSystemSummary={false} />
     <main id="main-content" className="lg:pl-64"><DigitalTwinView homeId={homeId} /></main>
   </div>;
 }
