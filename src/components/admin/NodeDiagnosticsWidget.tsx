@@ -96,10 +96,12 @@ export const LatencyGaugeArc: React.FC<{ avgLatencyMs: number; p95LatencyMs?: nu
           <span className={`text-xl font-extrabold tracking-tight ${getGaugeTone(avgLatencyMs)}`}>
             {avgLatencyMs}
           </span>
-          <span className="text-xs font-semibold text-muted">ms (RTT)</span>
+          <span className="text-xs font-semibold text-muted">
+            {avgLatencyMs === 0 ? 'ms (Chờ lệnh)' : 'ms (RTT)'}
+          </span>
         </div>
         <div className="text-[11px] font-mono text-muted flex items-center justify-center gap-2 mt-0.5">
-          <span>Phân vị P95: <b className="text-text font-bold">{p95} ms</b></span>
+          <span>Phân vị P95: <b className="text-text font-bold">{avgLatencyMs === 0 ? '0' : p95} ms</b></span>
         </div>
       </div>
     </div>
@@ -162,11 +164,11 @@ export const NodeDiagnosticsWidget: React.FC = () => {
     }
   };
 
-  const handleTripCircuit = async (nodeCode: string) => {
+  const handleTripCircuit = async (nodeId: string, nodeCode: string) => {
     setTrippingCode(nodeCode);
     try {
-      const updated = await tripNodeCircuitBreaker(nodeCode);
-      setNodes((prev) => prev.map((n) => (n.nodeCode === nodeCode ? updated : n)));
+      const updated = await tripNodeCircuitBreaker(nodeId);
+      setNodes((prev) => prev.map((n) => (n.nodeId === nodeId ? updated : n)));
       notify(`Đã kích hoạt ngắt mạch (TRIP) cho node ${nodeCode}`, 'warning');
       fetchData();
     } catch {
@@ -174,6 +176,16 @@ export const NodeDiagnosticsWidget: React.FC = () => {
     } finally {
       setTrippingCode(null);
     }
+  };
+
+  const formatLastSeen = (lastPingAt?: string): string => {
+    if (!lastPingAt) return 'Chưa có tín hiệu';
+    const diffSec = Math.max(0, Math.floor((Date.now() - new Date(lastPingAt).getTime()) / 1000));
+    if (diffSec < 10) return 'Vừa xong';
+    if (diffSec < 60) return `${diffSec}s trước`;
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `${diffMin} phút trước`;
+    return `${Math.floor(diffMin / 60)} giờ trước`;
   };
 
   const getCircuitBadge = (state: string) => {
@@ -333,7 +345,7 @@ export const NodeDiagnosticsWidget: React.FC = () => {
                   const isTripping = trippingCode === node.nodeCode;
 
                   return (
-                    <tr key={node.nodeId} className="hover:bg-off-soft/30 transition-colors">
+                    <tr key={node.nodeId} className={`hover:bg-off-soft/30 transition-colors ${node.status === 'OFFLINE' ? 'opacity-70 bg-slate-50/40' : ''}`}>
                       <td className="py-3.5 px-3 font-mono font-bold text-text">
                         {node.nodeCode}
                       </td>
@@ -341,14 +353,19 @@ export const NodeDiagnosticsWidget: React.FC = () => {
                         {node.homeName || 'N/A'}
                       </td>
                       <td className="py-3.5 px-3">
-                        <span className={`inline-flex items-center gap-1.5 font-semibold ${
-                          node.status === 'ONLINE' ? 'text-emerald-700' : 'text-slate-400'
-                        }`}>
-                          <span className={`w-2 h-2 rounded-full ${
-                            node.status === 'ONLINE' ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'
-                          }`} />
-                          {node.status}
-                        </span>
+                        <div className="flex flex-col">
+                          <span className={`inline-flex items-center gap-1.5 font-semibold ${
+                            node.status === 'ONLINE' ? 'text-emerald-700' : 'text-slate-400'
+                          }`}>
+                            <span className={`w-2 h-2 rounded-full ${
+                              node.status === 'ONLINE' ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'
+                            }`} />
+                            {node.status}
+                          </span>
+                          <span className="text-[10px] text-muted font-mono mt-0.5">
+                            {formatLastSeen(node.lastPingAt)}
+                          </span>
+                        </div>
                       </td>
                       <td className="py-3.5 px-3">
                         {getCircuitBadge(node.circuitState)}
@@ -389,7 +406,7 @@ export const NodeDiagnosticsWidget: React.FC = () => {
                           <button
                             type="button"
                             disabled={isTripping || node.circuitState === 'OPEN'}
-                            onClick={() => handleTripCircuit(node.nodeCode)}
+                            onClick={() => handleTripCircuit(node.nodeId, node.nodeCode)}
                             className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-lg border border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-600 hover:text-white transition-colors shadow-xs disabled:opacity-40"
                             title="Giả lập ngắt mạch khẩn cấp (Trip Circuit Breaker)"
                           >

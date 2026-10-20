@@ -220,9 +220,18 @@ export const getDeviceHealth = async (deviceId: string): Promise<DeviceHealthRes
   return response.data.result;
 };
 
-export const exportDeviceHistoryExcel = async (deviceId: string, filename?: string): Promise<void> => {
+export const exportDeviceHistoryExcel = async (
+  deviceId: string,
+  filename?: string,
+  from?: string,
+  to?: string
+): Promise<void> => {
   const response = await apiClient.get(`/devices/${deviceId}/history/export/excel`, {
     responseType: 'blob',
+    params: {
+      ...(from ? { from } : {}),
+      ...(to ? { to } : {}),
+    },
   });
   const blob = new Blob([response.data], {
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -237,8 +246,9 @@ export const exportDeviceHistoryExcel = async (deviceId: string, filename?: stri
   window.URL.revokeObjectURL(url);
 };
 
-export const extendDeviceAutomation = async (deviceId: string, hours = 1): Promise<void> => {
-  await apiClient.post(`/devices/${deviceId}/automation/extend`, { hours });
+export const extendDeviceAutomation = async (deviceId: string, hours = 1): Promise<string> => {
+  const response = await apiClient.post(`/devices/${deviceId}/automation/extend`, { hours });
+  return response.data.result;
 };
 
 // ===== Admin Device Onboarding & QR API =====

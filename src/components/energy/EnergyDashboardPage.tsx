@@ -4,7 +4,7 @@ import { HomeSidebar } from '../ui/HomeSidebar';
 import { getHomeEnergyAnalytics } from '../../services/energyApi';
 import type { EnergyAnalyticsResponse, DeviceEnergyBreakdown, EnergyTimeSeriesPoint } from '../../types/energy';
 import { getErrorMessage } from '../../utils/errors';
-import { Zap, TrendingUp, AlertCircle, DollarSign, Clock, ArrowLeft, RefreshCw, Layers, PieChart } from 'lucide-react';
+import { Zap, TrendingUp, TrendingDown, AlertCircle, DollarSign, Clock, ArrowLeft, RefreshCw, Layers, PieChart } from 'lucide-react';
 
 const DONUT_COLORS = [
   '#f59e0b', // Amber
@@ -30,22 +30,32 @@ export const EnergyDashboardPage: React.FC = () => {
   const [hoveredPoint, setHoveredPoint] = useState<EnergyTimeSeriesPoint | null>(null);
   const [hoveredBreakdown, setHoveredBreakdown] = useState<DeviceEnergyBreakdown | null>(null);
 
-  const fetchEnergy = useCallback(async () => {
+  const fetchEnergy = useCallback(async (isCancelled?: unknown) => {
     if (!homeId) return;
     try {
       setLoading(true);
       setError('');
       const res = await getHomeEnergyAnalytics(homeId, period);
-      setData(res);
+      if (!(typeof isCancelled === 'function' && isCancelled())) {
+        setData(res);
+      }
     } catch (err) {
-      setError(getErrorMessage(err, 'Không thể tải dữ liệu phân tích năng lượng'));
+      if (!(typeof isCancelled === 'function' && isCancelled())) {
+        setError(getErrorMessage(err, 'Không thể tải dữ liệu phân tích năng lượng'));
+      }
     } finally {
-      setLoading(false);
+      if (!(typeof isCancelled === 'function' && isCancelled())) {
+        setLoading(false);
+      }
     }
   }, [homeId, period]);
 
   useEffect(() => {
-    fetchEnergy();
+    let ignore = false;
+    void fetchEnergy(() => ignore);
+    return () => {
+      ignore = true;
+    };
   }, [fetchEnergy]);
 
   const summary = data?.summary;
@@ -159,24 +169,58 @@ export const EnergyDashboardPage: React.FC = () => {
           )}
 
           {/* 4 KPI Summary Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Card 1: Tổng điện năng */}
-            <div className="surface-card p-5 rounded-2xl relative overflow-hidden shadow-soft border border-line">
-              <div className="flex justify-between items-start">
-                <span className="text-xs font-semibold uppercase tracking-wider text-muted">Điện Năng Tiêu Thụ</span>
-                <span className="p-2 bg-amber-500/10 text-amber-500 rounded-xl">
-                  <Zap className="h-4 w-4" />
-                </span>
-              </div>
-              <div className="mt-3 flex items-baseline gap-2">
-                <span className="text-3xl font-extrabold text-text">{summary?.totalKwh ?? 0}</span>
-                <span className="text-sm font-semibold text-amber-500">kWh</span>
-              </div>
-              <div className="mt-2 text-xs text-muted flex items-center gap-1.5">
-                <TrendingUp className="h-3.5 w-3.5 text-emerald-600" />
-                <span>Hoạt động: {summary?.activeDeviceCount ?? 0}/{summary?.totalDeviceCount ?? 0} thiết bị</span>
-              </div>
+          {loading && !data ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 animate-pulse">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="surface-card p-5 rounded-2xl h-36 bg-sidebar/50 border border-line flex flex-col justify-between">
+                  <div className="h-3 w-24 bg-line rounded" />
+                  <div className="h-8 w-32 bg-line rounded" />
+                  <div className="h-3 w-40 bg-line rounded" />
+                </div>
+              ))}
             </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Card 1: Tổng điện năng */}
+              <div className="surface-card p-5 rounded-2xl relative overflow-hidden shadow-soft border border-line">
+                <div className="flex justify-between items-start">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-muted">Điện Năng Tiêu Thụ</span>
+                  <span className="p-2 bg-amber-500/10 text-amber-500 rounded-xl">
+                    <Zap className="h-4 w-4" />
+                  </span>
+                </div>
+                <div className="mt-3 flex items-baseline gap-2">
+                  <span className="text-3xl font-extrabold text-text">{summary?.totalKwh ?? 0}</span>
+                  <span className="text-sm font-semibold text-amber-500">kWh</span>
+                </div>
+                <div className="mt-2 text-xs text-muted flex items-center justify-between gap-1">
+                  <div className="flex items-center gap-1.5 truncate">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                    <span className="truncate">Hoạt động: {summary?.activeDeviceCount ?? 0}/{summary?.totalDeviceCount ?? 0} thiết bị</span>
+                  </div>
+                  {summary?.comparisonLastPeriodPercent !== undefined && summary.comparisonLastPeriodPercent !== 0 && (
+                    <span
+                      className={`inline-flex items-center gap-0.5 text-[11px] font-bold px-1.5 py-0.5 rounded-md shrink-0 ${
+                        summary.comparisonLastPeriodPercent > 0
+                          ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400'
+                          : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                      }`}
+                      title={`So sánh với kỳ ${period} trước đó`}
+                    >
+                      {summary.comparisonLastPeriodPercent > 0 ? (
+                        <TrendingUp className="w-3 h-3" />
+                      ) : (
+                        <TrendingDown className="w-3 h-3" />
+                      )}
+                      <span>
+                        {summary.comparisonLastPeriodPercent > 0
+                          ? `+${summary.comparisonLastPeriodPercent}%`
+                          : `${summary.comparisonLastPeriodPercent}%`}
+                      </span>
+                    </span>
+                  )}
+                </div>
+              </div>
 
             {/* Card 2: Tiền điện tạm tính */}
             <div className="surface-card p-5 rounded-2xl relative overflow-hidden shadow-soft border border-line">
@@ -250,6 +294,7 @@ export const EnergyDashboardPage: React.FC = () => {
               </div>
             </div>
           </div>
+          )}
 
           {/* Time Series Bar Chart */}
           <div className="surface-card p-5 sm:p-6 rounded-2xl space-y-4 border border-line shadow-soft">
@@ -274,7 +319,8 @@ export const EnergyDashboardPage: React.FC = () => {
             {/* SVG Interactive Bar Chart */}
             <div className="h-56 w-full pt-4 flex items-end gap-1 sm:gap-2">
               {timeSeries.map((point, idx) => {
-                const heightPercent = Math.max((point.kwh / maxKwh) * 100, 6);
+                const isZero = point.kwh <= 0.001;
+                const heightPercent = isZero ? 0 : Math.max((point.kwh / maxKwh) * 100, 6);
                 const isHovered = hoveredPoint?.label === point.label;
                 return (
                   <div
@@ -283,16 +329,30 @@ export const EnergyDashboardPage: React.FC = () => {
                     onMouseEnter={() => setHoveredPoint(point)}
                     onMouseLeave={() => setHoveredPoint(null)}
                   >
-                    <div
-                      style={{ height: `${heightPercent}%` }}
-                      className={`w-full max-w-[28px] rounded-t-md transition-all duration-200 ${
-                        isHovered
-                          ? 'bg-amber-400 shadow-lg shadow-amber-500/30'
-                          : 'bg-gradient-to-t from-amber-600/70 to-amber-500 hover:from-amber-500 hover:to-amber-400'
-                      }`}
-                    />
-                    <span className="text-[10px] text-muted mt-2 font-mono truncate max-w-full text-center hidden sm:block">
-                      {idx % (period === '24H' ? 3 : period === '7D' ? 1 : 5) === 0 ? point.label : ''}
+                    {isZero ? (
+                      <div
+                        className={`w-full max-w-[28px] h-1 rounded-full transition-all duration-200 ${
+                          isHovered ? 'bg-amber-400 h-1.5' : 'bg-line/60'
+                        }`}
+                        title={`${point.label}: 0 kWh`}
+                      />
+                    ) : (
+                      <div
+                        style={{ height: `${heightPercent}%` }}
+                        className={`w-full max-w-[28px] rounded-t-md transition-all duration-200 ${
+                          isHovered
+                            ? 'bg-amber-400 shadow-lg shadow-amber-500/30'
+                            : 'bg-gradient-to-t from-amber-600/70 to-amber-500 hover:from-amber-500 hover:to-amber-400'
+                        }`}
+                      />
+                    )}
+                    <span className="text-[10px] text-muted mt-2 font-mono truncate max-w-full text-center">
+                      <span className="hidden sm:inline">
+                        {idx % (period === '24H' ? 3 : period === '7D' ? 1 : 5) === 0 ? point.label : ''}
+                      </span>
+                      <span className="inline sm:hidden">
+                        {idx % (period === '24H' ? 6 : period === '7D' ? 2 : 10) === 0 ? point.label : ''}
+                      </span>
                     </span>
                   </div>
                 );
@@ -345,12 +405,28 @@ export const EnergyDashboardPage: React.FC = () => {
                       />
                       {/* Lát cắt của từng thiết bị */}
                       {(() => {
-                        const totalKwhCalc = breakdown.reduce((sum, d) => sum + (d.kwh || 0), 0) || 1;
+                        const totalKwhCalc = breakdown.reduce((sum, d) => sum + (d.kwh || 0), 0);
+                        const isAllZero = totalKwhCalc <= 0.001;
                         const circumference = 2 * Math.PI * 90;
                         let accumulated = 0;
 
+                        if (isAllZero) {
+                          return (
+                            <circle
+                              cx="140"
+                              cy="140"
+                              r="90"
+                              fill="transparent"
+                              stroke="currentColor"
+                              className="text-line/60"
+                              strokeWidth="24"
+                              strokeDasharray="6 8"
+                            />
+                          );
+                        }
+
                         return breakdown.map((dev, idx) => {
-                          const pct = dev.percentage > 0 ? dev.percentage : (dev.kwh / totalKwhCalc) * 100;
+                          const pct = dev.percentage > 0 ? dev.percentage : (dev.kwh / (totalKwhCalc || 1)) * 100;
                           const sliceLen = (pct / 100) * circumference;
                           const gap = breakdown.length > 1 ? 2.5 : 0;
                           const dashLength = Math.max(sliceLen - gap, 0.5);
@@ -400,6 +476,8 @@ export const EnergyDashboardPage: React.FC = () => {
                       <span className="text-xs font-semibold text-emerald-600 truncate max-w-[140px]">
                         {hoveredBreakdown
                           ? `${hoveredBreakdown.percentage}% (${formatCurrency(hoveredBreakdown.costVnd)})`
+                          : (summary?.totalKwh ?? 0) <= 0
+                          ? 'Chưa phát sinh tiêu thụ'
                           : formatCurrency(summary?.estimatedCostVnd)}
                       </span>
                     </div>

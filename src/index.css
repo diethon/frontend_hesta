@@ -597,6 +597,39 @@ textarea:disabled {
   transform: scale(0.97);
 }
 
+/* ===== Modern Smart Home Glassmorphism & React-Colorful Overrides ===== */
+.react-colorful {
+  width: 100% !important;
+  height: 180px !important;
+  border-radius: 1rem !important;
+  border: 1px solid var(--color-line) !important;
+  overflow: hidden !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+}
+.react-colorful__saturation {
+  border-radius: 0.875rem 0.875rem 0 0 !important;
+}
+.react-colorful__hue {
+  height: 22px !important;
+  border-radius: 0 0 0.875rem 0.875rem !important;
+}
+.react-colorful__pointer {
+  width: 22px !important;
+  height: 22px !important;
+  border: 2.5px solid #ffffff !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35) !important;
+}
+
+.glass-card {
+  backdrop-filter: blur(16px);
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  box-shadow: 
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.9),
+    0 8px 24px -4px rgba(0, 0, 0, 0.06);
+}
+
+
 /* The mock apartment shares the product shell; evening lighting is scene-only. */
 .twin-demo-stage {
   height: clamp(29rem, 48vw, 43rem);

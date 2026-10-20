@@ -1,24 +1,31 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 /**
  * Custom hook to manage live countdown timer for device manual overrides (Task PHO-043).
  * Provides seconds remaining and formatted MM:SS string, ticking every second.
  */
 export const useOverrideCountdown = (overrideUntil?: string | null) => {
-  const calculateRemaining = () => {
-    if (!overrideUntil) return 0;
-    const diff = Math.floor((new Date(overrideUntil).getTime() - Date.now()) / 1000);
-    return Math.max(0, diff);
-  };
+  const calculateRemaining = useCallback((targetTime: string): number => {
+    const target = new Date(targetTime).getTime();
+    const now = Date.now();
+    return Math.max(0, Math.floor((target - now) / 1000));
+  }, []);
 
-  const [remainingSeconds, setRemainingSeconds] = useState<number>(calculateRemaining);
+  const [prevOverrideUntil, setPrevOverrideUntil] = useState(overrideUntil);
+  const [remainingSeconds, setRemainingSeconds] = useState<number>(() =>
+    overrideUntil ? calculateRemaining(overrideUntil) : 0
+  );
+
+  if (prevOverrideUntil !== overrideUntil) {
+    setPrevOverrideUntil(overrideUntil);
+    setRemainingSeconds(overrideUntil ? calculateRemaining(overrideUntil) : 0);
+  }
 
   useEffect(() => {
-    setRemainingSeconds(calculateRemaining());
     if (!overrideUntil) return;
 
     const interval = setInterval(() => {
-      const remaining = calculateRemaining();
+      const remaining = calculateRemaining(overrideUntil);
       setRemainingSeconds(remaining);
       if (remaining <= 0) {
         clearInterval(interval);
@@ -26,7 +33,7 @@ export const useOverrideCountdown = (overrideUntil?: string | null) => {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [overrideUntil]);
+  }, [overrideUntil, calculateRemaining]);
 
   const minutes = Math.floor(remainingSeconds / 60);
   const seconds = remainingSeconds % 60;

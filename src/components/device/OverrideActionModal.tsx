@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Clock, X, Lock, CheckCircle2 } from 'lucide-react';
 import { resumeDeviceAutomation, extendDeviceAutomation } from '../../services/deviceApi';
 import { notify } from '../ui/notify';
@@ -10,7 +11,7 @@ interface OverrideActionModalProps {
   deviceId: string;
   deviceName: string;
   formattedTime?: string;
-  onOverrideChanged?: () => void;
+  onOverrideChanged?: (newUntil: string | null) => void;
 }
 
 export const OverrideActionModal: React.FC<OverrideActionModalProps> = ({
@@ -30,11 +31,11 @@ export const OverrideActionModal: React.FC<OverrideActionModalProps> = ({
     try {
       setLoadingAction('CANCEL');
       await resumeDeviceAutomation(deviceId);
-      notify('Đã hủy khóa, khôi phục quyền điều khiển tự động', 'success');
-      onOverrideChanged?.();
+      notify.success('Đã hủy khóa thiết bị', 'Khôi phục quyền điều khiển tự động');
+      onOverrideChanged?.(null);
       onClose();
     } catch (err) {
-      notify(getErrorMessage(err, 'Lỗi khi hủy khóa tự động hóa'), 'error');
+      notify.error(getErrorMessage(err, 'Lỗi khi hủy khóa tự động hóa'));
     } finally {
       setLoadingAction(null);
     }
@@ -44,24 +45,31 @@ export const OverrideActionModal: React.FC<OverrideActionModalProps> = ({
     e.stopPropagation();
     try {
       setLoadingAction('EXTEND');
-      await extendDeviceAutomation(deviceId, 1);
-      notify('Đã gia hạn khóa tự động hóa thêm 1 giờ', 'success');
-      onOverrideChanged?.();
+      const newUntil = await extendDeviceAutomation(deviceId, 1);
+      notify.success('Đã gia hạn khóa tự động hóa', 'Thời gian khóa tăng thêm 1 giờ');
+      onOverrideChanged?.(newUntil || new Date(Date.now() + 60 * 60 * 1000).toISOString());
       onClose();
     } catch (err) {
-      notify(getErrorMessage(err, 'Lỗi khi gia hạn khóa tự động hóa'), 'error');
+      notify.error(getErrorMessage(err, 'Lỗi khi gia hạn khóa tự động hóa'));
     } finally {
       setLoadingAction(null);
     }
   };
 
-  return (
+  const modalNode = (
     <div 
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs select-none"
       onClick={(e) => {
         e.stopPropagation();
         onClose();
       }}
+      onMouseEnter={(e) => e.stopPropagation()}
+      onMouseLeave={(e) => e.stopPropagation()}
+      onPointerEnter={(e) => e.stopPropagation()}
+      onPointerLeave={(e) => e.stopPropagation()}
+      onPointerDown={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.stopPropagation()}
+      onKeyDown={(e) => e.stopPropagation()}
     >
       <div 
         className="w-full max-w-sm rounded-2xl bg-surface border border-line p-5 shadow-float gentle-rise space-y-4"
@@ -131,4 +139,6 @@ export const OverrideActionModal: React.FC<OverrideActionModalProps> = ({
       </div>
     </div>
   );
+
+  return typeof document !== 'undefined' ? createPortal(modalNode, document.body) : null;
 };
