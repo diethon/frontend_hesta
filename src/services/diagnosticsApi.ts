@@ -16,8 +16,8 @@ export const resetNodeCircuitBreaker = async (nodeId: string): Promise<NodeDiagn
   return response.data.result;
 };
 
-export const tripNodeCircuitBreaker = async (nodeCode: string): Promise<NodeDiagnostics> => {
-  const response = await apiClient.post(`/admin/diagnostics/circuit-breaker/${nodeCode}/trip`);
+export const tripNodeCircuitBreaker = async (nodeId: string): Promise<NodeDiagnostics> => {
+  const response = await apiClient.post(`/admin/diagnostics/nodes/${nodeId}/circuit-breaker/trip`);
   return response.data.result;
 };
 
