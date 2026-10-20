@@ -62,7 +62,12 @@ export interface SceneExecutionResponse {
 export interface DeviceResponse {
   id: string;
   homeId: string;
+  roomId?: string;
+  roomName?: string;
   name: string;
   deviceType: string;
-  status: 'ONLINE' | 'OFFLINE' | 'ERROR' | 'UNKNOWN';
+  status: 'ONLINE' | 'OFFLINE' | 'ERROR' | 'UNKNOWN' | 'UNCLAIMED';
+  currentState?: Record<string, unknown>;
+  capabilities?: Record<string, string[]>;
+  icon?: string;
 }

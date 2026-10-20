@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import {
   Play,
@@ -10,17 +10,21 @@ import {
   Layers,
   ArrowUp,
   ArrowDown,
+  Trash2,
   AlertCircle,
   CheckCircle2,
   Loader2,
   Home,
   Zap,
-  Trash2,
+  Palette,
+  Sun,
+  Thermometer,
 } from 'lucide-react';
 import {
   createScene,
   deleteScene,
   executeScene,
+  getCachedScenes,
   getDevices,
   getScene,
   getSceneActionTypes,
@@ -29,6 +33,7 @@ import {
   updateScene,
 } from '../../services/sceneApi';
 import type { SceneActionType, SceneExecutionResponse, SceneResponse } from '../../types/scene';
+import { AppSidebar } from '../ui/AppSidebar';
 import type { DeviceSummary } from '../../types/automation';
 import {
   buildSceneActionInput,
@@ -40,7 +45,9 @@ import {
 } from './sceneActions';
 import { SchedulePanel } from '../ui/SchedulePanel';
 import { SceneIcon } from './SceneIcon';
-import { SCENE_PRESETS, detectSceneTheme, getDeviceTypeIcon } from './sceneConstants';
+import { AVAILABLE_ICONS, SCENE_PRESETS, detectSceneTheme, getDeviceTypeIcon } from './sceneConstants';
+import { notify } from '../ui/notify';
+import { ConfirmModal } from '../ui/ConfirmModal';
 
 export function ScenePage() {
   const { homeId = '', sceneId } = useParams();
@@ -49,18 +56,29 @@ export function ScenePage() {
 
 function SceneWorkspace({ homeId, sceneId }: { homeId: string; sceneId?: string }) {
   const navigate = useNavigate();
-  const [scenes, setScenes] = useState<SceneResponse[]>([]);
+  const cached = useMemo(() => getCachedScenes(homeId), [homeId]);
+  const [scenes, setScenes] = useState<SceneResponse[]>(cached || []);
+  const [loadingScenes, setLoadingScenes] = useState(!cached?.length);
   const [devices, setDevices] = useState<DeviceSummary[]>([]);
   const [actionTypes, setActionTypes] = useState<SceneActionType[]>([]);
   const [loadingOptions, setLoadingOptions] = useState(true);
-  const [editingScene, setEditingScene] = useState<SceneResponse | null>(null);
-  const [loadingScene, setLoadingScene] = useState(Boolean(sceneId));
+
+  // Pre-fill scene data immediately if sceneId is in cached or scenes
+  const initialScene = useMemo(() => {
+    if (!sceneId) return null;
+    return (cached || scenes).find((s) => s.id === sceneId) || null;
+  }, [sceneId, cached, scenes]);
+
+  const [editingScene, setEditingScene] = useState<SceneResponse | null>(initialScene);
+  const [loadingScene, setLoadingScene] = useState(Boolean(sceneId && !initialScene));
   const [togglingSceneId, setTogglingSceneId] = useState<string | null>(null);
-  const [name, setName] = useState('');
-  const [icon, setIcon] = useState('home');
-  const [description, setDescription] = useState('');
-  const [enabled, setEnabled] = useState(true);
-  const [actions, setActions] = useState<DraftSceneAction[]>([]);
+  const [name, setName] = useState(initialScene?.name ?? '');
+  const [icon, setIcon] = useState(initialScene?.icon ?? 'home');
+  const [description, setDescription] = useState(initialScene?.description ?? '');
+  const [enabled, setEnabled] = useState(initialScene?.enabled ?? true);
+  const [actions, setActions] = useState<DraftSceneAction[]>(
+    initialScene ? sceneActionsToDraft(initialScene.actions) : [],
+  );
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [runningId, setRunningId] = useState<string | null>(null);
@@ -73,59 +91,104 @@ function SceneWorkspace({ homeId, sceneId }: { homeId: string; sceneId?: string 
   // Filters & Search
   const [searchQuery, setSearchQuery] = useState('');
   const [filterTab, setFilterTab] = useState<'all' | 'enabled' | 'disabled'>('all');
+  const [showIconPicker, setShowIconPicker] = useState(false);
 
   // Reset editor when navigating; keep the workspace data mounted.
   if (selectedSceneId !== sceneId) {
     setSelectedSceneId(sceneId);
-    setEditingScene(null);
-    setLoadingScene(Boolean(sceneId));
-    setName('');
-    setIcon('home');
-    setDescription('');
-    setEnabled(true);
-    setActions([]);
+    const existing = (cached || scenes).find((s) => s.id === sceneId);
+    if (existing) {
+      setEditingScene(existing);
+      setName(existing.name);
+      setIcon(existing.icon ?? 'home');
+      setDescription(existing.description ?? '');
+      setEnabled(existing.enabled);
+      setActions(sceneActionsToDraft(existing.actions));
+      setLoadingScene(false);
+    } else {
+      setEditingScene(null);
+      setLoadingScene(Boolean(sceneId));
+      setName('');
+      setIcon('home');
+      setDescription('');
+      setEnabled(true);
+      setActions([]);
+    }
     setError('');
     setSuccess('');
   }
 
-  const load = useCallback(async () => {
-    try {
-      const [sceneResult, deviceResult, typeResult] = await Promise.all([
-        getScenes(homeId),
-        getDevices(homeId),
-        getSceneActionTypes(homeId),
-      ]);
-      setScenes(sceneResult);
-      setDevices(deviceResult);
-      setActionTypes(typeResult);
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Không thể tải dữ liệu');
-    }
-  }, [homeId]);
-
+  // 1. Fast path: load scenes list first
   useEffect(() => {
     let active = true;
-    Promise.all([getScenes(homeId), getDevices(homeId), getSceneActionTypes(homeId)])
-      .then(([sceneResult, deviceResult, typeResult]) => {
+    if (!scenes.length) setLoadingScenes(true);
+
+    getScenes(homeId)
+      .then((sceneResult) => {
         if (!active) return;
         setScenes(sceneResult);
-        setDevices(deviceResult);
-        setActionTypes(typeResult);
+        setLoadingScenes(false);
       })
       .catch((caught: unknown) => {
-        if (active) setError(caught instanceof Error ? caught.message : 'Không thể tải dữ liệu');
+        if (active) setError(caught instanceof Error ? caught.message : 'Không thể tải danh sách kịch bản');
       })
       .finally(() => {
-        if (active) setLoadingOptions(false);
+        if (active) setLoadingScenes(false);
       });
+
     return () => {
       active = false;
     };
   }, [homeId]);
 
+  // 2. Background path: load devices and action types
   useEffect(() => {
-    if (!sceneId) return;
     let active = true;
+    Promise.all([
+      getDevices(homeId).catch(() => []),
+      getSceneActionTypes(homeId).catch(() => []),
+    ])
+      .then(([devs, types]) => {
+        if (!active) return;
+        setDevices(devs);
+        setActionTypes(types);
+      })
+      .finally(() => {
+        if (active) setLoadingOptions(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [homeId]);
+
+  // 3. Scene detail fetching: fast memory lookup first, network fallback
+  useEffect(() => {
+    if (!sceneId) {
+      setEditingScene(null);
+      setName('');
+      setIcon('home');
+      setDescription('');
+      setEnabled(true);
+      setActions([]);
+      setLoadingScene(false);
+      return;
+    }
+
+    const foundInState = (cached || scenes).find((s) => s.id === sceneId);
+    if (foundInState) {
+      setEditingScene(foundInState);
+      setName(foundInState.name);
+      setIcon(foundInState.icon ?? 'home');
+      setDescription(foundInState.description ?? '');
+      setEnabled(foundInState.enabled);
+      setActions(sceneActionsToDraft(foundInState.actions));
+      setLoadingScene(false);
+      return;
+    }
+
+    let active = true;
+    setLoadingScene(true);
     getScene(homeId, sceneId)
       .then((scene) => {
         if (!active) return;
@@ -137,25 +200,30 @@ function SceneWorkspace({ homeId, sceneId }: { homeId: string; sceneId?: string 
         setActions(sceneActionsToDraft(scene.actions));
       })
       .catch((caught: unknown) => {
-        if (active) setError(caught instanceof Error ? caught.message : 'Không thể tải kịch bản.');
+        if (active) {
+          setError(caught instanceof Error ? caught.message : 'Không thể tải kịch bản.');
+        }
       })
       .finally(() => {
         if (active) setLoadingScene(false);
       });
+
     return () => {
       active = false;
     };
   }, [homeId, sceneId]);
 
   const addAction = () => {
-    const firstDev = devices[0];
+    const firstDev =
+      devices.find((d) => getSceneDeviceActions(d, actionTypes).length > 0) || devices[0];
     const available = firstDev ? getSceneDeviceActions(firstDev, actionTypes) : [];
+    const firstOpt = available[0];
     setActions((current) => [
       ...current,
       {
         deviceId: firstDev?.id ?? '',
-        action: available[0]?.code ?? '',
-        value: available[0]?.defaultValue ?? '',
+        action: firstOpt?.code ?? '',
+        value: firstOpt?.defaultValue ?? '',
       },
     ]);
   };
@@ -166,10 +234,9 @@ function SceneWorkspace({ homeId, sceneId }: { homeId: string; sceneId?: string 
     );
 
   const changeActionDevice = (index: number, deviceId: string) => {
-    const option = getSceneDeviceActions(
-      devices.find((device) => device.id === deviceId),
-      actionTypes,
-    )[0];
+    const selected = devices.find((device) => device.id === deviceId);
+    const available = getSceneDeviceActions(selected, actionTypes);
+    const option = available[0];
     updateAction(index, { deviceId, action: option?.code ?? '', value: option?.defaultValue ?? '' });
   };
 
@@ -178,7 +245,7 @@ function SceneWorkspace({ homeId, sceneId }: { homeId: string; sceneId?: string 
     const option = getSceneDeviceActions(selected, actionTypes).find(
       (candidate) => candidate.code === actionCode,
     );
-    updateAction(index, { action: option?.code ?? '', value: option?.defaultValue ?? '' });
+    updateAction(index, { action: actionCode, value: option?.defaultValue ?? '' });
   };
 
   const moveAction = (index: number, direction: -1 | 1) =>
@@ -209,37 +276,45 @@ function SceneWorkspace({ homeId, sceneId }: { homeId: string; sceneId?: string 
         const updated = await updateScene(homeId, sceneId, input);
         setEditingScene(updated);
         setActions(sceneActionsToDraft(updated.actions));
-        setSuccess('Đã lưu thay đổi kịch bản.');
+        setScenes((current) => current.map((s) => (s.id === updated.id ? updated : s)));
+        notify.success('Lưu kịch bản thành công', `Đã cập nhật kịch bản "${updated.name}".`);
       } else {
-        await createScene(homeId, input);
+        const created = await createScene(homeId, input);
+        setScenes((current) => [...current, created].sort((a, b) => a.name.localeCompare(b.name)));
         setName('');
-        setIcon('home');
         setDescription('');
         setActions([]);
-        setSuccess('Đã tạo kịch bản.');
+        notify.success('Tạo kịch bản thành công', `Đã tạo kịch bản "${input.name}" với ${input.actions.length} hành động.`);
       }
-      await load();
     } catch (caught) {
-      setError(
-        caught instanceof Error
-          ? caught.message
-          : 'Không thể lưu kịch bản. Vui lòng kiểm tra hành động.',
-      );
+      const msg = caught instanceof Error
+        ? caught.message
+        : 'Không thể lưu kịch bản. Vui lòng kiểm tra hành động.';
+      setError(msg);
+      notify.error('Lưu kịch bản thất bại', msg);
     } finally {
       setSaving(false);
     }
   };
 
-  const remove = async (idToRemove: string) => {
-    if (!window.confirm('Xóa kịch bản này? Hành động này không thể hoàn tác.')) return;
+  const [deletingScene, setDeletingScene] = useState<SceneResponse | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
+  const handleConfirmDelete = async () => {
+    if (!deletingScene) return;
+    setDeleteLoading(true);
     try {
-      await deleteScene(homeId, idToRemove);
-      setScenes((current) => current.filter((scene) => scene.id !== idToRemove));
-      if (idToRemove === editingScene?.id) navigate(`/homes/${homeId}/scenes`);
-      else await load();
-      setSuccess('Đã xóa kịch bản.');
+      await deleteScene(homeId, deletingScene.id);
+      setScenes((current) => current.filter((scene) => scene.id !== deletingScene.id));
+      if (deletingScene.id === editingScene?.id) navigate(`/homes/${homeId}/scenes`);
+      notify.success('Xóa kịch bản thành công', `Kịch bản "${deletingScene.name}" đã được xóa khỏi hệ thống.`);
+      setDeletingScene(null);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Không thể xóa kịch bản');
+      const msg = caught instanceof Error ? caught.message : 'Không thể xóa kịch bản';
+      setError(msg);
+      notify.error('Xóa kịch bản thất bại', msg);
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -250,12 +325,23 @@ function SceneWorkspace({ homeId, sceneId }: { homeId: string; sceneId?: string 
     try {
       const result = await executeScene(homeId, scene.id);
       const successCount = result.resultDetail.filter((item) => item.success).length;
-      setSuccess(
-        `Kịch bản “${scene.name}”: ${result.status} (${successCount}/${result.resultDetail.length} hành động thành công).`,
-      );
+      const totalCount = result.resultDetail.length;
+      if (result.status === 'SUCCESS' || (totalCount > 0 && successCount === totalCount)) {
+        notify.success(
+          'Kích hoạt kịch bản thành công',
+          `Kịch bản "${scene.name}": hoàn thành ${successCount}/${totalCount} hành động.`,
+        );
+      } else {
+        notify.warning(
+          `Kịch bản "${scene.name}": ${result.status}`,
+          `${successCount}/${totalCount} hành động thành công.`,
+        );
+      }
       if (historyId === scene.id) setExecutions(await getSceneExecutions(homeId, scene.id));
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Không thể chạy kịch bản.');
+      const msg = caught instanceof Error ? caught.message : 'Không thể chạy kịch bản.';
+      setError(msg);
+      notify.error('Kích hoạt kịch bản thất bại', msg);
     } finally {
       setRunningId(null);
     }
@@ -271,13 +357,26 @@ function SceneWorkspace({ homeId, sceneId }: { homeId: string; sceneId?: string 
     try {
       setExecutions(await getSceneExecutions(homeId, selectedIdForHistory));
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Không thể tải lịch sử.');
+      const msg = caught instanceof Error ? caught.message : 'Không thể tải lịch sử.';
+      setError(msg);
+      notify.error('Không thể tải lịch sử thực thi', msg);
     }
   };
 
   const toggle = async (scene: SceneResponse) => {
+    const nextState = !scene.enabled;
     setTogglingSceneId(scene.id);
     setError('');
+
+    // Optimistic UI update: flip switch immediately
+    setScenes((current) =>
+      current.map((item) => (item.id === scene.id ? { ...item, enabled: nextState } : item))
+    );
+    if (scene.id === editingScene?.id) {
+      setEnabled(nextState);
+      setEditingScene((prev) => (prev ? { ...prev, enabled: nextState } : null));
+    }
+
     try {
       const updated = await updateScene(homeId, scene.id, sceneToggleInput(scene));
       setScenes((current) => current.map((item) => (item.id === updated.id ? updated : item)));
@@ -285,8 +384,22 @@ function SceneWorkspace({ homeId, sceneId }: { homeId: string; sceneId?: string 
         setEditingScene(updated);
         setEnabled(updated.enabled);
       }
+      notify.success(
+        updated.enabled ? 'Đã kích hoạt kịch bản' : 'Đã tạm dừng kịch bản',
+        `Kịch bản "${scene.name}" hiện đang ${updated.enabled ? 'bật' : 'tắt'}.`,
+      );
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Không thể đổi trạng thái kịch bản.');
+      // Revert optimistic toggle
+      setScenes((current) =>
+        current.map((item) => (item.id === scene.id ? { ...item, enabled: scene.enabled } : item))
+      );
+      if (scene.id === editingScene?.id) {
+        setEnabled(scene.enabled);
+        setEditingScene((prev) => (prev ? { ...prev, enabled: scene.enabled } : null));
+      }
+      const msg = caught instanceof Error ? caught.message : 'Không thể đổi trạng thái kịch bản.';
+      setError(msg);
+      notify.error('Lỗi khi đổi trạng thái kịch bản', msg);
     } finally {
       setTogglingSceneId(null);
     }
@@ -348,7 +461,11 @@ function SceneWorkspace({ homeId, sceneId }: { homeId: string; sceneId?: string 
           </div>
           <div>
             <span className="text-xs text-muted block font-medium">Tổng kịch bản</span>
-            <span className="text-xl font-bold text-text">{scenes.length}</span>
+            {loadingScenes ? (
+              <span className="h-6 w-10 bg-sidebar rounded animate-pulse block mt-1" />
+            ) : (
+              <span className="text-xl font-bold text-text">{scenes.length}</span>
+            )}
           </div>
         </div>
 
@@ -358,7 +475,11 @@ function SceneWorkspace({ homeId, sceneId }: { homeId: string; sceneId?: string 
           </div>
           <div>
             <span className="text-xs text-muted block font-medium">Đang hoạt động</span>
-            <span className="text-xl font-bold text-text">{activeCount}</span>
+            {loadingScenes ? (
+              <span className="h-6 w-10 bg-sidebar rounded animate-pulse block mt-1" />
+            ) : (
+              <span className="text-xl font-bold text-text">{activeCount}</span>
+            )}
           </div>
         </div>
 
@@ -368,7 +489,11 @@ function SceneWorkspace({ homeId, sceneId }: { homeId: string; sceneId?: string 
           </div>
           <div>
             <span className="text-xs text-muted block font-medium">Tổng lệnh liên kết</span>
-            <span className="text-xl font-bold text-text">{totalActionsCount}</span>
+            {loadingScenes ? (
+              <span className="h-6 w-10 bg-sidebar rounded animate-pulse block mt-1" />
+            ) : (
+              <span className="text-xl font-bold text-text">{totalActionsCount}</span>
+            )}
           </div>
         </div>
       </div>
@@ -443,7 +568,23 @@ function SceneWorkspace({ homeId, sceneId }: { homeId: string; sceneId?: string 
 
           {/* Scenes List */}
           <div className="space-y-3.5 pt-1">
-            {filteredScenes.map((scene) => {
+            {loadingScenes && !scenes.length ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <div
+                    key={i}
+                    className="rounded-3xl border border-line bg-surface p-4 sm:p-5 animate-pulse space-y-3"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="h-4 w-32 bg-sidebar rounded" />
+                      <div className="h-5 w-16 bg-sidebar rounded-full" />
+                    </div>
+                    <div className="h-3 w-48 bg-sidebar/60 rounded" />
+                    <div className="h-8 bg-sidebar/40 rounded-xl mt-2" />
+                  </div>
+                ))}
+              </div>
+            ) : filteredScenes.map((scene) => {
               const isSelected = scene.id === sceneId;
               const theme = detectSceneTheme(scene.name, scene.icon);
 
@@ -508,7 +649,7 @@ function SceneWorkspace({ homeId, sceneId }: { homeId: string; sceneId?: string 
                                 {action.targetDeviceName}:
                               </span>
                               <span className="text-muted truncate">
-                                {formatSceneAction(action)}
+                                {formatSceneAction(action, devices)}
                               </span>
                             </li>
                           );
@@ -580,8 +721,8 @@ function SceneWorkspace({ homeId, sceneId }: { homeId: string; sceneId?: string 
 
                       <button
                         type="button"
-                        onClick={() => void remove(scene.id)}
-                        className="rounded-xl bg-rose-50 hover:bg-rose-100 px-2.5 py-1.5 text-xs font-semibold text-rose-600 transition-colors border border-rose-200/60"
+                        onClick={() => setDeletingScene(scene)}
+                        className="rounded-xl bg-rose-50 hover:bg-rose-100 px-2.5 py-1.5 text-xs font-semibold text-rose-600 transition-colors border border-rose-200/60 cursor-pointer"
                       >
                         Xóa
                       </button>
@@ -640,7 +781,7 @@ function SceneWorkspace({ homeId, sceneId }: { homeId: string; sceneId?: string 
               );
             })}
 
-            {!filteredScenes.length && (
+            {!loadingScenes && !filteredScenes.length && (
               <p className="text-xs text-muted italic p-6 text-center bg-sidebar/20 rounded-2xl border border-dashed border-line">
                 Chưa có kịch bản.
               </p>
@@ -731,23 +872,49 @@ function SceneWorkspace({ homeId, sceneId }: { homeId: string; sceneId?: string 
 
             {/* Icon picker */}
             <Field label="Biểu tượng">
-              <div className="flex items-center gap-3">
-                <select
-                  value={icon}
-                  onChange={(e) => setIcon(e.target.value)}
-                  className="flex-1 rounded-xl border border-line bg-surface px-3 py-2 text-xs text-text focus:border-primary focus:outline-none"
-                >
-                  <option value="home">🏠 Ngôi nhà</option>
-                  <option value="sun">☀️ Buổi sáng</option>
-                  <option value="moon">🌙 Ban đêm</option>
-                  <option value="lightbulb">💡 Chiếu sáng</option>
-                  <option value="film">🎬 Rạp phim</option>
-                  <option value="coffee">☕ Thư giãn</option>
-                  <option value="thermometer">❄️ Làm mát</option>
-                  <option value="shield">🛡️ An ninh</option>
-                  <option value="party">🎉 Tiệc tùng</option>
-                </select>
-                <SceneIcon iconKey={icon} name={name} size="sm" />
+              <div className="relative">
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowIconPicker(!showIconPicker)}
+                    className="flex items-center gap-2.5 px-3 py-2 rounded-xl border border-line bg-surface hover:bg-sidebar text-xs font-semibold text-text transition-all cursor-pointer shadow-2xs"
+                    title="Bấm để đổi biểu tượng"
+                  >
+                    <SceneIcon iconKey={icon} name={name} size="xs" />
+                    <span>{AVAILABLE_ICONS.find((i) => i.key === icon)?.label || 'Chọn biểu tượng'}</span>
+                  </button>
+                  <span className="text-[11px] text-muted">Bấm vào nút để chọn biểu tượng kịch bản</span>
+                </div>
+
+                {showIconPicker && (
+                  <div className="absolute left-0 top-full mt-2 z-50 w-72 max-h-64 overflow-y-auto rounded-2xl border border-line bg-surface p-3 shadow-xl grid grid-cols-4 gap-1.5 backdrop-blur-md">
+                    {AVAILABLE_ICONS.map((item) => {
+                      const isSelected = icon === item.key;
+                      const IconComp = item.icon;
+                      return (
+                        <button
+                          key={item.key}
+                          type="button"
+                          onClick={() => {
+                            setIcon(item.key);
+                            setShowIconPicker(false);
+                          }}
+                          className={`flex flex-col items-center justify-center p-2 rounded-xl transition-all cursor-pointer ${
+                            isSelected
+                              ? 'bg-primary text-white shadow-xs scale-105'
+                              : 'hover:bg-sidebar text-text'
+                          }`}
+                          title={item.label}
+                        >
+                          <IconComp size={18} />
+                          <span className="text-[10px] mt-1 font-medium truncate max-w-full">
+                            {item.label}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </Field>
 
@@ -788,11 +955,11 @@ function SceneWorkspace({ homeId, sceneId }: { homeId: string; sceneId?: string 
                 <button
                   type="button"
                   onClick={addAction}
-                  disabled={saving || loadingOptions || !devices.length || !actionTypes.length}
-                  className="inline-flex items-center gap-1 rounded-xl bg-primary hover:bg-primary-hover px-3 py-1.5 text-xs font-bold text-white shadow-xs disabled:opacity-50"
+                  disabled={saving || loadingOptions || !devices.length}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-primary hover:bg-primary-hover px-3.5 py-1.5 text-xs font-bold text-white shadow-xs transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
                 >
-                  <Plus size={13} />
-                  <span>+ Thêm</span>
+                  <Plus size={14} />
+                  <span>Thêm hành động</span>
                 </button>
               </div>
 
@@ -912,10 +1079,58 @@ function SceneWorkspace({ homeId, sceneId }: { homeId: string; sceneId?: string 
                         </p>
                       )}
 
+                      {/* 1. POWER (TURN_ON / TURN_OFF / TOGGLE) quick toggle buttons */}
+                      {(action.action === 'TURN_ON' || action.action === 'TURN_OFF' || action.action === 'TOGGLE') && (
+                        <div className="space-y-1.5 pt-2">
+                          <span className="text-[11px] font-bold text-muted uppercase tracking-wider block">
+                            Chế độ nguồn:
+                          </span>
+                          <div className="grid grid-cols-3 gap-2">
+                            <button
+                              type="button"
+                              onClick={() => changeActionType(index, 'TURN_ON')}
+                              className={`py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                                action.action === 'TURN_ON'
+                                  ? 'bg-emerald-600 text-white shadow-xs'
+                                  : 'bg-surface hover:bg-sidebar text-text border border-line'
+                              }`}
+                            >
+                              Bật nguồn (ON)
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => changeActionType(index, 'TURN_OFF')}
+                              className={`py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                                action.action === 'TURN_OFF'
+                                  ? 'bg-slate-700 text-white shadow-xs'
+                                  : 'bg-surface hover:bg-sidebar text-text border border-line'
+                              }`}
+                            >
+                              Tắt nguồn (OFF)
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => changeActionType(index, 'TOGGLE')}
+                              className={`py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                                action.action === 'TOGGLE'
+                                  ? 'bg-primary text-white shadow-xs'
+                                  : 'bg-surface hover:bg-sidebar text-text border border-line'
+                              }`}
+                            >
+                              Đảo bật/tắt
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 2. BRIGHTNESS / PERCENTAGE */}
                       {selectedOption?.valueKind === 'percentage' && (
-                        <div className="pt-2 bg-sidebar/30 p-3 rounded-xl border border-line/60">
+                        <div className="pt-2 bg-sidebar/30 p-3 rounded-xl border border-line/60 space-y-2">
                           <div className="flex justify-between items-center text-xs font-bold text-text mb-1.5">
-                            <span>{selectedOption.valueLabel || 'Mức độ (%)'}</span>
+                            <span className="flex items-center gap-1.5">
+                              <Sun size={14} className="text-amber-500" />
+                              <span>{selectedOption.valueLabel || 'Mức độ (%)'}</span>
+                            </span>
                             <span className="font-extrabold text-primary text-sm px-2 py-0.5 rounded-lg bg-primary/10 border border-primary/20">
                               {action.value || 0}%
                             </span>
@@ -940,13 +1155,37 @@ function SceneWorkspace({ homeId, sceneId }: { homeId: string; sceneId?: string 
                               className="w-16 rounded-xl border border-line px-2 py-1.5 text-xs text-center font-bold bg-surface"
                             />
                           </div>
+                          {/* Quick presets for brightness */}
+                          <div className="flex flex-wrap gap-1.5 pt-1">
+                            {[
+                              { label: '25% (Ngủ)', val: '25' },
+                              { label: '50% (Dịu)', val: '50' },
+                              { label: '75% (Chuẩn)', val: '75' },
+                              { label: '100% (Sáng)', val: '100' },
+                            ].map((preset) => (
+                              <button
+                                key={preset.val}
+                                type="button"
+                                onClick={() => updateAction(index, { value: preset.val })}
+                                className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                                  action.value === preset.val
+                                    ? 'bg-amber-500 text-white'
+                                    : 'bg-surface hover:bg-sidebar text-text border border-line'
+                                }`}
+                              >
+                                {preset.label}
+                              </button>
+                            ))}
+                          </div>
                         </div>
                       )}
 
+                      {/* 3. TEMPERATURE / NUMBER */}
                       {selectedOption?.valueKind === 'number' && (
                         <div className="pt-2 bg-sidebar/30 p-3 rounded-xl border border-line/60">
-                          <label className="block text-[11px] font-bold text-muted mb-1.5">
-                            {selectedOption.valueLabel || 'Nhiệt độ (°C)'}
+                          <label className="block text-[11px] font-bold text-muted mb-1.5 flex items-center gap-1.5">
+                            <Thermometer size={14} className="text-primary" />
+                            <span>{selectedOption.valueLabel || 'Nhiệt độ (°C)'}</span>
                           </label>
                           <div className="flex items-center gap-2 max-w-[220px]">
                             <button
@@ -981,6 +1220,7 @@ function SceneWorkspace({ homeId, sceneId }: { homeId: string; sceneId?: string 
                         </div>
                       )}
 
+                      {/* 4. JSON */}
                       {selectedOption?.valueKind === 'json' && (
                         <div className="pt-1">
                           <label className="block text-[11px] font-bold text-muted mb-1">
@@ -993,6 +1233,82 @@ function SceneWorkspace({ homeId, sceneId }: { homeId: string; sceneId?: string 
                             className="w-full rounded-xl border border-line bg-surface px-3 py-2 text-xs font-mono text-text focus:border-primary focus:outline-none"
                             placeholder='{"power": "ON"}'
                             rows={2}
+                          />
+                        </div>
+                      )}
+
+                      {/* 5. COLOR (SET_RGB / SET_COLOR / valueKind === 'color') */}
+                      {(selectedOption?.valueKind === 'color' || action.action === 'SET_RGB' || action.action === 'SET_COLOR') && (
+                        <div className="pt-2 bg-sidebar/30 p-3 rounded-xl border border-line/60 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <label className="text-[11px] font-bold text-muted flex items-center gap-1.5">
+                              <Palette size={14} className="text-primary" />
+                              <span>{selectedOption?.valueLabel || 'Màu sắc RGB'}</span>
+                            </label>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="color"
+                                value={action.value?.startsWith('#') ? action.value : '#ffc107'}
+                                onChange={(e) => updateAction(index, { value: e.target.value })}
+                                className="w-7 h-7 rounded-lg border border-line cursor-pointer p-0.5 bg-surface"
+                              />
+                              <span className="text-xs font-mono font-bold text-text uppercase">
+                                {action.value || '#ffc107'}
+                              </span>
+                            </div>
+                          </div>
+                          {/* Color swatches with checkmarks */}
+                          <div className="flex flex-wrap gap-1.5 pt-1">
+                            {[
+                              { label: 'Trắng ấm', hex: '#fff4e5' },
+                              { label: 'Vàng nắng', hex: '#ffc107' },
+                              { label: 'Cam hoàng hôn', hex: '#ff7043' },
+                              { label: 'Đỏ', hex: '#f44336' },
+                              { label: 'Xanh lá', hex: '#4caf50' },
+                              { label: 'Xanh băng', hex: '#00bcd4' },
+                              { label: 'Xanh dương', hex: '#2196f3' },
+                              { label: 'Tím', hex: '#9c27b0' },
+                              { label: 'Hồng', hex: '#e91e63' },
+                            ].map((preset) => {
+                              const isSelected = (action.value || '#ffc107').toLowerCase() === preset.hex.toLowerCase();
+                              return (
+                                <button
+                                  key={preset.hex}
+                                  type="button"
+                                  onClick={() => updateAction(index, { value: preset.hex })}
+                                  className={`px-2 py-1 rounded-lg text-[11px] font-medium border transition-all flex items-center gap-1.5 cursor-pointer ${
+                                    isSelected
+                                      ? 'border-primary bg-primary/10 text-primary font-bold shadow-2xs ring-1 ring-primary/40'
+                                      : 'border-line/70 bg-surface text-text hover:border-line'
+                                  }`}
+                                >
+                                  <span
+                                    className="w-3 h-3 rounded-full inline-flex items-center justify-center border border-black/10 shrink-0"
+                                    style={{ backgroundColor: preset.hex }}
+                                  >
+                                    {isSelected && <Check size={8} className="text-slate-800" />}
+                                  </span>
+                                  {preset.label}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 6. GENERAL TEXT (not color) */}
+                      {selectedOption?.valueKind === 'text' && action.action !== 'SET_COLOR' && action.action !== 'SET_RGB' && (
+                        <div className="pt-1">
+                          <label className="block text-[11px] font-bold text-muted mb-1">
+                            {selectedOption.valueLabel}
+                          </label>
+                          <input
+                            required
+                            type="text"
+                            value={action.value}
+                            onChange={(e) => updateAction(index, { value: e.target.value })}
+                            className="w-full rounded-xl border border-line bg-surface px-3 py-2 text-xs font-semibold text-text focus:border-primary focus:outline-none"
+                            placeholder="Nhập giá trị..."
                           />
                         </div>
                       )}
@@ -1012,7 +1328,6 @@ function SceneWorkspace({ homeId, sceneId }: { homeId: string; sceneId?: string 
             <button
               disabled={
                 saving ||
-                !actionTypes.length ||
                 actions.some(
                   (item) =>
                     !getSceneDeviceActions(
@@ -1021,7 +1336,7 @@ function SceneWorkspace({ homeId, sceneId }: { homeId: string; sceneId?: string 
                     ).some((option) => option.code === item.action),
                 )
               }
-              className="w-full py-2.5 px-4 rounded-xl bg-primary hover:bg-primary-hover active:scale-98 text-white font-bold text-xs shadow-sm transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+              className="w-full py-2.5 px-4 rounded-xl bg-primary hover:bg-primary-hover active:scale-98 text-white font-bold text-xs shadow-sm transition-all disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
             >
               {saving && <Loader2 size={14} className="animate-spin" />}
               <span>{saving ? 'Đang lưu...' : sceneId ? 'Lưu thay đổi' : 'Tạo kịch bản'}</span>
@@ -1029,6 +1344,17 @@ function SceneWorkspace({ homeId, sceneId }: { homeId: string; sceneId?: string 
           </form>
         )}
       </div>
+
+      {/* Confirm Delete Modal */}
+      <ConfirmModal
+        isOpen={!!deletingScene}
+        title="Xóa kịch bản"
+        description={`Bạn có chắc chắn muốn xóa kịch bản "${deletingScene?.name || ''}" không? Hành động này không thể hoàn tác.`}
+        confirmText="Xóa kịch bản"
+        loading={deleteLoading}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeletingScene(null)}
+      />
     </FeatureShell>
   );
 }
@@ -1043,8 +1369,9 @@ function FeatureShell({
   children: React.ReactNode;
 }) {
   return (
-    <main className="min-h-screen bg-app p-4 sm:p-7 text-text transition-colors">
-      <div className="mx-auto max-w-6xl space-y-6">
+    <div className="app-shell relative min-h-screen text-text">
+      <AppSidebar activeItem="scenes" homeId={homeId} />
+      <main className="min-w-0 flex-1 p-4 sm:p-7 lg:pl-64 space-y-6 max-w-7xl mx-auto transition-colors">
         <header className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4">
           <div>
             <div className="flex items-center gap-2">
@@ -1078,8 +1405,8 @@ function FeatureShell({
         </header>
 
         {children}
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }
 

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { generateRecommendations, getRecommendations, resolveRecommendation } from '../../services/recommendationApi';
 import type { Recommendation } from '../../types/recommendation';
+import { AppSidebar } from '../ui/AppSidebar';
 
 export function RecommendationsPage() {
   const { homeId = '' } = useParams();
@@ -45,8 +46,20 @@ export function RecommendationsPage() {
     finally { setWorkingId(null); }
   };
 
-  return <main className="app-shell min-h-screen p-4 text-text sm:p-6"><div className="mx-auto max-w-5xl space-y-5">
-    <header className="flex flex-wrap items-center justify-between gap-3"><div><h1 className="text-2xl font-bold">Gợi ý tự động hóa</h1><p className="text-sm text-muted">Phân tích hành vi 30 ngày gần đây để đề xuất lịch chạy.</p></div><Link to={`/homes/${homeId}/automation-rules`} className="rounded-xl bg-sidebar px-4 py-3 text-sm font-semibold text-text">Về quy tắc</Link></header>
+  return (
+    <div className="app-shell relative min-h-screen text-text">
+      <AppSidebar activeItem="automations" homeId={homeId} />
+      <main className="min-w-0 flex-1 p-4 text-text sm:p-6 lg:pl-64">
+        <div className="mx-auto max-w-5xl space-y-5">
+          <header className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-4">
+            <div>
+              <h1 className="text-2xl font-bold">Gợi ý tự động hóa</h1>
+              <p className="text-sm text-muted">Phân tích hành vi 30 ngày gần đây để đề xuất lịch chạy.</p>
+            </div>
+            <Link to={`/homes/${homeId}/automation-rules`} className="rounded-xl bg-sidebar px-4 py-2.5 text-xs font-semibold text-text shadow-xs hover:bg-sidebar-hover transition-colors">
+              Về quy tắc
+            </Link>
+          </header>
     {error && <p role="alert" className="rounded-xl bg-error-soft p-3">{error}</p>}
     {success && <p role="status" className="rounded-xl bg-success-soft p-3">{success}</p>}
     <button type="button" disabled={workingId !== null} onClick={() => void generate()} className="rounded-xl bg-primary px-4 py-3 font-semibold text-white disabled:opacity-50">{workingId === 'generate' ? 'Đang phân tích...' : 'Phân tích hành vi'}</button>
@@ -57,5 +70,8 @@ export function RecommendationsPage() {
       <p className="text-xs text-muted">Tạo: {new Date(item.createdAt).toLocaleString('vi-VN')}{item.resolvedAt ? ` · Xử lý: ${new Date(item.resolvedAt).toLocaleString('vi-VN')}` : ''}</p>
       {item.status === 'PENDING' && <div className="flex gap-2"><button type="button" disabled={workingId !== null} onClick={() => void resolve(item, 'approve')} className="rounded-xl bg-primary px-4 py-2 font-semibold text-white disabled:opacity-50">Chấp nhận</button><button type="button" disabled={workingId !== null} onClick={() => void resolve(item, 'reject')} className="rounded-xl bg-error-soft px-4 py-2 disabled:opacity-50">Từ chối</button></div>}
     </article>)}</div> : <p className="surface-card p-5 text-muted">Chưa có đề xuất. Chọn “Phân tích hành vi” để tìm mẫu lặp lại.</p>}
-  </div></main>;
+        </div>
+      </main>
+    </div>
+  );
 }

@@ -1,17 +1,22 @@
 import React from 'react';
+import { useNavigate } from 'react-router';
+import { notify } from './notify';
 
-type SidebarItem = {
+export type SidebarItem = {
   id: string;
   label: string;
   icon: React.ReactNode;
   onClick: () => void;
 };
 
-interface AppSidebarProps {
+export interface AppSidebarProps {
   activeItem: string;
-  items: SidebarItem[];
-  contextLabel: string;
+  items?: SidebarItem[];
+  homeId?: string;
+  contextLabel?: string;
   showSystemSummary?: boolean;
+  onMembersClick?: () => void;
+  isAdmin?: boolean;
 }
 
 export const HomeIcon = () => (
@@ -73,41 +78,191 @@ export const EnergyIcon = () => (
     </svg>
   );
 
+export const AutomationIcon = () => (
+  <svg aria-hidden="true" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 3v1.5M4.5 8.25H3m18 0h-1.5M4.5 12H3m18 0h-1.5m-15 3.75H3m18 0h-1.5M8.25 19.5V21M12 3v1.5m0 15V21m3.75-18v1.5m0 15V21m-9-1.5h10.5a2.25 2.25 0 0 0 2.25-2.25V6.75a2.25 2.25 0 0 0-2.25-2.25H6.75A2.25 2.25 0 0 0 4.5 6.75v10.5a2.25 2.25 0 0 0 2.25 2.25Zm.75-12h9v9h-9v-9Z" />
+  </svg>
+);
+
+export const AppSidebar: React.FC<AppSidebarProps> = ({
+  activeItem,
+  items,
+  homeId,
+  contextLabel = 'Không gian sống',
+  showSystemSummary = true,
+  onMembersClick,
+  isAdmin = false,
+}) => {
+  const navigate = useNavigate();
+
+  const defaultItems: SidebarItem[] = [
+    {
+      id: 'overview',
+      label: 'Tổng quan',
+      icon: <HomeIcon />,
+      onClick: () => {
+        if (activeItem === 'overview' || activeItem === 'home') {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        } else {
+          navigate('/home');
+        }
+      },
+    },
+    {
+      id: 'devices',
+      label: 'Thiết bị',
+      icon: <DeviceIcon />,
+      onClick: () => {
+        if (activeItem === 'devices') {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        } else if (homeId) {
+          navigate(`/home/${encodeURIComponent(homeId)}/devices`);
+        } else {
+          notify.info('Hãy tạo hoặc tham gia một ngôi nhà trước khi quản lý thiết bị.');
+        }
+      },
+    },
+    {
+      id: 'twin',
+      label: 'Digital Twin',
+      icon: <TwinIcon />,
+      onClick: () => {
+        if (activeItem === 'twin') {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        } else if (homeId) {
+          navigate(`/home/${encodeURIComponent(homeId)}/digital-twin`);
+        } else {
+          notify.info('Hãy tạo hoặc tham gia một ngôi nhà trước khi mở Digital Twin.');
+        }
+      },
+    },
+    {
+      id: 'energy',
+      label: 'Tiêu thụ điện',
+      icon: <EnergyIcon />,
+      onClick: () => {
+        if (activeItem === 'energy') {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        } else if (homeId) {
+          navigate(`/home/${encodeURIComponent(homeId)}/energy`);
+        } else {
+          notify.info('Hãy tạo hoặc tham gia một ngôi nhà trước.');
+        }
+      },
+    },
+    {
+      id: 'scenes',
+      label: 'Kịch bản',
+      icon: <SceneIcon />,
+      onClick: () => {
+        if (activeItem === 'scenes') {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        } else if (homeId) {
+          navigate(`/homes/${encodeURIComponent(homeId)}/scenes`);
+        } else {
+          notify.info('Hãy tạo hoặc tham gia một ngôi nhà trước khi mở kịch bản.');
+        }
+      },
+    },
+    {
+      id: 'automations',
+      label: 'Tự động hóa',
+      icon: <AutomationIcon />,
+      onClick: () => {
+        if (activeItem === 'automations') {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        } else if (homeId) {
+          navigate(`/homes/${encodeURIComponent(homeId)}/automation-rules`);
+        } else {
+          notify.info('Hãy tạo hoặc tham gia một ngôi nhà trước khi mở tự động hóa.');
+        }
+      },
+    },
+    {
+      id: 'members',
+      label: 'Thành viên',
+      icon: <PeopleIcon />,
+      onClick: () => {
+        if (onMembersClick) {
+          onMembersClick();
+        } else {
+          const el = document.getElementById('members-section');
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth' });
+          } else {
+            navigate('/home#members-section');
+          }
+        }
+      },
+    },
+    ...(isAdmin
+      ? [
+          {
+            id: 'admin',
+            label: 'Quản trị hệ thống',
+            icon: <AdminIcon />,
+            onClick: () => navigate('/admin'),
+          },
+        ]
+      : []),
+  ];
+
+  const navigationItems = items || defaultItems;
+
+  const isItemActive = (itemId: string) => {
+    if (itemId === activeItem) return true;
+    if (
+      (itemId === 'overview' && activeItem === 'home') ||
+      (itemId === 'home' && activeItem === 'overview')
+    ) {
+      return true;
+    }
+    return false;
+  };
+
+  return (
+    <aside className="app-sidebar fixed inset-y-0 left-0 z-30 hidden w-64 flex-col p-5 lg:flex">
+      <div className="px-2 py-1">
+        <BrandMark />
+      </div>
 export const AppSidebar: React.FC<AppSidebarProps> = ({ activeItem, items, contextLabel, showSystemSummary = true }) => (
   <aside className="app-sidebar fixed inset-y-0 left-0 z-30 hidden w-64 flex-col overflow-y-auto p-5 lg:flex">
     <div className="px-2 py-1">
       <BrandMark />
     </div>
 
-    <div className="mt-8 px-3 text-xs font-semibold text-muted">{contextLabel}</div>
-    <nav aria-label="Điều hướng chính" className="mt-3 space-y-1.5">
-      {items.map((item) => {
-        const active = item.id === activeItem;
-        return (
-          <button
-            key={item.id}
-            type="button"
-            aria-current={active ? 'page' : undefined}
-            onClick={item.onClick}
-            className={`flex w-full items-center gap-3 rounded-2xl px-3.5 py-3 text-left text-sm font-semibold transition-colors active:translate-y-px ${
-              active
-                ? 'bg-sidebar-active text-sky-800 font-bold border-r-4 border-primary shadow-xs'
-                : 'text-muted hover:bg-sidebar-hover hover:text-text'
-            }`}
-          >
-            <span className={active ? 'text-primary' : 'text-icon'}>{item.icon}</span>
-            {item.label}
-          </button>
-        );
-      })}
-    </nav>
+      <div className="mt-8 px-3 text-xs font-semibold text-muted">{contextLabel}</div>
+      <nav aria-label="Điều hướng chính" className="mt-3 space-y-1.5">
+        {navigationItems.map((item) => {
+          const active = isItemActive(item.id);
+          return (
+            <button
+              key={item.id}
+              type="button"
+              aria-current={active ? 'page' : undefined}
+              onClick={item.onClick}
+              className={`flex w-full items-center gap-3 rounded-2xl px-3.5 py-3 text-left text-sm font-semibold transition-colors active:translate-y-px ${
+                active
+                  ? 'bg-sidebar-active text-sky-800 font-bold border-r-4 border-primary shadow-xs'
+                  : 'text-muted hover:bg-sidebar-hover hover:text-text'
+              }`}
+            >
+              <span className={active ? 'text-primary' : 'text-icon'}>{item.icon}</span>
+              {item.label}
+            </button>
+          );
+        })}
+      </nav>
 
-    {showSystemSummary ? <div className="mt-auto rounded-2xl border border-line bg-white/80 p-4">
-      <div className="flex items-center gap-2 text-sm font-semibold text-text">
-        <span className="status-pulse h-2 w-2 rounded-full bg-success" />
-        Hệ thống ổn định
-      </div>
-      <p className="mt-2 text-xs leading-5 text-muted">Nhà của bạn đang được kết nối an toàn.</p>
-    </div> : null}
-  </aside>
-);
+      {showSystemSummary ? (
+        <div className="mt-auto rounded-2xl border border-line bg-white/80 p-4">
+          <div className="flex items-center gap-2 text-sm font-semibold text-text">
+            <span className="status-pulse h-2 w-2 rounded-full bg-success" />
+            Hệ thống ổn định
+          </div>
+          <p className="mt-2 text-xs leading-5 text-muted">Nhà của bạn đang được kết nối an toàn.</p>
+        </div>
+      ) : null}
+    </aside>
+  );
+};

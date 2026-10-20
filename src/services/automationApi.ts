@@ -1,8 +1,15 @@
-import type { AutomationExecution, AutomationRule, AutomationRuleInput, AutomationTestResult } from '../types/automation';
+import type { AutomationExecution, AutomationRule, AutomationRuleInput, AutomationTestResult, DeviceCapabilityInfo, HomeCapabilitiesResponse } from '../types/automation';
 import { featureRequest } from './featureApi';
 
 export const getAutomationRules = (homeId: string) =>
   featureRequest<AutomationRule[]>(`/homes/${homeId}/automation-rules`);
+
+export const getHomeDeviceCapabilities = (homeId: string) =>
+  featureRequest<HomeCapabilitiesResponse>(`/homes/${homeId}/device-capabilities`);
+
+export const getDeviceCapabilities = (deviceId: string) =>
+  featureRequest<DeviceCapabilityInfo>(`/devices/${deviceId}/capabilities`);
+
 
 export const createAutomationRule = (homeId: string, input: AutomationRuleInput) =>
   featureRequest<AutomationRule>(`/homes/${homeId}/automation-rules`, {

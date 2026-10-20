@@ -10,6 +10,7 @@ import { useAppDispatch } from "../../store/hooks";
 import { getErrorMessage } from "../../utils/errors";
 import { HomeSidebar } from "../ui/HomeSidebar";
 import { NotificationBell } from "../notification/NotificationBell";
+import { VoiceAssistantButton } from "../ui/VoiceAssistant";
 import { Link } from "react-router";
 import { notify } from '../ui/notify';
 import { UserAvatar } from '../ui/UserAvatar';
@@ -110,6 +111,15 @@ export const HomePage: React.FC<HomePageProps> = ({
     [dispatch],
   );
 
+  useEffect(() => {
+    if (window.location.hash === "#members-section") {
+      const timer = setTimeout(() => {
+        document.getElementById("members-section")?.scrollIntoView({ behavior: "smooth" });
+      }, 250);
+      return () => clearTimeout(timer);
+    }
+  }, [userHome?.homeId]);
+
   const handleCreateHome = async (e: React.FormEvent) => {
     e.preventDefault();
     setCreateLoading(true);
@@ -142,6 +152,16 @@ export const HomePage: React.FC<HomePageProps> = ({
 
   return (
     <div className="app-shell relative overflow-x-hidden">
+      <AppSidebar
+        activeItem="overview"
+        homeId={userHome?.homeId}
+        isAdmin={user.platformRole === "ADMIN"}
+        onMembersClick={() =>
+          document
+            .getElementById("members-section")
+            ?.scrollIntoView({ behavior: "smooth" })
+        }
+      />
       <HomeSidebar activeItem="overview" homeId={userHome?.homeId} />
       <div className="lg:pl-64">
         {/* Top Navbar */}
@@ -184,6 +204,7 @@ export const HomePage: React.FC<HomePageProps> = ({
               {user.platformRole}
             </span>
 
+            <VoiceAssistantButton />
             <NotificationBell />
 
             <div className="relative" ref={dropdownRef}>
