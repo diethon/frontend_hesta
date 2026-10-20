@@ -38,7 +38,7 @@ window.__twinFixtureScene = () => {
   const lights: { intensity: number; color: string }[] = [];
   const floors: { name: string; y: number; bounds: number[][] }[] = [];
   const roomSurfaces: { id: string; color: string; opacity: number }[] = [];
-  const deviceModels: { id: string; world: number[]; screen: number[]; geometry: string[]; meshes: number; emissive: number; animation: number[] }[] = [];
+  const deviceModels: { id: string; world: number[]; screen: number[]; geometry: string[]; meshes: number; emissive: number; animation: number[]; diffusers: string[] }[] = [];
   const projected: number[][] = [];
   state.scene.traverse((object) => {
     if (object.name.includes(':floor:')) { const box = new Box3().setFromObject(object); floors.push({ name: object.name, y: object.position.y, bounds: [box.min.toArray(), box.max.toArray()] }); }
@@ -47,10 +47,12 @@ window.__twinFixtureScene = () => {
       let meshCount = 0, emissive = 0;
       const animation: number[] = [];
       const geometry: string[] = [];
-      object.traverse((child) => { animation.push(child.rotation.y); if (child instanceof Mesh) { meshCount++; const m = Array.isArray(child.material) ? child.material[0] : child.material; if ('emissiveIntensity' in m) emissive = Math.max(emissive, Number(m.emissiveIntensity)); } });
+      const diffusers: string[] = [];
+      object.traverse((child) => { if (child.name === 'light-diffuser' && child instanceof Mesh && !Array.isArray(child.material) && 'color' in child.material) diffusers.push((child.material.color as import('three').Color).getHexString()); });
+      object.traverse((child) => { animation.push(child.rotation.y); if (child instanceof Mesh) { meshCount++; const m = Array.isArray(child.material) ? child.material[0] : child.material; if ('emissiveIntensity' in m && 'emissive' in m) { const color = m.emissive as import('three').Color; emissive = Math.max(emissive, Number(m.emissiveIntensity) * Math.max(color.r, color.g, color.b)); } } });
       object.traverse((child) => { if (child instanceof Mesh) geometry.push(child.geometry.uuid); });
       const center = new Box3().setFromObject(object).getCenter(new Vector3()).project(state.camera);
-      deviceModels.push({ id: object.name, world: object.getWorldPosition(new Vector3()).toArray(), screen: [(center.x + 1) * state.size.width / 2, (1 - center.y) * state.size.height / 2], geometry, meshes: meshCount, emissive, animation });
+      deviceModels.push({ id: object.name, world: object.getWorldPosition(new Vector3()).toArray(), screen: [(center.x + 1) * state.size.width / 2, (1 - center.y) * state.size.height / 2], geometry, meshes: meshCount, emissive, animation, diffusers });
     }
     if (object instanceof PointLight) lights.push({ intensity: object.intensity, color: object.color.getHexString() });
     if (object instanceof Mesh) {

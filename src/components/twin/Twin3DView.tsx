@@ -108,7 +108,7 @@ export function Twin3DView({ geometry, drafting, role, onEdit2D }: { geometry: T
             <div aria-label="Ánh sáng không gian" className="pointer-events-auto flex rounded-xl border border-line bg-surface/95 p-1 shadow-soft">
               <button type="button" aria-label="Hiện vị trí thiết bị và cảm biến" title="Hiện vị trí thiết bị và cảm biến" aria-pressed={markerMode === 'all'} onClick={() => setMarkerMode((value) => value === 'all' ? 'important' : 'all')} className={`flex h-10 w-10 items-center justify-center rounded-lg ${markerMode === 'all' ? 'bg-sidebar-active text-primary-hover' : 'text-muted hover:bg-sidebar-hover'}`}><MousePointer2 size={17} /></button>
               <button type="button" aria-label="Ban ngày" aria-pressed={theme === 'DAYLIGHT'} onClick={() => setTheme('DAYLIGHT')} className={`flex h-10 w-10 items-center justify-center rounded-lg ${theme === 'DAYLIGHT' ? 'bg-sidebar-active text-primary-hover' : 'text-muted hover:bg-sidebar-hover'}`}><Sun size={17} /></button>
-              <button type="button" aria-label="Không gian ấm" aria-pressed={theme === 'COZY'} onClick={() => setTheme('COZY')} className={`flex h-10 w-10 items-center justify-center rounded-lg ${theme === 'COZY' ? 'bg-sidebar-active text-primary-hover' : 'text-muted hover:bg-sidebar-hover'}`}><Moon size={17} /></button>
+              <button type="button" aria-label="Không gian ấm" title="Giảm ánh sáng nền để xem rõ ánh sáng thiết bị" aria-pressed={theme === 'COZY'} onClick={() => setTheme('COZY')} className={`flex h-10 w-10 items-center justify-center rounded-lg ${theme === 'COZY' ? 'bg-sidebar-active text-primary-hover' : 'text-muted hover:bg-sidebar-hover'}`}><Moon size={17} /></button>
               <button type="button" aria-label="Danh sách phòng và thiết bị" aria-expanded={treeOpen} onClick={() => setTreeOpen((open) => !open)} className="flex h-10 w-10 items-center justify-center rounded-lg text-muted hover:bg-sidebar-hover"><ListTree size={17} /></button>
             </div>
           </div>
@@ -138,7 +138,7 @@ export function Twin3DView({ geometry, drafting, role, onEdit2D }: { geometry: T
         </details>
         {unplacedRooms + unplaced.deviceIds.length + unplaced.sensorIds.length ? <p className="px-1 text-xs text-muted">Chưa đặt: {unplacedRooms} phòng, {unplaced.deviceIds.length} thiết bị, {unplaced.sensorIds.length} cảm biến.</p> : null}
       </div>
-      <aside ref={inspector} aria-label="Bảng điều khiển ngôi nhà" className="min-w-0 space-y-4">
+      <aside ref={inspector} aria-label="Bảng điều khiển ngôi nhà" className="twin-control-sidebar min-w-0 space-y-4">
         {selection ? <div className="flex items-center justify-between px-1"><span className="text-xs font-semibold text-muted">Đang điều khiển</span><button type="button" aria-label="Đóng chi tiết" onClick={() => select(null)} className="flex h-9 w-9 items-center justify-center rounded-xl text-muted hover:bg-sidebar-hover"><X size={17} /></button></div> : null}
         <div className="twin-living-inspector"><Twin3DInspector geometry={visibleGeometry} selection={selection} onSelect={select} onEdit2D={onEdit2D} canEdit={role === 'OWNER'} onFocusRoom={focusRoom} onFitHome={fitHome} /></div>
         <TwinLivingDevices geometry={visibleGeometry} selection={selection} onSelect={select} />

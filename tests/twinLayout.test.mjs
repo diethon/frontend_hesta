@@ -666,6 +666,18 @@ test('Day heatmap interpolates surfaces and RGB state remains HESTA-only', () =>
   assert.equal(lightColor({state:{color:{r:999,g:0,b:0}}},'#ffffff'),'#ffffff');
 });
 
+test('visual state reads numeric MQTT values and both backend fan command fields', () => {
+  const { boundedPercent, fanSpeed, openingFraction } = loadSource('src/components/twin/devices/deviceVisualState.ts');
+  assert.equal(boundedPercent('35', 100), 35);
+  for (const value of ['', '  ', null, false, Infinity, 'bad']) assert.equal(boundedPercent(value, 60), 60);
+  assert.equal(boundedPercent(200, 0), 100);
+  assert.equal(fanSpeed({state:{fan:'LOW'}}), 25);
+  assert.equal(fanSpeed({state:{fan:'HIGH'}}), 100);
+  assert.equal(fanSpeed({state:{speed:'0',fan:'HIGH'}}), 0);
+  assert.equal(openingFraction({state:{position:'75'}}), .75);
+  assert.equal(openingFraction({state:{state:'OPENING'}}), 0);
+});
+
 test('unchanged geometry and returning to saved geometry are clean; invalid draft is rejected', async () => {
   const store = await ready(); edit(store);
   change(store, structuredClone(draft(store))); assert.equal(store.getState().twinLayout.dirty, false);

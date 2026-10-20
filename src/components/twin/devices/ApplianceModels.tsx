@@ -3,19 +3,12 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { RoundedBox } from '@react-three/drei';
 import { DoubleSide, Group } from 'three';
 import type { DeviceModelProps } from './models';
-import { boundedPercent, lightColor } from './deviceVisualState';
+import { boundedPercent, fanSpeed, lightColor } from './deviceVisualState';
 import { useReducedMotion } from '../useTwinMotion';
+import { LampEmitter } from './LampEmitter';
 
-function LampGlow({ device, palette }: DeviceModelProps) {
-  const brightness = boundedPercent(device.state.brightness ?? device.state.level, 100) / 100;
-  const color = lightColor(device, palette.lightOn);
-  return <group>
-    <mesh rotation={[-Math.PI / 2, 0, 0]} raycast={() => undefined}><circleGeometry args={[.19, 24]} /><meshStandardMaterial color={palette.surface} emissive={color} emissiveIntensity={device.powered ? brightness * 2 : 0} side={DoubleSide} toneMapped={false} /></mesh>
-    {device.powered && brightness > 0 ? <pointLight position={[0, -.08, 0]} color={color} intensity={brightness * 12} distance={6} decay={2} /> : null}
-  </group>;
-}
 export function CeilingLightModel(props: DeviceModelProps) {
-  return <group><mesh position={[0, -.045, 0]} castShadow><cylinderGeometry args={[.26, .25, .09, 32]} /><meshStandardMaterial color={props.palette.surface} roughness={.5} /></mesh><group position={[0, -.095, 0]}><LampGlow {...props} /></group></group>;
+  return <group><mesh position={[0, -.045, 0]} castShadow><cylinderGeometry args={[.26, .25, .09, 32]} /><meshStandardMaterial color={props.palette.surface} roughness={.5} /></mesh><group position={[0, .002, 0]}><LampEmitter {...props} radius={.23} /></group></group>;
 }
 export function StandingLampModel({ appearance, ...props }: DeviceModelProps) {
   const { palette } = props;
@@ -24,12 +17,12 @@ export function StandingLampModel({ appearance, ...props }: DeviceModelProps) {
     <mesh position={[0, .035, 0]} castShadow><cylinderGeometry args={[.2, .23, .07, 24]} /><meshStandardMaterial color={palette.metal} metalness={.5} roughness={.35} /></mesh>
     <mesh position={[0, height / 2, 0]} castShadow><cylinderGeometry args={[.02, .02, height, 12]} /><meshStandardMaterial color={palette.wood} /></mesh>
     <mesh position={[0, height, 0]} castShadow><cylinderGeometry args={[.15, .26, .3, 32, 1, true]} /><meshStandardMaterial color={palette.surface} side={DoubleSide} roughness={.75} /></mesh>
-    <group position={[0, height - .14, 0]}><LampGlow {...props} /></group>
+    <group position={[0, height + .15, 0]}><LampEmitter {...props} radius={.15} upward /></group>
   </group>;
 }
 export function WallLightModel(props: DeviceModelProps) {
   const { palette } = props;
-  return <group><mesh castShadow><boxGeometry args={[.18, .3, .08]} /><meshStandardMaterial color={palette.metal} /></mesh><mesh position={[0, .02, .16]} castShadow><cylinderGeometry args={[.12, .19, .26, 24, 1, true]} /><meshStandardMaterial color={palette.surface} side={DoubleSide} /></mesh><group position={[0, -.12, .16]}><LampGlow {...props} /></group></group>;
+  return <group><mesh castShadow><boxGeometry args={[.18, .3, .08]} /><meshStandardMaterial color={palette.metal} /></mesh><mesh position={[0, .02, .16]} castShadow><cylinderGeometry args={[.12, .19, .26, 24, 1, true]} /><meshStandardMaterial color={palette.surface} side={DoubleSide} /></mesh><group position={[0, .151, .16]}><LampEmitter {...props} radius={.12} upward /></group></group>;
 }
 export function LedStripModel({ device, palette }: DeviceModelProps) {
   const brightness = boundedPercent(device.state.brightness ?? device.state.level, 100) / 100;
@@ -38,7 +31,7 @@ export function LedStripModel({ device, palette }: DeviceModelProps) {
 }
 export function StandingFanModel({ device, palette }: DeviceModelProps) {
   const blades = useRef<Group>(null), reduced = useReducedMotion(), invalidate = useThree((state) => state.invalidate);
-  const speed = typeof device.state.speed === 'string' ? ({ LOW: 25, MEDIUM: 55, HIGH: 100 }[device.state.speed.toUpperCase()] ?? 50) : boundedPercent(device.state.speed, 50);
+  const speed = fanSpeed(device);
   useFrame((_, delta) => { if (device.powered && !reduced && blades.current && speed > 0) { blades.current.rotation.z += Math.min(delta, .05) * (2 + speed / 8); invalidate(); } });
   return <group>
     <mesh position={[0, .035, 0]} castShadow><cylinderGeometry args={[.25, .28, .07, 24]} /><meshStandardMaterial color={palette.surface} /></mesh>

@@ -682,6 +682,11 @@ textarea:disabled {
   scrollbar-color: var(--color-line) transparent;
 }
 
+/* Capability controls load after selection; keep the selected panel in place. */
+.twin-control-sidebar {
+  overflow-anchor: none;
+}
+
 .twin-control-range {
   appearance: none;
   background: transparent;

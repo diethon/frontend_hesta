@@ -54,3 +54,17 @@ The real Twin now opens in Daylight with the existing architectural materials an
 Control sliders use the shared HESTA colors, show the selected percentage and remain keyboard-operable. The RGB field shows its draft color and keeps the explicit Apply action. Technical model details stay under device information. No API, authorization, layout persistence or realtime behavior changed.
 
 The refined view was checked in real Chromium at desktop, tablet and 320px widths: 23 browser checks passed alongside the 134 unit tests. Screenshots are available in `.tmp/twin-interaction-evidence/desktop-overview.png`, `desktop-selected-light.png`, `tablet-interactions.png` and `mobile-interactions.png`.
+
+## Confirmed device appearance
+
+The existing backend accepts `SET_COLOR`/`SET_RGB` with RGB channels or HEX, and brightness through `brightness`/`level`. It returns fan mode as `fan` for `SET_FAN`, or `speed` for speed commands. The renderer uses these confirmed state fields; it does not turn a submitted command into a successful local state.
+
+Lamp diffusers now show their confirmed hue from the architectural viewing angle and share that colour with the actual Three.js point light. Brightness affects both emission and room illumination; OFF removes the light. The colour picker remains an unsaved command draft, while **Màu thiết bị** shows the separately confirmed colour. Ceiling, floor/table, wall and pendant lights share the emitter; LED strips retain their physical emitter model.
+
+Daylight ambient/fill illumination is lower so furniture retains depth and device colours are visible. **Không gian ấm** lowers background illumination further with a soft warm viewport background; the rest of HESTA stays bright. No post-processing, light maps or additional shadow maps were added. Reusable geometry, demand rendering and architectural buffers remain intact across RGB changes.
+
+Numeric state strings are accepted for brightness, speed and opening percentage, while invalid values keep a safe fallback. Fan blades and AC airflow follow both backend speed field variants. OFF/zero-speed effects stop; partial door states such as OPENING are not treated as a confirmed fully open door.
+
+Browser evidence includes `confirmed-light-red.png`, `confirmed-light-green.png`, `confirmed-light-blue.png`, `confirmed-light-dimmed.png` and `confirmed-light-off.png` in the ignored `.tmp/twin-interaction-evidence/` directory. These are real WebGL screenshots with mocked transport; physical ESP32 verification remains a separate step.
+
+Verification after this change: 135 unit tests, 31 browser checks and focused lint passed. The browser checked both the diffuser material colour and physical light, dim/OFF emission, fan mode/zero speed, stable architectural buffers and control visibility at tablet/320px widths. Full lint still reports the existing 64 errors and 6 warnings outside this change. Panel scroll anchoring is disabled to prevent asynchronously loaded capability controls from moving the tablet viewport.
