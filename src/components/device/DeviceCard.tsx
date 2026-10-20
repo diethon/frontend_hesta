@@ -50,6 +50,8 @@ export const DeviceCard: React.FC<DeviceCardProps> = (props) => {
     case 'TEMP_HUMID_SENSOR':
     case 'MOTION_SENSOR':
     case 'SMOKE_SENSOR':
+    case 'LUX_SENSOR':
+    case 'LIGHT_SENSOR':
       return <SensorCard device={props.device} onClick={props.onClick} />;
 
     case 'GATE':
