@@ -881,3 +881,74 @@ test('unassigned devices stay in a separate list and new devices are automatical
   }
   assert.equal(puts().length, 0);
 });
+
+test('demo furniture keeps the saved world footprint, rotation and explicit mounting height', () => {
+  const { interiorTransform } = loadSource('src/components/twin/interior/interiorLayout.ts');
+  const { furnitureFootprint } = loadSource('src/components/twin/neonplan/model.ts');
+  const { Euler, Matrix4, Quaternion, Vector3 } = require('three');
+  for (const rotation of [0, 35, 90, -120]) {
+    const item = { id: 'saved-sofa', type: 'sofa', x: 5, z: -3, w: 2.5, d: .95, h: 1.1, rotation, mount_y: .42 };
+    const before = structuredClone(item), transform = interiorTransform(item);
+    const matrix = new Matrix4().compose(new Vector3(...transform.position), new Quaternion().setFromEuler(new Euler(...transform.rotation)), new Vector3(...transform.scale));
+    const actual = [-1.53, 1.53].flatMap((x) => [-.69, .69].map((z) => new Vector3(x, 0, z).applyMatrix4(matrix)));
+    const footprint = furnitureFootprint(item);
+    for (const p of actual) {
+      assert.ok(footprint.some(([x, z]) => Math.hypot(x - p.x, z - p.z) < 1e-8));
+      assert.equal(p.y, .42);
+    }
+    assert.deepEqual(item, before);
+  }
+});
+
+test('illustrative rugs stay within their actual room and do not change saved furniture', () => {
+  const { interiorRugs } = loadSource('src/components/twin/interior/interiorLayout.ts');
+  const { furnitureFootprint, pointInPolygon } = loadSource('src/components/twin/neonplan/model.ts');
+  const room = { id: 'concave', name: 'Room', floor_material: 'wood', points: [[0, 0], [5, 0], [5, 2], [2, 2], [2, 5], [0, 5]] };
+  const furniture = [
+    { id: 'inside', type: 'bed', x: 1, z: 3.5, w: 1.2, d: 1.5, h: .9, rotation: 0 },
+    { id: 'edge', type: 'bed', x: 1.4, z: 1.4, w: 1.2, d: 1.2, h: .9, rotation: 0 },
+  ];
+  const before = structuredClone({ room, furniture });
+  const rugs = interiorRugs(room, furniture);
+  assert.deepEqual(rugs.map((rug) => rug.id), ['inside:rug']);
+  for (const rug of rugs) for (const p of furnitureFootprint(rug)) assert.ok(pointInPolygon(p, room.points));
+  assert.deepEqual({ room, furniture }, before);
+});
+
+test('device focus follows its mounted world model and ignores airflow and click targets', () => {
+  const { nodeFocusBounds } = loadSource('src/components/twin/scene/cameraFraming.ts');
+  const { BoxGeometry, Group, Mesh, MeshBasicMaterial } = require('three');
+  const root = new Group(); root.position.set(3, 5, -2);
+  const visual = new Group(); visual.name = 'model:ac'; visual.rotation.y = Math.PI / 2;
+  const body = new Mesh(new BoxGeometry(1.4, .4, .3), new MeshBasicMaterial());
+  const airflow = new Group(); airflow.name = 'device-airflow';
+  const mist = new Mesh(new BoxGeometry(20, 20, 20), new MeshBasicMaterial());
+  airflow.add(mist); visual.add(body, airflow); root.add(visual);
+  const hitTarget = new Mesh(new BoxGeometry(40, 40, 40), new MeshBasicMaterial({ transparent: true, opacity: 0 }));
+  root.add(hitTarget);
+  const box = nodeFocusBounds(root);
+  assert.ok(Math.abs(box.min.x - 2.85) < 1e-6 && Math.abs(box.max.x - 3.15) < 1e-6);
+  assert.ok(Math.abs(box.min.y - 4.8) < 1e-6 && Math.abs(box.max.y - 5.2) < 1e-6);
+  assert.ok(Math.abs(box.min.z + 2.7) < 1e-6 && Math.abs(box.max.z + 1.3) < 1e-6);
+  for (const mesh of [body, mist, hitTarget]) { mesh.geometry.dispose(); mesh.material.dispose(); }
+});
+
+test('device focus keeps a useful existing angle and approaches wall devices from the front without a full turn', () => {
+  const { nodeFocusAngles } = loadSource('src/components/twin/scene/cameraFraming.ts');
+  const { Group } = require('three');
+  const root = new Group(), visual = new Group();
+  visual.name = 'model:ac'; visual.userData.modelMount = 'wall'; root.add(visual);
+  assert.deepEqual(nodeFocusAngles(root, .3, 1.05), { theta: .3, phi: 1.05 });
+  for (const facing of [0, Math.PI / 2, -Math.PI + .1]) {
+    visual.rotation.y = facing;
+    for (const start of [-Math.PI + .05, 0, Math.PI - .05, 8 * Math.PI]) {
+      const result = nodeFocusAngles(root, start, .2);
+      const offset = Math.atan2(Math.sin(result.theta - facing), Math.cos(result.theta - facing));
+      assert.ok(Math.abs(offset) <= .50001);
+      assert.ok(Math.abs(result.theta - start) <= Math.PI);
+      assert.ok(result.phi >= .9 && result.phi <= 1.2);
+    }
+  }
+  visual.userData.modelMount = 'floor';
+  assert.equal(nodeFocusAngles(root, 2.4, 1.05).theta, 2.4);
+});

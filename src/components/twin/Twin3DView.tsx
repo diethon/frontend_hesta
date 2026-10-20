@@ -6,7 +6,7 @@ import type { TwinHeatmapMode } from '../../types/twinView';
 import { Twin3DCanvas } from './Twin3DCanvas';
 import { Twin3DInspector } from './Twin3DInspector';
 import { TwinLayoutButton } from './TwinLayoutButton';
-import { readTwin3DPalette } from './twin3dPalette';
+import { readApartmentPalette } from './interior/apartmentPalette';
 import { rendererPalette, type TwinRendererTheme } from './scene/rendererTheme';
 import { geometryForFloor, layoutFloors, resolveUnplacedNodes } from './twin3dGeometry';
 import { supportsWebGL } from './twin3dSupport';
@@ -45,7 +45,7 @@ export function Twin3DView({ geometry, drafting, role, onEdit2D }: { geometry: T
   const [ready, setReady] = useState(false), [sceneError, setSceneError] = useState<Error | null>(null);
   const supported = useMemo(() => supportsWebGL(), []);
   const compact = useSyncExternalStore(subscribeCompact, () => window.matchMedia('(max-width: 767px)').matches, () => true);
-  const palette = useMemo(() => supported ? rendererPalette(readTwin3DPalette(), theme) : null, [supported,theme]);
+  const palette = useMemo(() => supported ? rendererPalette(readApartmentPalette(), theme) : null, [supported,theme]);
   const unplaced = useMemo(() => resolveUnplacedNodes(geometry, deviceIds, sensorIds), [deviceIds, geometry, sensorIds]);
   const unplacedRooms = roomIds.filter((id) => !geometry.rooms.some((room) => room.roomId === id)).length;
   const floors = useMemo(() => layoutFloors(geometry.rooms), [geometry.rooms]);
@@ -56,7 +56,6 @@ export function Twin3DView({ geometry, drafting, role, onEdit2D }: { geometry: T
   const onCount = activeDevices.filter((device) => device.status === 'ONLINE' && device.healthStatus === 'ACTIVE' && knownPower(device.currentState) === true).length;
   const handleReady = useCallback(() => setReady(true), []), handleCameraInteract = useCallback(() => setActiveView(null), []);
   const changeCamera = (action: TwinCameraAction) => { setCameraRequest((previous) => ({ serial: previous.serial + 1, action })); if (action !== 'zoom-in' && action !== 'zoom-out') setActiveView(action === 'turn-left' || action === 'turn-right' ? null : action); };
-  const select = useCallback((next: TwinLayoutSelection | null) => { setSelection(next); if (!next) { setFocusRoomId(null); setFocusNodeKey(null); } }, []);
   const fitHome = () => { setFocusNodeKey(null); setFocusRoomId(null); setFitRequest((value) => value + 1); };
   const focusRoom = (id: string) => { setFocusNodeKey(null); setFocusRoomId(id); setFitRequest((value) => value + 1); };
   const focusSelection = useCallback((next: TwinLayoutSelection) => {
@@ -66,6 +65,10 @@ export function Twin3DView({ geometry, drafting, role, onEdit2D }: { geometry: T
     if (room) { setActiveFloor(room.floor ?? 1); setMode('single'); }
     setFitRequest((value) => value + 1);
   }, [geometry]);
+  const select = useCallback((next: TwinLayoutSelection | null) => {
+    if (next?.kind === 'node') { focusSelection(next); return; }
+    setSelection(next); setFocusRoomId(null); setFocusNodeKey(null);
+  }, [focusSelection]);
   const chooseFloor = (floor: number | 'all') => { setActiveFloor(floor); setMode(floor === 'all' ? 'house' : 'single'); setSelection(null); fitHome(); };
   const chooseMode = (next: TwinFloorMode) => { setMode(next); setActiveFloor(next === 'single' ? resolvedFloor === 'all' ? floors[0] : resolvedFloor : 'all'); setSelection(null); fitHome(); };
   if (!geometry.rooms.length) return <section aria-label="Chế độ 3D" className="surface-card p-8 text-center sm:p-12"><House className="mx-auto text-primary" size={32} /><h2 className="mt-4 text-xl font-semibold text-text">Chưa có sơ đồ nhà</h2><p className="mt-2 text-sm text-muted">Các phòng hiện có chưa được đặt lên Digital Twin.</p>{role === 'OWNER' ? <div className="mt-5 flex justify-center"><TwinLayoutButton variant="primary" leadingIcon={<LayoutDashboard size={18} />} onClick={onEdit2D}>Thiết kế sơ đồ</TwinLayoutButton></div> : <p className="mt-4 text-sm text-muted">Chủ nhà chưa thiết lập sơ đồ Digital Twin.</p>}<p className="mt-4 text-xs text-muted">Unplaced · {unplacedRooms} phòng · {unplaced.deviceIds.length} thiết bị · {unplaced.sensorIds.length} cảm biến</p><details className="mt-4 text-left"><summary className="cursor-pointer text-sm text-primary-hover">Đọc dữ liệu trực tiếp</summary><TwinContent /></details></section>;
