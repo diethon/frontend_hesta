@@ -4,6 +4,7 @@ import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { currentHomeChanged, currentHomeCleared } from '../../store/homeSlice';
 import { loadTwinSnapshot, twinClosed, twinOpened } from '../../store/twinSlice';
 import { TwinDashboardHeader } from './dashboard/TwinDashboardHeader';
+import { HomeSidebar } from '../ui/HomeSidebar';
 import type { TwinRendererTheme } from './scene/rendererTheme';
 import { TwinLayoutEditor } from './TwinLayoutEditor';
 import { loadLayoutRole, loadTwinLayout } from '../../store/twinLayoutSlice';
@@ -59,6 +60,7 @@ export function DigitalTwinPage() {
     };
   }, [dispatch, homeId]);
   return <div className="app-shell">
-    <main id="main-content"><DigitalTwinView homeId={homeId} /></main>
+    <HomeSidebar activeItem="twin" homeId={homeId} showSystemSummary={false} />
+    <main id="main-content" className="min-w-0 lg:pl-64"><DigitalTwinView homeId={homeId} /></main>
   </div>;
 }

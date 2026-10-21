@@ -2,7 +2,6 @@ import { lazy, Suspense, useId, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { ChevronDown, Menu, RefreshCw, Sun } from 'lucide-react';
 import { NotificationBell } from '../../notification/NotificationBell';
-import { BrandMark } from '../../ui/AppSidebar';
 import { UserAvatar } from '../../ui/UserAvatar';
 import { useAppDispatch, useAppSelector } from '../../../store/hooks';
 import { selectCurrentUser } from '../../../store/selectors';
@@ -42,6 +41,8 @@ export function TwinDashboardHeader({ homeId, connected, connectionLabel, loadin
     { label: 'Kịch bản', href: `/homes/${encodedHome}/scenes` },
     { label: 'Tự động hóa', href: `/homes/${encodedHome}/automation-rules` },
     { label: 'Năng lượng', href: `/home/${encodedHome}/energy` },
+    { label: 'Thành viên', href: `/home?homeId=${encodedHome}#members-section` },
+    ...(user?.platformRole === 'ADMIN' ? [{ label: 'Quản trị hệ thống', href: '/admin' }] : []),
   ];
   const closeProfile = () => {
     setProfileOpen(false);
@@ -51,14 +52,7 @@ export function TwinDashboardHeader({ homeId, connected, connectionLabel, loadin
   return <>
     <header className="relative z-40 border-b border-line bg-surface px-4 py-3 shadow-soft sm:px-6">
       <div className="flex min-w-0 items-center justify-between gap-3">
-        <Link to="/home" aria-label="HESTA — Chọn ngôi nhà" className="flex min-w-0 items-center gap-3 rounded-xl focus-visible:outline-2 focus-visible:outline-primary">
-          <BrandMark compact />
-          <div className="min-w-0"><p className="truncate text-base font-bold tracking-tight text-text">HESTA</p><h1 className="truncate text-xs font-medium text-muted sm:text-sm">Digital Twin Dashboard</h1></div>
-        </Link>
-        <nav aria-label="Điều hướng HESTA" className="hidden min-w-0 items-center gap-1 xl:flex">
-          {links.map(({ label, href }) => <Link key={href} to={href} className="rounded-xl px-3 py-3 text-xs font-medium text-muted transition-colors hover:bg-app hover:text-text focus-visible:outline-2 focus-visible:outline-primary">{label}</Link>)}
-          <span aria-current="page" className="rounded-xl bg-info-soft px-3 py-3 text-xs font-semibold text-primary-hover">Digital Twin</span>
-        </nav>
+        <div className="min-w-0"><p className="text-xs font-medium text-muted">Không gian sống</p><h1 className="mt-1 text-lg font-semibold tracking-tight text-text sm:text-xl">Digital Twin Dashboard</h1></div>
         <div className="flex shrink-0 items-center gap-2">
           <NotificationBell />
           {user ? <button ref={profileButton} type="button" aria-label={`Mở hồ sơ ${user.fullName}`} aria-haspopup="dialog" onClick={() => setProfileOpen(true)} className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full border border-line bg-info-soft text-primary-hover transition-colors hover:bg-sidebar-hover focus-visible:outline-2 focus-visible:outline-primary"><UserAvatar src={user.avatarUrl} name={user.fullName} size={44} fallbackClassName="text-sm font-bold" /></button> : null}
@@ -66,7 +60,7 @@ export function TwinDashboardHeader({ homeId, connected, connectionLabel, loadin
       </div>
       <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
-          <details ref={menu} className="relative xl:hidden" onKeyDown={(event) => {
+          <details ref={menu} className="relative lg:hidden" onKeyDown={(event) => {
             if (event.key === 'Escape' && menu.current?.open) {
               menu.current.open = false;
               menu.current.querySelector('summary')?.focus();

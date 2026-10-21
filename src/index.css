@@ -773,24 +773,8 @@ textarea:disabled {
   }
 }
 
-/* Premium Twin tokens are scoped: other HESTA routes retain their design system. */
+/* Inherit the shared HESTA palette, including navigation and selection states. */
 .twin-premium-dashboard {
-  --color-app: #f5f8fc;
-  --color-surface: #ffffff;
-  --color-primary: #2563eb;
-  --color-primary-hover: #1d4ed8;
-  --color-info-soft: #dbeafe;
-  --color-sidebar-active: #dbeafe;
-  --color-sidebar-hover: #edf3fd;
-  --color-text: #172b4d;
-  --color-muted: #64748b;
-  --color-success: #16a34a;
-  --color-warning: #f59e0b;
-  --color-error: #ef4444;
-  --color-off: #94a3b8;
-  --color-line: #e2e8f0;
-  --shadow-soft: 0 4px 18px rgb(23 43 77 / .035);
-  --shadow-float: 0 16px 48px rgb(23 43 77 / .12);
   min-height: 100dvh;
 }
 
@@ -872,12 +856,19 @@ textarea:disabled {
   to { opacity: 1; transform: translateY(0); }
 }
 
+/* Leave room for the shared 16rem HESTA navigation at laptop widths. */
 @media (min-width: 1280px) {
   .twin-premium-layout {
-    grid-template-columns: 15rem minmax(0, 1fr) 21.25rem;
+    grid-template-columns: minmax(0, 1fr) 20rem;
+  }
+}
+
+@media (min-width: 1536px) {
+  .twin-premium-layout {
+    grid-template-columns: 14rem minmax(0, 1fr) 20rem;
   }
   .twin-premium-layout[data-explorer-collapsed="true"] {
-    grid-template-columns: minmax(0, 1fr) 21.25rem;
+    grid-template-columns: minmax(0, 1fr) 20rem;
   }
 }
 

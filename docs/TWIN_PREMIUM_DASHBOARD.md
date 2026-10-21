@@ -29,10 +29,13 @@ HESTA REST + shared STOMP subscription
 
 ## Trải nghiệm mới
 
-- Một header HESTA: navigation, realtime, notification và hồ sơ thật; renderer
-  theme được điều khiển tại header. Không thêm navigation header trùng.
-- Desktop: explorer 240px / scene co giãn / control panel 340px; explorer thu gọn.
-  Tablet: native modal drawer; mobile: bottom sheet có focus trap và Escape.
+- Giữ `HomeSidebar` dùng chung với các trang HESTA, chọn đúng mục Digital Twin;
+  header bên trong chỉ giữ tiêu đề, realtime, notification, hồ sơ và renderer
+  theme. Menu điều hướng trên mobile bổ sung Thành viên và Admin theo quyền.
+- Từ 1536px: nav HESTA 256px / explorer 224px / scene co giãn / control 320px.
+  Laptop 1280–1535px: explorer mở dạng drawer để scene có đủ diện tích.
+  Tablet: các panel dạng native modal drawer; mobile: bottom sheet có focus trap
+  và Escape. Không dùng menu ngang thay thế sidebar của ứng dụng.
 - Explorer dùng tầng từ layout thực, phòng và số thiết bị từ Redux. Chọn tầng
   chuyển single-floor; chọn phòng focus camera. Whole house là mặc định,
   exploded chỉ khi chọn rõ ràng. Có fullscreen cho toàn khu vực điều khiển 3D.
@@ -59,9 +62,10 @@ Canvas memoized và demand-rendered; selector từng device/sensor, geometry kh�
 phụ thuộc device state. Cluster chỉ đổi state khi vượt ngưỡng zoom. Các native
 panel đóng không mount thêm control hoặc gọi capability API.
 
-Theme DAYLIGHT/COZY/BLUEPRINT/NIGHT chỉ đổi renderer. App vẫn sáng. Palette theo
-brief mới được scope trong `.twin-premium-dashboard`, dùng lại semantic tokens;
-không đổi màu các trang HESTA khác.
+Theme DAYLIGHT/COZY/BLUEPRINT/NIGHT chỉ đổi renderer. App vẫn sáng. Theo phản hồi
+ngày 2026-10-21, đã bỏ toàn bộ palette ghi đè riêng của Digital Twin. Nền, nút,
+tab, trạng thái chọn, chữ, border và shadow kế thừa chính token HESTA hiện tại;
+không thay palette của các trang khác.
 
 ## File chính
 
@@ -97,11 +101,12 @@ với ảnh chưa được cung cấp.
 
 - `npm test`: **156/156 passed**, gồm aggregation, empty/invalid readings,
   floor scope, room precedence, unassigned devices và marker/motion helpers.
-- `npm run test:twin:interaction`: **47/47 passed**, không uncaught exception.
+- `npm run test:twin:interaction`: **51/51 passed**, không uncaught exception.
   Browser Chromium WebGL thật kiểm tra physical picking, RGB diffuser/light,
   brightness, pending/ACK, command failure, door, fan, read-only capability,
   không refetch snapshot, tablet/mobile/Escape, house/single/exploded, clustering
-  và renderer theme. Harness chỉ trả lời native beforeunload cho fixture cô lập;
+  renderer theme, shared HESTA navigation, content offset và laptop explorer.
+  Các theme giữ nguyên token giao diện chung HESTA. Harness chỉ trả lời native beforeunload cho fixture cô lập;
   không bỏ navigation guard của production.
 - Single floor đo được khoảng **70% chiều rộng canvas**. Đổi theme giữ hướng
   nhìn và điểm focus; camera vẫn fit lại khi viewport đổi kích thước.
@@ -117,9 +122,9 @@ với ảnh chưa được cung cấp.
 
 | Phần | Gzip KB |
 | --- | ---: |
-| Initial JS và static imports | 261.44 |
-| DigitalTwinPage async | 27.09 |
-| Twin3DView async | 47.57 |
+| Initial JS và static imports | 262.60 |
+| DigitalTwinPage async | 27.15 |
+| Twin3DView async | 47.59 |
 | R3F vendor async | 25.72 |
 | Three vendor async | 185.43 |
 
@@ -133,6 +138,7 @@ không phải tuyên bố mức giảm so với baseline chưa được đo lạ
 Artifacts local, không nhập dữ liệu fixture vào production:
 
 - [Desktop overview](../.tmp/twin-interaction-evidence/desktop-overview.png)
+- [Laptop với nav HESTA](../.tmp/twin-interaction-evidence/laptop-with-hesta-navigation.png)
 - [Whole house](../.tmp/twin-interaction-evidence/premium-whole-house.png)
 - [Single floor](../.tmp/twin-interaction-evidence/premium-single-floor.png)
 - [Daylight](../.tmp/twin-interaction-evidence/premium-theme-daylight.png)

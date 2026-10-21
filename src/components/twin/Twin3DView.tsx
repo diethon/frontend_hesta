@@ -24,6 +24,7 @@ import { notify } from '../ui/notify';
 import { knownPower } from './twinPresentation';
 
 const subscribeDesktop = (callback: () => void) => { const media = window.matchMedia('(min-width: 1280px)'); media.addEventListener('change', callback); return () => media.removeEventListener('change', callback); };
+const subscribeExplorerDesktop = (callback: () => void) => { const media = window.matchMedia('(min-width: 1536px)'); media.addEventListener('change', callback); return () => media.removeEventListener('change', callback); };
 const subscribeCompact = (callback: () => void) => { const media = window.matchMedia('(max-width: 767px)'); media.addEventListener('change', callback); return () => media.removeEventListener('change', callback); };
 class Twin3DErrorBoundary extends Component<{ children: ReactNode; onError: (error: Error) => void }, { failed: boolean }> {
   state = { failed: false }; static getDerivedStateFromError() { return { failed: true }; }
@@ -51,6 +52,7 @@ export function Twin3DView({ geometry, drafting, role, onEdit2D, rendererTheme, 
   const [fullscreen, setFullscreen] = useState(false);
   const dashboard = useRef<HTMLElement>(null);
   const desktop = useSyncExternalStore(subscribeDesktop, () => window.matchMedia('(min-width: 1280px)').matches, () => true);
+  const explorerDesktop = useSyncExternalStore(subscribeExplorerDesktop, () => window.matchMedia('(min-width: 1536px)').matches, () => true);
   useEffect(() => { const update = () => setFullscreen(document.fullscreenElement === dashboard.current); document.addEventListener('fullscreenchange', update); return () => document.removeEventListener('fullscreenchange', update); }, []);
   const toggleFullscreen = async () => { try { if (document.fullscreenElement) await document.exitFullscreen(); else await dashboard.current?.requestFullscreen(); } catch { notify.info('Trình duyệt chưa hỗ trợ toàn màn hình.'); } };
   const selectedRoomId = useAppSelector((state) => selection?.kind === 'room' ? selection.id : selection?.kind === 'node' ? selection.id.startsWith('DEVICE:') ? state.twin.devicesById[selection.id.slice(7)]?.roomId ?? null : state.twin.sensorsById[selection.id.slice(7)]?.roomId ?? null : null);
@@ -97,12 +99,12 @@ export function Twin3DView({ geometry, drafting, role, onEdit2D, rendererTheme, 
   const closeControls = () => { select(null); setPanelOpen(false); };
   return <section ref={dashboard} aria-label="Chế độ 3D" className="twin-dashboard-view min-w-0 space-y-4">
     <div className="flex flex-wrap items-center justify-between gap-2">
-      <div className="flex flex-wrap items-center gap-2"><button type="button" aria-label="Danh sách tầng và phòng" aria-expanded={desktop ? !explorerCollapsed : treeOpen} onClick={() => desktop ? setExplorerCollapsed(value => !value) : setTreeOpen(true)} className="flex min-h-11 items-center gap-2 rounded-xl border border-line bg-surface px-3 text-xs font-semibold text-text">{explorerCollapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}<span>House Explorer</span></button>
+      <div className="flex flex-wrap items-center gap-2"><button type="button" aria-label="Danh sách tầng và phòng" aria-expanded={explorerDesktop ? !explorerCollapsed : treeOpen} onClick={() => explorerDesktop ? setExplorerCollapsed(value => !value) : setTreeOpen(true)} className="flex min-h-11 items-center gap-2 rounded-xl border border-line bg-surface px-3 text-xs font-semibold text-text">{explorerCollapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}<span>House Explorer</span></button>
       {!desktop ? <button type="button" aria-label="Mở điều khiển thông minh" onClick={() => setPanelOpen(true)} className="flex min-h-11 items-center gap-2 rounded-xl bg-primary px-3 text-xs font-semibold text-white"><Sliders size={17} />Điều khiển</button> : null}</div>
       <p className="flex items-center gap-2 text-xs text-muted"><span className="h-1.5 w-1.5 rounded-full bg-success" aria-hidden="true" /><strong className="font-semibold text-text">{onCount} đang bật</strong><span>/</span>{activeRooms.length} phòng · {activeDevices.length} thiết bị</p>
     </div>
     <div className="twin-premium-layout" data-explorer-collapsed={explorerCollapsed}>
-      {desktop && !explorerCollapsed ? <aside aria-label="House Explorer" className="twin-explorer-column">{explorer}</aside> : null}
+      {explorerDesktop && !explorerCollapsed ? <aside aria-label="House Explorer" className="twin-explorer-column">{explorer}</aside> : null}
       <div className="twin-scene-column min-w-0 space-y-3">
         <div className="twin-3d-stage twin-living-stage relative isolate min-w-0 overflow-hidden rounded-3xl border border-line shadow-soft" data-theme={theme} data-floor-mode={mode} data-wall-mode={wallMode} data-marker-mode={markerMode}>
           {!ready ? <div role="status" className="absolute inset-0 z-50 flex items-center justify-center bg-app text-sm text-muted">Đang dựng không gian của bạn…</div> : null}
@@ -113,7 +115,7 @@ export function Twin3DView({ geometry, drafting, role, onEdit2D, rendererTheme, 
               <button type="button" aria-label="Hiện vị trí thiết bị và cảm biến" title="Hiện vị trí thiết bị và cảm biến" aria-pressed={markerMode === 'all'} onClick={() => setMarkerMode((value) => value === 'all' ? 'important' : 'all')} className={`flex h-10 w-10 items-center justify-center rounded-lg ${markerMode === 'all' ? 'bg-sidebar-active text-primary-hover' : 'text-muted hover:bg-sidebar-hover'}`}><MousePointer2 size={17} /></button>
               <button type="button" aria-label="Ban ngày" aria-pressed={theme === 'DAYLIGHT'} onClick={() => setTheme('DAYLIGHT')} className={`flex h-10 w-10 items-center justify-center rounded-lg ${theme === 'DAYLIGHT' ? 'bg-sidebar-active text-primary-hover' : 'text-muted hover:bg-sidebar-hover'}`}><Sun size={17} /></button>
               <button type="button" aria-label="Không gian ấm" title="Giảm ánh sáng nền để xem rõ ánh sáng thiết bị" aria-pressed={theme === 'COZY'} onClick={() => setTheme('COZY')} className={`flex h-10 w-10 items-center justify-center rounded-lg ${theme === 'COZY' ? 'bg-sidebar-active text-primary-hover' : 'text-muted hover:bg-sidebar-hover'}`}><Moon size={17} /></button>
-              <button type="button" aria-label="Danh sách phòng và thiết bị" aria-expanded={desktop ? !explorerCollapsed : treeOpen} onClick={() => desktop ? setExplorerCollapsed(value => !value) : setTreeOpen(true)} className="flex h-10 w-10 items-center justify-center rounded-lg text-muted hover:bg-sidebar-hover"><ListTree size={17} /></button>
+              <button type="button" aria-label="Danh sách phòng và thiết bị" aria-expanded={explorerDesktop ? !explorerCollapsed : treeOpen} onClick={() => explorerDesktop ? setExplorerCollapsed(value => !value) : setTreeOpen(true)} className="flex h-10 w-10 items-center justify-center rounded-lg text-muted hover:bg-sidebar-hover"><ListTree size={17} /></button>
             </div>
           </div>
           <div className="pointer-events-none absolute inset-x-0 bottom-0 z-40 flex flex-wrap items-center justify-between gap-2 p-4 sm:p-5">
@@ -147,9 +149,7 @@ export function Twin3DView({ geometry, drafting, role, onEdit2D, rendererTheme, 
       </aside> : null}
     </div>
     <TwinAnalytics roomId={selectedRoomId} scopeRoomIds={scopeRoomIds} scopeName={scopeName} />
-    {!desktop ? <>
-      <TwinPanelDialog open={treeOpen} title="House Explorer" side="left" onDismiss={() => setTreeOpen(false)}>{explorer}</TwinPanelDialog>
-      <TwinPanelDialog open={panelOpen || selection?.kind === 'node'} title="Điều khiển thiết bị" side="right" onDismiss={closeControls}>{controls}</TwinPanelDialog>
-    </> : null}
+    {!explorerDesktop ? <TwinPanelDialog open={treeOpen} title="House Explorer" side="left" onDismiss={() => setTreeOpen(false)}>{explorer}</TwinPanelDialog> : null}
+    {!desktop ? <TwinPanelDialog open={panelOpen || selection?.kind === 'node'} title="Điều khiển thiết bị" side="right" onDismiss={closeControls}>{controls}</TwinPanelDialog> : null}
   </section>;
 }

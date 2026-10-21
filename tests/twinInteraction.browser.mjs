@@ -88,12 +88,14 @@ try {
     await evaluate(`(()=>{const marker=document.querySelector('.twin-3d-marker[data-node-id="${id}"]');const row=[...document.querySelectorAll('button')].find(b=>b.getAttribute('aria-label')==='Chọn thiết bị '+window.__twinFixtureScene().devices['${id}'].name);(marker||row).click()})()`);
   };
   await Promise.all([send('Page.enable'), send('Runtime.enable'), send('Log.enable')]);
-  await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1050, deviceScaleFactor: 1, mobile: false });
+  await send('Emulation.setDeviceMetricsOverride', { width: 1600, height: 1050, deviceScaleFactor: 1, mobile: false });
   await send('Page.navigate', { url: testUrl });
   await waitFor(`window.__twinFixtureScene?.()?.deviceModels.length === 13`);
   await settle();
   check('bright Daylight renderer is the default', await evaluate(`document.querySelector('.twin-3d-stage').dataset.theme==='DAYLIGHT'`));
   check('desktop uses real house explorer scene and control columns', await evaluate(`!!document.querySelector('[aria-label="House Explorer"]') && !!document.querySelector('[aria-label="Bảng điều khiển thông minh"]') && !!document.querySelector('[aria-label="Thống kê ngôi nhà"]')`));
+  check('shared HESTA sidebar retains every home navigation item and selected Twin', await evaluate(`(()=>{const nav=document.querySelector('.app-sidebar nav');return !!nav && nav.querySelectorAll('button').length>=7 && nav.querySelector('[aria-current="page"]')?.textContent.includes('Digital Twin')})()`));
+  check('Twin content clears the fixed application sidebar', await evaluate(`document.querySelector('.twin-premium-dashboard').getBoundingClientRect().left>=256`));
   check('sensor history is never replaced with fabricated charts', await evaluate(`document.querySelectorAll('[aria-label="Thống kê ngôi nhà"] canvas,[aria-label="Thống kê ngôi nhà"] svg polyline').length===0`));
   await screenshot('desktop-overview');
   if (!process.env.TWIN_DASHBOARD_ONLY) {
@@ -196,6 +198,13 @@ try {
   check('confirmed numeric-string zero speed stops blades', JSON.stringify((await scene()).deviceModels.find((model) => model.id === 'DEVICE:fan').animation) === JSON.stringify(fanStopped));
   await screenshot('desktop-selected-light');
   await click('Đóng chi tiết');
+  await send('Emulation.setDeviceMetricsOverride', {width:1440,height:1050,deviceScaleFactor:1,mobile:false});
+  await settle();
+  check('laptop prioritizes the scene and controls inside the shared shell', await evaluate(`document.querySelector('.twin-3d-stage').getBoundingClientRect().width>=600 && !document.querySelector('.twin-explorer-column') && !!document.querySelector('.twin-controls-column') && document.documentElement.scrollWidth<=window.innerWidth+1`));
+  await screenshot('laptop-with-hesta-navigation');
+  await click('Danh sách tầng và phòng');
+  check('laptop floor explorer remains accessible in a modal', await evaluate(`!!document.querySelector('dialog[open].twin-panel-left')`));
+  await click('Đóng bảng điều khiển');
   await send('Emulation.setDeviceMetricsOverride', {width:768,height:1024,deviceScaleFactor:1,mobile:false});
   await settle();
   await click('Mở điều khiển thông minh');
@@ -215,7 +224,7 @@ try {
   await waitFor(`document.querySelector('dialog[open]')===null`);
   check('mobile bottom sheet closes with Escape', await evaluate(`document.querySelector('dialog[open]')===null`));
   }
-  await send('Emulation.setDeviceMetricsOverride', {width:1440,height:1050,deviceScaleFactor:1,mobile:false});
+  await send('Emulation.setDeviceMetricsOverride', {width:1600,height:1050,deviceScaleFactor:1,mobile:false});
   if (!process.env.TWIN_INTERACTION_ONLY) {
   const multiFloorUrl = new URL(testUrl); multiFloorUrl.search='?multifloor=1&interactions=1'; multiFloorUrl.hash='';
   await send('Page.navigate',{url:multiFloorUrl.href});
@@ -242,7 +251,7 @@ try {
     // Full-page capture can briefly resize the viewport. Radius may refit to
     // that aspect; the user's viewing direction and focal point must remain.
     check(`${theme} preserves camera view and framing`, direction(themed).every((value,i)=>Math.abs(value-floorDirection[i])<.001) && themed.target.every((value,i)=>Math.abs(value-floorTarget[i])<.01) && Math.max(themed.extent.width,themed.extent.height)>=.7 && Math.max(themed.extent.width,themed.extent.height)<=.86);
-    check(`${theme} changes only the renderer environment`, await evaluate(`getComputedStyle(document.querySelector('.twin-premium-dashboard')).backgroundColor==='rgb(245, 248, 252)'`));
+    check(`${theme} keeps the shared HESTA application palette`, await evaluate(`(()=>{const app=getComputedStyle(document.documentElement),twin=getComputedStyle(document.querySelector('.twin-premium-dashboard'));return ['--color-app','--color-primary','--color-primary-hover','--color-text','--color-muted','--color-line','--color-sidebar-active'].every(token=>twin.getPropertyValue(token).trim()===app.getPropertyValue(token).trim())})()`));
     await screenshot('premium-theme-'+theme.toLowerCase());
   }
   await click('Cả ngôi nhà'); await waitFor(`window.__twinFixtureScene().floors.length===3`); await settle();
