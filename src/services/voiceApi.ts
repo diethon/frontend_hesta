@@ -20,6 +20,7 @@ export interface VoiceCommandResponse {
   totalDurationMs: number;
   stepDurations: Record<string, number>;
   audioUrl?: string | null;
+  audioData?: string | null;
 }
 
 /**

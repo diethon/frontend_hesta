@@ -129,15 +129,31 @@ export const VoiceAssistantButton: React.FC = () => {
   const modalRef = useRef<HTMLDivElement>(null);
   const autoCloseTimerRef = useRef<any>(null);
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
+  const watchdogTimerRef = useRef<any>(null);
+
+  /* ── Kích hoạt / Unlock AudioContext & Audio Player trên tương tác người dùng ── */
+  const unlockAudioPlayer = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      if (!audioPlayerRef.current) {
+        audioPlayerRef.current = new Audio();
+      }
+      // Đảm bảo volume = 1.0 và trình duyệt ghi nhận gesture unlock
+      audioPlayerRef.current.volume = 1.0;
+    } catch {}
+  }, []);
 
   /* ── Dừng toàn bộ âm thanh (cả Audio stream và Web Speech) ── */
   const stopAllAudio = useCallback(() => {
+    if (watchdogTimerRef.current) {
+      clearTimeout(watchdogTimerRef.current);
+      watchdogTimerRef.current = null;
+    }
     if (audioPlayerRef.current) {
       try {
         audioPlayerRef.current.pause();
         audioPlayerRef.current.currentTime = 0;
       } catch {}
-      audioPlayerRef.current = null;
     }
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       try {
@@ -149,6 +165,7 @@ export const VoiceAssistantButton: React.FC = () => {
 
   /* ── Bật/tắt giọng đọc phản hồi ── */
   const toggleTts = useCallback(() => {
+    unlockAudioPlayer();
     setTtsEnabled((prev) => {
       const next = !prev;
       try {
@@ -159,7 +176,7 @@ export const VoiceAssistantButton: React.FC = () => {
       }
       return next;
     });
-  }, [stopAllAudio]);
+  }, [stopAllAudio, unlockAudioPlayer]);
 
   /* ── Fallback chỉ dùng Web Speech API NẾU máy có giọng tiếng Việt thực thụ ── */
   const fallbackLocalSpeech = useCallback((cleanMessage: string) => {
@@ -198,40 +215,57 @@ export const VoiceAssistantButton: React.FC = () => {
 
   /* ── Phát âm thanh giọng đọc phản hồi tiếng Việt ── */
   const speakResponse = useCallback(
-    (text: string, customAudioUrl?: string | null) => {
+    (text: string, customAudioPayload?: string | null) => {
       if (!ttsEnabled) return;
       stopAllAudio();
 
-      const cleanMessage = text.replace(/[✅⚠️❌⚡📝]/g, '').trim();
+      const cleanMessage = text.replace(/[✅⚠️❌⚡📝🔒🔓💡🔌🌀❄️☀️🌡️🔊🔇\*_`~#]/g, '').trim();
       if (!cleanMessage) return;
 
-      // 1. Ưu tiên cao nhất: Sử dụng Neural Audio tiếng Việt từ voice-service (Giọng Hoài My cực chuẩn & tự nhiên)
-      const audioUrl = customAudioUrl || getTtsAudioUrl(cleanMessage);
+      // 1. Ưu tiên cao nhất: Dùng Neural Audio (Base64 data URL tức thì < 10ms hoặc Stream URL từ server)
+      const audioSrc = customAudioPayload || getTtsAudioUrl(cleanMessage);
       try {
-        const audio = new Audio(audioUrl);
-        audioPlayerRef.current = audio;
+        if (!audioPlayerRef.current) {
+          audioPlayerRef.current = new Audio();
+        }
+        const audio = audioPlayerRef.current;
+        audio.pause();
+        audio.src = audioSrc;
+
+        let finished = false;
+        const finishSpeech = () => {
+          if (finished) return;
+          finished = true;
+          setIsSpeaking(false);
+          if (watchdogTimerRef.current) {
+            clearTimeout(watchdogTimerRef.current);
+            watchdogTimerRef.current = null;
+          }
+        };
 
         audio.onplay = () => setIsSpeaking(true);
-        audio.onended = () => {
-          setIsSpeaking(false);
-          audioPlayerRef.current = null;
-        };
+        audio.onended = finishSpeech;
         audio.onerror = () => {
-          console.warn('Server TTS audio error, checking local voice...');
-          audioPlayerRef.current = null;
+          console.warn('Audio playback error, falling back...');
+          finishSpeech();
           fallbackLocalSpeech(cleanMessage);
         };
+
+        // Watchdog: Tự động giải phóng trạng thái isSpeaking sau 8s để không bao giờ bị đơ UI
+        if (watchdogTimerRef.current) clearTimeout(watchdogTimerRef.current);
+        watchdogTimerRef.current = setTimeout(finishSpeech, 8000);
 
         const playPromise = audio.play();
         if (playPromise !== undefined) {
           playPromise.catch((err) => {
-            console.warn('Audio play failed:', err);
-            audioPlayerRef.current = null;
+            console.warn('Audio play() rejected:', err);
+            finishSpeech();
             fallbackLocalSpeech(cleanMessage);
           });
         }
       } catch (e) {
         console.warn('Could not initialize Audio player:', e);
+        setIsSpeaking(false);
         fallbackLocalSpeech(cleanMessage);
       }
     },
@@ -322,10 +356,11 @@ export const VoiceAssistantButton: React.FC = () => {
         setVoiceState(resp.success ? 'success' : 'error');
         setHistory((prev) => [voiceResult, ...prev.filter((h) => h.transcript !== cleanText)].slice(0, 8));
 
-        // Phát giọng nói tiếng Việt chuẩn tự nhiên
+        // Phát giọng nói tiếng Việt chuẩn tự nhiên (ưu tiên Base64 phát tức thì < 10ms)
         if (resp.message) {
           const directUrl = resp.audioUrl ? `${VOICE_SERVICE_URL}${resp.audioUrl}` : undefined;
-          speakResponse(resp.message, directUrl);
+          const audioPayload = resp.audioData || directUrl;
+          speakResponse(resp.message, audioPayload);
         }
 
         // Tự động chuyển về idle sau 5s (đủ nghe trọn vẹn câu phản hồi)
@@ -353,6 +388,9 @@ export const VoiceAssistantButton: React.FC = () => {
 
   /* ── Bắt đầu nghe giọng nói ── */
   const startListening = useCallback(() => {
+    // Mở khóa âm thanh trước cho trình duyệt để tránh bị chặn phát giọng đọc
+    unlockAudioPlayer();
+
     // Dừng giọng đọc nếu đang nói dở để lắng nghe người dùng
     stopAllAudio();
 
@@ -440,7 +478,7 @@ export const VoiceAssistantButton: React.FC = () => {
     } catch (e) {
       console.warn('Recognition start warning:', e);
     }
-  }, [sendCommand]);
+  }, [sendCommand, stopAllAudio, unlockAudioPlayer]);
 
   /* ── Dừng nghe ── */
   const stopListening = useCallback(() => {
@@ -453,6 +491,7 @@ export const VoiceAssistantButton: React.FC = () => {
 
   /* ── Mở modal & tự động kích hoạt mic ── */
   const handleOpen = () => {
+    unlockAudioPlayer();
     setIsOpen(true);
     setVoiceState('idle');
     setTranscript('');
