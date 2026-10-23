@@ -8,6 +8,7 @@ import type {
   ManualOverrideRecord,
   DeviceUptimeResponse,
   DeviceHealthResponse,
+  DeviceShadowResponse,
 } from '../types/device';
 
 export interface DevicePublicPreviewResponse {
@@ -296,6 +297,25 @@ export const getHomeDeviceCapabilities = async (homeId: string): Promise<import(
 
 export const getDeviceCapabilities = async (deviceId: string): Promise<import('../types/automation').DeviceCapabilityInfo> => {
   const response = await apiClient.get(`/devices/${deviceId}/capabilities`);
+  return response.data.result;
+};
+
+// Device Shadow (Desired vs Reported State)
+export const getDeviceShadow = async (deviceId: string): Promise<DeviceShadowResponse> => {
+  const response = await apiClient.get(`/devices/${deviceId}/shadow`);
+  return response.data.result;
+};
+
+export const updateDesiredShadow = async (
+  deviceId: string,
+  desiredState: Record<string, unknown>
+): Promise<DeviceShadowResponse> => {
+  const response = await apiClient.put(`/devices/${deviceId}/shadow/desired`, desiredState);
+  return response.data.result;
+};
+
+export const reconcileDeviceShadow = async (deviceId: string): Promise<DeviceShadowResponse> => {
+  const response = await apiClient.post(`/devices/${deviceId}/shadow/reconcile`);
   return response.data.result;
 };
 

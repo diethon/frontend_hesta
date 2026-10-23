@@ -5,6 +5,7 @@ import { getHomeEnergyAnalytics } from '../../services/energyApi';
 import type { EnergyAnalyticsResponse, DeviceEnergyBreakdown, EnergyTimeSeriesPoint } from '../../types/energy';
 import { getErrorMessage } from '../../utils/errors';
 import { Zap, TrendingUp, TrendingDown, AlertCircle, DollarSign, Clock, ArrowLeft, RefreshCw, Layers, PieChart } from 'lucide-react';
+import { DemandResponseCard } from './DemandResponseCard';
 
 const DONUT_COLORS = [
   '#f59e0b', // Amber
@@ -295,6 +296,9 @@ export const EnergyDashboardPage: React.FC = () => {
             </div>
           </div>
           )}
+
+          {/* Demand Response & Peak Shaving [PHO-049] */}
+          {homeId && <DemandResponseCard homeId={homeId} />}
 
           {/* Time Series Bar Chart */}
           <div className="surface-card p-5 sm:p-6 rounded-2xl space-y-4 border border-line shadow-soft">

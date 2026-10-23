@@ -8,13 +8,15 @@ import { StatusChips } from './StatusChips';
 import { DeviceFilters } from './DeviceFilters';
 import { SceneBar } from './SceneBar';
 import { DeviceGroupSection } from './DeviceGroupSection';
+import { RoomManagementModal } from './RoomManagementModal';
 import {
   getDevicesByHome,
   sendDeviceCommand,
   sendManualPowerCommand,
 } from '../../services/deviceApi';
-import { getHomeRooms } from '../../services/homeApi';
+import { getRooms } from '../../services/roomApi';
 import type { DeviceResponse } from '../../types/device';
+import type { RoomResponse } from '../../types/room';
 import { getErrorMessage, isDuplicateCommandError } from '../../utils/errors';
 import { HomeSidebar } from '../ui/HomeSidebar';
 import { NotificationBell } from '../notification/NotificationBell';
@@ -63,37 +65,64 @@ export const DevicePage: React.FC = () => {
   const dispatch = useAppDispatch();
 
   // ── Core state ──
-  const [rooms, setRooms] = useState<{ id: string; name: string }[]>([]);
+  const [rooms, setRooms] = useState<RoomResponse[]>([]);
   const [selectedRoomId, setSelectedRoomId] = useState<string>('ALL');
   const [activeCategory, setActiveCategory] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [devices, setDevices] = useState<DeviceResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [powerPendingId, setPowerPendingId] = useState<string | null>(null);
+  const [powerPendingIds, setPowerPendingIds] = useState<Record<string, boolean>>({});
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isRoomModalOpen, setIsRoomModalOpen] = useState(false);
 
   // ── Drawer state ──
   const [selectedDevice, setSelectedDevice] = useState<DeviceResponse | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const drawerCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Drag-and-drop ordering ──
   const [deviceOrder, setDeviceOrder] = useState<string[]>([]);
   const [reorderingDeviceId, setReorderingDeviceId] = useState<string | null>(null);
-  const dragItem = useRef<number | null>(null);
-  const dragOverItem = useRef<number | null>(null);
+  const draggedDeviceIdRef = useRef<string | null>(null);
+  const dragOverDeviceIdRef = useRef<string | null>(null);
 
-  // Load device order from local storage when homeId changes
+  // Clear drawer close timeout on unmount
   useEffect(() => {
+    return () => {
+      if (drawerCloseTimerRef.current) {
+        clearTimeout(drawerCloseTimerRef.current);
+      }
+    };
+  }, []);
+
+  // Reset page state and load device order from local storage when homeId changes
+  useEffect(() => {
+    // Reset home-scoped state to prevent cross-home data leaks
+    setSelectedRoomId('ALL');
+    setSelectedDevice(null);
+    setIsDrawerOpen(false);
+    setDevices([]);
+    setError('');
+    if (drawerCloseTimerRef.current) {
+      clearTimeout(drawerCloseTimerRef.current);
+      drawerCloseTimerRef.current = null;
+    }
+
     if (homeId) {
       const saved = localStorage.getItem(`deviceOrder_${homeId}`);
       if (saved) {
         try {
-          setDeviceOrder(JSON.parse(saved));
+          const parsed = JSON.parse(saved);
+          setDeviceOrder(Array.isArray(parsed) ? parsed : []);
         } catch {
           setDeviceOrder([]);
         }
+      } else {
+        setDeviceOrder([]);
       }
+    } else {
+      setDeviceOrder([]);
     }
   }, [homeId]);
 
@@ -157,10 +186,10 @@ export const DevicePage: React.FC = () => {
   const fetchRooms = useCallback(async () => {
     if (!homeId) return;
     try {
-      const data = await getHomeRooms(homeId);
+      const data = await getRooms(homeId);
       setRooms(data || []);
     } catch (err: unknown) {
-      console.error('Lỗi tải phòng:', err);
+      console.error('Lỗi tải danh sách phòng:', err);
     }
   }, [homeId]);
 
@@ -185,18 +214,13 @@ export const DevicePage: React.FC = () => {
   }, [homeId]);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => void fetchRooms(), 0);
-    return () => window.clearTimeout(timer);
-  }, [fetchRooms]);
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => void fetchDevices(), 0);
-    return () => window.clearTimeout(timer);
-  }, [fetchDevices]);
+    void fetchRooms();
+    void fetchDevices();
+  }, [fetchRooms, fetchDevices]);
 
   // ── Toggle power (with 30-min automation override) ──
   const handleTogglePower = async (deviceId: string, currentPower: string) => {
-    setPowerPendingId(deviceId);
+    setPowerPendingIds((prev) => ({ ...prev, [deviceId]: true }));
     const action = currentPower === 'ON' ? 'TURN_OFF' : 'TURN_ON';
     const nextPower = action === 'TURN_ON' ? 'ON' : 'OFF';
 
@@ -253,7 +277,11 @@ export const DevicePage: React.FC = () => {
       }
       void fetchDevices(true); // Rollback silently via refetch
     } finally {
-      setPowerPendingId(null);
+      setPowerPendingIds((prev) => {
+        const next = { ...prev };
+        delete next[deviceId];
+        return next;
+      });
     }
   };
 
@@ -346,6 +374,10 @@ export const DevicePage: React.FC = () => {
   const handleDeviceClick = (deviceId: string) => {
     const device = devices.find((d) => d.id === deviceId);
     if (device) {
+      if (drawerCloseTimerRef.current) {
+        clearTimeout(drawerCloseTimerRef.current);
+        drawerCloseTimerRef.current = null;
+      }
       setSelectedDevice(device);
       setIsDrawerOpen(true);
     }
@@ -359,7 +391,7 @@ export const DevicePage: React.FC = () => {
   // ── Device updated ──
   const handleDeviceUpdated = (updatedDevice: DeviceResponse) => {
     setDevices((prev) => prev.map((d) => (d.id === updatedDevice.id ? updatedDevice : d)));
-    setSelectedDevice(updatedDevice);
+    setSelectedDevice((prev) => (prev && prev.id === updatedDevice.id ? updatedDevice : prev));
   };
 
   // ── Scene activation (placeholder logic) ──
@@ -454,26 +486,21 @@ export const DevicePage: React.FC = () => {
     }
   };
 
-  const handleDragStart = (e: React.DragEvent, index: number) => {
-    dragItem.current = index;
+  const handleDragStart = (e: React.DragEvent, deviceId: string) => {
+    draggedDeviceIdRef.current = deviceId;
     e.currentTarget.classList.add('opacity-50');
   };
 
-  const handleDragEnter = (index: number) => {
-    dragOverItem.current = index;
+  const handleDragEnter = (deviceId: string) => {
+    dragOverDeviceIdRef.current = deviceId;
   };
 
   const handleDragEnd = (e: React.DragEvent) => {
     e.currentTarget.classList.remove('opacity-50');
     setReorderingDeviceId(null);
-    if (
-      dragItem.current !== null &&
-      dragOverItem.current !== null &&
-      dragItem.current !== dragOverItem.current
-    ) {
-      const draggedId = sortedDevices[dragItem.current].id;
-      const targetId = sortedDevices[dragOverItem.current].id;
-
+    const draggedId = draggedDeviceIdRef.current;
+    const targetId = dragOverDeviceIdRef.current;
+    if (draggedId && targetId && draggedId !== targetId) {
       let currentGlobalOrder = [...deviceOrder];
       // Ensure all current devices are in the global order array
       devices.forEach((d) => {
@@ -489,7 +516,9 @@ export const DevicePage: React.FC = () => {
       const targetGlobalIndex = currentGlobalOrder.indexOf(targetId);
       if (targetGlobalIndex !== -1) {
         // If moving down, insert AFTER target. If moving up, insert BEFORE target.
-        const isMovingDown = dragItem.current < dragOverItem.current;
+        const fromSortedIdx = sortedDevices.findIndex((d) => d.id === draggedId);
+        const toSortedIdx = sortedDevices.findIndex((d) => d.id === targetId);
+        const isMovingDown = fromSortedIdx !== -1 && toSortedIdx !== -1 ? fromSortedIdx < toSortedIdx : true;
         const insertIndex = isMovingDown ? targetGlobalIndex + 1 : targetGlobalIndex;
         currentGlobalOrder.splice(insertIndex, 0, draggedId);
       } else {
@@ -501,8 +530,8 @@ export const DevicePage: React.FC = () => {
         localStorage.setItem(`deviceOrder_${homeId}`, JSON.stringify(currentGlobalOrder));
       }
     }
-    dragItem.current = null;
-    dragOverItem.current = null;
+    draggedDeviceIdRef.current = null;
+    dragOverDeviceIdRef.current = null;
   };
 
   // ──────────────────────────────────────────────────────────────────
@@ -585,9 +614,9 @@ export const DevicePage: React.FC = () => {
             <SceneBar onSceneActivate={handleSceneActivate} />
           </section>
 
-          {/* ───── Virtual Device Groups (Master Control) ───── */}
+          {/* ───── Smart Device Groups ───── */}
           {homeId && (
-            <section aria-label="Nhóm thiết bị ảo">
+            <section aria-label="Nhóm thiết bị thông minh">
               <DeviceGroupSection
                 homeId={homeId}
                 availableDevices={devices}
@@ -614,6 +643,7 @@ export const DevicePage: React.FC = () => {
             totalDeviceCount={devices.length}
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
+            onOpenRoomManagement={() => setIsRoomModalOpen(true)}
           />
 
           {/* ───── Device Grid ───── */}
@@ -673,7 +703,7 @@ export const DevicePage: React.FC = () => {
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 grid-flow-dense gap-4 p-1">
-              {sortedDevices.map((device, index) => {
+              {sortedDevices.map((device) => {
                 const wide = isWideCard(device);
                 const isDraggable = reorderingDeviceId === device.id;
                 return (
@@ -689,16 +719,16 @@ export const DevicePage: React.FC = () => {
                         e.preventDefault();
                         return;
                       }
-                      handleDragStart(e, index);
+                      handleDragStart(e, device.id);
                     }}
                     onDragEnter={() => {
-                      if (dragItem.current !== null) {
-                        handleDragEnter(index);
+                      if (draggedDeviceIdRef.current !== null) {
+                        handleDragEnter(device.id);
                       }
                     }}
                     onDragEnd={handleDragEnd}
                     onDragOver={(e: React.DragEvent) => {
-                      if (dragItem.current !== null) {
+                      if (draggedDeviceIdRef.current !== null) {
                         e.preventDefault();
                       }
                     }}
@@ -718,7 +748,7 @@ export const DevicePage: React.FC = () => {
                     )}
                     <DeviceCard
                       device={device}
-                      powerPending={powerPendingId === device.id}
+                      powerPending={!!powerPendingIds[device.id]}
                       onTogglePower={handleTogglePower}
                       onClick={handleDeviceClick}
                       onStateChange={handleDeviceUpdated}
@@ -736,8 +766,14 @@ export const DevicePage: React.FC = () => {
         key={selectedDevice?.id ?? 'closed'}
         isOpen={isDrawerOpen}
         onClose={() => {
+          if (drawerCloseTimerRef.current) {
+            clearTimeout(drawerCloseTimerRef.current);
+          }
           setIsDrawerOpen(false);
-          setTimeout(() => setSelectedDevice(null), 300);
+          drawerCloseTimerRef.current = setTimeout(() => {
+            setSelectedDevice(null);
+            drawerCloseTimerRef.current = null;
+          }, 300);
         }}
         device={selectedDevice ? (devices.find((d) => d.id === selectedDevice.id) ?? selectedDevice) : null}
         onDeviceRemoved={handleDeviceRemoved}
@@ -745,7 +781,7 @@ export const DevicePage: React.FC = () => {
         onTogglePower={handleTogglePower}
         onColorChange={handleColorChange}
         onBrightnessChange={handleBrightnessChange}
-        isPowerPending={powerPendingId === selectedDevice?.id}
+        isPowerPending={!!selectedDevice && !!powerPendingIds[selectedDevice.id]}
       />
 
       {/* ───── Add Device Modal ───── */}
@@ -758,6 +794,24 @@ export const DevicePage: React.FC = () => {
           selectedRoomId={selectedRoomId}
           onSuccess={() => {
             void fetchDevices();
+          }}
+        />
+      )}
+
+      {/* ───── Room Management Modal ───── */}
+      {homeId && (
+        <RoomManagementModal
+          isOpen={isRoomModalOpen}
+          onClose={() => setIsRoomModalOpen(false)}
+          homeId={homeId}
+          onRoomsChanged={() => {
+            void fetchRooms();
+            void fetchDevices(true);
+          }}
+          onRoomDeleted={(deletedRoomId) => {
+            if (selectedRoomId === deletedRoomId) {
+              setSelectedRoomId('ALL');
+            }
           }}
         />
       )}

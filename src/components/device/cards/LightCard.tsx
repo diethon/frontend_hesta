@@ -117,6 +117,14 @@ export const LightCard: React.FC<LightCardProps> = ({
 
   const brightnessThrottleRef = useRef<number | null>(null);
 
+  useEffect(() => {
+    return () => {
+      if (brightnessThrottleRef.current) {
+        window.clearTimeout(brightnessThrottleRef.current);
+      }
+    };
+  }, []);
+
   const handleBrightnessChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = Number(e.target.value);
     setBrightness(val);
@@ -225,7 +233,7 @@ export const LightCard: React.FC<LightCardProps> = ({
       onClick={() => onClick?.(device.id)}
       onKeyDown={(e) => e.key === 'Enter' && onClick?.(device.id)}
       style={{ boxShadow: glowShadow }}
-      className={`relative flex flex-col justify-between p-4 sm:p-5 rounded-2xl border transition-all duration-300 select-none cursor-pointer overflow-hidden ${
+      className={`relative flex flex-col justify-between p-4 sm:p-5 rounded-2xl border transition-all duration-300 select-none cursor-pointer overflow-hidden transform-gpu ${
         isOffline
           ? 'bg-off-soft/60 border-line/50 opacity-70 grayscale'
           : isOn

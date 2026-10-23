@@ -42,6 +42,7 @@ import {
   getDeviceUptime,
   getDeviceHealth
 } from '../../services/deviceApi';
+import { DeviceShadowSection } from './DeviceShadowSection';
 import { useOverrideCountdown } from './useOverrideCountdown';
 import { getDeviceEnergy } from '../../services/energyApi';
 import { notify } from '../ui/notify';
@@ -522,6 +523,9 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
               )}
             </div>
           </div>
+
+          {/* Device Shadow [PHO-048] */}
+          <DeviceShadowSection deviceId={device.id} />
 
           {/* Energy Summary Widget */}
           {deviceEnergy && (

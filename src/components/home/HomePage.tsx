@@ -4,7 +4,8 @@ import type { UserResponse } from "../../types/auth";
 import { ProfileModal } from "../profile/ProfileModal";
 import { MemberManagement } from "./MemberManagement";
 import { SceneManagement } from "./SceneManagement";
-import { getMyHomes, createHome } from "../../services/homeApi";
+import { getMyHomes, createHome, updateHome } from "../../services/homeApi";
+import { Pencil, Sparkles, X } from "lucide-react";
 import { currentHomeChanged, currentHomeCleared } from "../../store/homeSlice";
 import { useAppDispatch } from "../../store/hooks";
 import { getErrorMessage } from "../../utils/errors";
@@ -36,12 +37,6 @@ interface HomeSummary {
   role: "OWNER" | "MEMBER";
 }
 
-interface HomeSummary {
-  homeId: string;
-  homeName: string;
-  role: "OWNER" | "MEMBER";
-}
-
 export const HomePage: React.FC<HomePageProps> = ({
   user,
   onLogout,
@@ -58,6 +53,12 @@ export const HomePage: React.FC<HomePageProps> = ({
   const [newHomeName, setNewHomeName] = useState("");
   const [createLoading, setCreateLoading] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isRenameModalOpen, setIsRenameModalOpen] = useState(false);
+  const [renameHomeName, setRenameHomeName] = useState("");
+  const [renameLoading, setRenameLoading] = useState(false);
+  const [isOnboardingModalOpen, setIsOnboardingModalOpen] = useState(false);
+  const [onboardingHomeName, setOnboardingHomeName] = useState("");
+  const [onboardingLoading, setOnboardingLoading] = useState(false);
   const [homesList, setHomesList] = useState<HomeSummary[]>([]);
   const navigate = useNavigate();
   const fetchHomes = async () => {
@@ -134,6 +135,64 @@ export const HomePage: React.FC<HomePageProps> = ({
     } finally {
       setCreateLoading(false);
     }
+  };
+
+  // First-time owner onboarding: prompt to name home if it still has the default "Nhà của..." name
+  useEffect(() => {
+    if (userHome && userHome.role === "OWNER") {
+      const dismissed = localStorage.getItem(`dismiss_home_name_${userHome.homeId}`);
+      if (!dismissed && userHome.homeName.startsWith("Nhà của ")) {
+        setOnboardingHomeName(userHome.homeName);
+        setIsOnboardingModalOpen(true);
+      }
+    }
+  }, [userHome?.homeId]);
+
+  const handleOpenRename = (home: HomeSummary) => {
+    setRenameHomeName(home.homeName);
+    setIsRenameModalOpen(true);
+  };
+
+  const handleUpdateHomeName = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = renameHomeName.trim();
+    if (!userHome || !trimmed) return;
+    setRenameLoading(true);
+    try {
+      await updateHome(userHome.homeId, trimmed);
+      setIsRenameModalOpen(false);
+      notify.success('Đã đổi tên nhà thành công', trimmed);
+      await fetchHomes();
+    } catch (err) {
+      notify.error(getErrorMessage(err, 'Lỗi khi đổi tên nhà'));
+    } finally {
+      setRenameLoading(false);
+    }
+  };
+
+  const handleSaveOnboardingName = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = onboardingHomeName.trim();
+    if (!userHome || !trimmed) return;
+    setOnboardingLoading(true);
+    try {
+      await updateHome(userHome.homeId, trimmed);
+      localStorage.setItem(`dismiss_home_name_${userHome.homeId}`, 'true');
+      setIsOnboardingModalOpen(false);
+      notify.success('Đã cập nhật tên nhà thành công', trimmed);
+      await fetchHomes();
+    } catch (err) {
+      notify.error(getErrorMessage(err, 'Lỗi khi cập nhật tên nhà'));
+    } finally {
+      setOnboardingLoading(false);
+    }
+  };
+
+  const handleDismissOnboarding = () => {
+    if (userHome) {
+      localStorage.setItem(`dismiss_home_name_${userHome.homeId}`, 'true');
+    }
+    setIsOnboardingModalOpen(false);
   };
 
   // Close dropdown when clicking outside
@@ -333,24 +392,37 @@ export const HomePage: React.FC<HomePageProps> = ({
                 >
                   Đang xem thông tin của nhà:
                 </label>
-                <select
-                  id="home-selector"
-                  value={userHome?.homeId || ""}
-                  onChange={(e) => {
-                    const selected = homesList.find(
-                      (h) => h.homeId === e.target.value,
-                    );
-                    if (selected) setUserHome(selected);
-                  }}
-                  className="w-full rounded-xl border border-line bg-sidebar px-4 py-2.5 text-sm text-text outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 md:w-64"
-                >
-                  {homesList.map((h) => (
-                    <option key={h.homeId} value={h.homeId}>
-                      {h.homeName} (
-                      {h.role === "OWNER" ? "Chủ nhà" : "Thành viên"})
-                    </option>
-                  ))}
-                </select>
+                <div className="flex items-center gap-2">
+                  <select
+                    id="home-selector"
+                    value={userHome?.homeId || ""}
+                    onChange={(e) => {
+                      const selected = homesList.find(
+                        (h) => h.homeId === e.target.value,
+                      );
+                      if (selected) setUserHome(selected);
+                    }}
+                    className="w-full rounded-xl border border-line bg-sidebar px-4 py-2.5 text-sm text-text outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 md:w-64"
+                  >
+                    {homesList.map((h) => (
+                      <option key={h.homeId} value={h.homeId}>
+                        {h.homeName} (
+                        {h.role === "OWNER" ? "Chủ nhà" : "Thành viên"})
+                      </option>
+                    ))}
+                  </select>
+                  {userHome?.role === "OWNER" && (
+                    <button
+                      type="button"
+                      onClick={() => handleOpenRename(userHome)}
+                      className="p-2.5 rounded-xl border border-line bg-sidebar hover:bg-sidebar-hover text-icon hover:text-primary transition-colors shrink-0 cursor-pointer"
+                      title="Đổi tên nhà"
+                      aria-label="Đổi tên nhà"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -539,7 +611,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                 <input
                   id="new-home-name"
                   type="text"
-                  placeholder="VD: Nhà của tôi, Tổ ấm…"
+                  placeholder="VD: Nhà riêng, Căn hộ 1205…"
                   value={newHomeName}
                   onChange={(e) => setNewHomeName(e.target.value)}
                   className="w-full bg-surface border border-line rounded-xl px-4 py-3 text-text placeholder-muted focus:border-primary outline-none mb-6"
@@ -559,7 +631,116 @@ export const HomePage: React.FC<HomePageProps> = ({
         )}
       </div>
 
-      {/* Profile Modal */}
+              {/* Rename Home Modal */}
+        {isRenameModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-in fade-in">
+            <div className="surface-card w-full max-w-sm rounded-2xl shadow-xl border border-line overflow-hidden">
+              <div className="p-5 border-b border-line flex justify-between items-center">
+                <h3 className="text-base font-bold text-text flex items-center gap-2">
+                  <Pencil className="w-4 h-4 text-primary" />
+                  Đổi Tên Nhà
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setIsRenameModalOpen(false)}
+                  className="p-1 rounded-lg text-icon hover:text-text hover:bg-sidebar-hover"
+                  aria-label="Đóng"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <form onSubmit={handleUpdateHomeName} className="p-5 space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-muted mb-1.5">
+                    Tên ngôi nhà của bạn
+                  </label>
+                  <input
+                    type="text"
+                    value={renameHomeName}
+                    onChange={(e) => setRenameHomeName(e.target.value)}
+                    placeholder="VD: Nhà riêng, Căn hộ 1205…"
+                    maxLength={50}
+                    className="w-full bg-surface border border-line rounded-xl px-3.5 py-2.5 text-sm text-text placeholder:text-muted focus:border-primary outline-none"
+                    autoFocus
+                  />
+                </div>
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-line">
+                  <button
+                    type="button"
+                    onClick={() => setIsRenameModalOpen(false)}
+                    className="px-4 py-2 text-xs font-semibold rounded-xl border border-line text-muted hover:text-text"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={renameLoading || !renameHomeName.trim()}
+                    className="px-4 py-2 text-xs font-bold rounded-xl bg-primary text-white hover:bg-primary-hover shadow-xs disabled:opacity-50"
+                  >
+                    {renameLoading ? "Đang lưu…" : "Lưu thay đổi"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* First-time Onboarding Modal (Đặt tên nhà lần đầu) */}
+        {isOnboardingModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in">
+            <div className="surface-card w-full max-w-md rounded-2xl shadow-2xl border border-line p-6 space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                  <Sparkles className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-text">
+                    Chào mừng bạn đến với HESTA!
+                  </h3>
+                  <p className="text-xs text-muted">
+                    Hãy đặt tên cho ngôi nhà của bạn để dễ dàng nhận biết và quản lý.
+                  </p>
+                </div>
+              </div>
+
+              <form onSubmit={handleSaveOnboardingName} className="space-y-4 pt-2">
+                <div>
+                  <label className="block text-xs font-bold text-muted mb-1.5">
+                    Tên ngôi nhà của bạn
+                  </label>
+                  <input
+                    type="text"
+                    value={onboardingHomeName}
+                    onChange={(e) => setOnboardingHomeName(e.target.value)}
+                    placeholder="VD: Nhà riêng, Căn hộ 1205, Biệt thự…"
+                    maxLength={50}
+                    className="w-full bg-surface border border-line rounded-xl px-3.5 py-2.5 text-sm text-text placeholder:text-muted focus:border-primary outline-none"
+                    autoFocus
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-line">
+                  <button
+                    type="button"
+                    onClick={handleDismissOnboarding}
+                    className="px-4 py-2 text-xs font-semibold rounded-xl border border-line text-muted hover:text-text transition-colors"
+                  >
+                    Để sau
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={onboardingLoading || !onboardingHomeName.trim()}
+                    className="px-4 py-2 text-xs font-bold rounded-xl bg-primary text-white hover:bg-primary-hover shadow-xs transition-colors disabled:opacity-50"
+                  >
+                    {onboardingLoading ? "Đang lưu…" : "Lưu tên nhà"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Profile Modal */}
       {isProfileModalOpen ? (
         <ProfileModal
           isOpen
