@@ -76,6 +76,24 @@ const StatusIcon: React.FC<{ state: VoiceState }> = ({ state }) => {
   return null;
 };
 
+/* ── VolumeIcon (Speaker) ── */
+const VolumeIcon: React.FC<{ className?: string }> = ({ className = 'h-4 w-4' }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M11 5L6 9H2v6h4l5 4V5z" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+  </svg>
+);
+
+/* ── VolumeMuteIcon (Speaker Muted) ── */
+const VolumeMuteIcon: React.FC<{ className?: string }> = ({ className = 'h-4 w-4' }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M11 5L6 9H2v6h4l5 4V5z" />
+    <line x1="23" y1="9" x2="17" y2="15" strokeLinecap="round" />
+    <line x1="17" y1="9" x2="23" y2="15" strokeLinecap="round" />
+  </svg>
+);
+
 const QUICK_COMMANDS = [
   'Bật đèn phòng ngủ',
   'Bật quạt phòng khách',
@@ -98,10 +116,79 @@ export const VoiceAssistantButton: React.FC = () => {
   const [result, setResult] = useState<VoiceResult | null>(null);
   const [serviceOnline, setServiceOnline] = useState<boolean | null>(null);
   const [history, setHistory] = useState<VoiceResult[]>([]);
+  const [ttsEnabled, setTtsEnabled] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('hesta_voice_tts') !== 'false';
+    } catch {
+      return true;
+    }
+  });
+  const [isSpeaking, setIsSpeaking] = useState<boolean>(false);
 
   const recognitionRef = useRef<any>(null);
   const modalRef = useRef<HTMLDivElement>(null);
   const autoCloseTimerRef = useRef<any>(null);
+
+  /* ── Bật/tắt giọng đọc phản hồi ── */
+  const toggleTts = useCallback(() => {
+    setTtsEnabled((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('hesta_voice_tts', String(next));
+      } catch {}
+      if (!next && typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        try {
+          window.speechSynthesis.cancel();
+        } catch {}
+        setIsSpeaking(false);
+      }
+      return next;
+    });
+  }, []);
+
+  /* ── Phát âm thanh giọng đọc phản hồi tiếng Việt ── */
+  const speakResponse = useCallback(
+    (text: string) => {
+      if (!ttsEnabled || typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+      try {
+        window.speechSynthesis.cancel();
+        const cleanMessage = text.replace(/[✅⚠️❌⚡📝]/g, '').trim();
+        if (!cleanMessage) return;
+
+        const utterance = new SpeechSynthesisUtterance(cleanMessage);
+
+        // Tìm giọng tiếng Việt tối ưu trên trình duyệt
+        const voices = window.speechSynthesis.getVoices();
+        const viVoice =
+          voices.find((v) => v.lang && v.lang.toLowerCase().replace('_', '-').startsWith('vi')) ||
+          voices.find(
+            (v) =>
+              (v.name && v.name.toLowerCase().includes('vietnam')) ||
+              (v.name && v.name.toLowerCase().includes('tiếng việt')),
+          ) ||
+          null;
+
+        if (viVoice) {
+          utterance.voice = viVoice;
+          utterance.lang = viVoice.lang;
+        } else {
+          utterance.lang = 'vi-VN';
+        }
+        utterance.rate = 1.05; // Tốc độ đàm thoại tự nhiên
+        utterance.pitch = 1.0;
+
+        utterance.onstart = () => setIsSpeaking(true);
+        utterance.onend = () => setIsSpeaking(false);
+        utterance.onerror = () => setIsSpeaking(false);
+
+        window.speechSynthesis.speak(utterance);
+      } catch (err) {
+        console.warn('Speech synthesis error:', err);
+        setIsSpeaking(false);
+      }
+    },
+    [ttsEnabled],
+  );
 
   /* ── Kiểm tra voice service khi mở modal ── */
   useEffect(() => {
@@ -122,7 +209,7 @@ export const VoiceAssistantButton: React.FC = () => {
     };
   }, [isOpen]);
 
-  /* ── Cleanup recognition khi unmount ── */
+  /* ── Cleanup recognition & speech khi unmount ── */
   useEffect(() => {
     return () => {
       if (recognitionRef.current) {
@@ -133,6 +220,11 @@ export const VoiceAssistantButton: React.FC = () => {
       }
       if (autoCloseTimerRef.current) {
         clearTimeout(autoCloseTimerRef.current);
+      }
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        try {
+          window.speechSynthesis.cancel();
+        } catch {}
       }
     };
   }, []);
@@ -149,6 +241,12 @@ export const VoiceAssistantButton: React.FC = () => {
       clearTimeout(autoCloseTimerRef.current);
       autoCloseTimerRef.current = null;
     }
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      try {
+        window.speechSynthesis.cancel();
+      } catch {}
+    }
+    setIsSpeaking(false);
     setIsOpen(false);
     setVoiceState('idle');
     setTranscript('');
@@ -185,10 +283,15 @@ export const VoiceAssistantButton: React.FC = () => {
         setVoiceState(resp.success ? 'success' : 'error');
         setHistory((prev) => [voiceResult, ...prev.filter((h) => h.transcript !== cleanText)].slice(0, 8));
 
-        // Tự động chuyển về idle sau 4s
+        // Phát giọng nói phản hồi
+        if (resp.message) {
+          speakResponse(resp.message);
+        }
+
+        // Tự động chuyển về idle sau 5s (đủ nghe trọn vẹn câu phản hồi)
         autoCloseTimerRef.current = setTimeout(() => {
           setVoiceState('idle');
-        }, 4000);
+        }, 5000);
       } catch (err: any) {
         const voiceResult: VoiceResult = {
           success: false,
@@ -199,13 +302,25 @@ export const VoiceAssistantButton: React.FC = () => {
         setResult(voiceResult);
         setVoiceState('error');
         setHistory((prev) => [voiceResult, ...prev.filter((h) => h.transcript !== cleanText)].slice(0, 8));
+
+        if (voiceResult.message) {
+          speakResponse(voiceResult.message);
+        }
       }
     },
-    [currentHomeId],
+    [currentHomeId, speakResponse],
   );
 
   /* ── Bắt đầu nghe giọng nói ── */
   const startListening = useCallback(() => {
+    // Dừng giọng đọc nếu đang nói dở để nghe người dùng
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      try {
+        window.speechSynthesis.cancel();
+      } catch {}
+      setIsSpeaking(false);
+    }
+
     if (!SpeechRecognition) {
       setResult({
         success: false,
@@ -374,6 +489,34 @@ export const VoiceAssistantButton: React.FC = () => {
                       {serviceOnline ? 'Online' : 'Offline'}
                     </span>
                   )}
+                  {/* TTS Voice Feedback Toggle Button */}
+                  <button
+                    type="button"
+                    onClick={toggleTts}
+                    className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border transition-all ${
+                      ttsEnabled
+                        ? 'bg-primary/10 text-primary border-primary/20 hover:bg-primary/20'
+                        : 'bg-surface text-muted border-line hover:bg-line'
+                    }`}
+                    title={
+                      ttsEnabled
+                        ? 'Giọng phản hồi: Đang BẬT (Click để tắt)'
+                        : 'Giọng phản hồi: Đang TẮT (Click để bật)'
+                    }
+                    aria-label="Bật hoặc tắt giọng phản hồi"
+                  >
+                    {ttsEnabled ? (
+                      <>
+                        <VolumeIcon className={`h-3.5 w-3.5 ${isSpeaking ? 'animate-bounce text-primary' : ''}`} />
+                        <span>{isSpeaking ? 'Đang đọc...' : 'Voice'}</span>
+                      </>
+                    ) : (
+                      <>
+                        <VolumeMuteIcon className="h-3.5 w-3.5 text-muted" />
+                        <span>Mute</span>
+                      </>
+                    )}
+                  </button>
                   <button
                     type="button"
                     onClick={handleClose}
@@ -463,16 +606,32 @@ export const VoiceAssistantButton: React.FC = () => {
                         : 'bg-rose-50 border-rose-200 text-rose-700'
                     }`}
                   >
-                    <div className="flex items-start gap-2.5">
-                      <span className="mt-0.5 text-base">{result.success ? '✅' : '⚠️'}</span>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium leading-relaxed">{result.message}</p>
-                        {result.durationMs > 0 && (
-                          <p className="mt-1 text-xs opacity-75 font-mono">
-                            ⚡ Phản hồi: {Math.round(result.durationMs)}ms
-                          </p>
-                        )}
+                    <div className="flex items-start gap-2.5 justify-between">
+                      <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                        <span className="mt-0.5 text-base shrink-0">{result.success ? '✅' : '⚠️'}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium leading-relaxed">{result.message}</p>
+                          {result.durationMs > 0 && (
+                            <p className="mt-1 text-xs opacity-75 font-mono">
+                              ⚡ Phản hồi: {Math.round(result.durationMs)}ms
+                            </p>
+                          )}
+                        </div>
                       </div>
+                      {/* Replay TTS button */}
+                      <button
+                        type="button"
+                        onClick={() => speakResponse(result.message)}
+                        className={`p-1.5 rounded-xl border transition-all shrink-0 ${
+                          isSpeaking
+                            ? 'bg-primary text-white border-primary shadow-sm animate-pulse'
+                            : 'bg-surface border-line text-muted hover:text-text hover:bg-line'
+                        }`}
+                        title="Nghe lại câu phản hồi"
+                        aria-label="Nghe lại câu phản hồi"
+                      >
+                        <VolumeIcon className="h-4 w-4" />
+                      </button>
                     </div>
                   </div>
                 )}
