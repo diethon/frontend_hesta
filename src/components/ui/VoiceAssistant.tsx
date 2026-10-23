@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useAppSelector } from '../../store/hooks';
 import { selectCurrentHomeId, selectCurrentUser } from '../../store/selectors';
-import { processVoiceCommand, checkVoiceServiceHealth } from '../../services/voiceApi';
+import { processVoiceCommand, checkVoiceServiceHealth, getTtsAudioUrl, VOICE_SERVICE_URL } from '../../services/voiceApi';
 import type { VoiceCommandResponse } from '../../services/voiceApi';
 
 /* ── Trạng thái voice ── */
@@ -128,6 +128,24 @@ export const VoiceAssistantButton: React.FC = () => {
   const recognitionRef = useRef<any>(null);
   const modalRef = useRef<HTMLDivElement>(null);
   const autoCloseTimerRef = useRef<any>(null);
+  const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
+
+  /* ── Dừng toàn bộ âm thanh (cả Audio stream và Web Speech) ── */
+  const stopAllAudio = useCallback(() => {
+    if (audioPlayerRef.current) {
+      try {
+        audioPlayerRef.current.pause();
+        audioPlayerRef.current.currentTime = 0;
+      } catch {}
+      audioPlayerRef.current = null;
+    }
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      try {
+        window.speechSynthesis.cancel();
+      } catch {}
+    }
+    setIsSpeaking(false);
+  }, []);
 
   /* ── Bật/tắt giọng đọc phản hồi ── */
   const toggleTts = useCallback(() => {
@@ -136,58 +154,88 @@ export const VoiceAssistantButton: React.FC = () => {
       try {
         localStorage.setItem('hesta_voice_tts', String(next));
       } catch {}
-      if (!next && typeof window !== 'undefined' && 'speechSynthesis' in window) {
-        try {
-          window.speechSynthesis.cancel();
-        } catch {}
-        setIsSpeaking(false);
+      if (!next) {
+        stopAllAudio();
       }
       return next;
     });
+  }, [stopAllAudio]);
+
+  /* ── Fallback chỉ dùng Web Speech API NẾU máy có giọng tiếng Việt thực thụ ── */
+  const fallbackLocalSpeech = useCallback((cleanMessage: string) => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    try {
+      const voices = window.speechSynthesis.getVoices();
+      const viVoice =
+        voices.find((v) => v.lang && v.lang.toLowerCase().replace('_', '-').startsWith('vi')) ||
+        voices.find(
+          (v) =>
+            (v.name && v.name.toLowerCase().includes('vietnam')) ||
+            (v.name && v.name.toLowerCase().includes('tiếng việt')),
+        );
+
+      // QUAN TRỌNG: Nếu Windows KHÔNG có gói giọng tiếng Việt cài sẵn, tuyệt đối KHÔNG cho đọc
+      // để tránh việc Chrome lấy giọng tiếng Anh (Microsoft David) đọc tiếng Việt như "người Anh cố đọc"!
+      if (!viVoice) {
+        console.info('Hệ điều hành chưa cài giọng tiếng Việt cục bộ. Đã bỏ qua fallback tiếng Anh.');
+        setIsSpeaking(false);
+        return;
+      }
+
+      const utterance = new SpeechSynthesisUtterance(cleanMessage);
+      utterance.voice = viVoice;
+      utterance.lang = viVoice.lang;
+      utterance.rate = 1.05;
+      utterance.onstart = () => setIsSpeaking(true);
+      utterance.onend = () => setIsSpeaking(false);
+      utterance.onerror = () => setIsSpeaking(false);
+
+      window.speechSynthesis.speak(utterance);
+    } catch {
+      setIsSpeaking(false);
+    }
   }, []);
 
   /* ── Phát âm thanh giọng đọc phản hồi tiếng Việt ── */
   const speakResponse = useCallback(
-    (text: string) => {
-      if (!ttsEnabled || typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    (text: string, customAudioUrl?: string | null) => {
+      if (!ttsEnabled) return;
+      stopAllAudio();
+
+      const cleanMessage = text.replace(/[✅⚠️❌⚡📝]/g, '').trim();
+      if (!cleanMessage) return;
+
+      // 1. Ưu tiên cao nhất: Sử dụng Neural Audio tiếng Việt từ voice-service (Giọng Hoài My cực chuẩn & tự nhiên)
+      const audioUrl = customAudioUrl || getTtsAudioUrl(cleanMessage);
       try {
-        window.speechSynthesis.cancel();
-        const cleanMessage = text.replace(/[✅⚠️❌⚡📝]/g, '').trim();
-        if (!cleanMessage) return;
+        const audio = new Audio(audioUrl);
+        audioPlayerRef.current = audio;
 
-        const utterance = new SpeechSynthesisUtterance(cleanMessage);
+        audio.onplay = () => setIsSpeaking(true);
+        audio.onended = () => {
+          setIsSpeaking(false);
+          audioPlayerRef.current = null;
+        };
+        audio.onerror = () => {
+          console.warn('Server TTS audio error, checking local voice...');
+          audioPlayerRef.current = null;
+          fallbackLocalSpeech(cleanMessage);
+        };
 
-        // Tìm giọng tiếng Việt tối ưu trên trình duyệt
-        const voices = window.speechSynthesis.getVoices();
-        const viVoice =
-          voices.find((v) => v.lang && v.lang.toLowerCase().replace('_', '-').startsWith('vi')) ||
-          voices.find(
-            (v) =>
-              (v.name && v.name.toLowerCase().includes('vietnam')) ||
-              (v.name && v.name.toLowerCase().includes('tiếng việt')),
-          ) ||
-          null;
-
-        if (viVoice) {
-          utterance.voice = viVoice;
-          utterance.lang = viVoice.lang;
-        } else {
-          utterance.lang = 'vi-VN';
+        const playPromise = audio.play();
+        if (playPromise !== undefined) {
+          playPromise.catch((err) => {
+            console.warn('Audio play failed:', err);
+            audioPlayerRef.current = null;
+            fallbackLocalSpeech(cleanMessage);
+          });
         }
-        utterance.rate = 1.05; // Tốc độ đàm thoại tự nhiên
-        utterance.pitch = 1.0;
-
-        utterance.onstart = () => setIsSpeaking(true);
-        utterance.onend = () => setIsSpeaking(false);
-        utterance.onerror = () => setIsSpeaking(false);
-
-        window.speechSynthesis.speak(utterance);
-      } catch (err) {
-        console.warn('Speech synthesis error:', err);
-        setIsSpeaking(false);
+      } catch (e) {
+        console.warn('Could not initialize Audio player:', e);
+        fallbackLocalSpeech(cleanMessage);
       }
     },
-    [ttsEnabled],
+    [ttsEnabled, stopAllAudio, fallbackLocalSpeech],
   );
 
   /* ── Kiểm tra voice service khi mở modal ── */
@@ -221,13 +269,9 @@ export const VoiceAssistantButton: React.FC = () => {
       if (autoCloseTimerRef.current) {
         clearTimeout(autoCloseTimerRef.current);
       }
-      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-        try {
-          window.speechSynthesis.cancel();
-        } catch {}
-      }
+      stopAllAudio();
     };
-  }, []);
+  }, [stopAllAudio]);
 
   /* ── Dọn dẹp khi đóng ── */
   const handleClose = useCallback(() => {
@@ -241,17 +285,12 @@ export const VoiceAssistantButton: React.FC = () => {
       clearTimeout(autoCloseTimerRef.current);
       autoCloseTimerRef.current = null;
     }
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      try {
-        window.speechSynthesis.cancel();
-      } catch {}
-    }
-    setIsSpeaking(false);
+    stopAllAudio();
     setIsOpen(false);
     setVoiceState('idle');
     setTranscript('');
     setResult(null);
-  }, []);
+  }, [stopAllAudio]);
 
   /* ── Gửi text command → voice service ── */
   const sendCommand = useCallback(
@@ -283,9 +322,10 @@ export const VoiceAssistantButton: React.FC = () => {
         setVoiceState(resp.success ? 'success' : 'error');
         setHistory((prev) => [voiceResult, ...prev.filter((h) => h.transcript !== cleanText)].slice(0, 8));
 
-        // Phát giọng nói phản hồi
+        // Phát giọng nói tiếng Việt chuẩn tự nhiên
         if (resp.message) {
-          speakResponse(resp.message);
+          const directUrl = resp.audioUrl ? `${VOICE_SERVICE_URL}${resp.audioUrl}` : undefined;
+          speakResponse(resp.message, directUrl);
         }
 
         // Tự động chuyển về idle sau 5s (đủ nghe trọn vẹn câu phản hồi)
@@ -313,13 +353,8 @@ export const VoiceAssistantButton: React.FC = () => {
 
   /* ── Bắt đầu nghe giọng nói ── */
   const startListening = useCallback(() => {
-    // Dừng giọng đọc nếu đang nói dở để nghe người dùng
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      try {
-        window.speechSynthesis.cancel();
-      } catch {}
-      setIsSpeaking(false);
-    }
+    // Dừng giọng đọc nếu đang nói dở để lắng nghe người dùng
+    stopAllAudio();
 
     if (!SpeechRecognition) {
       setResult({
