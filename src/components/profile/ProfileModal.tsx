@@ -121,8 +121,13 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-text/30 p-4 backdrop-blur-sm">
-      <div role="dialog" aria-modal="true" aria-labelledby="profile-modal-title" className="auth-surface gentle-rise flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden overscroll-contain">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="profile-modal-title"
+        className="auth-surface gentle-rise flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden overscroll-contain shadow-float"
+      >
         
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-line">

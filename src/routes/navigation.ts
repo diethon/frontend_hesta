@@ -43,14 +43,14 @@ export function loginDestination(user: UserResponse, search: string, state: Navi
   if (token && state.handledInviteToken !== token) return '/join';
   if (state.returnTo === '/home') return state.returnTo;
   if (isTwinReturnPath(state.returnTo)) return state.returnTo;
-  if (state.returnTo === '/admin' && user.platformRole === 'ADMIN') return '/admin';
+  if (state.returnTo?.startsWith('/admin') && user.platformRole === 'ADMIN') return state.returnTo;
   if (state.returnTo?.match(/^\/homes\/[0-9a-f-]+\/(scenes|automation-rules)$/i)) return state.returnTo;
   return defaultRoute(user);
 }
 
 function isSafeReturnPath(value: unknown): value is string {
   return typeof value === 'string' && (
-    value === '/home' || value === '/admin' || value === '/join' ||
+    value === '/home' || value === '/admin' || value === '/admin/users' || value === '/admin/diagnostics' || value === '/join' ||
     isTwinReturnPath(value) ||
     /^\/homes\/[0-9a-f-]+\/(scenes|automation-rules)$/i.test(value)
   );

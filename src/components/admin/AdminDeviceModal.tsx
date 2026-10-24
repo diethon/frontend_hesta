@@ -62,7 +62,7 @@ export const AdminDeviceModal: React.FC<AdminDeviceModalProps> = ({ isOpen, onCl
     try {
       const res = await adminCreateDevice(formData);
       setCreatedData(res);
-      notify.success('Tạo thiết bị và sinh mã QR thành công!', '');
+      notify.success('Tạo thiết bị và tạo mã QR thành công!', '');
     } catch (err) {
       notify.error(getErrorMessage(err, 'Không thể tạo thiết bị'), '');
     } finally {

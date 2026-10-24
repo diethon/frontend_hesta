@@ -1,12 +1,29 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router';
 import type { UserResponse } from '../../types/auth';
-import { NotificationBell } from '../notification/NotificationBell';
+import type { DeviceCatalog, DeviceAdminStats } from '../../types/deviceCatalog';
+import { getDeviceCatalogs, getDeviceAdminStats, deleteDeviceCatalog } from '../../services/deviceCatalogApi';
 import { ProfileModal } from '../profile/ProfileModal';
-import { AdminDeviceModal } from './AdminDeviceModal';
-import { AdminIcon, AppSidebar, HomeIcon } from '../ui/AppSidebar';
-import { UserAvatar } from '../ui/UserAvatar';
-import { Activity } from 'lucide-react';
+import { AdminCatalogModal } from './AdminCatalogModal';
+import { AdminBatchQrModal } from './AdminBatchQrModal';
+import { AdminNavbar } from './AdminNavbar';
+import { AdminIcon, AppSidebar, PeopleIcon } from '../ui/AppSidebar';
+import { notify } from '../ui/notify';
+import { getErrorMessage } from '../../utils/errors';
+import {
+  Activity,
+  Layers,
+  Cpu,
+  Search,
+  Plus,
+  Edit2,
+  Trash2,
+  RefreshCw,
+  Clock,
+  CheckCircle2,
+  Tag,
+  Zap,
+} from 'lucide-react';
 
 interface AdminDashboardProps {
   user: UserResponse;
@@ -14,216 +31,376 @@ interface AdminDashboardProps {
   onProfileUpdate: (user: UserResponse) => void;
 }
 
+const DEVICE_TYPE_OPTIONS = [
+  { value: 'ALL', label: 'Tất Cả Loại Thiết Bị' },
+  { value: 'LED_RGB', label: 'Đèn LED RGB' },
+  { value: 'LIGHT', label: 'Công Tắc / Đèn Relay' },
+  { value: 'SMART_PLUG', label: 'Ổ Cắm Đo Điện' },
+  { value: 'FAN', label: 'Quạt Thông Minh' },
+  { value: 'WATER_PUMP', label: 'Máy Bơm Nước' },
+  { value: 'GATE_MOTOR', label: 'Motor Cổng Tự Động' },
+  { value: 'AC_REMOTE', label: 'Điều Khiển Điều Hòa' },
+  { value: 'TEMP_HUMID_SENSOR', label: 'Cảm Biến Nhiệt Ẩm' },
+  { value: 'MOTION_SENSOR', label: 'Cảm Biến Chuyển Động' },
+  { value: 'SMOKE_SENSOR', label: 'Cảm Biến Báo Khói' },
+  { value: 'CAMERA_AI', label: 'Camera AI' },
+];
+
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout, onProfileUpdate }) => {
   const navigate = useNavigate();
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
-  const [isDeviceModalOpen, setIsDeviceModalOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
 
+  // Catalog & QR states
+  const [catalogs, setCatalogs] = useState<DeviceCatalog[]>([]);
+  const [stats, setStats] = useState<DeviceAdminStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [searchKeyword, setSearchKeyword] = useState('');
+  const [selectedType, setSelectedType] = useState('ALL');
 
-  // Close dropdown when clicking outside
+  // Modals
+  const [isCatalogModalOpen, setIsCatalogModalOpen] = useState(false);
+  const [editingCatalog, setEditingCatalog] = useState<DeviceCatalog | null>(null);
+  const [isBatchQrModalOpen, setIsBatchQrModalOpen] = useState(false);
+  const [selectedCatalogForQr, setSelectedCatalogForQr] = useState<DeviceCatalog | null>(null);
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const typeParam = selectedType === 'ALL' ? undefined : selectedType;
+      const [catalogsData, statsData] = await Promise.all([
+        getDeviceCatalogs({ keyword: searchKeyword || undefined, deviceType: typeParam }),
+        getDeviceAdminStats(),
+      ]);
+      setCatalogs(catalogsData);
+      setStats(statsData);
+    } catch (err) {
+      console.error('Failed to load device catalog data:', err);
+      notify.error(getErrorMessage(err, 'Không thể tải danh mục thiết bị'), '');
+    } finally {
+      setLoading(false);
+    }
+  }, [searchKeyword, selectedType]);
+
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsDropdownOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+    loadData();
+  }, [loadData]);
+
+  const handleDeleteCatalog = async (catalog: DeviceCatalog) => {
+    if (!window.confirm(`Bạn có chắc chắn muốn xóa mẫu sản phẩm "${catalog.name}" (${catalog.modelCode}) không?`)) {
+      return;
+    }
+    try {
+      await deleteDeviceCatalog(catalog.id);
+      notify.success('Đã xóa mẫu sản phẩm thành công', '');
+      loadData();
+    } catch (err) {
+      notify.error(getErrorMessage(err, 'Không thể xóa mẫu sản phẩm'), '');
+    }
+  };
+
+  const handleOpenGenerateQr = (cat: DeviceCatalog) => {
+    setSelectedCatalogForQr(cat);
+    setIsBatchQrModalOpen(true);
+  };
+
+  const handleOpenEditCatalog = (cat: DeviceCatalog) => {
+    setEditingCatalog(cat);
+    setIsCatalogModalOpen(true);
+  };
+
+  const handleOpenCreateCatalog = () => {
+    setEditingCatalog(null);
+    setIsCatalogModalOpen(true);
+  };
 
   return (
-    <div className="app-shell relative overflow-x-hidden">
+    <div className="app-shell relative overflow-x-hidden text-text">
       <AppSidebar
         activeItem="admin"
         contextLabel="Quản trị nền tảng"
         items={[
-          { id: 'home', label: 'Nhà của tôi', icon: <HomeIcon />, onClick: () => navigate('/home') },
           { id: 'admin', label: 'Quản lý thiết bị & QR', icon: <AdminIcon />, onClick: () => window.scrollTo({ top: 0, behavior: 'smooth' }) },
+          { id: 'users', label: 'Quản lý người dùng', icon: <PeopleIcon />, onClick: () => navigate('/admin/users') },
           { id: 'diagnostics', label: 'Chẩn đoán hạ tầng IoT', icon: <Activity className="w-5 h-5 text-primary" />, onClick: () => navigate('/admin/diagnostics') },
         ]}
       />
       <div className="lg:pl-64">
-      {/* Top Navbar */}
-      <nav className="sticky top-0 z-20 flex items-center justify-between gap-2 border-b border-line bg-white/90 px-4 py-3 backdrop-blur-xl sm:px-6">
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-warning text-white shadow-soft">
-            <svg aria-hidden={true} className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        {/* Reusable Top Navbar */}
+        <AdminNavbar
+          title="HESTA Admin Center"
+          subtitle="Quản lý danh mục thiết bị & cấp phát mã QR"
+          icon={
+            <svg aria-hidden={true} className="w-6 h-6 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
             </svg>
-          </div>
-          <div className="min-w-0">
-            <h1 className="truncate text-base font-bold tracking-tight text-text sm:text-lg">HESTA Admin Center</h1>
-            <p className="hidden text-xs font-medium text-muted sm:block">Theo dõi sức khỏe nền tảng HESTA</p>
-          </div>
-        </div>
+          }
+          showBackButton={false}
+          user={user}
+          onLogout={onLogout}
+          onOpenProfile={() => setIsProfileModalOpen(true)}
+        />
 
-        <div className="flex shrink-0 items-center gap-2 sm:gap-4">
-          <span className={`hidden sm:inline-block px-2.5 py-1 text-xs font-semibold rounded-full border ${
-            user.platformRole === 'ADMIN'
-              ? 'border-warning bg-warning-soft text-text'
-              : 'border-info bg-info-soft text-primary-hover'
-          }`}>
-            {user.platformRole}
-          </span>
-          
-          <NotificationBell />
-
-          <div className="relative" ref={dropdownRef}>
-            <button
-              type="button"
-              aria-label="Mở menu tài khoản quản trị"
-              aria-expanded={isDropdownOpen}
-              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-              className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border-2 border-line bg-warning shadow-soft transition-colors hover:bg-warning-soft focus:outline-none focus:ring-2 focus:ring-warning focus:ring-offset-2 focus:ring-offset-surface"
-            >
-              <UserAvatar
-                src={user.avatarUrl}
-                name={user.fullName}
-                size={40}
-                fallbackClassName="text-sm font-bold text-white"
-              />
-            </button>
-
-            {isDropdownOpen && (
-              <div className="gentle-rise absolute right-0 z-50 mt-2 w-56 rounded-2xl border border-line bg-white py-1 shadow-float">
-                <div className="px-4 py-2 border-b border-slate-800">
-                  <p className="truncate text-sm font-medium text-text">{user.fullName}</p>
-                  <p className="text-xs text-slate-400 truncate">{user.email}</p>
-                </div>
-                
-                <div className="p-1">
-                  <button
-                    onClick={() => {
-                      setIsDropdownOpen(false);
-                      setIsProfileModalOpen(true);
-                    }}
-                    className="w-full text-left px-3 py-2 text-sm text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg transition-colors flex items-center gap-2"
-                  >
-                    <svg aria-hidden={true} className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                    </svg>
-                    Hồ sơ & Bảo mật
-                  </button>
-                  
-                  <button
-                    className="w-full text-left px-3 py-2 text-sm text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg transition-colors flex items-center gap-2"
-                  >
-                    <svg aria-hidden={true} className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                    Cấu hình Hệ thống
-                  </button>
-                </div>
-                
-                <div className="border-t border-slate-800 p-1">
-                  <button
-                    onClick={onLogout}
-                    className="w-full text-left px-3 py-2 text-sm text-rose-400 hover:text-rose-300 hover:bg-rose-950/50 rounded-lg transition-colors flex items-center gap-2"
-                  >
-                    <svg aria-hidden={true} className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                    </svg>
-                    Đăng xuất
-                  </button>
-                </div>
+        {/* Main Content */}
+        <main id="main-content" className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8">
+          {/* Header Banner */}
+          <div className="surface-card relative overflow-hidden p-6 lg:p-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5 border border-line">
+            <div>
+              <div className="absolute left-0 top-0 bottom-0 w-1/3 bg-amber-500/10 blur-3xl pointer-events-none" />
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-500/10 text-amber-600 border border-amber-500/20 mb-3">
+                <Tag className="w-3.5 h-3.5" />
+                Hệ Thống Quản Lý Sản Phẩm &amp; Xuất Xưởng
               </div>
-            )}
-          </div>
-        </div>
-      </nav>
-
-      {/* Main Content Dashboard */}
-      <main id="main-content" className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8">
-        {/* Welcome Banner */}
-        <div className="surface-card relative overflow-hidden p-6 lg:p-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <div className="absolute left-0 top-0 bottom-0 w-1/3 bg-amber-500/10 blur-2xl pointer-events-none" />
-            <p className="mb-2 text-sm font-semibold text-primary-hover">Quản trị hệ thống</p>
-            <h2 className="mb-2 text-2xl font-bold text-text sm:text-3xl">Xin chào, {user.fullName}</h2>
-            <p className="text-sm text-slate-300 max-w-2xl leading-relaxed">
-              Chào mừng bạn đến với trang quản trị cấp cao của HESTA Smart Home. 
-              Tại đây bạn có thể quản lý toàn bộ hệ thống, người dùng và thiết bị.
-            </p>
-          </div>
-          <button
-            onClick={() => setIsDeviceModalOpen(true)}
-            className="shrink-0 flex items-center gap-2 rounded-2xl bg-amber-500 px-5 py-3 text-sm font-bold text-slate-900 shadow-float hover:bg-amber-400 transition-all cursor-pointer"
-          >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            Tạo Thiết Bị & In QR
-          </button>
-        </div>
-
-        {/* Dashboard Grid */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <div className="surface-card group p-6 transition hover:-translate-y-0.5 hover:border-primary">
-            <div className="w-12 h-12 bg-amber-500/10 text-amber-500 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-              <svg aria-hidden={true} className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-              </svg>
+              <h2 className="text-2xl font-black text-text sm:text-3xl">Danh Mục Thiết Bị &amp; Cấp Mã QR</h2>
+              <p className="text-sm text-muted max-w-2xl mt-1 leading-relaxed">
+                Định nghĩa mẫu thiết bị, cấp phát tem QR với số sê-ri tự tăng liên tiếp và theo dõi trạng thái thiết bị 
+                từ lúc sản xuất (<span className="text-amber-500 font-semibold">UNCLAIMED</span>) đến khi người dùng quét vào nhà (<span className="text-emerald-500 font-semibold">CLAIMED</span>).
+              </p>
             </div>
-            <h3 className="text-2xl font-bold text-white mb-1">124</h3>
-            <p className="text-xs text-slate-400">Tổng người dùng</p>
+            <div className="flex flex-wrap items-center gap-3 shrink-0">
+              <button
+                onClick={loadData}
+                disabled={loading}
+                className="inline-flex items-center gap-2 rounded-2xl border border-line bg-surface hover:bg-surface-hover px-4 py-3 text-sm font-semibold text-text shadow-soft transition-all cursor-pointer"
+                title="Làm mới dữ liệu"
+              >
+                <RefreshCw className={`w-4 h-4 text-muted ${loading ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">Làm mới</span>
+              </button>
+              <button
+                onClick={handleOpenCreateCatalog}
+                className="inline-flex items-center gap-2 rounded-2xl bg-amber-500 px-5 py-3 text-sm font-bold text-slate-900 shadow-float hover:bg-amber-400 transition-all cursor-pointer"
+              >
+                <Plus className="w-5 h-5" />
+                <span>Thêm Dòng Sản Phẩm Mới</span>
+              </button>
+            </div>
           </div>
 
-          <div className="surface-card group p-6 transition hover:-translate-y-0.5 hover:border-primary">
-            <div className="w-12 h-12 bg-blue-500/10 text-blue-400 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-              <svg aria-hidden={true} className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-              </svg>
+          {/* 4 Focused Device Metric Cards */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {/* Card 1: Total Catalogs */}
+            <div className="surface-card group p-5 border border-line rounded-3xl transition hover:-translate-y-0.5 hover:border-amber-500/50">
+              <div className="flex items-center justify-between mb-3">
+                <div className="w-12 h-12 bg-amber-500/10 text-amber-500 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <Layers className="w-6 h-6" />
+                </div>
+                <span className="text-xs px-2.5 py-1 rounded-full font-bold bg-amber-500/10 text-amber-600">
+                  Danh mục SKU
+                </span>
+              </div>
+              <h3 className="text-3xl font-black text-text mb-0.5">
+                {loading ? '...' : stats?.totalCatalogs ?? 0}
+              </h3>
+              <p className="text-xs text-muted">Dòng sản phẩm phần cứng</p>
             </div>
-            <h3 className="text-2xl font-bold text-white mb-1">892</h3>
-            <p className="text-xs text-slate-400">Thiết bị đang hoạt động</p>
+
+            {/* Card 2: Total Generated Devices */}
+            <div className="surface-card group p-5 border border-line rounded-3xl transition hover:-translate-y-0.5 hover:border-blue-500/50">
+              <div className="flex items-center justify-between mb-3">
+                <div className="w-12 h-12 bg-blue-500/10 text-blue-500 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <Cpu className="w-6 h-6" />
+                </div>
+                <span className="text-xs px-2.5 py-1 rounded-full font-bold bg-blue-500/10 text-blue-600">
+                  Tổng thiết bị
+                </span>
+              </div>
+              <h3 className="text-3xl font-black text-text mb-0.5">
+                {loading ? '...' : stats?.totalDevices ?? 0}
+              </h3>
+              <p className="text-xs text-muted">Thiết bị đã sinh tem QR</p>
+            </div>
+
+            {/* Card 3: Unclaimed Devices */}
+            <div className="surface-card group p-5 border border-line rounded-3xl transition hover:-translate-y-0.5 hover:border-rose-500/50">
+              <div className="flex items-center justify-between mb-3">
+                <div className="w-12 h-12 bg-rose-500/10 text-rose-500 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <Clock className="w-6 h-6" />
+                </div>
+                <span className="text-xs px-2.5 py-1 rounded-full font-bold bg-rose-500/10 text-rose-600">
+                  Chờ quét
+                </span>
+              </div>
+              <h3 className="text-3xl font-black text-text mb-0.5">
+                {loading ? '...' : stats?.unclaimedDevices ?? 0}
+              </h3>
+              <p className="text-xs text-muted">QR xuất xưởng đang chờ kích hoạt</p>
+            </div>
+
+            {/* Card 4: Claimed Devices */}
+            <div className="surface-card group p-5 border border-line rounded-3xl transition hover:-translate-y-0.5 hover:border-emerald-500/50">
+              <div className="flex items-center justify-between mb-3">
+                <div className="w-12 h-12 bg-emerald-500/10 text-emerald-500 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <CheckCircle2 className="w-6 h-6" />
+                </div>
+                <span className="text-xs px-2.5 py-1 rounded-full font-bold bg-emerald-500/10 text-emerald-600">
+                  Đang hoạt động
+                </span>
+              </div>
+              <h3 className="text-3xl font-black text-text mb-0.5">
+                {loading ? '...' : stats?.claimedDevices ?? 0}
+              </h3>
+              <p className="text-xs text-muted">Thiết bị đã ghép nối vào nhà</p>
+            </div>
           </div>
 
-          <div className="surface-card group p-6 transition hover:-translate-y-0.5 hover:border-warning">
-            <div className="w-12 h-12 bg-rose-500/10 text-rose-400 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-              <svg aria-hidden={true} className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
+          {/* Filter Toolbar */}
+          <div className="surface-card p-4 rounded-3xl border border-line flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
+              <input
+                type="text"
+                value={searchKeyword}
+                onChange={(e) => setSearchKeyword(e.target.value)}
+                placeholder="Tìm kiếm theo tên mẫu thiết bị, mã model (VD: HESTA-RGB-01)..."
+                className="w-full rounded-2xl border border-line bg-surface pl-10 pr-4 py-2.5 text-sm text-text focus:border-primary focus:outline-none"
+              />
             </div>
-            <h3 className="text-2xl font-bold text-white mb-1">3</h3>
-            <p className="text-xs text-slate-400">Cảnh báo hệ thống</p>
-          </div>
-          
-          <div className="surface-card group p-6 transition hover:-translate-y-0.5 hover:border-mint">
-            <div className="w-12 h-12 bg-emerald-500/10 text-emerald-400 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-              <svg aria-hidden={true} className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
+            <div className="flex items-center gap-2">
+              <select
+                value={selectedType}
+                onChange={(e) => setSelectedType(e.target.value)}
+                className="rounded-2xl border border-line bg-surface px-4 py-2.5 text-sm text-text focus:border-primary focus:outline-none cursor-pointer"
+              >
+                {DEVICE_TYPE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
             </div>
-            <h3 className="text-2xl font-bold text-white mb-1">99.9%</h3>
-            <p className="text-xs text-slate-400">Uptime Server</p>
           </div>
-        </div>
 
-        {/* Technical Diagnostics Shortcut Card */}
-        <div className="surface-card p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border border-primary/30 bg-gradient-to-r from-primary/10 via-surface to-surface">
-          <div className="space-y-1">
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-primary/20 text-primary">
-              <Activity className="w-3.5 h-3.5" />
-              Hạ Tầng Phân Tán &amp; Giám Sát IoT
+          {/* Catalog Grid */}
+          {loading && catalogs.length === 0 ? (
+            <div className="p-16 text-center text-muted surface-card rounded-3xl border border-line">
+              <RefreshCw className="w-8 h-8 mx-auto animate-spin text-amber-500 mb-3" />
+              <p className="text-sm font-semibold">Đang tải danh mục thiết bị HESTA...</p>
             </div>
-            <h3 className="text-lg font-bold text-text">Trung Tâm Chẩn Đoán Kỹ Thuật Nền Tảng</h3>
-            <p className="text-xs text-muted max-w-xl">
-              Đồng hồ đo độ trễ MQTT RTT, cơ chế ngắt mạch bảo vệ Circuit Breaker và bảng điều khiển Live MQTT Packet Sniffer.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => navigate('/admin/diagnostics')}
-            className="shrink-0 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary hover:bg-primary-hover text-white text-sm font-bold shadow-soft transition-all"
-          >
-            <span>Mở Bảng Chẩn Đoán</span>
-            <Activity className="w-4 h-4" />
-          </button>
-        </div>
-      </main>
+          ) : catalogs.length === 0 ? (
+            <div className="p-16 text-center text-muted surface-card rounded-3xl border border-line space-y-4">
+              <Layers className="w-12 h-12 mx-auto text-muted/50" />
+              <div>
+                <p className="text-base font-bold text-text">Không tìm thấy dòng sản phẩm nào</p>
+                <p className="text-xs text-muted mt-1">
+                  Hãy thử thay đổi bộ lọc tìm kiếm hoặc bấm nút bên dưới để tạo mẫu sản phẩm mới.
+                </p>
+              </div>
+              <button
+                onClick={handleOpenCreateCatalog}
+                className="inline-flex items-center gap-2 rounded-xl bg-amber-500 px-5 py-2.5 text-xs font-bold text-slate-900 hover:bg-amber-400 transition-all cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Thêm Mẫu Đầu Tiên</span>
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {catalogs.map((catalog) => {
+                const total = catalog.totalDeviceCount || 0;
+                const claimed = catalog.claimedCount || 0;
+                const unclaimed = catalog.unclaimedCount || 0;
+                const claimedPercent = total > 0 ? Math.round((claimed / total) * 100) : 0;
+
+                return (
+                  <div
+                    key={catalog.id}
+                    className="surface-card group rounded-3xl border border-line p-5 flex flex-col justify-between transition-all hover:border-amber-500/50 hover:shadow-soft"
+                  >
+                    <div>
+                      {/* Product Image & Badges */}
+                      <div className="relative mb-4 h-48 w-full overflow-hidden rounded-2xl border border-line bg-slate-50 dark:bg-slate-900/40 p-2 flex items-center justify-center">
+                        {catalog.imageUrl ? (
+                          <img
+                            src={catalog.imageUrl}
+                            alt={catalog.name}
+                            className="max-h-full max-w-full object-contain drop-shadow-sm transition-transform duration-300 group-hover:scale-105"
+                          />
+                        ) : (
+                          <div className="h-full w-full flex items-center justify-center text-muted">
+                            <Layers className="w-12 h-12" />
+                          </div>
+                        )}
+                        <div className="absolute top-2.5 left-2.5 z-10">
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-xl text-xs font-mono font-bold bg-slate-950 text-amber-400 border border-slate-800 shadow-md">
+                            {catalog.modelCode}
+                          </span>
+                        </div>
+                        <div className="absolute top-2.5 right-2.5 z-10">
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-xl text-[11px] font-bold bg-amber-500 text-slate-950 shadow-md">
+                            {catalog.deviceType}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Title & Info */}
+                      <h3 className="text-base font-bold text-text group-hover:text-primary transition-colors line-clamp-1">
+                        {catalog.name}
+                      </h3>
+                      <p className="text-xs font-mono text-muted mt-0.5">
+                        Prefix: <span className="text-amber-500 font-bold">{catalog.serialPrefix}</span>xxxx
+                      </p>
+                      <p className="text-xs text-muted mt-2 line-clamp-2 leading-relaxed">
+                        {catalog.description || 'Chưa có thông tin mô tả kỹ thuật cho mẫu sản phẩm này.'}
+                      </p>
+
+                      {/* Progress / Output Stats */}
+                      <div className="mt-4 pt-3 border-t border-line space-y-2">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-muted">Sản lượng đã tạo:</span>
+                          <span className="font-bold text-text">{total} chiếc</span>
+                        </div>
+                        <div className="h-2 w-full rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden flex">
+                          <div
+                            style={{ width: `${claimedPercent}%` }}
+                            className="bg-emerald-500 h-full"
+                            title={`Đã kích hoạt: ${claimed}`}
+                          />
+                          <div
+                            style={{ width: `${100 - claimedPercent}%` }}
+                            className="bg-amber-500/80 h-full"
+                            title={`Chờ kích hoạt: ${unclaimed}`}
+                          />
+                        </div>
+                        <div className="flex items-center justify-between text-[11px] text-muted">
+                          <span className="text-amber-600 font-medium">Chờ quét: {unclaimed}</span>
+                          <span className="text-emerald-600 font-medium">Đang dùng: {claimed} ({claimedPercent}%)</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Bottom Actions */}
+                    <div className="mt-5 pt-3 border-t border-line flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => handleOpenEditCatalog(catalog)}
+                          className="p-2 rounded-xl text-muted hover:text-text hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                          title="Sửa thông tin mẫu"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteCatalog(catalog)}
+                          className="p-2 rounded-xl text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
+                          title="Xóa mẫu"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+
+                      <button
+                        onClick={() => handleOpenGenerateQr(catalog)}
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-amber-500 px-4 py-2 text-xs font-bold text-slate-900 shadow-soft hover:bg-amber-400 transition-all cursor-pointer"
+                      >
+                        <Zap className="w-3.5 h-3.5 fill-current" />
+                        <span>Tạo Mã QR</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </main>
       </div>
 
       {/* Profile Modal */}
@@ -236,12 +413,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout, 
         />
       ) : null}
 
-      {/* Admin Device Modal */}
-      <AdminDeviceModal
-        isOpen={isDeviceModalOpen}
-        onClose={() => setIsDeviceModalOpen(false)}
+      {/* Catalog Modal (Add & Edit) */}
+      <AdminCatalogModal
+        isOpen={isCatalogModalOpen}
+        onClose={() => setIsCatalogModalOpen(false)}
+        onSuccess={loadData}
+        editingCatalog={editingCatalog}
+      />
+
+      {/* Batch QR Generation Modal */}
+      <AdminBatchQrModal
+        isOpen={isBatchQrModalOpen}
+        onClose={() => setIsBatchQrModalOpen(false)}
+        onSuccess={loadData}
+        catalog={selectedCatalogForQr}
       />
     </div>
-
   );
 };

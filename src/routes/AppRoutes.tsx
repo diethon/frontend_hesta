@@ -5,6 +5,7 @@ import { ForgotPasswordForm } from '../components/auth/ForgotPasswordForm';
 import { ResetPasswordForm } from '../components/auth/ResetPasswordForm';
 import { HomePage } from '../components/home/HomePage';
 import { AdminDashboard } from '../components/admin/AdminDashboard';
+import { AdminUsersPage } from '../components/admin/AdminUsersPage';
 import { SystemDiagnosticsPage } from '../components/admin/SystemDiagnosticsPage';
 import { JoinHome } from '../components/home/JoinHome';
 import { UnauthenticatedJoin } from '../components/home/UnauthenticatedJoin';
@@ -93,6 +94,7 @@ export function AppRoutes() {
         <Route path="/home/:homeId/digital-twin" element={<Suspense fallback={<p role="status" className="p-8 text-muted">Đang tải Digital Twin…</p>}><DigitalTwinPage /></Suspense>} />
         <Route element={<RequireAdmin initialized={initialized} user={user} />}>
           <Route path="/admin" element={<AdminDashboard user={user!} onLogout={logout} onProfileUpdate={updateUser} />} />
+          <Route path="/admin/users" element={<AdminUsersPage user={user!} onLogout={logout} onProfileUpdate={updateUser} />} />
           <Route path="/admin/diagnostics" element={<SystemDiagnosticsPage user={user!} onLogout={logout} onProfileUpdate={updateUser} />} />
         </Route>
       </Route>
