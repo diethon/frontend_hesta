@@ -1,5 +1,5 @@
 import { featureRequest } from './featureApi';
-import type { Recommendation } from '../types/recommendation';
+import type { Recommendation, MlModelStatus } from '../types/recommendation';
 
 const path = (homeId: string) => `/homes/${homeId}/recommendations`;
 
@@ -9,5 +9,11 @@ export const getRecommendations = (homeId: string) =>
 export const generateRecommendations = (homeId: string, from: string, to: string) =>
   featureRequest<Recommendation[]>(`${path(homeId)}/generate?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`, { method: 'POST' });
 
-export const resolveRecommendation = (homeId: string, recommendationId: string, action: 'approve' | 'reject') =>
+export const resolveRecommendation = (homeId: string, recommendationId: string, action: 'approve' | 'reject' | 'dismiss') =>
   featureRequest<Recommendation>(`${path(homeId)}/${recommendationId}/${action}`, { method: 'POST' });
+
+export const getModelStatus = (homeId: string) =>
+  featureRequest<MlModelStatus>(`${path(homeId)}/model-status`);
+
+export const retrainModel = (homeId: string) =>
+  featureRequest<MlModelStatus>(`${path(homeId)}/retrain`, { method: 'POST' });
