@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useLocation, useSearchParams } from "react-router";
 import type { UserResponse } from "../../types/auth";
 import type { DeviceResponse } from "../../types/device";
@@ -14,9 +14,13 @@ import { HomeRoomsWidget } from "./HomeRoomsWidget";
 import { HomeQuickScenes } from "./HomeQuickScenes";
 import { HomeFavoriteDevices } from "./HomeFavoriteDevices";
 import { HomeEnergyWidget } from "./HomeEnergyWidget";
+import { HomeActivityWidget } from "./HomeActivityWidget";
+import { DashboardNavRail } from "./DashboardNavRail";
+import { DashboardTopBar, type HomeOption } from "./DashboardTopBar";
+import { DashboardBottomNav } from "./DashboardBottomNav";
 import { getMyHomes, createHome, updateHome } from "../../services/homeApi";
 import { getRooms } from "../../services/roomApi";
-import { getDevicesByHome } from "../../services/deviceApi";
+import { getDevicesByHome, sendManualPowerCommand } from "../../services/deviceApi";
 import { getScenes } from "../../services/sceneApi";
 import { getHomeEnergySummary } from "../../services/energyApi";
 import {
@@ -27,17 +31,12 @@ import {
   Home,
   Building2,
   RotateCw,
-  Layers,
-  Users,
+  ArrowLeft,
 } from "lucide-react";
 import { currentHomeChanged, currentHomeCleared } from "../../store/homeSlice";
 import { useAppDispatch } from "../../store/hooks";
 import { getErrorMessage } from "../../utils/errors";
-import { HomeSidebar } from "../ui/HomeSidebar";
-import { NotificationBell } from "../notification/NotificationBell";
-import { VoiceAssistantButton } from "../ui/VoiceAssistant";
 import { notify } from '../ui/notify';
-import { UserAvatar } from '../ui/UserAvatar';
 
 interface HomePageProps {
   user: UserResponse;
@@ -45,15 +44,9 @@ interface HomePageProps {
   onProfileUpdate: (user: UserResponse) => void;
 }
 
-interface HomeSummary {
-  homeId: string;
-  homeName: string;
-  role: "OWNER" | "MEMBER";
-}
-
 function retainSelectedHome(
-  homes: HomeSummary[],
-  selectedHome: HomeSummary | null,
+  homes: HomeOption[],
+  selectedHome: HomeOption | null,
 ) {
   if (homes.length === 0) return null;
   if (!selectedHome) return homes[0];
@@ -70,13 +63,11 @@ export const HomePage: React.FC<HomePageProps> = ({
   const [searchParams] = useSearchParams();
   const requestedHomeId = searchParams.get("homeId");
 
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Home state
-  const [userHome, setUserHome] = useState<HomeSummary | null>(null);
-  const [homesList, setHomesList] = useState<HomeSummary[]>([]);
+  const [userHome, setUserHome] = useState<HomeOption | null>(null);
+  const [homesList, setHomesList] = useState<HomeOption[]>([]);
   const [newHomeName, setNewHomeName] = useState("");
   const [createLoading, setCreateLoading] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -98,7 +89,7 @@ export const HomePage: React.FC<HomePageProps> = ({
 
   const fetchHomes = async () => {
     try {
-      const homes = (await getMyHomes()) as HomeSummary[];
+      const homes = (await getMyHomes()) as HomeOption[];
       setHomesList(homes || []);
       if (homes && homes.length > 0) {
         setUserHome((prev) => {
@@ -155,15 +146,13 @@ export const HomePage: React.FC<HomePageProps> = ({
     }
   }, [userHome?.homeId, loadHomeDashboardData]);
 
-  // Scroll into view on deep links
+  // Deep links scroll and tab selection
   useEffect(() => {
     if (!userHome) return;
     if (location.hash === "#scenes-section") {
       setActiveTabSection('scenes');
-      document.getElementById("scenes-section")?.scrollIntoView({ behavior: "smooth" });
     } else if (location.hash === "#members-section") {
       setActiveTabSection('members');
-      document.getElementById("members-section")?.scrollIntoView({ behavior: "smooth" });
     }
   }, [location.hash, location.key, userHome]);
 
@@ -204,7 +193,7 @@ export const HomePage: React.FC<HomePageProps> = ({
     }
   }, [userHome?.homeId]);
 
-  const handleOpenRename = (home: HomeSummary) => {
+  const handleOpenRename = (home: HomeOption) => {
     setRenameHomeName(home.homeName);
     setIsRenameModalOpen(true);
   };
@@ -251,16 +240,29 @@ export const HomePage: React.FC<HomePageProps> = ({
     setIsOnboardingModalOpen(false);
   };
 
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsDropdownOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  // Turn off all lights quick handler
+  const handleTurnOffAllLights = async () => {
+    const activeLights = devices.filter((d) => {
+      const isLight = d.deviceType === 'LIGHT' || d.deviceType === 'LED_RGB';
+      const isPowerOn = d.currentState?.power === 'ON' || d.currentState?.power === true;
+      return isLight && isPowerOn;
+    });
+
+    if (activeLights.length === 0) {
+      notify.info('Không có đèn nào đang bật.');
+      return;
+    }
+
+    try {
+      await Promise.allSettled(
+        activeLights.map((light) => sendManualPowerCommand(light.id, 'TURN_OFF'))
+      );
+      notify.success(`Đã tắt ${activeLights.length} đèn đang bật`);
+      if (userHome) loadHomeDashboardData(userHome.homeId);
+    } catch (err: unknown) {
+      notify.error(getErrorMessage(err, 'Lỗi khi tắt đèn.'));
+    }
+  };
 
   // Compute live aggregates from devices
   const onlineDevicesCount = devices.filter((d) => d.status === 'ONLINE').length;
@@ -270,7 +272,6 @@ export const HomePage: React.FC<HomePageProps> = ({
     return isLight && isPowerOn;
   }).length;
 
-  // Temperature & humidity calculation
   const sensorDevices = devices.filter((d) => d.deviceType.includes('SENSOR') && d.currentState?.temperature);
   const avgTemp = sensorDevices.length > 0
     ? sensorDevices.reduce((acc, s) => acc + Number(s.currentState.temperature || 0), 0) / sensorDevices.length
@@ -279,285 +280,138 @@ export const HomePage: React.FC<HomePageProps> = ({
     ? sensorDevices.reduce((acc, s) => acc + Number(s.currentState.humidity || 0), 0) / sensorDevices.length
     : 61.8;
 
-  // Format date in Vietnamese: e.g. "THỨ HAI, 26 THÁNG 10"
-  const today = new Date();
-  const dateFormatted = new Intl.DateTimeFormat('vi-VN', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-  }).format(today).toUpperCase();
-
-  const currentHour = today.getHours();
-  const greeting = currentHour < 12 ? 'Chào buổi sáng' : currentHour < 18 ? 'Chào buổi chiều' : 'Chào buổi tối';
-
   return (
-    <div className="app-shell relative overflow-x-hidden min-h-screen">
-      <HomeSidebar activeItem="overview" homeId={userHome?.homeId} />
+    <div className="app-shell">
+      {/* 3 Pastel Meshes from Figma design */}
+      <div className="mesh mesh-one" />
+      <div className="mesh mesh-two" />
+      <div className="mesh mesh-three" />
 
-      <div className="lg:pl-64">
-        {/* Top Navbar */}
-        <nav className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-line bg-surface/90 px-4 py-3 backdrop-blur-xl sm:px-6">
-          {/* Left Title & Home Switcher */}
-          <div className="flex min-w-0 items-center gap-3">
-            <div className="min-w-0">
-              <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-muted">
-                {dateFormatted}
-              </p>
-              <h1 className="truncate text-base sm:text-xl font-extrabold tracking-tight text-text">
-                {greeting}, {user.fullName?.split(' ').slice(-1)[0] || user.fullName}
-              </h1>
-            </div>
+      {/* Modern Figma Floating Navigation Rail */}
+      <DashboardNavRail
+        homeId={userHome?.homeId}
+        activeItem={
+          activeTabSection === 'dashboard'
+            ? 'overview'
+            : activeTabSection === 'scenes'
+              ? 'scenes'
+              : 'members'
+        }
+        user={user}
+        onOpenSettings={() => setIsProfileModalOpen(true)}
+        onSelectOverview={() => {
+          setActiveTabSection('dashboard');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        onSelectMembers={() => setActiveTabSection('members')}
+        onOpenProfile={() => setIsProfileModalOpen(true)}
+      />
 
-            {/* Quick Home Switcher */}
-            {homesList.length > 0 && (
-              <div className="hidden sm:flex items-center gap-1.5 ml-2 pl-3 border-l border-line/70">
-                <select
-                  value={userHome?.homeId || ""}
-                  onChange={(e) => {
-                    const selected = homesList.find((h) => h.homeId === e.target.value);
-                    if (selected) setUserHome(selected);
-                  }}
-                  className="rounded-xl border border-line bg-sidebar px-3 py-1.5 text-xs font-semibold text-text outline-none transition focus:border-primary cursor-pointer"
-                >
-                  {homesList.map((h) => (
-                    <option key={h.homeId} value={h.homeId}>
-                      {h.homeName} ({h.role === "OWNER" ? "Chủ nhà" : "Thành viên"})
-                    </option>
-                  ))}
-                </select>
+      <main>
+        {/* Figma Topbar */}
+        <DashboardTopBar
+          user={user}
+          currentHome={userHome}
+          homesList={homesList}
+          onSelectHome={(h) => setUserHome(h)}
+          onOpenCreateHome={() => setIsCreateModalOpen(true)}
+          onOpenRenameHome={(h) => handleOpenRename(h)}
+          onOpenProfile={() => setIsProfileModalOpen(true)}
+          onLogout={onLogout}
+        />
 
-                {userHome?.role === "OWNER" && (
-                  <button
-                    type="button"
-                    onClick={() => handleOpenRename(userHome)}
-                    className="p-1.5 rounded-lg border border-line bg-sidebar hover:bg-sidebar-hover text-icon hover:text-primary transition-colors cursor-pointer"
-                    title="Đổi tên nhà"
-                  >
-                    <Pencil className="w-3.5 h-3.5" />
-                  </button>
-                )}
-
-                <button
-                  type="button"
-                  onClick={() => setIsCreateModalOpen(true)}
-                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-primary/30 bg-primary/10 hover:bg-primary/20 text-primary font-bold text-xs transition-all cursor-pointer shadow-2xs"
-                  title="Thêm nhà mới"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Thêm nhà</span>
-                </button>
-              </div>
-            )}
+        {/* Fallback back-to-dashboard banner if viewing Scenes or Members */}
+        {activeTabSection !== 'dashboard' && (
+          <div className="mb-6 flex items-center justify-between p-3 rounded-2xl glass-g2">
+            <button
+              type="button"
+              onClick={() => setActiveTabSection('dashboard')}
+              className="flex items-center gap-2 text-xs font-bold text-accent hover:opacity-80 transition-all cursor-pointer"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Quay lại Tổng quan Dashboard</span>
+            </button>
+            <span className="text-xs font-semibold text-secondary">
+              {activeTabSection === 'scenes' ? 'Quản lý Kịch bản' : 'Thành viên gia đình'}
+            </span>
           </div>
+        )}
 
-          {/* Right Controls */}
-          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-            <VoiceAssistantButton />
-            <NotificationBell />
+        {/* ── Main Dashboard: Pixel-perfect Figma Layout ── */}
+        {activeTabSection === 'dashboard' && (
+          <div className="dashboard">
+            <HomeHeroLiveCamera
+              homeId={userHome?.homeId}
+              totalDevices={devices.length || 8}
+              onlineDevices={onlineDevicesCount || 8}
+              activeLightsCount={activeLightsCount}
+              avgTemperature={avgTemp}
+              avgHumidity={avgHum}
+              activePowerWatts={energySummary?.activeDeviceCount ? energySummary.activeDeviceCount * 45 : 350}
+              onTurnOffAllLights={handleTurnOffAllLights}
+            />
 
-            {/* Profile Dropdown */}
-            <div className="relative" ref={dropdownRef}>
-              <button
-                type="button"
-                aria-label="Mở menu tài khoản"
-                aria-expanded={isDropdownOpen}
-                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border-2 border-line bg-primary shadow-soft transition-transform hover:scale-105 focus:outline-none"
-              >
-                <UserAvatar
-                  src={user.avatarUrl}
-                  name={user.fullName}
-                  size={40}
-                  fallbackClassName="text-sm font-bold text-white"
-                />
-              </button>
+            <HomeRoomsWidget
+              rooms={rooms}
+              devices={devices}
+              selectedRoomId={selectedRoomId}
+              onSelectRoom={(roomId) => setSelectedRoomId(roomId)}
+              onOpenAddRoom={() => setIsRoomModalOpen(true)}
+            />
 
-              {isDropdownOpen && (
-                <div className="gentle-rise absolute right-0 z-50 mt-2 w-56 rounded-2xl border border-line bg-surface py-1 shadow-float">
-                  <div className="px-4 py-2 border-b border-line">
-                    <p className="truncate text-sm font-bold text-text">{user.fullName}</p>
-                    <p className="truncate text-xs text-muted">{user.email}</p>
-                  </div>
+            <HomeQuickScenes
+              homeId={userHome?.homeId}
+              scenes={scenes}
+              onOpenSceneManagement={() => setActiveTabSection('scenes')}
+            />
 
-                  <div className="p-1">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsDropdownOpen(false);
-                        setIsProfileModalOpen(true);
-                      }}
-                      className="w-full text-left px-3 py-2 text-sm text-text hover:bg-sidebar-hover hover:text-primary rounded-xl transition-colors flex items-center gap-2 cursor-pointer"
-                    >
-                      <Sparkles className="w-4 h-4 text-icon" />
-                      <span>Hồ sơ & Bảo mật</span>
-                    </button>
-                  </div>
+            <HomeFavoriteDevices
+              homeId={userHome?.homeId}
+              devices={devices}
+              selectedRoomId={selectedRoomId}
+              onRefreshDevices={() => userHome && loadHomeDashboardData(userHome.homeId)}
+            />
 
-                  <div className="border-t border-line p-1">
-                    <button
-                      type="button"
-                      onClick={onLogout}
-                      className="w-full text-left px-3 py-2 text-sm text-error hover:bg-error-soft rounded-xl transition-colors flex items-center gap-2 cursor-pointer"
-                    >
-                      <X className="w-4 h-4" />
-                      <span>Đăng xuất</span>
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
+            <HomeEnergyWidget
+              homeId={userHome?.homeId}
+              energySummary={energySummary}
+            />
+
+            <HomeActivityWidget homeId={userHome?.homeId} />
           </div>
-        </nav>
+        )}
 
-        {/* Main Dashboard Content */}
-        <main id="main-content" className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8">
-          {userHome ? (
-            <>
-              {/* Optional Section Selector for Seamless Deep Links */}
-              <div className="flex items-center gap-2 border-b border-line pb-2">
-                <button
-                  type="button"
-                  onClick={() => setActiveTabSection('dashboard')}
-                  className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
-                    activeTabSection === 'dashboard'
-                      ? 'bg-primary text-white shadow-soft'
-                      : 'bg-surface text-muted hover:text-text hover:bg-sidebar'
-                  }`}
-                >
-                  <Home className="w-4 h-4" />
-                  <span>Tổng quan Không gian</span>
-                </button>
+        {/* ── Detailed Scene Management (Preserves existing functional logic) ── */}
+        {activeTabSection === 'scenes' && userHome && (
+          <section id="scenes-section" className="scroll-mt-24 space-y-4">
+            <SceneManagement
+              key={userHome.homeId}
+              homeId={userHome.homeId}
+              currentUserRole={userHome.role}
+            />
+          </section>
+        )}
 
-                <button
-                  type="button"
-                  onClick={() => setActiveTabSection('scenes')}
-                  className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
-                    activeTabSection === 'scenes'
-                      ? 'bg-primary text-white shadow-soft'
-                      : 'bg-surface text-muted hover:text-text hover:bg-sidebar'
-                  }`}
-                >
-                  <Layers className="w-4 h-4" />
-                  <span>Quản lý Kịch bản ({scenes.length})</span>
-                </button>
+        {/* ── Detailed Member Management (Preserves existing functional logic) ── */}
+        {activeTabSection === 'members' && userHome && (
+          <section id="members-section" className="scroll-mt-24 space-y-4">
+            <MemberManagement
+              homeId={userHome.homeId}
+              currentUserRole={userHome.role}
+            />
+          </section>
+        )}
+      </main>
 
-                <button
-                  type="button"
-                  onClick={() => setActiveTabSection('members')}
-                  className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
-                    activeTabSection === 'members'
-                      ? 'bg-primary text-white shadow-soft'
-                      : 'bg-surface text-muted hover:text-text hover:bg-sidebar'
-                  }`}
-                >
-                  <Users className="w-4 h-4" />
-                  <span>Thành viên gia đình</span>
-                </button>
-              </div>
+      {/* Figma Mobile Bottom Navigation */}
+      <DashboardBottomNav
+        homeId={userHome?.homeId}
+        activeItem={activeTabSection === 'dashboard' ? 'overview' : 'scenes'}
+        onSelectOverview={() => setActiveTabSection('dashboard')}
+        onOpenMore={() => setIsProfileModalOpen(true)}
+      />
 
-              {/* TAB 1: Main Modern Dashboard (Figma Layout) */}
-              {activeTabSection === 'dashboard' && (
-                <div className="space-y-6">
-                  {/* Row 1: Hero Camera Card (Left 8 cols) & Vertical Rooms Widget (Right 4 cols) */}
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
-                    <div className="lg:col-span-8">
-                      <HomeHeroLiveCamera
-                        homeId={userHome.homeId}
-                        totalDevices={devices.length || 8}
-                        onlineDevices={onlineDevicesCount || 8}
-                        activeLightsCount={activeLightsCount}
-                        avgTemperature={avgTemp}
-                        avgHumidity={avgHum}
-                        activePowerWatts={energySummary?.activeDeviceCount ? energySummary.activeDeviceCount * 45 : 350}
-                      />
-                    </div>
-
-                    <div className="lg:col-span-4">
-                      <HomeRoomsWidget
-                        rooms={rooms}
-                        devices={devices}
-                        selectedRoomId={selectedRoomId}
-                        onSelectRoom={(roomId) => setSelectedRoomId(roomId)}
-                        onOpenAddRoom={() => setIsRoomModalOpen(true)}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Row 2: Quick Scenes (Truy cập nhanh - Kịch bản) */}
-                  <HomeQuickScenes
-                    homeId={userHome.homeId}
-                    scenes={scenes}
-                    onOpenSceneManagement={() => setActiveTabSection('scenes')}
-                  />
-
-                  {/* Row 3: Favorite Devices (Left 8 cols) & Energy Widget (Right 4 cols) */}
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-                    <div className="lg:col-span-8">
-                      <HomeFavoriteDevices
-                        homeId={userHome.homeId}
-                        devices={devices}
-                        selectedRoomId={selectedRoomId}
-                        onRefreshDevices={() => loadHomeDashboardData(userHome.homeId)}
-                      />
-                    </div>
-
-                    <div className="lg:col-span-4">
-                      <HomeEnergyWidget
-                        homeId={userHome.homeId}
-                        energySummary={energySummary}
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* TAB 2: Detailed Scene Management (Preserves existing functional logic) */}
-              {activeTabSection === 'scenes' && (
-                <section id="scenes-section" className="scroll-mt-24 space-y-4">
-                  <SceneManagement
-                    key={userHome.homeId}
-                    homeId={userHome.homeId}
-                    currentUserRole={userHome.role}
-                  />
-                </section>
-              )}
-
-              {/* TAB 3: Member Management (Preserves existing functional logic) */}
-              {activeTabSection === 'members' && (
-                <section id="members-section" className="scroll-mt-24 space-y-4">
-                  <MemberManagement
-                    homeId={userHome.homeId}
-                    currentUserRole={userHome.role}
-                  />
-                </section>
-              )}
-            </>
-          ) : (
-            /* Empty State when no home exists yet */
-            <div className="surface-card mt-8 border-dashed border-2 border-primary/20 p-10 text-center rounded-3xl bg-gradient-to-b from-surface via-surface to-primary/5 max-w-lg mx-auto shadow-sm">
-              <div className="w-16 h-16 bg-primary/10 text-primary border border-primary/20 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-xs">
-                <Home className="w-8 h-8" />
-              </div>
-              <h3 className="text-lg font-bold text-text mb-2">
-                Bạn chưa tham gia Ngôi nhà nào
-              </h3>
-              <p className="text-xs text-muted mb-6 leading-relaxed">
-                Bạn cần có một Ngôi nhà để kết nối thiết bị IoT, bố trí sơ đồ Digital Twin và chia sẻ quyền điều khiển.
-              </p>
-              <button
-                type="button"
-                onClick={() => setIsCreateModalOpen(true)}
-                className="flex items-center gap-2 px-6 py-3 bg-primary hover:bg-primary-hover text-white font-bold text-xs rounded-xl transition-all shadow-md hover:shadow-lg cursor-pointer mx-auto"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Tạo nhà mới ngay</span>
-              </button>
-            </div>
-          )}
-        </main>
-      </div>
-
-      {/* ── All Working Modals ── */}
+      {/* ── Functional Modals ── */}
       {/* Room Management Modal */}
       {userHome && isRoomModalOpen && (
         <RoomManagementModal

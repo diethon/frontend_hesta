@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./components/home/dashboard.css";
 
 .hesta-toast {
   opacity: 1;

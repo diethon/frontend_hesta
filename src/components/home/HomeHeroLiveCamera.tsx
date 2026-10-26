@@ -1,16 +1,9 @@
 import React, { useState } from 'react';
-import {
-  Camera,
-  Maximize2,
-  Power,
-  ChevronDown,
-  Thermometer,
-  Droplets,
-  Zap,
-  ShieldCheck,
-} from 'lucide-react';
 import { useNavigate } from 'react-router';
+import { Icon } from './HomeIcons';
 import { notify } from '../ui/notify';
+
+export type CameraState = 'live' | 'loading' | 'offline' | 'empty';
 
 interface HomeHeroLiveCameraProps {
   homeId?: string;
@@ -21,22 +14,24 @@ interface HomeHeroLiveCameraProps {
   avgHumidity?: number;
   activePowerWatts?: number;
   onTurnOffAllLights?: () => void;
+  state?: CameraState;
 }
 
 export const HomeHeroLiveCamera: React.FC<HomeHeroLiveCameraProps> = ({
   homeId,
-  totalDevices,
-  onlineDevices,
-  activeLightsCount,
+  totalDevices = 8,
+  onlineDevices = 8,
+  activeLightsCount = 2,
   avgTemperature = 26.9,
   avgHumidity = 61.8,
   activePowerWatts = 350,
   onTurnOffAllLights,
+  state = 'live',
 }) => {
   const navigate = useNavigate();
-  const [isSnapping, setIsSnapping] = useState(false);
   const [selectedCamera, setSelectedCamera] = useState('Camera phòng khách');
-  const [isCameraDropdownOpen, setIsCameraDropdownOpen] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isSnapping, setIsSnapping] = useState(false);
 
   const cameras = ['Camera phòng khách', 'Camera sân trước', 'Camera ban công'];
 
@@ -44,8 +39,8 @@ export const HomeHeroLiveCamera: React.FC<HomeHeroLiveCameraProps> = ({
     setIsSnapping(true);
     setTimeout(() => {
       setIsSnapping(false);
-      notify.success('Đã lưu ảnh snapshot', 'Ảnh chụp từ camera đã được lưu vào nhật ký an ninh.');
-    }, 400);
+      notify.success('Đã chụp ảnh snapshot', 'Hình ảnh camera an ninh đã được lưu vào nhật ký.');
+    }, 450);
   };
 
   const handleFullscreen = () => {
@@ -56,147 +51,179 @@ export const HomeHeroLiveCamera: React.FC<HomeHeroLiveCameraProps> = ({
     }
   };
 
-  const handleQuickTurnOffLights = () => {
+  const handleQuickTurnOff = () => {
     if (onTurnOffAllLights) {
       onTurnOffAllLights();
     } else {
-      notify.success('Đã tắt nhanh toàn bộ đèn trong phòng');
+      notify.success('Đã tắt nhanh các đèn đang bật trong phòng.');
     }
   };
 
+  const SensorChips = () => (
+    <div className="camera-sensors">
+      <span className="camera-chip">
+        <Icon name="thermometer" size={16} />
+        {avgTemperature.toFixed(1)}°C
+      </span>
+      <span className="camera-chip">
+        <Icon name="droplet" size={16} />
+        {avgHumidity.toFixed(1)}%
+      </span>
+      <span className="camera-chip">
+        <Icon name="energy" size={16} />
+        {activePowerWatts} W
+      </span>
+      <span className="camera-chip success">
+        <Icon name="shield" size={16} />
+        An toàn
+      </span>
+    </div>
+  );
+
   return (
-    <div className="relative aspect-[16/10] sm:aspect-[16/9] w-full overflow-hidden rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-[0_4px_20px_rgba(0,0,0,0.06)] group select-none bg-slate-900">
-      {/* Background Image */}
-      <img
-        src="/camera_living_room.jpg"
-        alt="Camera phòng khách"
-        className={`h-full w-full object-cover transition-all duration-700 ${
-          isSnapping ? 'brightness-150' : 'brightness-95 contrast-105'
-        }`}
-      />
+    <section className={`hero camera-card glass-g2 camera-${state}`}>
+      <div className="camera-viewport">
+        {state === 'live' && (
+          <img
+            className={`camera-image transition-all duration-300 ${
+              isSnapping ? 'brightness-150 scale-[1.01]' : ''
+            }`}
+            src="https://images.unsplash.com/photo-1632829882891-5047ccc421bc?crop=entropy&cs=tinysrgb&fit=crop&fm=jpg&q=85&w=1600"
+            alt="Hình ảnh trực tiếp phòng khách sáng và yên tĩnh"
+            onError={(e) => {
+              // Fallback to local image if internet is slow
+              e.currentTarget.src = '/camera_living_room.jpg';
+            }}
+          />
+        )}
 
-      {/* Subtle Dark Overlays for Text Readability */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/15 to-black/50 pointer-events-none" />
-
-      {/* ── Top Bar inside Camera Card ── */}
-      <div className="absolute top-4 left-4 right-4 sm:top-5 sm:left-5 sm:right-5 flex flex-wrap items-center justify-between gap-2.5 z-10">
-        {/* Top-Left Badges: Live & Camera Selector */}
-        <div className="flex items-center gap-2">
-          {/* Live badge */}
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/95 dark:bg-slate-900/90 backdrop-blur-md shadow-sm border border-white/40">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
-            </span>
-            <span className="text-xs font-bold text-slate-800 dark:text-slate-100">Live</span>
+        {state === 'loading' && (
+          <div className="camera-state camera-loading">
+            <Icon name="camera" size={34} />
+            <span>Đang kết nối camera</span>
           </div>
+        )}
 
-          {/* Camera Dropdown */}
-          <div className="relative">
+        {state === 'offline' && (
+          <div className="camera-state">
+            <Icon name="cameraOff" size={38} />
+            <strong>Camera ngoại tuyến</strong>
             <button
               type="button"
-              onClick={() => setIsCameraDropdownOpen(!isCameraDropdownOpen)}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-black/40 hover:bg-black/60 text-white text-xs font-semibold backdrop-blur-md border border-white/20 transition-all cursor-pointer shadow-xs"
+              className="secondary-button"
+              onClick={() => notify.info('Đang kết nối lại camera…')}
             >
-              <span>{selectedCamera}</span>
-              <ChevronDown className="w-3.5 h-3.5 opacity-80" />
+              <Icon name="refresh" size={17} />
+              Thử lại
             </button>
-
-            {isCameraDropdownOpen && (
-              <div className="absolute left-0 mt-2 w-44 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl py-1 z-20">
-                {cameras.map((cam) => (
-                  <button
-                    key={cam}
-                    type="button"
-                    onClick={() => {
-                      setSelectedCamera(cam);
-                      setIsCameraDropdownOpen(false);
-                      notify.info(`Đã chuyển sang ${cam}`);
-                    }}
-                    className={`w-full text-left px-3.5 py-2 text-xs font-medium transition-colors ${
-                      selectedCamera === cam
-                        ? 'text-primary font-bold bg-primary/10'
-                        : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
-                    }`}
-                  >
-                    {cam}
-                  </button>
-                ))}
-              </div>
-            )}
           </div>
-        </div>
+        )}
 
-        {/* Top-Right Overlaid Environmental Metrics (Figma Exact Placement) */}
-        <div className="hidden sm:flex items-center gap-2">
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-white/85 dark:bg-slate-900/80 backdrop-blur-md border border-white/30 text-slate-800 dark:text-slate-100 text-xs font-bold shadow-xs">
-            <Thermometer className="w-3.5 h-3.5 text-amber-500" />
-            <span>{avgTemperature.toFixed(1)}°C</span>
+        {state === 'empty' && (
+          <div className="camera-state">
+            <Icon name="camera" size={38} />
+            <strong>Chưa có camera</strong>
+            <button
+              type="button"
+              className="camera-primary"
+              onClick={() => notify.info('Thêm camera an ninh mới')}
+            >
+              <Icon name="plus" size={17} />
+              Thêm camera
+            </button>
           </div>
+        )}
 
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-white/85 dark:bg-slate-900/80 backdrop-blur-md border border-white/30 text-slate-800 dark:text-slate-100 text-xs font-bold shadow-xs">
-            <Droplets className="w-3.5 h-3.5 text-cyan-500" />
-            <span>{avgHumidity.toFixed(1)}%</span>
-          </div>
+        {state !== 'empty' && (
+          <div className="camera-top-left">
+            <span className="live-badge">
+              <span className="live-dot" />
+              Live
+            </span>
 
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-white/85 dark:bg-slate-900/80 backdrop-blur-md border border-white/30 text-slate-800 dark:text-slate-100 text-xs font-bold shadow-xs">
-            <Zap className="w-3.5 h-3.5 text-indigo-500" />
-            <span>{activePowerWatts} W</span>
-          </div>
+            <div className="relative">
+              <button
+                type="button"
+                className="camera-name"
+                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              >
+                <span>{selectedCamera}</span>
+                <Icon name="chevronDown" size={15} />
+              </button>
 
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-white/85 dark:bg-slate-900/80 backdrop-blur-md border border-white/30 text-emerald-600 dark:text-emerald-400 text-xs font-bold shadow-xs">
-            <ShieldCheck className="w-3.5 h-3.5" />
-            <span>An toàn</span>
+              {isDropdownOpen && (
+                <div className="absolute left-0 mt-2 w-48 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xl py-1 z-30">
+                  {cameras.map((cam) => (
+                    <button
+                      key={cam}
+                      type="button"
+                      onClick={() => {
+                        setSelectedCamera(cam);
+                        setIsDropdownOpen(false);
+                        notify.info(`Đã chuyển sang ${cam}`);
+                      }}
+                      className={`w-full text-left px-3.5 py-2 text-xs font-semibold transition-colors ${
+                        selectedCamera === cam
+                          ? 'text-primary bg-primary/10'
+                          : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
+                      }`}
+                    >
+                      {cam}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* Overlaid inside viewport on desktop */}
+        <SensorChips />
+
+        {state !== 'empty' && (
+          <div className="camera-bottom">
+            <p>
+              <span className="safe-dot" /> Nhà an toàn · {activeLightsCount} đèn đang bật ·{' '}
+              {onlineDevices}/{totalDevices} thiết bị trực tuyến
+            </p>
+
+            <div className="camera-controls">
+              <button
+                type="button"
+                className="camera-control"
+                aria-label="Chụp ảnh camera"
+                title="Chụp ảnh camera"
+                onClick={handleSnapshot}
+              >
+                <Icon name="camera" size={18} />
+              </button>
+
+              <button
+                type="button"
+                className="camera-control"
+                aria-label="Toàn màn hình Digital Twin"
+                title="Toàn màn hình Digital Twin"
+                onClick={handleFullscreen}
+              >
+                <Icon name="maximize" size={18} />
+              </button>
+
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={handleQuickTurnOff}
+                title="Tắt nhanh các đèn đang bật"
+              >
+                <Icon name="power" size={18} />
+                <span>Tắt nhanh đèn</span>
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* ── Bottom Overlay Info & Controls ── */}
-      <div className="absolute bottom-4 left-4 right-4 sm:bottom-5 sm:left-5 sm:right-5 flex flex-wrap items-center justify-between gap-3 z-10">
-        {/* Status text */}
-        <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-black/40 backdrop-blur-md border border-white/15 text-white text-xs sm:text-sm font-medium shadow-xs">
-          <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]" />
-          <span>
-            Nhà an toàn · {activeLightsCount} đèn đang bật · {onlineDevices}/{totalDevices || 8} thiết bị trực tuyến
-          </span>
-        </div>
-
-        {/* Action buttons matching Figma */}
-        <div className="flex items-center gap-2">
-          {/* Snapshot */}
-          <button
-            type="button"
-            onClick={handleSnapshot}
-            aria-label="Chụp ảnh nhanh"
-            title="Chụp ảnh snapshot"
-            className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-black/40 hover:bg-black/60 text-white backdrop-blur-md border border-white/20 transition-all shadow-xs hover:scale-105 active:scale-95 cursor-pointer"
-          >
-            <Camera className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
-          </button>
-
-          {/* Fullscreen / 3D Twin */}
-          <button
-            type="button"
-            onClick={handleFullscreen}
-            aria-label="Xem 3D Digital Twin"
-            title="Toàn màn hình Digital Twin"
-            className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-black/40 hover:bg-black/60 text-white backdrop-blur-md border border-white/20 transition-all shadow-xs hover:scale-105 active:scale-95 cursor-pointer"
-          >
-            <Maximize2 className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
-          </button>
-
-          {/* Tắt nhanh đèn (Exact Figma pill button) */}
-          <button
-            type="button"
-            onClick={handleQuickTurnOffLights}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/90 hover:bg-white text-slate-900 text-xs font-bold backdrop-blur-md border border-white/50 transition-all shadow-xs hover:scale-105 active:scale-95 cursor-pointer"
-            title="Tắt nhanh toàn bộ đèn"
-          >
-            <Power className="w-3.5 h-3.5 text-slate-800" />
-            <span className="hidden xs:inline">Tắt nhanh đèn</span>
-          </button>
-        </div>
-      </div>
-    </div>
+      {/* Rendered below viewport on mobile viewports via responsive CSS */}
+      <SensorChips />
+    </section>
   );
 };
