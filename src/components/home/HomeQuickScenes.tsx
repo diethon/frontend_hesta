@@ -1,5 +1,14 @@
 import React, { useState } from 'react';
-import { Sun, Briefcase, Armchair, Film, Moon, PowerOff, ChevronRight, Loader2 } from 'lucide-react';
+import {
+  Sun,
+  Briefcase,
+  Armchair,
+  Film,
+  Moon,
+  PowerOff,
+  ChevronRight,
+  Loader2,
+} from 'lucide-react';
 import { useNavigate } from 'react-router';
 import type { SceneResponse } from '../../types/scene';
 import { executeScene } from '../../services/sceneApi';
@@ -38,7 +47,6 @@ export const HomeQuickScenes: React.FC<HomeQuickScenesProps> = ({
   const handleActivate = async (preset: DefaultScenePreset) => {
     setActivatingId(preset.id);
     try {
-      // Find matching scene in DB if exists
       const matchedScene = scenes.find(
         (s) => s.name.toLowerCase().includes(preset.name.toLowerCase()) ||
                preset.name.toLowerCase().includes(s.name.toLowerCase())
@@ -48,7 +56,6 @@ export const HomeQuickScenes: React.FC<HomeQuickScenesProps> = ({
         await executeScene(homeId, matchedScene.id);
         notify.success(`Kích hoạt thành công: ${matchedScene.name}`, 'Các thiết bị đã được thiết lập theo kịch bản.');
       } else {
-        // Fallback visual feedback if scene not yet configured in DB
         await new Promise((r) => setTimeout(r, 400));
         notify.success(`Đã kích hoạt kịch bản: ${preset.name}`, preset.hint);
       }
@@ -72,7 +79,7 @@ export const HomeQuickScenes: React.FC<HomeQuickScenesProps> = ({
 
   return (
     <div className="space-y-3">
-      {/* Header */}
+      {/* Header matching Figma */}
       <div className="flex items-center justify-between">
         <div>
           <p className="text-[11px] font-bold uppercase tracking-wider text-muted">Truy cập nhanh</p>
@@ -82,15 +89,15 @@ export const HomeQuickScenes: React.FC<HomeQuickScenesProps> = ({
         <button
           type="button"
           onClick={handleManageClick}
-          className="flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary-hover transition-colors cursor-pointer group"
+          className="flex items-center gap-1 text-xs font-bold text-primary hover:text-primary-hover transition-colors cursor-pointer group"
         >
           <span>Quản lý</span>
           <ChevronRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
         </button>
       </div>
 
-      {/* Horizontal Scrolling Scene Cards */}
-      <div className="flex items-stretch gap-3 overflow-x-auto pb-2 scrollbar-none snap-x">
+      {/* Row of 6 wide horizontal scene cards matching Figma */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
         {defaultPresets.map((preset) => {
           const isActivating = activatingId === preset.id;
           return (
@@ -99,18 +106,15 @@ export const HomeQuickScenes: React.FC<HomeQuickScenesProps> = ({
               type="button"
               disabled={isActivating}
               onClick={() => handleActivate(preset)}
-              className="flex flex-col items-center justify-center gap-2 min-w-[124px] sm:min-w-[140px] px-4 py-4 rounded-2xl bg-surface border border-line shadow-xs hover:border-primary/50 hover:shadow-soft hover:-translate-y-0.5 active:translate-y-0 active:scale-98 transition-all cursor-pointer group text-center shrink-0 snap-start"
+              className="surface-card flex items-center gap-3 p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-[0_2px_12px_rgba(0,0,0,0.03)] hover:border-primary/50 hover:shadow-soft hover:-translate-y-0.5 active:scale-98 transition-all cursor-pointer group text-left"
             >
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-sidebar group-hover:bg-primary/10 transition-colors">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 group-hover:bg-primary/10 transition-colors">
                 {isActivating ? <Loader2 className="w-5 h-5 text-primary animate-spin" /> : preset.icon}
               </div>
 
               <div className="min-w-0">
                 <p className="text-xs sm:text-sm font-bold text-text truncate group-hover:text-primary transition-colors">
                   {preset.name}
-                </p>
-                <p className="text-[10px] text-muted truncate max-w-[110px]">
-                  {preset.hint}
                 </p>
               </div>
             </button>

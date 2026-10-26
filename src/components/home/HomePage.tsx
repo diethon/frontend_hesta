@@ -10,6 +10,7 @@ import { MemberManagement } from "./MemberManagement";
 import { SceneManagement } from "./SceneManagement";
 import { RoomManagementModal } from "../device/RoomManagementModal";
 import { HomeHeroLiveCamera } from "./HomeHeroLiveCamera";
+import { HomeRoomsWidget } from "./HomeRoomsWidget";
 import { HomeQuickScenes } from "./HomeQuickScenes";
 import { HomeFavoriteDevices } from "./HomeFavoriteDevices";
 import { HomeEnergyWidget } from "./HomeEnergyWidget";
@@ -456,106 +457,40 @@ export const HomePage: React.FC<HomePageProps> = ({
 
               {/* TAB 1: Main Modern Dashboard (Figma Layout) */}
               {activeTabSection === 'dashboard' && (
-                <div className="space-y-8">
-                  {/* Row 1: Hero Camera Card & Environmental Badges */}
-                  <HomeHeroLiveCamera
-                    homeId={userHome.homeId}
-                    totalDevices={devices.length || 8}
-                    onlineDevices={onlineDevicesCount || 8}
-                    activeLightsCount={activeLightsCount}
-                    avgTemperature={avgTemp}
-                    avgHumidity={avgHum}
-                    activePowerWatts={energySummary?.activeDeviceCount ? energySummary.activeDeviceCount * 45 : 350}
-                  />
-
-                  {/* Row 2: Rooms (Không gian - Phòng) */}
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-[11px] font-bold uppercase tracking-wider text-muted">Không gian</p>
-                        <h2 className="text-xl font-bold tracking-tight text-text">Phòng</h2>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => setIsRoomModalOpen(true)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-primary/30 bg-primary/10 hover:bg-primary/20 text-primary font-bold text-xs transition-all cursor-pointer shadow-2xs"
-                      >
-                        <Plus className="w-4 h-4" />
-                        <span>Thêm</span>
-                      </button>
+                <div className="space-y-6">
+                  {/* Row 1: Hero Camera Card (Left 8 cols) & Vertical Rooms Widget (Right 4 cols) */}
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+                    <div className="lg:col-span-8">
+                      <HomeHeroLiveCamera
+                        homeId={userHome.homeId}
+                        totalDevices={devices.length || 8}
+                        onlineDevices={onlineDevicesCount || 8}
+                        activeLightsCount={activeLightsCount}
+                        avgTemperature={avgTemp}
+                        avgHumidity={avgHum}
+                        activePowerWatts={energySummary?.activeDeviceCount ? energySummary.activeDeviceCount * 45 : 350}
+                      />
                     </div>
 
-                    {/* Room Filter Pills */}
-                    <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedRoomId(null)}
-                        className={`flex items-center gap-2 px-5 py-2.5 rounded-2xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
-                          selectedRoomId === null
-                            ? 'bg-primary text-white shadow-soft scale-102'
-                            : 'bg-surface text-muted hover:text-text hover:bg-sidebar border border-line'
-                        }`}
-                      >
-                        <span>Tất cả</span>
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
-                          selectedRoomId === null ? 'bg-white/20 text-white' : 'bg-sidebar text-muted'
-                        }`}>
-                          {devices.length || 4}
-                        </span>
-                      </button>
-
-                      {rooms.map((room) => {
-                        const isSelected = selectedRoomId === room.id;
-                        const roomDeviceCount = devices.filter((d) => d.roomId === room.id).length;
-                        return (
-                          <button
-                            key={room.id}
-                            type="button"
-                            onClick={() => setSelectedRoomId(room.id)}
-                            className={`flex items-center gap-2 px-5 py-2.5 rounded-2xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
-                              isSelected
-                                ? 'bg-primary text-white shadow-soft scale-102'
-                                : 'bg-surface text-muted hover:text-text hover:bg-sidebar border border-line'
-                            }`}
-                          >
-                            <span>{room.name}</span>
-                            {roomDeviceCount > 0 && (
-                              <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
-                                isSelected ? 'bg-white/20 text-white' : 'bg-sidebar text-muted'
-                              }`}>
-                                {roomDeviceCount}
-                              </span>
-                            )}
-                          </button>
-                        );
-                      })}
-
-                      {rooms.length === 0 && (
-                        <>
-                          {['P. khách', 'P. ngủ', 'P. bếp', 'Hành lang', 'Ban công'].map((mockRoomName) => (
-                            <button
-                              key={mockRoomName}
-                              type="button"
-                              onClick={() => notify.info(`Lọc theo ${mockRoomName}`)}
-                              className="px-5 py-2.5 rounded-2xl text-xs font-bold bg-surface text-muted hover:text-text hover:bg-sidebar border border-line shrink-0 cursor-pointer transition-all"
-                            >
-                              {mockRoomName}
-                            </button>
-                          ))}
-                        </>
-                      )}
+                    <div className="lg:col-span-4">
+                      <HomeRoomsWidget
+                        rooms={rooms}
+                        devices={devices}
+                        selectedRoomId={selectedRoomId}
+                        onSelectRoom={(roomId) => setSelectedRoomId(roomId)}
+                        onOpenAddRoom={() => setIsRoomModalOpen(true)}
+                      />
                     </div>
                   </div>
 
-                  {/* Row 3: Quick Scenes (Truy cập nhanh - Kịch bản) */}
+                  {/* Row 2: Quick Scenes (Truy cập nhanh - Kịch bản) */}
                   <HomeQuickScenes
                     homeId={userHome.homeId}
                     scenes={scenes}
                     onOpenSceneManagement={() => setActiveTabSection('scenes')}
                   />
 
-                  {/* Row 4: Favorite Devices (Left 8 cols) & Energy Widget (Right 4 cols) */}
+                  {/* Row 3: Favorite Devices (Left 8 cols) & Energy Widget (Right 4 cols) */}
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
                     <div className="lg:col-span-8">
                       <HomeFavoriteDevices

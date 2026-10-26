@@ -6,7 +6,6 @@ import {
   DoorClosed,
   ChevronRight,
   MoreVertical,
-  Sliders,
 } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import type { DeviceResponse } from '../../types/device';
@@ -74,7 +73,6 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
     },
   ];
 
-  // Helper to get power state
   const getDevicePower = (device: DeviceResponse | (typeof mockDevices)[0]) => {
     if (localPowerState[device.id] !== undefined) {
       return localPowerState[device.id];
@@ -157,11 +155,10 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
     }
   };
 
-  // Determine which list to render: if real devices exist, render real devices, otherwise mock Figma presets
   const displayList = filteredDevices.length > 0 ? filteredDevices : mockDevices;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3.5">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -172,14 +169,14 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
         <button
           type="button"
           onClick={handleViewAll}
-          className="flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary-hover transition-colors cursor-pointer group"
+          className="flex items-center gap-1 text-xs font-bold text-primary hover:text-primary-hover transition-colors cursor-pointer group"
         >
           <span>Xem tất cả</span>
           <ChevronRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
         </button>
       </div>
 
-      {/* Grid of Devices */}
+      {/* Grid of Devices (Exact 2x2 layout in Figma) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {displayList.map((item) => {
           const isReal = 'currentState' in item;
@@ -195,18 +192,18 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
               localBrightness[id] ??
               (isReal && typeof (item as any).currentState?.brightness === 'number'
                 ? (item as any).currentState.brightness
-                : (item as any).brightness ?? 80);
+                : (item as any).brightness ?? 12);
 
             return (
               <div
                 key={id}
-                className="surface-card p-5 rounded-3xl border border-line shadow-xs hover:border-primary/40 hover:shadow-soft transition-all space-y-4 flex flex-col justify-between"
+                className="surface-card p-5 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-[0_2px_12px_rgba(0,0,0,0.03)] hover:border-primary/40 hover:shadow-soft transition-all space-y-4 flex flex-col justify-between"
               >
                 <div className="flex items-start justify-between">
-                  <div className={`flex h-12 w-12 items-center justify-center rounded-2xl transition-colors ${
-                    isOn ? 'bg-primary/15 text-primary' : 'bg-sidebar text-muted'
+                  <div className={`flex h-11 w-11 items-center justify-center rounded-2xl transition-colors ${
+                    isOn ? 'bg-blue-100 text-blue-600 dark:bg-blue-950/60' : 'bg-slate-100 text-slate-500 dark:bg-slate-800'
                   }`}>
-                    <Lightbulb className="w-6 h-6" />
+                    <Lightbulb className="w-5 h-5" />
                   </div>
 
                   {/* Toggle Switch */}
@@ -215,13 +212,13 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
                     role="switch"
                     aria-checked={isOn}
                     onClick={() => handleToggleLight(id, isOn)}
-                    className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
                       isOn ? 'bg-primary' : 'bg-slate-300 dark:bg-slate-700'
                     }`}
                   >
                     <span
                       aria-hidden="true"
-                      className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
                         isOn ? 'translate-x-5' : 'translate-x-0'
                       }`}
                     />
@@ -231,27 +228,30 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
                 <div>
                   <h4 className="text-base font-bold text-text truncate">{name}</h4>
                   <p className="text-xs text-muted mt-0.5">
-                    {isOn ? `Đang bật · ${currentBright}%` : 'Đang tắt'} · {room}
+                    {isOn ? `Đang bật · ${currentBright}%` : 'Đang tắt'}
                   </p>
                 </div>
 
-                {/* Brightness Slider */}
-                <div className="space-y-1.5 pt-1">
-                  <div className="flex items-center justify-between text-[11px] font-semibold text-muted">
-                    <span className="flex items-center gap-1">
-                      <Sliders className="w-3 h-3" /> Độ sáng
-                    </span>
-                    <span>{currentBright}%</span>
+                {/* Brightness Slider & 12% text on right */}
+                <div className="flex items-center gap-3 pt-1">
+                  <div className="relative flex-1 h-3 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden cursor-pointer">
+                    <div
+                      style={{ width: `${currentBright}%` }}
+                      className={`h-full rounded-full transition-all duration-300 ${
+                        isOn ? 'bg-primary' : 'bg-slate-300'
+                      }`}
+                    />
+                    <input
+                      type="range"
+                      min={1}
+                      max={100}
+                      value={currentBright}
+                      disabled={!isOn}
+                      onChange={(e) => handleBrightnessChange(id, Number(e.target.value))}
+                      className="absolute inset-0 opacity-0 cursor-pointer disabled:cursor-not-allowed w-full"
+                    />
                   </div>
-                  <input
-                    type="range"
-                    min={1}
-                    max={100}
-                    value={currentBright}
-                    disabled={!isOn}
-                    onChange={(e) => handleBrightnessChange(id, Number(e.target.value))}
-                    className="w-full h-2 rounded-lg bg-sidebar accent-primary cursor-pointer disabled:opacity-40"
-                  />
+                  <span className="text-xs font-bold text-muted w-8 text-right">{currentBright}%</span>
                 </div>
               </div>
             );
@@ -263,13 +263,13 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
             return (
               <div
                 key={id}
-                className="surface-card p-5 rounded-3xl border border-line shadow-xs hover:border-primary/40 hover:shadow-soft transition-all space-y-4 flex flex-col justify-between"
+                className="surface-card p-5 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-[0_2px_12px_rgba(0,0,0,0.03)] hover:border-primary/40 hover:shadow-soft transition-all space-y-4 flex flex-col justify-between"
               >
                 <div className="flex items-start justify-between">
-                  <div className={`flex h-12 w-12 items-center justify-center rounded-2xl transition-colors ${
-                    isOn ? 'bg-cyan-500/15 text-cyan-500' : 'bg-sidebar text-muted'
+                  <div className={`flex h-11 w-11 items-center justify-center rounded-2xl transition-colors ${
+                    isOn ? 'bg-blue-100 text-blue-600 dark:bg-blue-950/60' : 'bg-slate-100 text-slate-500 dark:bg-slate-800'
                   }`}>
-                    <Snowflake className="w-6 h-6" />
+                    <Snowflake className="w-5 h-5" />
                   </div>
 
                   {/* Toggle Switch */}
@@ -278,13 +278,13 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
                     role="switch"
                     aria-checked={isOn}
                     onClick={() => handleToggleAc(id, isOn)}
-                    className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
                       isOn ? 'bg-primary' : 'bg-slate-300 dark:bg-slate-700'
                     }`}
                   >
                     <span
                       aria-hidden="true"
-                      className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
                         isOn ? 'translate-x-5' : 'translate-x-0'
                       }`}
                     />
@@ -296,7 +296,7 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
                   <p className="text-xs text-muted mt-0.5">
                     {isOn ? `Lạnh · ${temp}°C` : 'Đang tắt'}
                   </p>
-                  <p className="text-[11px] text-muted/70 mt-0.5">{room}</p>
+                  <p className="text-[11px] text-muted/70 mt-1">{room}</p>
                 </div>
               </div>
             );
@@ -310,18 +310,18 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
             return (
               <div
                 key={id}
-                className="surface-card p-5 rounded-3xl border border-line shadow-xs hover:border-primary/40 hover:shadow-soft transition-all space-y-3 flex flex-col justify-between"
+                className="surface-card p-5 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-[0_2px_12px_rgba(0,0,0,0.03)] hover:border-primary/40 hover:shadow-soft transition-all space-y-3 flex flex-col justify-between"
               >
                 <div className="flex items-start justify-between">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/15 text-amber-500">
-                    <Thermometer className="w-6 h-6" />
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-50 text-amber-500 dark:bg-amber-950/40">
+                    <Thermometer className="w-5 h-5" />
                   </div>
                   <button
                     type="button"
                     aria-label="Tùy chọn"
-                    className="p-1.5 rounded-xl text-icon hover:bg-sidebar transition-colors"
+                    className="p-1 rounded-xl text-icon hover:bg-slate-100 transition-colors"
                   >
-                    <MoreVertical className="w-4 h-4" />
+                    <MoreVertical className="w-4 h-4 text-slate-400" />
                   </button>
                 </div>
 
@@ -331,7 +331,7 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
                   </div>
                   <h4 className="text-base font-bold text-text truncate mt-1">{name}</h4>
                   <p className="text-xs text-muted mt-0.5">Độ ẩm {humidity}%</p>
-                  <p className="text-[11px] text-muted/70 mt-0.5">{room}</p>
+                  <p className="text-[11px] text-muted/70 mt-1">{room}</p>
                 </div>
               </div>
             );
@@ -341,13 +341,13 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
           return (
             <div
               key={id}
-              className="surface-card p-5 rounded-3xl border border-line shadow-xs hover:border-primary/40 hover:shadow-soft transition-all space-y-4 flex flex-col justify-between"
+              className="surface-card p-5 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-[0_2px_12px_rgba(0,0,0,0.03)] hover:border-primary/40 hover:shadow-soft transition-all space-y-4 flex flex-col justify-between"
             >
               <div className="flex items-start justify-between">
-                <div className={`flex h-12 w-12 items-center justify-center rounded-2xl transition-colors ${
-                  isOn ? 'bg-indigo-500/15 text-indigo-500' : 'bg-sidebar text-muted'
+                <div className={`flex h-11 w-11 items-center justify-center rounded-2xl transition-colors ${
+                  isOn ? 'bg-indigo-100 text-indigo-600 dark:bg-indigo-950/60' : 'bg-slate-100 text-slate-500 dark:bg-slate-800'
                 }`}>
-                  <DoorClosed className="w-6 h-6" />
+                  <DoorClosed className="w-5 h-5" />
                 </div>
 
                 {/* Toggle Switch */}
@@ -356,13 +356,13 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
                   role="switch"
                   aria-checked={isOn}
                   onClick={() => handleToggleGate(id, isOn)}
-                  className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
                     isOn ? 'bg-primary' : 'bg-slate-300 dark:bg-slate-700'
                   }`}
                 >
                   <span
                     aria-hidden="true"
-                    className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
                       isOn ? 'translate-x-5' : 'translate-x-0'
                     }`}
                   />
@@ -374,7 +374,7 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
                 <p className="text-xs text-muted mt-0.5">
                   {isOn ? 'Đang mở' : 'Đã dừng'}
                 </p>
-                <p className="text-[11px] text-muted/70 mt-0.5">{room}</p>
+                <p className="text-[11px] text-muted/70 mt-1">{room}</p>
               </div>
             </div>
           );
