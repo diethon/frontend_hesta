@@ -19,7 +19,7 @@ import {
   retrainModel
 } from '../../services/recommendationApi';
 import type { Recommendation, MlModelStatus } from '../../types/recommendation';
-import { AppSidebar } from '../ui/AppSidebar';
+import { HomeSidebar } from '../ui/HomeSidebar';
 
 export function RecommendationsPage() {
   const { homeId = '' } = useParams();
