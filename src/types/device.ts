@@ -2,6 +2,19 @@ export interface DeviceState {
   [key: string]: unknown;
 }
 
+export interface DeviceShadowResponse {
+  deviceId: string;
+  deviceName: string;
+  desiredState: Record<string, unknown>;
+  reportedState: Record<string, unknown>;
+  deltaState: Record<string, unknown>;
+  desiredVersion: number;
+  reportedVersion: number;
+  desiredUpdatedAt: string;
+  reportedUpdatedAt: string;
+  inSync: boolean;
+}
+
 export interface DeviceCommandResult {
   commandId?: string;
   success: boolean;

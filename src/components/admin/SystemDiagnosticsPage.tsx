@@ -5,8 +5,10 @@ import { ProfileModal } from '../profile/ProfileModal';
 import { AdminIcon, AppSidebar, PeopleIcon } from '../ui/AppSidebar';
 import { NodeDiagnosticsWidget } from './NodeDiagnosticsWidget';
 import { MqttSnifferConsole } from './MqttSnifferConsole';
+import { DeadLetterQueueConsole } from './DeadLetterQueueConsole';
+import { OtaCampaignManager } from './OtaCampaignManager';
 import { AdminNavbar } from './AdminNavbar';
-import { Activity, Terminal, Cpu } from 'lucide-react';
+import { Activity, Terminal, Cpu, ShieldAlert, UploadCloud } from 'lucide-react';
 
 interface SystemDiagnosticsPageProps {
   user: UserResponse;
@@ -20,7 +22,7 @@ export const SystemDiagnosticsPage: React.FC<SystemDiagnosticsPageProps> = ({
   onProfileUpdate,
 }) => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'NODES' | 'MQTT'>('NODES');
+  const [activeTab, setActiveTab] = useState<'NODES' | 'MQTT' | 'DLQ' | 'OTA'>('NODES');
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
   return (
@@ -50,7 +52,7 @@ export const SystemDiagnosticsPage: React.FC<SystemDiagnosticsPageProps> = ({
         {/* Main Content */}
         <main id="main-content" className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8">
           {/* Sub-Navigation Tabs */}
-          <div className="flex items-center gap-2 border-b border-line pb-1">
+          <div className="flex flex-wrap items-center gap-2 border-b border-line pb-1">
             <button
               type="button"
               onClick={() => setActiveTab('NODES')}
@@ -76,10 +78,39 @@ export const SystemDiagnosticsPage: React.FC<SystemDiagnosticsPageProps> = ({
               <Terminal className="w-4 h-4" />
               <span>Live MQTT Packet Sniffer</span>
             </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('DLQ')}
+              className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-bold rounded-xl transition shadow-xs ${
+                activeTab === 'DLQ'
+                  ? 'bg-primary text-white shadow-soft'
+                  : 'bg-surface text-muted hover:text-text hover:bg-sidebar'
+              }`}
+            >
+              <ShieldAlert className="w-4 h-4 text-red-500" />
+              <span>Cứu Tín Hiệu Thiết Bị (DLQ)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('OTA')}
+              className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-bold rounded-xl transition shadow-xs ${
+                activeTab === 'OTA'
+                  ? 'bg-primary text-white shadow-soft'
+                  : 'bg-surface text-muted hover:text-text hover:bg-sidebar'
+              }`}
+            >
+              <UploadCloud className="w-4 h-4 text-indigo-400" />
+              <span>Cập Nhật Phần Mềm Từ Xa (OTA)</span>
+            </button>
           </div>
 
           {/* Active Tab Content */}
-          {activeTab === 'NODES' ? <NodeDiagnosticsWidget /> : <MqttSnifferConsole />}
+          {activeTab === 'NODES' && <NodeDiagnosticsWidget />}
+          {activeTab === 'MQTT' && <MqttSnifferConsole />}
+          {activeTab === 'DLQ' && <DeadLetterQueueConsole />}
+          {activeTab === 'OTA' && <OtaCampaignManager />}
         </main>
       </div>
 

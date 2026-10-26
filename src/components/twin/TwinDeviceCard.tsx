@@ -5,11 +5,13 @@ import { useTwinUpdateMotion } from './useTwinMotion';
 import { DeviceGlyph } from './TwinVisualIcon';
 import { TwinHealthBadge } from './TwinHealthBadge';
 import { TwinTime } from './TwinTime';
+import { sortStateEntries } from '../device/DeviceStateVisualizer';
 
 const stateLabels: Record<string, string> = {
   power: 'Nguồn', brightness: 'Độ sáng', temperature: 'Nhiệt độ', humidity: 'Độ ẩm',
   mode: 'Chế độ', fan: 'Quạt',
   motion: 'Chuyển động', battery: 'Pin', speed: 'Tốc độ', state: 'Trạng thái',
+  r: 'Màu Đỏ (R)', g: 'Màu Lục (G)', b: 'Màu Lam (B)',
 };
 
 export function TwinDeviceCard({ deviceId }: { deviceId: string }) {
@@ -17,7 +19,7 @@ export function TwinDeviceCard({ deviceId }: { deviceId: string }) {
   const motionRef = useTwinUpdateMotion<HTMLDListElement>(JSON.stringify([device?.currentState, device?.lastSeen]));
   if (!device) return null;
   const entries = device.currentState && typeof device.currentState === 'object' && !Array.isArray(device.currentState)
-    ? Object.entries(device.currentState) : [['state', device.currentState] as const];
+    ? sortStateEntries(device.currentState as Record<string, unknown>) : [['state', device.currentState] as const];
   const simple = entries.filter(([, value]) => value === null || typeof value !== 'object');
   const expanded = entries.filter(([key]) => !simple.slice(0, 6).some(([shown]) => shown === key));
   return (

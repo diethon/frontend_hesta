@@ -19,7 +19,7 @@ interface GateCardProps {
   onStateChange?: (updatedDevice: DeviceResponse) => void;
 }
 
-export const GateCard: React.FC<GateCardProps> = ({
+const GateCardComponent: React.FC<GateCardProps> = ({
   device,
   onClick,
   onStateChange,
@@ -217,3 +217,12 @@ export const GateCard: React.FC<GateCardProps> = ({
     </motion.article>
   );
 };
+
+export const GateCard = React.memo(GateCardComponent, (prev, next) => {
+  return (
+    prev.device.id === next.device.id &&
+    prev.device.status === next.device.status &&
+    prev.device.name === next.device.name &&
+    JSON.stringify(prev.device.currentState) === JSON.stringify(next.device.currentState)
+  );
+});

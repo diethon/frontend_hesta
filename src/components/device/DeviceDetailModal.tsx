@@ -3,6 +3,7 @@ import type { DeviceResponse, DeviceStateHistoryResponse, ManualOverrideRecord }
 import { removeDevice, getDeviceHistory, cancelDeviceAutomation, getDeviceOverrideHistory, updateDeviceConfig } from '../../services/deviceApi';
 import { getErrorMessage } from '../../utils/errors';
 import { notify } from '../ui/notify';
+import { DeviceStateVisualizer, getSortedFormattedJson } from './DeviceStateVisualizer';
 
 interface DeviceDetailModalProps {
   isOpen: boolean;
@@ -14,6 +15,32 @@ interface DeviceDetailModalProps {
   onTempChange?: (deviceId: string, temp: number) => void;
   onModeChange?: (deviceId: string, mode: string) => void;
 }
+
+const getFriendlyDeviceTypeName = (type: string) => {
+  switch (type) {
+    case 'LIGHT': return 'Đèn chiếu sáng';
+    case 'LED':
+    case 'LED_RGB': return 'Đèn màu thông minh (RGB)';
+    case 'FAN': return 'Quạt điện';
+    case 'AC':
+    case 'AIR_CONDITIONER': return 'Máy điều hòa nhiệt độ';
+    case 'SMART_PLUG':
+    case 'SOCKET': return 'Ổ cắm thông minh';
+    case 'SWITCH': return 'Công tắc thông minh';
+    case 'WATER_PUMP': return 'Máy bơm nước';
+    case 'GATE': return 'Cổng tự động';
+    case 'DOOR': return 'Cửa ra vào';
+    case 'LOCK': return 'Khóa thông minh';
+    case 'TEMP_HUMID_SENSOR': return 'Cảm biến nhiệt độ & độ ẩm';
+    case 'MOTION_SENSOR': return 'Cảm biến chuyển động';
+    case 'SMOKE_SENSOR': return 'Cảm biến khói';
+    case 'LIGHT_SENSOR':
+    case 'LUX_SENSOR': return 'Cảm biến ánh sáng';
+    case 'CAMERA':
+    case 'CAMERA_AI': return 'Camera giám sát';
+    default: return type;
+  }
+};
 
 export const DeviceDetailModal: React.FC<DeviceDetailModalProps> = ({
   isOpen,
@@ -196,54 +223,65 @@ export const DeviceDetailModal: React.FC<DeviceDetailModalProps> = ({
             </div>
 
           <div className="space-y-3 bg-slate-950/50 p-4 rounded-xl border border-slate-800">
-            <div className="flex justify-between items-center gap-4">
-              <span className="text-sm text-slate-400 shrink-0">Mã định danh (ID):</span>
-              <span className="text-sm text-text font-mono truncate" title={device.id}>{device.id}</span>
-            </div>
-            
             <div className="flex justify-between items-center">
               <span className="text-sm text-slate-400">Loại thiết bị:</span>
-              <span className="text-sm text-text font-medium bg-sidebar px-2 py-0.5 rounded">{device.deviceType}</span>
+              <span className="text-sm text-text font-semibold bg-primary/10 text-primary border border-primary/20 px-2.5 py-0.5 rounded-lg">
+                {getFriendlyDeviceTypeName(device.deviceType)}
+              </span>
             </div>
-
-            {device.nodeId && (
-              <div className="flex justify-between items-center gap-4">
-                <span className="text-sm text-slate-400 shrink-0">Node quản lý:</span>
-                <span className="text-sm text-text font-medium truncate" title={device.nodeId}>{device.nodeName || device.nodeId}</span>
-              </div>
-            )}
-
-            {device.gpioPin !== undefined && device.gpioPin !== null && (
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-slate-400">GPIO Pin:</span>
-                <span className="text-sm text-cyan-400 font-mono">{device.gpioPin}</span>
-              </div>
-            )}
 
             {device.roomId && (
               <div className="flex justify-between items-center gap-4">
-                <span className="text-sm text-slate-400 shrink-0">Phòng (Room):</span>
-                <span className="text-sm text-text font-medium truncate" title={device.roomId}>{device.roomName || device.roomId}</span>
+                <span className="text-sm text-slate-400 shrink-0">Vị trí phòng:</span>
+                <span className="text-sm text-text font-medium truncate" title={device.roomId}>
+                  {device.roomName || device.roomId}
+                </span>
               </div>
             )}
 
             <div className="flex justify-between items-center">
               <span className="text-sm text-slate-400">Lần cuối phản hồi:</span>
-              <span className="text-sm text-text">{formatDate(device.lastSeen)}</span>
+              <span className="text-sm text-text font-medium">{formatDate(device.lastSeen)}</span>
             </div>
 
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-slate-400">Tọa độ 3D (Twin):</span>
-              <span className="text-sm text-text font-mono">
-                X:{device.digitalTwinX ?? 0} Y:{device.digitalTwinY ?? 0} Z:{device.digitalTwinZ ?? 0}
-              </span>
-            </div>
+            {/* Thông số kỹ thuật chuyên sâu (ẩn mặc định cho gọn mắt người dùng) */}
+            <details className="group rounded-xl border border-line bg-sidebar/40 p-2.5 mt-1 transition-all">
+              <summary className="cursor-pointer text-xs font-semibold text-muted flex items-center justify-between select-none">
+                <span>Thông tin kỹ thuật & phần cứng</span>
+                <span className="text-[10px] text-muted group-open:rotate-180 transition-transform">▼</span>
+              </summary>
+              <div className="mt-2.5 space-y-2 pt-2 border-t border-line text-xs">
+                <div className="flex justify-between items-center gap-2">
+                  <span className="text-muted shrink-0">Mã ID:</span>
+                  <span className="text-text font-mono text-[11px] truncate max-w-[200px]" title={device.id}>
+                    {device.id}
+                  </span>
+                </div>
+                {device.nodeId && (
+                  <div className="flex justify-between items-center gap-2">
+                    <span className="text-muted shrink-0">Node IoT:</span>
+                    <span className="text-text font-mono text-[11px] truncate max-w-[200px]" title={device.nodeId}>
+                      {device.nodeName || device.nodeId}
+                    </span>
+                  </div>
+                )}
+                {device.gpioPin !== undefined && device.gpioPin !== null && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted">Chân GPIO:</span>
+                    <span className="text-cyan-400 font-mono text-[11px] font-bold">{device.gpioPin}</span>
+                  </div>
+                )}
+                <div className="flex justify-between items-center">
+                  <span className="text-muted">Tọa độ 3D:</span>
+                  <span className="text-text font-mono text-[11px]">
+                    X:{device.digitalTwinX ?? 0} Y:{device.digitalTwinY ?? 0} Z:{device.digitalTwinZ ?? 0}
+                  </span>
+                </div>
+              </div>
+            </details>
             
             <div className="flex flex-col border-t border-slate-800 pt-3 mt-3 gap-2">
-              <span className="text-sm text-slate-400">Trạng thái hiện tại:</span>
-              <pre className="text-xs text-emerald-400 font-mono bg-slate-900 p-3 rounded-lg overflow-x-auto border border-slate-800/50">
-                {JSON.stringify(device.currentState, null, 2)}
-              </pre>
+              <DeviceStateVisualizer state={device.currentState} defaultShowJson={false} />
             </div>
 
             {/* GIAO DIỆN MÁY LẠNH (AIR_CONDITIONER) */}
@@ -317,12 +355,22 @@ export const DeviceDetailModal: React.FC<DeviceDetailModalProps> = ({
                         {record.source}
                       </span>
                     </div>
-                    <div className="grid grid-cols-2 gap-2 text-xs font-mono">
-                      <div className="bg-slate-900 p-2 rounded text-slate-500 overflow-x-auto">
-                        {JSON.stringify(record.previousState)}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs font-mono">
+                      <div className="bg-slate-900 p-2.5 rounded-lg text-slate-400 border border-slate-800/60 overflow-x-auto max-h-36">
+                        <span className="text-[10px] text-slate-500 block font-sans font-medium mb-1">
+                          Trạng thái trước:
+                        </span>
+                        <pre className="text-[11px] leading-relaxed whitespace-pre-wrap font-mono">
+                          {getSortedFormattedJson(record.previousState, true)}
+                        </pre>
                       </div>
-                      <div className="bg-slate-900 p-2 rounded text-cyan-400 overflow-x-auto">
-                        {JSON.stringify(record.newState)}
+                      <div className="bg-slate-900 p-2.5 rounded-lg text-cyan-400 border border-slate-800/60 overflow-x-auto max-h-36">
+                        <span className="text-[10px] text-cyan-500/70 block font-sans font-medium mb-1">
+                          Trạng thái mới:
+                        </span>
+                        <pre className="text-[11px] leading-relaxed whitespace-pre-wrap font-mono">
+                          {getSortedFormattedJson(record.newState, true)}
+                        </pre>
                       </div>
                     </div>
                   </div>

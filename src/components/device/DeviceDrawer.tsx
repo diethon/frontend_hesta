@@ -22,6 +22,7 @@ import {
   ToggleRight,
   Radio
 } from 'lucide-react';
+import { getFriendlyDeviceTypeName } from './DeviceStateVisualizer';
 import type { 
   DeviceResponse, 
   DeviceStateHistoryResponse, 
@@ -42,6 +43,7 @@ import {
   getDeviceUptime,
   getDeviceHealth
 } from '../../services/deviceApi';
+import { DeviceShadowSection } from './DeviceShadowSection';
 import { useOverrideCountdown } from './useOverrideCountdown';
 import { getDeviceEnergy } from '../../services/energyApi';
 import { notify } from '../ui/notify';
@@ -441,7 +443,7 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
               <div className="flex justify-between py-1 border-b border-line border-dashed">
                 <span className="text-muted">Loại:</span>
-                <span className="font-medium text-text">{device.deviceType}</span>
+                <span className="font-medium text-text">{getFriendlyDeviceTypeName(device.deviceType)}</span>
               </div>
               <div className="flex justify-between py-1 border-b border-line border-dashed">
                 <span className="text-muted">Phòng:</span>
@@ -522,6 +524,9 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
               )}
             </div>
           </div>
+
+          {/* Device Shadow [PHO-048] */}
+          <DeviceShadowSection deviceId={device.id} deviceType={device.deviceType} />
 
           {/* Energy Summary Widget */}
           {deviceEnergy && (
