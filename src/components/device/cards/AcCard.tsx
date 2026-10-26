@@ -78,7 +78,7 @@ const describeArc = (
   return `M ${start.x} ${start.y} A ${r} ${r} 0 ${largeArcFlag} 1 ${end.x} ${end.y}`;
 };
 
-export const AcCard: React.FC<AcCardProps> = ({
+const AcCardComponent: React.FC<AcCardProps> = ({
   device,
   powerPending = false,
   onTogglePower,
@@ -750,3 +750,14 @@ export const AcCard: React.FC<AcCardProps> = ({
     </motion.article>
   );
 };
+
+export const AcCard = React.memo(AcCardComponent, (prev, next) => {
+  return (
+    prev.device.id === next.device.id &&
+    prev.device.status === next.device.status &&
+    prev.powerPending === next.powerPending &&
+    prev.device.name === next.device.name &&
+    prev.device.manualOverrideUntil === next.device.manualOverrideUntil &&
+    JSON.stringify(prev.device.currentState) === JSON.stringify(next.device.currentState)
+  );
+});

@@ -180,7 +180,7 @@ export const SystemDiagnosticsPage: React.FC<SystemDiagnosticsPageProps> = ({
               }`}
             >
               <ShieldAlert className="w-4 h-4 text-red-500" />
-              <span>Hộp Thư Rác DLQ &amp; Ingress</span>
+              <span>Cứu Tín Hiệu Thiết Bị (DLQ)</span>
             </button>
 
             <button
@@ -193,7 +193,7 @@ export const SystemDiagnosticsPage: React.FC<SystemDiagnosticsPageProps> = ({
               }`}
             >
               <UploadCloud className="w-4 h-4 text-indigo-400" />
-              <span>Chiến Dịch OTA Firmware</span>
+              <span>Cập Nhật Phần Mềm Từ Xa (OTA)</span>
             </button>
           </div>
 

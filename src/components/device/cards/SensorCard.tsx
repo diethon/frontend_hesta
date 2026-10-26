@@ -19,7 +19,7 @@ interface SensorCardProps {
   onClick?: (deviceId: string) => void;
 }
 
-export const SensorCard: React.FC<SensorCardProps> = ({ device, onClick }) => {
+const SensorCardComponent: React.FC<SensorCardProps> = ({ device, onClick }) => {
   const isOffline = device.status === 'OFFLINE';
   const type = device.deviceType;
   const state = device.currentState;
@@ -320,3 +320,12 @@ export const SensorCard: React.FC<SensorCardProps> = ({ device, onClick }) => {
     </motion.article>
   );
 };
+
+export const SensorCard = React.memo(SensorCardComponent, (prev, next) => {
+  return (
+    prev.device.id === next.device.id &&
+    prev.device.status === next.device.status &&
+    prev.device.name === next.device.name &&
+    JSON.stringify(prev.device.currentState) === JSON.stringify(next.device.currentState)
+  );
+});

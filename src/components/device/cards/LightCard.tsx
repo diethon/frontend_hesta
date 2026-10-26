@@ -18,7 +18,7 @@ interface LightCardProps {
   onStateChange?: (updatedDevice: DeviceResponse) => void;
 }
 
-export const LightCard: React.FC<LightCardProps> = ({
+const LightCardComponent: React.FC<LightCardProps> = ({
   device,
   powerPending = false,
   onTogglePower,
@@ -46,6 +46,8 @@ export const LightCard: React.FC<LightCardProps> = ({
       ? Number(device.currentState.brightness)
       : 80
   );
+  const isDraggingRef = useRef(false);
+  const pendingBrightnessRef = useRef<number | null>(null);
 
   const rgbColor = resolveDeviceRgb(device.currentState);
 
@@ -104,7 +106,8 @@ export const LightCard: React.FC<LightCardProps> = ({
   }, [device.id, device.settings?.customColors]);
 
   useEffect(() => {
-    if (typeof device.currentState?.brightness === 'number') {
+    // Chỉ đồng bộ độ sáng từ server khi người dùng KHÔNG đang giữ chuột kéo (chống giật con trượt)
+    if (!isDraggingRef.current && typeof device.currentState?.brightness === 'number') {
       setBrightness(Number(device.currentState.brightness));
     }
   }, [device.currentState?.brightness]);
@@ -127,47 +130,45 @@ export const LightCard: React.FC<LightCardProps> = ({
 
   const handleBrightnessChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = Number(e.target.value);
-    setBrightness(val);
+    setBrightness(val); // Phản hồi 60Hz siêu tốc nội bộ thẻ, KHÔNG gọi onStateChange gây re-render cả trang!
 
-    // 1. Optimistic update immediately so the local card and parent reflect brightness at 60fps
-    onStateChange?.({
-      ...device,
-      currentState: {
-        ...device.currentState,
-        brightness: val,
-        power: val > 0 ? 'ON' : device.currentState?.power,
-      },
-    });
-
-    // 2. Throttle backend calls to 100ms so the light smoothly tracks finger/mouse without spamming
+    // Throttled gửi lệnh backend 80ms không làm nghẽn broker
+    pendingBrightnessRef.current = val;
     if (brightnessThrottleRef.current) {
       window.clearTimeout(brightnessThrottleRef.current);
     }
     brightnessThrottleRef.current = window.setTimeout(() => {
-      void sendDeviceCommand(device.id, 'SET_BRIGHTNESS', { brightness: val }).catch(() => {});
-    }, 100);
+      if (pendingBrightnessRef.current !== null) {
+        void sendDeviceCommand(device.id, 'SET_BRIGHTNESS', { brightness: pendingBrightnessRef.current }).catch(() => {});
+      }
+    }, 80);
   };
 
-  const syncBrightnessToBackend = async () => {
+  const handleBrightnessPointerDown = () => {
+    isDraggingRef.current = true;
+  };
+
+  const handleBrightnessPointerUp = async () => {
+    isDraggingRef.current = false;
     if (isOffline) return;
     if (brightnessThrottleRef.current) {
       window.clearTimeout(brightnessThrottleRef.current);
     }
+    // Commit lên trang cha đúng 1 lần khi người dùng nhấc tay ra
+    onStateChange?.({
+      ...device,
+      currentState: {
+        ...device.currentState,
+        brightness,
+        power: brightness > 0 ? 'ON' : device.currentState?.power,
+      },
+    });
     try {
       await sendDeviceCommand(device.id, 'SET_BRIGHTNESS', { brightness });
-      onStateChange?.({
-        ...device,
-        currentState: {
-          ...device.currentState,
-          brightness,
-          power: brightness > 0 ? 'ON' : device.currentState?.power,
-        },
-      });
     } catch (err) {
-      if (isDuplicateCommandError(err)) {
-        return;
+      if (!isDuplicateCommandError(err)) {
+        notify.error(getErrorMessage(err, 'Lỗi chỉnh độ sáng'));
       }
-      notify.error(getErrorMessage(err, 'Lỗi chỉnh độ sáng'));
     }
   };
 
@@ -370,9 +371,11 @@ export const LightCard: React.FC<LightCardProps> = ({
               max={100}
               value={brightness}
               disabled={isOffline}
+              onPointerDown={handleBrightnessPointerDown}
+              onTouchStart={handleBrightnessPointerDown}
               onChange={handleBrightnessChange}
-              onPointerUp={syncBrightnessToBackend}
-              onTouchEnd={syncBrightnessToBackend}
+              onPointerUp={handleBrightnessPointerUp}
+              onTouchEnd={handleBrightnessPointerUp}
               className="absolute inset-0 w-full h-full opacity-0 cursor-ew-resize disabled:cursor-not-allowed z-20"
               aria-label={`Độ sáng ${device.name}`}
             />
@@ -437,3 +440,18 @@ export const LightCard: React.FC<LightCardProps> = ({
     </motion.article>
   );
 };
+
+export const LightCard = React.memo(LightCardComponent, (prev, next) => {
+  return (
+    prev.device.id === next.device.id &&
+    prev.device.status === next.device.status &&
+    prev.powerPending === next.powerPending &&
+    prev.device.name === next.device.name &&
+    prev.device.currentState?.power === next.device.currentState?.power &&
+    prev.device.currentState?.brightness === next.device.currentState?.brightness &&
+    prev.device.currentState?.r === next.device.currentState?.r &&
+    prev.device.currentState?.g === next.device.currentState?.g &&
+    prev.device.currentState?.b === next.device.currentState?.b &&
+    prev.device.manualOverrideUntil === next.device.manualOverrideUntil
+  );
+});
