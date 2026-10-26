@@ -26,10 +26,11 @@ export const SystemDiagnosticsPage: React.FC<SystemDiagnosticsPageProps> = ({
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
   return (
-    <div className="app-shell relative overflow-x-hidden min-h-screen">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-text relative overflow-x-hidden">
       <AppSidebar
         activeItem="diagnostics"
         contextLabel="Quản trị nền tảng"
+        showSystemSummary={false}
         items={[
           { id: 'admin', label: 'Quản lý thiết bị & QR', icon: <AdminIcon />, onClick: () => navigate('/admin') },
           { id: 'users', label: 'Quản lý người dùng', icon: <PeopleIcon />, onClick: () => navigate('/admin/users') },

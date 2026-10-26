@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { useLocation, useSearchParams } from "react-router";
+import { useLocation, useSearchParams, Navigate } from "react-router";
 import type { UserResponse } from "../../types/auth";
 import type { DeviceResponse } from "../../types/device";
 import type { RoomResponse } from "../../types/room";
@@ -58,6 +58,10 @@ export const HomePage: React.FC<HomePageProps> = ({
   onLogout,
   onProfileUpdate,
 }) => {
+  if (user?.platformRole === 'ADMIN') {
+    return <Navigate to="/admin" replace />;
+  }
+
   const dispatch = useAppDispatch();
   const location = useLocation();
   const [searchParams] = useSearchParams();

@@ -4,6 +4,7 @@ import { Icon, IconButton, type IconName } from './HomeIcons';
 import type { DeviceResponse } from '../../types/device';
 import { sendManualPowerCommand, setAcPower, sendDeviceCommand } from '../../services/deviceApi';
 import { notify } from '../ui/notify';
+import { DeviceDetailModal, type FigmaDeviceType } from '../device/DeviceDetailModal';
 
 interface HomeFavoriteDevicesProps {
   homeId?: string;
@@ -18,12 +19,14 @@ interface DashboardDeviceItem {
   status: string;
   room: string;
   icon: IconName;
+  type?: FigmaDeviceType;
   on?: boolean;
   offline?: boolean;
   sensor?: string;
   slider?: boolean;
   brightness?: number;
   realDeviceId?: string;
+  raw?: DeviceResponse;
 }
 
 export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
@@ -37,6 +40,7 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
   // Local interactive states for responsiveness
   const [localPower, setLocalPower] = useState<Record<string, boolean>>({});
   const [localBrightness, setLocalBrightness] = useState<Record<string, number>>({});
+  const [selectedDetail, setSelectedDetail] = useState<any | null>(null);
 
   // 8 default devices matching Figma design
   const defaultFigmaDevices: DashboardDeviceItem[] = [
@@ -46,6 +50,7 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
       status: 'Đang bật · 12%',
       room: 'Phòng ngủ',
       icon: 'lamp',
+      type: 'Đèn',
       on: true,
       slider: true,
       brightness: 12,
@@ -56,6 +61,7 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
       status: 'Lạnh · 26°C',
       room: 'Phòng khách',
       icon: 'snowflake',
+      type: 'Điều hòa',
       on: true,
     },
     {
@@ -64,6 +70,7 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
       status: 'Độ ẩm 61.8%',
       room: 'Phòng khách',
       icon: 'thermometer',
+      type: 'Cảm biến',
       sensor: '27.7°',
     },
     {
@@ -72,6 +79,7 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
       status: 'Đã dừng',
       room: 'Sân trước',
       icon: 'door',
+      type: 'Cổng',
       on: false,
     },
     {
@@ -80,6 +88,7 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
       status: 'Trời sáng',
       room: 'Ban công',
       icon: 'sun',
+      type: 'Cảm biến',
       sensor: '820',
     },
     {
@@ -88,6 +97,7 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
       status: 'Bình thường',
       room: 'Hành lang',
       icon: 'activity',
+      type: 'Cảm biến',
       sensor: 'Tĩnh',
     },
     {
@@ -96,6 +106,7 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
       status: 'Ngoại tuyến',
       room: 'Sân trước',
       icon: 'camera',
+      type: 'Camera',
       offline: true,
     },
     {
@@ -104,6 +115,7 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
       status: 'Đã khóa',
       room: 'Sảnh',
       icon: 'lock',
+      type: 'Công tắc',
       on: false,
     },
   ];
@@ -115,36 +127,61 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
         ? localPower[d.id]
         : d.currentState?.power === 'ON' || d.currentState?.power === true || d.currentState?.power === 'true';
 
-    let icon: IconName = 'lamp';
+    let icon: IconName = 'automation';
+    let type: FigmaDeviceType = 'Công tắc';
     let isSensor = false;
     let sensorVal: string | undefined;
     let hasSlider = false;
     let brightnessVal = localBrightness[d.id] ?? (d.currentState?.brightness ? Number(d.currentState.brightness) : 80);
 
     const typeStr = d.deviceType?.toUpperCase() || '';
-    if (typeStr.includes('LIGHT') || typeStr.includes('LED')) {
+    const nameLower = (d.name || '').toLowerCase();
+
+    if (nameLower.includes('bơm') || typeStr.includes('PUMP') || typeStr.includes('WATER')) {
+      icon = 'droplet';
+      type = 'Công tắc';
+    } else if (nameLower.includes('quạt') || typeStr.includes('FAN')) {
+      icon = 'automation';
+      type = 'Công tắc';
+    } else if (typeStr.includes('LIGHT') || typeStr.includes('LED') || nameLower.includes('đèn')) {
       icon = 'lamp';
+      type = 'Đèn';
       hasSlider = isPowerOn;
-    } else if (typeStr.includes('AIR') || typeStr.includes('CLIMATE') || typeStr.includes('AC')) {
+    } else if (typeStr.includes('AIR') || typeStr.includes('CLIMATE') || typeStr.includes('AC') || nameLower.includes('điều hòa') || nameLower.includes('casper')) {
       icon = 'snowflake';
-    } else if (typeStr.includes('GATE') || typeStr.includes('DOOR')) {
+      type = 'Điều hòa';
+    } else if (typeStr.includes('GATE') || typeStr.includes('DOOR') || nameLower.includes('cổng')) {
       icon = 'door';
-    } else if (typeStr.includes('LOCK')) {
+      type = 'Cổng';
+    } else if (typeStr.includes('LOCK') || nameLower.includes('khóa')) {
       icon = 'lock';
-    } else if (typeStr.includes('CAMERA')) {
+      type = 'Công tắc';
+    } else if (typeStr.includes('CAMERA') || nameLower.includes('camera')) {
       icon = 'camera';
+      type = 'Camera';
     } else if (typeStr.includes('TEMP') || typeStr.includes('HUMID')) {
       icon = 'thermometer';
+      type = 'Cảm biến';
       isSensor = true;
       sensorVal = d.currentState?.temperature ? `${d.currentState.temperature}°` : '27.7°';
     } else if (typeStr.includes('MOTION')) {
       icon = 'activity';
+      type = 'Cảm biến';
       isSensor = true;
       sensorVal = 'Tĩnh';
     } else if (typeStr.includes('SUN') || typeStr.includes('LUX')) {
       icon = 'sun';
+      type = 'Cảm biến';
       isSensor = true;
       sensorVal = '820';
+    } else if (typeStr.includes('SMOKE')) {
+      icon = 'shield';
+      type = 'Cảm biến';
+      isSensor = true;
+      sensorVal = d.currentState?.smoke ? 'Cảnh báo' : 'An toàn';
+    } else {
+      icon = 'automation';
+      type = 'Công tắc';
     }
 
     let statusText = isPowerOn ? 'Đang bật' : 'Đã tắt';
@@ -156,6 +193,8 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
       statusText = `Độ ẩm ${d.currentState?.humidity || 61.8}%`;
     } else if (icon === 'door') {
       statusText = isPowerOn ? 'Đang mở' : 'Đã dừng';
+    } else if (icon === 'droplet') {
+      statusText = isPowerOn ? 'Đang tưới' : 'Đã tắt';
     }
 
     return {
@@ -164,12 +203,14 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
       status: statusText,
       room: d.roomName || 'Phòng khách',
       icon,
+      type,
       on: isPowerOn,
       offline: d.status === 'OFFLINE',
       sensor: sensorVal,
       slider: hasSlider,
       brightness: brightnessVal,
       realDeviceId: d.id,
+      raw: d,
     };
   });
 
@@ -179,17 +220,8 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
     const roomFiltered = devices.filter((d) => d.roomId === selectedRoomId);
     displayList = roomFiltered.length > 0 ? mappedRealDevices.filter((d) => roomFiltered.some((rf) => rf.id === d.id)) : [];
   } else {
-    // If not enough devices exist to fill the 8-card grid, blend or use Figma items
-    if (mappedRealDevices.length >= 8) {
-      displayList = mappedRealDevices.slice(0, 8);
-    } else if (mappedRealDevices.length > 0) {
-      displayList = [
-        ...mappedRealDevices,
-        ...defaultFigmaDevices.slice(mappedRealDevices.length),
-      ];
-    } else {
-      displayList = defaultFigmaDevices;
-    }
+    // Strictly display real backend devices when available
+    displayList = mappedRealDevices.length > 0 ? mappedRealDevices : defaultFigmaDevices;
   }
 
   const handleToggle = async (device: DashboardDeviceItem) => {
@@ -267,6 +299,11 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
           const isOn = localPower[device.id] !== undefined ? localPower[device.id] : device.on;
           const currentBrightness = localBrightness[device.id] ?? device.brightness ?? 12;
 
+          const handleCardClick = () => {
+            const realDev = devices.find((d) => d.id === device.id || d.id === device.realDeviceId);
+            setSelectedDetail(realDev ? { ...realDev, ...device } : device);
+          };
+
           return (
             <article
               key={device.id}
@@ -274,6 +311,9 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
                 device.offline ? 'offline' : ''
               }`}
               tabIndex={0}
+              onClick={handleCardClick}
+              onKeyDown={(e) => e.key === 'Enter' && handleCardClick()}
+              style={{ cursor: 'pointer' }}
             >
               <div className="device-top">
                 <span className="device-icon">
@@ -286,7 +326,9 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
                   <IconButton
                     icon="more"
                     label={`Tùy chọn ${device.name}`}
-                    onClick={handleSeeAll}
+                    onClick={() => {
+                      handleCardClick();
+                    }}
                   />
                 ) : (
                   <button
@@ -334,6 +376,47 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
           );
         })}
       </div>
+
+      {selectedDetail && (
+        <DeviceDetailModal
+          device={selectedDetail}
+          placement="center"
+          onClose={() => setSelectedDetail(null)}
+          onDeviceUpdated={() => {
+            onRefreshDevices?.();
+            setSelectedDetail(null);
+          }}
+          onDeviceRemoved={() => {
+            onRefreshDevices?.();
+            setSelectedDetail(null);
+          }}
+          onTogglePower={() => {
+            const devItem = displayList.find(
+              (d) => d.id === selectedDetail.id || d.realDeviceId === selectedDetail.id
+            );
+            if (devItem) handleToggle(devItem);
+          }}
+          onBrightnessChange={(brightness) => {
+            const id = selectedDetail.realDeviceId || selectedDetail.id;
+            setLocalBrightness((prev) => ({ ...prev, [selectedDetail.id]: brightness }));
+            if (id) {
+              sendDeviceCommand(id, 'SET_BRIGHTNESS', { brightness }).catch(console.warn);
+            }
+          }}
+          onColorChange={(r, g, b) => {
+            const id = selectedDetail.realDeviceId || selectedDetail.id;
+            if (id) {
+              sendDeviceCommand(id, 'SET_RGB', {
+                r,
+                g,
+                b,
+                brightness: localBrightness[selectedDetail.id] || 80,
+              }).catch(console.warn);
+            }
+          }}
+        />
+      )}
     </section>
   );
 };
+

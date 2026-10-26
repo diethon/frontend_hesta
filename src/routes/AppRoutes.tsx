@@ -40,7 +40,7 @@ export function AppRoutes() {
       destination === '/join' ? invitationSearch(location.search, 'token') : location.search);
   };
 
-  const leaveInvitation = () => go('/home', {
+  const leaveInvitation = () => go(defaultRoute(user), {
     ...state,
     returnTo: undefined,
     handledInviteToken: invitationToken(location.search) || undefined,
@@ -84,16 +84,17 @@ export function AppRoutes() {
         <Navigate to={{ pathname: '/login', search: location.search, hash: location.hash }} state={state} replace />
       )} />
       <Route element={<RequireAuth initialized={initialized} user={user} />}>
-        <Route path="/home" element={<HomePage user={user!} onLogout={logout} onProfileUpdate={updateUser} />} />
-        <Route path="/homes/:homeId/scenes" element={<ScenePage />} />
-        <Route path="/homes/:homeId/scenes/:sceneId" element={<ScenePage />} />
-        <Route path="/homes/:homeId/automation-rules" element={<AutomationRulePage />} />
-        <Route path="/homes/:homeId/recommendations" element={<RecommendationsPage />} />
-        <Route path="/home/:homeId/devices" element={<DevicePage />} />
-        <Route path="/home/:homeId/energy" element={<EnergyDashboardPage />} />
-        <Route path="/home/:homeId/digital-twin" element={<Suspense fallback={<p role="status" className="p-8 text-muted">Đang tải Digital Twin…</p>}><DigitalTwinPage /></Suspense>} />
+        <Route path="/home" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <HomePage user={user!} onLogout={logout} onProfileUpdate={updateUser} />} />
+        <Route path="/homes/:homeId/scenes" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <ScenePage />} />
+        <Route path="/homes/:homeId/scenes/:sceneId" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <ScenePage />} />
+        <Route path="/homes/:homeId/automation-rules" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <AutomationRulePage />} />
+        <Route path="/homes/:homeId/recommendations" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <RecommendationsPage />} />
+        <Route path="/home/:homeId/devices" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <DevicePage />} />
+        <Route path="/home/:homeId/energy" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <EnergyDashboardPage />} />
+        <Route path="/home/:homeId/digital-twin" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <Suspense fallback={<p role="status" className="p-8 text-muted">Đang tải Digital Twin…</p>}><DigitalTwinPage /></Suspense>} />
         <Route element={<RequireAdmin initialized={initialized} user={user} />}>
           <Route path="/admin" element={<AdminDashboard user={user!} onLogout={logout} onProfileUpdate={updateUser} />} />
+          <Route path="/admin/devices" element={<Navigate to="/admin" replace />} />
           <Route path="/admin/users" element={<AdminUsersPage user={user!} onLogout={logout} onProfileUpdate={updateUser} />} />
           <Route path="/admin/diagnostics" element={<SystemDiagnosticsPage user={user!} onLogout={logout} onProfileUpdate={updateUser} />} />
         </Route>

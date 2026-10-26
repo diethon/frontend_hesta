@@ -114,10 +114,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout, 
   };
 
   return (
-    <div className="app-shell relative overflow-x-hidden text-text">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-text relative overflow-x-hidden">
       <AppSidebar
         activeItem="admin"
         contextLabel="Quản trị nền tảng"
+        showSystemSummary={false}
         items={[
           { id: 'admin', label: 'Quản lý thiết bị & QR', icon: <AdminIcon />, onClick: () => window.scrollTo({ top: 0, behavior: 'smooth' }) },
           { id: 'users', label: 'Quản lý người dùng', icon: <PeopleIcon />, onClick: () => navigate('/admin/users') },
