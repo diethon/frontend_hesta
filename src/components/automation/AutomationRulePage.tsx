@@ -77,6 +77,56 @@ const conditionOperators = [
   { code: 'LTE', label: '≤ Nhỏ hơn hoặc bằng' },
 ] as const;
 
+function getSuggestedAttributes(device?: DeviceSummary): { attr: string; label: string; defaultExpected?: string }[] {
+  if (!device) {
+    return [
+      { attr: 'temperature', label: 'Nhiệt độ (°C)', defaultExpected: '30' },
+      { attr: 'humidity', label: 'Độ ẩm (%)', defaultExpected: '70' },
+      { attr: 'motion', label: 'Chuyển động (PIR)', defaultExpected: 'true' },
+      { attr: 'light', label: 'Ánh sáng (LDR)', defaultExpected: 'true' },
+    ];
+  }
+  const type = (device.deviceType || '').toUpperCase();
+  if (type.includes('DHT') || type.includes('TEMP') || type.includes('CLIMATE')) {
+    return [
+      { attr: 'temperature', label: 'Nhiệt độ (°C)', defaultExpected: '30' },
+      { attr: 'humidity', label: 'Độ ẩm (%)', defaultExpected: '70' },
+    ];
+  }
+  if (type.includes('PIR') || type.includes('MOTION')) {
+    return [
+      { attr: 'motion', label: 'Có người (true / 1)', defaultExpected: 'true' },
+      { attr: 'MOTION_SENSOR', label: 'PIR (1/0)', defaultExpected: '1' },
+    ];
+  }
+  if (type.includes('LDR') || type.includes('LIGHT') || type.includes('LUX')) {
+    return [
+      { attr: 'light', label: 'Có sáng (true / 1)', defaultExpected: 'true' },
+      { attr: 'LIGHT_SENSOR', label: 'Quang trở (1/0)', defaultExpected: '1' },
+    ];
+  }
+  if (type === 'GATE' || type === 'DOOR' || type === 'ROLLING_DOOR') {
+    return [
+      { attr: 'state', label: 'Trạng thái (OPEN / CLOSED / STOPPED)', defaultExpected: 'OPEN' },
+    ];
+  }
+  if (type === 'AC' || type === 'AIR_CONDITIONER') {
+    return [
+      { attr: 'power', label: 'Nguồn (true/false)', defaultExpected: 'true' },
+      { attr: 'temperature', label: 'Nhiệt độ cài đặt (°C)', defaultExpected: '26' },
+      { attr: 'mode', label: 'Chế độ (COOL, HEAT, DRY, FAN)', defaultExpected: 'COOL' },
+    ];
+  }
+  return [
+    { attr: 'temperature', label: 'Nhiệt độ', defaultExpected: '30' },
+    { attr: 'humidity', label: 'Độ ẩm', defaultExpected: '70' },
+    { attr: 'motion', label: 'Chuyển động', defaultExpected: 'true' },
+    { attr: 'light', label: 'Ánh sáng', defaultExpected: 'true' },
+    { attr: 'power', label: 'Nguồn', defaultExpected: 'true' },
+    { attr: 'state', label: 'Trạng thái', defaultExpected: 'OPEN' },
+  ];
+}
+
 export function AutomationRulePage() {
   const { homeId = '' } = useParams();
 
@@ -931,6 +981,37 @@ export function AutomationRulePage() {
                           />
                         </div>
                       </div>
+
+                      {/* Quick Attribute Suggestions for Selected Device */}
+                      {(() => {
+                        const targetDevice = devices.find((d) => d.id === condition.deviceId);
+                        const suggestions = getSuggestedAttributes(targetDevice);
+                        if (!suggestions.length) return null;
+                        return (
+                          <div className="flex flex-wrap items-center gap-1.5 pt-1 text-[11px]">
+                            <span className="text-muted font-semibold">Gợi ý chỉ số:</span>
+                            {suggestions.map((sugg) => (
+                              <button
+                                key={sugg.attr}
+                                type="button"
+                                onClick={() =>
+                                  updateCondition(index, {
+                                    attribute: sugg.attr,
+                                    expected: condition.expected || sugg.defaultExpected || '',
+                                  })
+                                }
+                                className={`px-2 py-0.5 rounded-md border font-medium transition-all cursor-pointer ${
+                                  condition.attribute.toLowerCase() === sugg.attr.toLowerCase()
+                                    ? 'bg-primary/10 border-primary text-primary font-bold'
+                                    : 'border-line bg-surface hover:bg-sidebar text-text'
+                                }`}
+                              >
+                                {sugg.label}
+                              </button>
+                            ))}
+                          </div>
+                        );
+                      })()}
                     </div>
                   );
                 })}
@@ -1140,6 +1221,52 @@ export function AutomationRulePage() {
                               }`}
                             >
                               Đảo bật/tắt
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 1.1 GATE (OPEN / CLOSE / STOP) */}
+                      {(action.action === 'OPEN' ||
+                        action.action === 'CLOSE' ||
+                        action.action === 'STOP') && (
+                        <div className="space-y-1.5 pt-1">
+                          <span className="text-[11px] font-bold text-muted uppercase tracking-wider block">
+                            Lệnh điều khiển cổng / cửa:
+                          </span>
+                          <div className="grid grid-cols-3 gap-2">
+                            <button
+                              type="button"
+                              onClick={() => updateAction(index, { action: 'OPEN', value: '' })}
+                              className={`py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                                action.action === 'OPEN'
+                                  ? 'bg-emerald-600 text-white shadow-xs'
+                                  : 'bg-surface hover:bg-sidebar text-text border border-line'
+                              }`}
+                            >
+                              Mở (OPEN)
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => updateAction(index, { action: 'STOP', value: '' })}
+                              className={`py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                                action.action === 'STOP'
+                                  ? 'bg-amber-600 text-white shadow-xs'
+                                  : 'bg-surface hover:bg-sidebar text-text border border-line'
+                              }`}
+                            >
+                              Dừng (STOP)
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => updateAction(index, { action: 'CLOSE', value: '' })}
+                              className={`py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                                action.action === 'CLOSE'
+                                  ? 'bg-rose-600 text-white shadow-xs'
+                                  : 'bg-surface hover:bg-sidebar text-text border border-line'
+                              }`}
+                            >
+                              Đóng (CLOSE)
                             </button>
                           </div>
                         </div>
