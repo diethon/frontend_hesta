@@ -48,7 +48,7 @@ import {
   type DraftAction,
 } from './automationActions';
 import { SchedulePanel } from '../ui/SchedulePanel';
-import { AppSidebar } from '../ui/AppSidebar';
+import { HomeSidebar } from '../ui/HomeSidebar';
 import { getDeviceTypeIcon } from '../scene/sceneConstants';
 import { COLOR_PRESETS } from '../device/deviceMultiActionHelpers';
 import { ConfirmModal } from '../ui/ConfirmModal';
@@ -396,7 +396,7 @@ export function AutomationRulePage() {
   return (
     <div className="app-shell relative min-h-screen bg-canvas text-text">
       {/* ── SIDEBAR NAVIGATION ── */}
-      <AppSidebar
+      <HomeSidebar
         activeItem="automations"
         homeId={homeId}
       />

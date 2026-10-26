@@ -38,7 +38,8 @@ export const DEVICE_TYPES = {
   TEMP_HUMID_SENSOR: 'TEMP_HUMID_SENSOR', // Cảm biến DHT22
   MOTION_SENSOR: 'MOTION_SENSOR',   // Cảm biến PIR
   SMOKE_SENSOR: 'SMOKE_SENSOR',     // Cảm biến MQ-2
-  CAMERA_AI: 'CAMERA_AI'            // Camera Ugreen qua Orange Pi
+  CAMERA_AI: 'CAMERA_AI',           // Camera Ugreen qua Orange Pi
+  LUX_SENSOR: 'LUX_SENSOR',         // Cảm biến ánh sáng quang trở (LDR)
 } as const;
 
 export type DeviceType = keyof typeof DEVICE_TYPES;

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { motion } from 'motion/react';
 import { useNavigate } from 'react-router';
 import { 
   X, 
@@ -15,8 +16,13 @@ import {
   ChevronRight,
   HeartPulse,
   BellRing,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Mic,
+  Smartphone,
+  ToggleRight,
+  Radio
 } from 'lucide-react';
+import { getFriendlyDeviceTypeName } from './DeviceStateVisualizer';
 import type { 
   DeviceResponse, 
   DeviceStateHistoryResponse, 
@@ -37,6 +43,7 @@ import {
   getDeviceUptime,
   getDeviceHealth
 } from '../../services/deviceApi';
+import { DeviceShadowSection } from './DeviceShadowSection';
 import { useOverrideCountdown } from './useOverrideCountdown';
 import { getDeviceEnergy } from '../../services/energyApi';
 import { notify } from '../ui/notify';
@@ -56,6 +63,7 @@ export interface DeviceDrawerProps {
   onTogglePower?: (deviceId: string, currentPower: string) => void;
   onColorChange?: (deviceId: string, r: number, g: number, b: number) => void;
   onBrightnessChange?: (deviceId: string, brightness: number) => void;
+  isPowerPending?: boolean;
 }
 
 export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
@@ -66,7 +74,8 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
   onDeviceUpdated,
   onTogglePower,
   onColorChange,
-  onBrightnessChange
+  onBrightnessChange,
+  isPowerPending = false
 }) => {
   const navigate = useNavigate();
   const [history, setHistory] = useState<DeviceStateHistoryResponse[]>([]);
@@ -75,6 +84,9 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
   const [healthData, setHealthData] = useState<DeviceHealthResponse | null>(null);
   const [isEditingName, setIsEditingName] = useState(false);
   const [editName, setEditName] = useState('');
+  const [isEditingWattage, setIsEditingWattage] = useState(false);
+  const [editWattage, setEditWattage] = useState('');
+  const [isSavingWattage, setIsSavingWattage] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [deviceEnergy, setDeviceEnergy] = useState<DeviceEnergyBreakdown | null>(null);
   const [isExporting, setIsExporting] = useState(false);
@@ -97,9 +109,56 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
     if (isOpen && device) {
       setEditName(device.name);
       setIsEditingName(false);
+      setEditWattage(String(device.settings?.wattage || ''));
+      setIsEditingWattage(false);
       fetchHistory(device.id);
     }
   }, [isOpen, device]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
+  const handleUpdateWattage = async () => {
+    if (!device) return;
+    const trimmed = editWattage.trim();
+    const parsedWatt = parseInt(trimmed, 10);
+    if (!trimmed || isNaN(parsedWatt) || parsedWatt <= 0) {
+      notify.error('Vui lòng nhập công suất hợp lệ lớn hơn 0W');
+      return;
+    }
+    
+    setIsSavingWattage(true);
+    try {
+      const updatedSettings = {
+        ...(device.settings || {}),
+        wattage: parsedWatt
+      };
+      const updated = await updateDeviceConfig(device.id, {
+        settings: updatedSettings
+      });
+      setIsEditingWattage(false);
+      notify.success(`Đã cập nhật công suất thành ${parsedWatt}W`);
+      onDeviceUpdated({
+        ...device,
+        ...updated,
+        settings: updatedSettings
+      });
+      // Tải lại thông số năng lượng sau khi cập nhật công suất
+      getDeviceEnergy(device.id).then(res => res && setDeviceEnergy(res)).catch(() => null);
+    } catch (error) {
+      notify.error('Lỗi khi cập nhật công suất thiết bị');
+    } finally {
+      setIsSavingWattage(false);
+    }
+  };
 
   const fetchHistory = async (deviceId: string) => {
     setIsLoadingHistory(true);
@@ -144,7 +203,7 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
     if (!device) return;
     try {
       await cancelDeviceAutomation(device.id);
-      notify.success('Đã hủy tự động hóa');
+      notify.success('Đã tạm dừng tự động hóa', 'Khóa can thiệp tự động 30 phút');
       fetchHistory(device.id);
     } catch (error) {
       notify.error('Lỗi khi hủy tự động hóa');
@@ -186,19 +245,84 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
   };
 
   const formatState = (state: Record<string, unknown>) => {
-    if (!state) return 'Không rõ';
+    if (!state || Object.keys(state).length === 0) return 'Không rõ';
     const parts = [];
-    if (state.power) parts.push(state.power === 'ON' ? 'Bật nguồn' : 'Tắt nguồn');
-    if (state.temperature) parts.push(`Nhiệt độ ${state.temperature}°C`);
-    if (state.brightness) parts.push(`Độ sáng ${state.brightness}%`);
-    if (state.motion) parts.push(state.motion === 'DETECTED' ? 'Phát hiện chuyển động' : 'Không có chuyển động');
-    if (state.smoke) parts.push(state.smoke === 'DETECTED' ? 'Phát hiện khói' : 'An toàn');
-    if (state.state) {
-       if (state.state === 'OPEN') parts.push('Đã mở');
-       if (state.state === 'CLOSED') parts.push('Đã đóng');
-       if (state.state === 'STOPPED') parts.push('Đã dừng');
+
+    if (state.power !== undefined) {
+      const isPowerOn = state.power === true || String(state.power).toUpperCase() === 'ON' || String(state.power) === '1';
+      parts.push(isPowerOn ? 'Bật nguồn' : 'Tắt nguồn');
+    }
+    if (state.temperature !== undefined) parts.push(`Nhiệt độ ${state.temperature}°C`);
+    if (state.humidity !== undefined) parts.push(`Độ ẩm ${state.humidity}%`);
+    if (state.brightness !== undefined) parts.push(`Độ sáng ${state.brightness}%`);
+    if (state.color && typeof state.color === 'object') {
+      const c = state.color as { r?: number; g?: number; b?: number };
+      if (c.r !== undefined && c.g !== undefined && c.b !== undefined) {
+        parts.push(`Màu RGB(${c.r}, ${c.g}, ${c.b})`);
+      }
+    }
+    if (state.motion !== undefined) {
+      const isMotion = state.motion === true || String(state.motion).toUpperCase() === 'DETECTED';
+      parts.push(isMotion ? 'Phát hiện chuyển động' : 'Không có chuyển động');
+    }
+    if (state.smoke !== undefined) {
+      const isSmoke = state.smoke === true || String(state.smoke).toUpperCase() === 'DETECTED';
+      parts.push(isSmoke ? 'Phát hiện khói' : 'An toàn');
+    }
+    if (state.state !== undefined) {
+      const s = String(state.state).toUpperCase();
+      if (s === 'OPEN') parts.push('Đã mở');
+      else if (s === 'CLOSED') parts.push('Đã đóng');
+      else if (s === 'OPENING') parts.push('Đang mở');
+      else if (s === 'CLOSING') parts.push('Đang đóng');
+      else if (s === 'STOPPED') parts.push('Đã dừng');
+      else parts.push(s);
+    }
+    if (state.lux !== undefined) parts.push(`Độ sáng ${state.lux} Lux`);
+    else if (state.LIGHT_SENSOR !== undefined) {
+      const isBright = state.LIGHT_SENSOR === 1 || state.LIGHT_SENSOR === '1' || state.LIGHT_SENSOR === true;
+      parts.push(isBright ? 'Trời sáng' : 'Trời tối');
     }
     return parts.length > 0 ? parts.join(', ') : 'Cập nhật trạng thái';
+  };
+
+  const renderSourceBadge = (source?: string) => {
+    switch (source?.toUpperCase()) {
+      case 'VOICE':
+        return (
+          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 border border-purple-200">
+            <Mic className="w-3 h-3 text-purple-600" /> Giọng nói AI
+          </span>
+        );
+      case 'APP':
+      case 'WEB':
+        return (
+          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-100 text-sky-700 border border-sky-200">
+            <Smartphone className="w-3 h-3 text-sky-600" /> Ứng dụng
+          </span>
+        );
+      case 'AUTOMATION':
+      case 'RULE':
+      case 'SCENE':
+        return (
+          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">
+            <Zap className="w-3 h-3 text-amber-600" /> Tự động hóa
+          </span>
+        );
+      case 'MANUAL':
+      case 'PHYSICAL':
+        return (
+          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200">
+            <ToggleRight className="w-3 h-3 text-emerald-600" /> Công tắc cơ
+          </span>
+        );
+      default:
+        return (
+          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-off-soft text-text border border-line">
+            <Radio className="w-3 h-3 text-muted" /> {source || 'Hệ thống'}
+          </span>
+        );
+    }
   };
 
   const renderControl = () => {
@@ -208,7 +332,7 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
         return <AcControl device={device} onStateChange={onDeviceUpdated} />;
       case 'LIGHT':
       case 'SMART_PLUG':
-        return <LightControl device={device} onTogglePower={onTogglePower || (() => {})} />;
+        return <LightControl device={device} onTogglePower={onTogglePower || (() => {})} isPending={isPowerPending} />;
       case 'LED_RGB':
         return (
           <RgbLightControl 
@@ -216,6 +340,7 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
             onTogglePower={onTogglePower || (() => {})} 
             onColorChange={onColorChange || (() => {})} 
             onBrightnessChange={onBrightnessChange || (() => {})} 
+            isPending={isPowerPending}
           />
         );
       case 'GATE':
@@ -224,6 +349,8 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
       case 'TEMP_HUMID_SENSOR':
       case 'MOTION_SENSOR':
       case 'SMOKE_SENSOR':
+      case 'LUX_SENSOR':
+      case 'LIGHT_SENSOR':
       case 'CAMERA_AI':
         return <SensorDisplay device={device} />;
       default:
@@ -236,16 +363,25 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
   };
 
   return (
-    <>
-      <div 
-        className="fixed inset-0 z-50 bg-text/20 backdrop-blur-sm drawer-overlay" 
-        onClick={onClose} 
-      />
-      
-      <div className="fixed inset-y-0 right-0 z-50 flex flex-col w-full md:w-full md:max-w-md bg-surface shadow-float drawer-enter border-l border-line">
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.2 }}
+      className="fixed inset-0 z-50 flex justify-end bg-slate-950/50 backdrop-blur-xs overflow-hidden"
+      onClick={onClose}
+    >
+      <motion.div 
+        initial={{ x: '100%' }}
+        animate={{ x: 0 }}
+        exit={{ x: '100%' }}
+        transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+        className="relative w-full md:w-1/2 lg:w-1/3 xl:w-1/3 h-full max-h-screen flex flex-col bg-surface border-l border-line shadow-2xl overflow-hidden rounded-l-2xl sm:rounded-l-3xl"
+        onClick={(e) => e.stopPropagation()}
+      >
         
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-line bg-sidebar">
+        <div className="flex items-center justify-between p-4 sm:p-5 border-b border-line bg-sidebar shrink-0">
           <div className="flex flex-col flex-1">
             <div className="flex items-center space-x-2">
               {isEditingName ? (
@@ -254,37 +390,44 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
                     type="text"
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
-                    className="px-2 py-1 border border-line rounded-md text-text focus:outline-none focus:border-primary"
+                    className="px-2.5 py-1 border border-line rounded-lg text-text focus:outline-none focus:border-primary bg-surface font-semibold text-base"
                     autoFocus
                   />
-                  <button onClick={handleUpdateName} className="p-1 text-success hover:bg-success-soft rounded-md">
+                  <button onClick={handleUpdateName} className="p-1.5 text-success hover:bg-success-soft rounded-lg transition-colors">
                     <Check className="w-4 h-4" />
                   </button>
                 </div>
               ) : (
-                <h2 className="text-lg font-bold text-text flex items-center space-x-2">
+                <h2 className="text-lg sm:text-xl font-bold text-text flex items-center space-x-2">
                   <span>{device.name}</span>
-                  <button onClick={() => setIsEditingName(true)} className="p-1 text-icon hover:text-primary transition-colors">
+                  <button onClick={() => setIsEditingName(true)} className="p-1 text-icon hover:text-primary transition-colors" title="Đổi tên thiết bị">
                     <Edit2 className="w-3.5 h-3.5" />
                   </button>
                 </h2>
               )}
             </div>
-            <div className="flex items-center space-x-1.5 mt-1">
-              <div className={`w-2 h-2 rounded-full ${getStatusColor(device.status).split(' ')[1]}`} />
-              <span className="text-xs font-medium text-muted">{getStatusText(device.status)}</span>
+            <div className="flex items-center space-x-2 mt-1">
+              <div className={`w-2.5 h-2.5 rounded-full ${getStatusColor(device.status).split(' ')[1]}`} />
+              <span className="text-xs font-semibold text-muted">{getStatusText(device.status)}</span>
+              {device.roomName && (
+                <>
+                  <span className="text-xs text-muted/60">•</span>
+                  <span className="text-xs text-muted">{device.roomName}</span>
+                </>
+              )}
             </div>
           </div>
           <button 
             onClick={onClose}
             className="p-2 text-icon hover:text-text hover:bg-line rounded-full transition-colors"
+            title="Đóng (Esc)"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-6 bg-app">
+        <div className="flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-5 space-y-5 bg-app">
           
           {/* Controls Section */}
           <div className="gentle-rise" style={{ animationDelay: '50ms' }}>
@@ -292,15 +435,15 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
           </div>
 
           {/* Info Section */}
-          <div className="surface-card p-4 gentle-rise" style={{ animationDelay: '100ms' }}>
+          <div className="surface-card p-4 sm:p-5 gentle-rise" style={{ animationDelay: '100ms' }}>
             <h3 className="text-sm font-bold text-text mb-3 flex items-center space-x-2">
               <Tag className="w-4 h-4 text-icon" />
               <span>Thông tin thiết bị</span>
             </h3>
-            <div className="space-y-2 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
               <div className="flex justify-between py-1 border-b border-line border-dashed">
                 <span className="text-muted">Loại:</span>
-                <span className="font-medium text-text">{device.deviceType}</span>
+                <span className="font-medium text-text">{getFriendlyDeviceTypeName(device.deviceType)}</span>
               </div>
               <div className="flex justify-between py-1 border-b border-line border-dashed">
                 <span className="text-muted">Phòng:</span>
@@ -314,14 +457,76 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
                 <span className="text-muted">ID:</span>
                 <span className="font-mono text-xs text-text">{device.id.substring(0, 8)}...</span>
               </div>
+              <div className="flex items-center justify-between py-1.5 border-b border-line border-dashed sm:col-span-2">
+                <span className="text-muted flex items-center gap-1.5">
+                  <Zap className="w-3.5 h-3.5 text-amber-500" />
+                  <span>Công suất định mức:</span>
+                </span>
+                {isEditingWattage ? (
+                  <div className="flex items-center space-x-1.5">
+                    <input
+                      type="number"
+                      min={1}
+                      max={10000}
+                      value={editWattage}
+                      onChange={(e) => setEditWattage(e.target.value)}
+                      placeholder={String(deviceEnergy?.wattage ?? 60)}
+                      className="w-20 px-2 py-0.5 text-right border border-line rounded-md text-text focus:outline-none focus:border-primary text-sm font-bold bg-surface"
+                      autoFocus
+                    />
+                    <span className="text-xs text-muted">W</span>
+                    <button 
+                      onClick={handleUpdateWattage} 
+                      disabled={isSavingWattage}
+                      className="p-1 text-success hover:bg-success-soft rounded-md transition-colors"
+                      title="Lưu công suất"
+                    >
+                      <Check className="w-4 h-4" />
+                    </button>
+                    <button 
+                      onClick={() => {
+                        setIsEditingWattage(false);
+                        setEditWattage(String(device.settings?.wattage || ''));
+                      }} 
+                      className="p-1 text-muted hover:bg-line rounded-md transition-colors"
+                      title="Hủy"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center space-x-2">
+                    <span className="font-semibold text-text">
+                      {device.settings?.wattage ? (
+                        <span className="text-primary font-bold">{device.settings.wattage} W <span className="text-[10px] font-normal text-muted">(Tùy chỉnh)</span></span>
+                      ) : (
+                        <span>{deviceEnergy?.wattage ?? 60} W <span className="text-[10px] font-normal text-muted">(Mặc định)</span></span>
+                      )}
+                    </span>
+                    <button 
+                      onClick={() => {
+                        setEditWattage(String(device.settings?.wattage || deviceEnergy?.wattage || 60));
+                        setIsEditingWattage(true);
+                      }} 
+                      className="p-1 text-icon hover:text-primary transition-colors"
+                      title="Tùy chỉnh công suất thiết bị"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+              </div>
               {device.gpioPin !== undefined && (
-                <div className="flex justify-between py-1 border-b border-line border-dashed">
+                <div className="flex justify-between py-1 border-b border-line border-dashed sm:col-span-2">
                   <span className="text-muted">GPIO:</span>
                   <span className="font-medium text-text">{device.gpioPin}</span>
                 </div>
               )}
             </div>
           </div>
+
+          {/* Device Shadow [PHO-048] */}
+          <DeviceShadowSection deviceId={device.id} deviceType={device.deviceType} />
 
           {/* Energy Summary Widget */}
           {deviceEnergy && (
@@ -367,7 +572,7 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-sm font-bold text-emerald-800 flex items-center space-x-1.5">
                   <Activity className="w-4 h-4 text-emerald-600" />
-                  <span>Uptime Availability (7 ngày qua)</span>
+                  <span>Tần suất Hoạt động & Vận hành (7 ngày qua)</span>
                 </h3>
                 <span className="text-xs font-extrabold text-emerald-700 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-full">
                   {uptimeData.uptimePercent.toFixed(1)}%
@@ -384,22 +589,29 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
                 <div className="space-y-1">
                   <div className="flex items-center justify-between text-[10px] text-muted font-mono">
                     <span>00:00</span>
-                    <span>Khung giờ hoạt động trong ngày</span>
+                    <span>24 Khung giờ hoạt động thực tế hôm nay</span>
                     <span>23:00</span>
                   </div>
                   <div className="flex gap-0.5 p-1 bg-white/70 border border-emerald-200/50 rounded-lg overflow-hidden">
-                    {(uptimeData.timelinePoints && uptimeData.timelinePoints.length === 24
+                    {(uptimeData.timelinePoints && uptimeData.timelinePoints.length > 0
                       ? uptimeData.timelinePoints
                       : Array.from({ length: 24 }, (_, i) => ({
                           hour: i,
-                          state: i >= 7 && i <= 21 ? ('ON' as const) : ('OFF' as const),
+                          state: 'OFF' as const,
+                          durationSeconds: 0,
                         }))
                     ).map((pt) => {
                       const isOn = pt.state === 'ON';
+                      const activeMinutes = Math.round((pt.durationSeconds || 0) / 60);
+                      const tooltip = `${String(pt.hour).padStart(2, '0')}:00 - ${
+                        isOn
+                          ? `BẬT (${activeMinutes > 0 ? `${activeMinutes} phút` : 'Đang hoạt động'})`
+                          : 'TẮT (0 phút)'
+                      }`;
                       return (
                         <div
                           key={pt.hour}
-                          title={`${String(pt.hour).padStart(2, '0')}:00 - Trạng thái: ${isOn ? 'BẬT (ON)' : 'TẮT (OFF)'}`}
+                          title={tooltip}
                           className={`flex-1 h-5 rounded-xs transition-colors cursor-pointer ${
                             isOn
                               ? 'bg-emerald-500 hover:bg-emerald-400 shadow-2xs shadow-emerald-500/50'
@@ -409,21 +621,24 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
                       );
                     })}
                   </div>
-                  <div className="flex items-center justify-end gap-3 text-[10px] text-muted pt-0.5">
-                    <span className="flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-xs bg-emerald-500" /> Bật
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-xs bg-slate-200" /> Tắt
-                    </span>
+                  <div className="flex items-center justify-between text-[10px] text-muted pt-0.5">
+                    <span>* Di chuột để xem số phút bật trong từng giờ</span>
+                    <div className="flex items-center gap-3">
+                      <span className="flex items-center gap-1">
+                        <span className="w-2 h-2 rounded-xs bg-emerald-500" /> Bật
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <span className="w-2 h-2 rounded-xs bg-slate-200" /> Tắt
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Relay Health Card [PHO-042] */}
-          {healthData && (
+          {/* Relay Health Card [PHO-042] (Chỉ hiển thị cho thiết bị đóng ngắt rơ-le / công tắc, không áp dụng cho cảm biến) */}
+          {healthData && !device.deviceType?.endsWith('SENSOR') && device.deviceType !== 'CAMERA' && (
             <div className="surface-card p-4 gentle-rise border-sky-500/20 bg-sky-500/5" style={{ animationDelay: '140ms' }}>
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-sm font-bold text-sky-800 flex items-center space-x-1.5">
@@ -527,7 +742,7 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
                       }
                     }}
                     className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 transition-colors shadow-xs"
-                    title="Xuất báo cáo Excel (.xlsx) lịch sử hoạt động"
+                    title="Xuất báo cáo Excel (.xlsx) kiểm toán 30 ngày qua"
                   >
                     <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
                     <span>{isExportingExcel ? 'Đang xuất...' : 'Xuất Excel'}</span>
@@ -545,18 +760,22 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
                 {history.map((record) => (
                   <div key={record.id} className="relative pl-4 border-l-2 border-line pb-4 last:pb-0">
                     <div className="absolute -left-[5px] top-1 w-2 h-2 rounded-full bg-primary" />
-                    <div className="flex items-center space-x-2 mb-1">
-                      <span className="text-xs font-medium text-muted">
+                    <div className="flex items-center space-x-2 mb-1.5 flex-wrap">
+                      <span className="text-xs font-mono font-medium text-muted">
                         {new Date(record.changedAt).toLocaleString('vi-VN', { 
                           hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' 
                         })}
                       </span>
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-off-soft text-text border border-line">
-                        {record.source}
-                      </span>
+                      {renderSourceBadge(record.source)}
                     </div>
-                    <div className="text-sm text-text">
-                      {formatState(record.previousState as Record<string, unknown>)} → <span className="font-semibold">{formatState(record.newState as Record<string, unknown>)}</span>
+                    <div className="text-xs text-text flex items-center gap-1.5 flex-wrap">
+                      <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-medium border border-slate-200">
+                        {formatState(record.previousState as Record<string, unknown>)}
+                      </span>
+                      <span className="text-muted font-bold">→</span>
+                      <span className="px-2 py-0.5 rounded-md bg-primary/10 text-primary font-semibold border border-primary/20">
+                        {formatState(record.newState as Record<string, unknown>)}
+                      </span>
                     </div>
                   </div>
                 ))}
@@ -613,13 +832,13 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
         </div>
 
         {/* Footer Actions */}
-        <div className="p-4 border-t border-line bg-surface grid grid-cols-2 gap-3">
+        <div className="p-4 sm:p-5 border-t border-line bg-surface grid grid-cols-2 gap-3 shrink-0">
           <button
             onClick={handleCancelAutomation}
             className="flex items-center justify-center space-x-2 p-2.5 rounded-xl border border-warning/30 bg-warning-soft text-warning-dark hover:bg-warning hover:text-white transition-colors"
           >
             <AlertTriangle className="w-4 h-4" />
-            <span className="font-medium text-sm">Hủy tự động</span>
+            <span className="font-semibold text-sm">Hủy tự động</span>
           </button>
           
           <button
@@ -627,11 +846,11 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
             className="flex items-center justify-center space-x-2 p-2.5 rounded-xl border border-error/30 bg-error-soft text-error hover:bg-error hover:text-white transition-colors"
           >
             <Trash2 className="w-4 h-4" />
-            <span className="font-medium text-sm">Xóa thiết bị</span>
+            <span className="font-semibold text-sm">Xóa thiết bị</span>
           </button>
         </div>
 
-      </div>
-    </>
+      </motion.div>
+    </motion.div>
   );
 };

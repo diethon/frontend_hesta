@@ -21,6 +21,7 @@ const DEVICE_TYPES = [
   { value: 'TEMP_HUMID_SENSOR', label: 'Cảm biến Nhiệt/Ẩm (TEMP_HUMID_SENSOR)' },
   { value: 'MOTION_SENSOR', label: 'Cảm biến Chuyển động (MOTION_SENSOR)' },
   { value: 'SMOKE_SENSOR', label: 'Cảm biến Khói (SMOKE_SENSOR)' },
+  { value: 'LUX_SENSOR', label: 'Cảm biến Ánh sáng (LUX_SENSOR)' },
   { value: 'IR_REMOTE', label: 'Bộ điều khiển hồng ngoại (IR_REMOTE)' },
   { value: 'CAMERA_AI', label: 'Camera AI (CAMERA_AI)' },
 ];

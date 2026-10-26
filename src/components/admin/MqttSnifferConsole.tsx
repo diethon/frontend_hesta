@@ -50,7 +50,7 @@ export const MqttSnifferConsole: React.FC = () => {
     if (isPaused) return;
     const interval = setInterval(() => {
       fetchPackets();
-    }, 4000);
+    }, 2000);
     return () => clearInterval(interval);
   }, [isPaused]);
 
@@ -73,8 +73,14 @@ export const MqttSnifferConsole: React.FC = () => {
     notify('Đã xóa log console', 'info');
   };
 
+  const isPktInbound = (dir?: string) => dir === 'INBOUND' || dir === 'IN';
+  const isPktOutbound = (dir?: string) => dir === 'OUTBOUND' || dir === 'OUT';
+
   const filteredPackets = packets.filter((pkt) => {
-    const matchDirection = directionFilter === 'ALL' || pkt.direction === directionFilter;
+    const matchDirection =
+      directionFilter === 'ALL' ||
+      (directionFilter === 'INBOUND' && isPktInbound(pkt.direction)) ||
+      (directionFilter === 'OUTBOUND' && isPktOutbound(pkt.direction));
     const q = searchQuery.toLowerCase().trim();
     const matchQuery =
       !q ||
@@ -197,9 +203,10 @@ export const MqttSnifferConsole: React.FC = () => {
               {loading ? 'Đang lắng nghe gói tin MQTT...' : 'Không có gói tin nào phù hợp với bộ lọc.'}
             </div>
           ) : (
-            filteredPackets.map((pkt) => {
-              const isInbound = pkt.direction === 'INBOUND';
-              const isExpanded = expandedId === pkt.id;
+            filteredPackets.map((pkt, idx) => {
+              const isInbound = isPktInbound(pkt.direction);
+              const packetKey = pkt.id || `${pkt.timestamp}-${pkt.topic}-${idx}`;
+              const isExpanded = expandedId === packetKey;
               const formattedTime = pkt.timestamp
                 ? new Date(pkt.timestamp).toLocaleTimeString('vi-VN', {
                     hour: '2-digit',
@@ -211,8 +218,8 @@ export const MqttSnifferConsole: React.FC = () => {
 
               return (
                 <div
-                  key={pkt.id}
-                  onClick={() => setExpandedId(isExpanded ? null : pkt.id)}
+                  key={packetKey}
+                  onClick={() => setExpandedId(isExpanded ? null : packetKey)}
                   className={`p-2.5 rounded-xl border transition-all cursor-pointer ${
                     isExpanded
                       ? 'bg-[#111c2e] border-slate-600 shadow-md'
@@ -235,7 +242,7 @@ export const MqttSnifferConsole: React.FC = () => {
                         }`}
                       >
                         {isInbound ? <ArrowDownLeft className="w-3 h-3" /> : <ArrowUpRight className="w-3 h-3" />}
-                        {pkt.direction}
+                        {isInbound ? 'INBOUND' : 'OUTBOUND'}
                       </span>
 
                       {/* QoS badge */}
@@ -252,11 +259,11 @@ export const MqttSnifferConsole: React.FC = () => {
                     {/* Copy action */}
                     <button
                       type="button"
-                      onClick={(e) => handleCopyPayload(pkt.id, pkt.payloadSummary, e)}
+                      onClick={(e) => handleCopyPayload(packetKey, pkt.payloadSummary, e)}
                       className="inline-flex items-center gap-1 text-[11px] text-slate-400 hover:text-white px-2 py-0.5 rounded bg-[#070d18] hover:bg-slate-800 border border-[#1e293b] transition shrink-0 self-end sm:self-auto"
                       title="Sao chép nội dung payload"
                     >
-                      {copiedId === pkt.id ? (
+                      {copiedId === packetKey ? (
                         <>
                           <Check className="w-3 h-3 text-emerald-400" />
                           <span className="text-emerald-400">Đã chép</span>

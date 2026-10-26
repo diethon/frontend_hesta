@@ -1,4 +1,5 @@
 import React from 'react';
+import { motion } from 'motion/react';
 import type { DeviceResponse } from '../../../types/device';
 import { Cctv, Video, AlertTriangle, SlidersHorizontal, Eye } from 'lucide-react';
 
@@ -14,9 +15,12 @@ export const CameraCard: React.FC<CameraCardProps> = ({ device, onClick }) => {
   const motionDetected = state?.motion === true;
 
   return (
-    <article
+    <motion.article
       role="button"
       tabIndex={0}
+      whileHover={{ translateY: -3 }}
+      whileTap={{ scale: 0.985 }}
+      transition={{ type: 'spring', stiffness: 450, damping: 25 }}
       onClick={() => onClick?.(device.id)}
       onKeyDown={(e) => e.key === 'Enter' && onClick?.(device.id)}
       className={`relative flex flex-col justify-between rounded-2xl border transition-all duration-200 overflow-hidden select-none cursor-pointer group ${
@@ -106,6 +110,6 @@ export const CameraCard: React.FC<CameraCardProps> = ({ device, onClick }) => {
           </div>
         </div>
       </div>
-    </article>
+    </motion.article>
   );
 };

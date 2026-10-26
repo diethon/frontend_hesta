@@ -1,4 +1,5 @@
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
+import { Html, RoundedBox } from '@react-three/drei';
 import { useFrame, useThree } from '@react-three/fiber';
 import { DoubleSide, Group } from 'three';
 import type { TwinDeviceView } from '../../../types/twinView';
@@ -11,6 +12,8 @@ import { boundedPercent, lightColor } from './deviceVisualState';
 import { ArchitecturalOpeningModel } from './ArchitecturalOpeningModel';
 import type { OpeningInfo } from '../neonplan/viewer/build';
 import { useTwinResource } from '../hooks/useTwinResource';
+import type { DeviceAppearance } from './deviceAppearance';
+import { AirflowEffect } from './AirflowEffect';
 
 function createPendantGeometry() {
   const buffer = new GeoBuffer();
@@ -25,7 +28,7 @@ function createCameraGeometry() {
   return buffer.geometry();
 }
 
-export interface DeviceModelProps { device: TwinDeviceView; palette: Twin3DPalette; opening?: OpeningInfo }
+export interface DeviceModelProps { device: TwinDeviceView; palette: Twin3DPalette; opening?: OpeningInfo; appearance?: DeviceAppearance }
 export function LightModel({ device, palette }: DeviceModelProps) {
   const brightness = boundedPercent(device.state.brightness ?? device.state.level, 100) / 100;
   const color = lightColor(device, palette.lightOn);
@@ -40,8 +43,30 @@ export function FanModel({ device, palette }: DeviceModelProps) {
   return <group><mesh position={[0, -.12, 0]} castShadow><cylinderGeometry args={[.035, .035, .24, 8]} /><meshStandardMaterial color={palette.metal} /></mesh><group ref={blades} position={[0, -.3, 0]}>{[0, 1, 2].map((blade) => <group key={blade} rotation={[0, blade * Math.PI * 2 / 3, 0]}><mesh position={[.36, 0, 0]} castShadow><boxGeometry args={[.62, .035, .16]} /><meshStandardMaterial color={device.online ? palette.wood : palette.off} /></mesh></group>)}<mesh castShadow><sphereGeometry args={[.12, 12, 8]} /><meshStandardMaterial color={palette.surface} /></mesh></group></group>;
 }
 export function AirConditionerModel({ device, palette }: DeviceModelProps) {
-  return <group><mesh castShadow><boxGeometry args={[.98, .3, .22]} /><meshStandardMaterial color={device.online ? palette.surface : palette.off} roughness={.6} /></mesh><mesh position={[0, -.09, .12]} rotation={[device.powered ? -.3 : 0, 0, 0]}><boxGeometry args={[.83, .045, .03]} /><meshStandardMaterial color={palette.metal} /></mesh><mesh position={[.32, -.005, .113]}><planeGeometry args={[.06, .03]} /><meshStandardMaterial color={device.powered ? palette.success : palette.off} emissive={palette.success} emissiveIntensity={device.powered ? .35 : 0} /></mesh>
-    {device.powered ? [0, 1, 2].map((line) => <mesh key={line} position={[(line - 1) * .25, -.24, .23]} rotation={[-.5, 0, 0]}><boxGeometry args={[.015, .23, .015]} /><meshStandardMaterial color={palette.primary} transparent opacity={.2} /></mesh>) : null}</group>;
+  const flap = useRef<Group>(null), reduced = useReducedMotion(), invalidate = useThree((state) => state.invalidate);
+  const active = device.powered;
+  const fan = String(device.state.fan ?? device.state.fanSpeed ?? device.state.speed ?? 'AUTO').toUpperCase();
+  const speed = fan === 'HIGH' ? 1.5 : fan === 'LOW' ? .6 : 1;
+  const mode = String(device.state.mode ?? 'COOL').toUpperCase();
+  const color = mode === 'HEAT' ? palette.lightOn : mode === 'DRY' ? palette.mint : palette.primary;
+  const temperature = Number(device.state.temperature ?? device.state.targetTemperature);
+  const swing = device.state.swing === true || device.state.swing === 'ON';
+  useEffect(() => { invalidate(); }, [active, swing, invalidate]);
+  useFrame(({ clock }, delta) => {
+    if (!flap.current) return;
+    const target = active ? -.4 + (swing && !reduced ? Math.sin(clock.elapsedTime * .8) * .15 : 0) : 0;
+    const moving = Math.abs(flap.current.rotation.x - target) > .001;
+    flap.current.rotation.x += (target - flap.current.rotation.x) * (reduced ? 1 : 1 - Math.exp(-Math.min(delta, .05) * 10));
+    if (moving || active && swing && !reduced) invalidate();
+  });
+  return <group>
+    <RoundedBox args={[1.2, .38, .28]} radius={.065} smoothness={3} castShadow><meshStandardMaterial color={device.online ? palette.surface : palette.off} roughness={.5} /></RoundedBox>
+    <mesh position={[0, -.115, .145]}><boxGeometry args={[1.04, .065, .02]} /><meshStandardMaterial color={palette.dark} /></mesh>
+    <group ref={flap} position={[0, -.12, .16]}><mesh><boxGeometry args={[1.07, .035, .09]} /><meshStandardMaterial color={palette.metal} /></mesh></group>
+    <mesh position={[.43, .015, .145]}><planeGeometry args={[.025, .02]} /><meshStandardMaterial color={active ? palette.success : palette.off} emissive={palette.success} emissiveIntensity={active ? .5 : 0} /></mesh>
+    {active && Number.isFinite(temperature) ? <Html position={[.23, .015, .15]} transform distanceFactor={4} zIndexRange={[20, 0]}><span className="pointer-events-none text-[8px] font-semibold text-muted">{temperature}°</span></Html> : null}
+    <AirflowEffect active={active} color={color} speed={speed} />
+  </group>;
 }
 export function TvModel({ device, palette }: DeviceModelProps) {
   return <group><mesh castShadow><boxGeometry args={[1.25, .74, .075]} /><meshStandardMaterial color={palette.dark} roughness={.55} /></mesh><mesh position={[0, 0, .04]}><planeGeometry args={[1.18, .67]} /><meshStandardMaterial color={device.powered ? palette.glass : palette.dark} emissive={palette.primary} emissiveIntensity={device.powered ? .35 : 0} roughness={.25} /></mesh></group>;

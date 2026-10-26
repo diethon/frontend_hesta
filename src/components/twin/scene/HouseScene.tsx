@@ -13,6 +13,8 @@ import { FloorScene } from './FloorScene';
 import { themeEnvironment } from './rendererTheme';
 import { EXPLODE_GAP, roomBounds } from './cameraFraming';
 import type { TwinFloorMode, TwinWallMode, TwinMarkerMode } from './architectureMaterials';
+import { readApartmentPalette } from '../interior/apartmentPalette';
+import { ApartmentLighting } from '../interior/ApartmentLighting';
 
 export function HouseScene({ house, drafting, activeFloor, mode, wallMode, markerMode, selection, fitRequest, cameraRequest, focusRoomId, focusNodeKey, compact, palette, theme, heatmapMode, onSelect, onFocus, onCameraInteract }: {
   house: TwinHouseView; geometry: TwinLayoutGeometry; drafting: TwinDraftingMetadata; activeFloor: number | 'all'; mode: TwinFloorMode; wallMode: TwinWallMode; markerMode: TwinMarkerMode;
@@ -21,6 +23,7 @@ export function HouseScene({ house, drafting, activeFloor, mode, wallMode, marke
 }) {
   const get = useThree(state => state.get), invalidate=useThree(state=>state.invalidate);
   const environment=themeEnvironment[theme];
+  const apartmentPalette = useMemo(() => readApartmentPalette(palette), [palette]);
   const regress=useThree(state=>state.performance.regress);
   useEffect(()=>{get().gl.toneMappingExposure=environment.exposure;invalidate();},[get,environment, invalidate]);
   const floors = useMemo(() => house.floors.filter((floor) => mode !== 'single' || floor.level === activeFloor), [house, mode, activeFloor]);
@@ -36,14 +39,16 @@ export function HouseScene({ house, drafting, activeFloor, mode, wallMode, marke
   const bounds = { centerX: (box.min.x + box.max.x) / 2, centerZ: (box.min.z + box.max.z) / 2, width: box.max.x - box.min.x, depth: box.max.z - box.min.z };
   return <>
     <color attach="background" args={[palette.infoSoft]} />
-    <PerspectiveCamera makeDefault fov={38} near={.05} far={200} position={[-14, 18, 20]} />
+    <PerspectiveCamera makeDefault fov={38} near={.05} far={200} position={[10.5, 10.5, 13]} />
     <AdaptiveDpr />
     <OrbitControls makeDefault enablePan enableDamping dampingFactor={.12} minDistance={2} maxDistance={100} minPolarAngle={CAMERA_MIN_POLAR} maxPolarAngle={CAMERA_MAX_POLAR} rotateSpeed={compact ? .85 : 1} zoomSpeed={.8} touches={{ ONE: TOUCH.ROTATE, TWO: TOUCH.DOLLY_PAN }} onStart={()=>{regress();onCameraInteract();}} />
+    {theme === 'COZY' || theme === 'DAYLIGHT' ? <ApartmentLighting palette={apartmentPalette} daylight={theme === 'DAYLIGHT'} compact={compact || rooms.length > 18} centerX={bounds.centerX} centerZ={bounds.centerZ} elevation={maxY - 2.6} extent={Math.max(bounds.width, bounds.depth, 8)} /> : <>
     <hemisphereLight args={[environment.sky, palette.ground, environment.hemisphere]} />
     <directionalLight castShadow color={environment.sky} intensity={environment.sun} position={[-8, 16 + maxY, 8]} shadow-camera-left={-20} shadow-camera-right={20} shadow-camera-top={20} shadow-camera-bottom={-20} shadow-camera-far={80} shadow-mapSize-width={compact || rooms.length > 18 ? 512 : 1024} shadow-mapSize-height={compact || rooms.length > 18 ? 512 : 1024} shadow-normalBias={.025} shadow-bias={-.0002} shadow-radius={4} />
     <directionalLight color={environment.sky} intensity={environment.fill} position={[9, 8, -10]} />
+    </>}
     <FitCamera rooms={rooms} room={focusRoom} node={focusNode} request={fitRequest} cameraRequest={cameraRequest} />
     {floors.map((floor) => <FloorScene key={floor.id} floor={floor} targetElevation={offsets.get(floor.id) ?? 0} mode={mode} wallMode={wallMode} markerMode={markerMode} drafting={drafting} selection={selection} compact={compact} showLabels={floors.length === 1 || mode === 'single'} palette={palette} theme={theme} heatmapMode={heatmapMode} onSelect={onSelect} onFocus={onFocus} />)}
-    <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[bounds.centerX, -.24, bounds.centerZ]} onClick={(event) => { if (event.delta <= 3) onSelect(null); }}><planeGeometry args={[bounds.width + 2, bounds.depth + 2]} /><meshStandardMaterial color={palette.ground} roughness={1} /></mesh>
+    <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[bounds.centerX, -.34, bounds.centerZ]} onClick={(event) => { if (event.delta <= 3) onSelect(null); }}><planeGeometry args={[bounds.width + 8, bounds.depth + 8]} />{theme === 'COZY' ? <shadowMaterial transparent opacity={.22} /> : <meshStandardMaterial color={palette.ground} roughness={1} />}</mesh>
   </>;
 }

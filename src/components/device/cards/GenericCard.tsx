@@ -1,4 +1,5 @@
 import React from 'react';
+import { motion } from 'motion/react';
 import type { DeviceResponse } from '../../../types/device';
 import { Cpu, Power, SlidersHorizontal } from 'lucide-react';
 
@@ -26,9 +27,12 @@ export const GenericCard: React.FC<GenericCardProps> = ({
   };
 
   return (
-    <article
+    <motion.article
       role="button"
       tabIndex={0}
+      whileHover={{ translateY: -3 }}
+      whileTap={{ scale: 0.985 }}
+      transition={{ type: 'spring', stiffness: 450, damping: 25 }}
       onClick={() => onClick?.(device.id)}
       onKeyDown={(e) => e.key === 'Enter' && onClick?.(device.id)}
       className={`relative flex flex-col justify-between p-4 sm:p-5 rounded-2xl border transition-all duration-200 select-none cursor-pointer ${
@@ -95,6 +99,6 @@ export const GenericCard: React.FC<GenericCardProps> = ({
           {isOffline ? 'Ngoại tuyến' : isOn ? 'Hoạt động' : 'Tắt'}
         </span>
       </div>
-    </article>
+    </motion.article>
   );
 };

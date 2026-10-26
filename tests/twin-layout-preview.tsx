@@ -83,7 +83,8 @@ const query = new URLSearchParams(location.search);
 const multiFloor = query.has('multifloor');
 const reference = query.has('reference');
 const demo = reference || multiFloor;
-const extraModels = query.has('models');
+const appearanceModels = query.has('appearances');
+const extraModels = query.has('models') || appearanceModels;
 const modelDevices = [
   { deviceId: 'fan', name: 'Quạt trần', deviceType: 'FAN', roomId: 'living' },
   { deviceId: 'camera', name: 'Camera phòng khách', deviceType: 'CAMERA', roomId: 'living' },
@@ -91,7 +92,13 @@ const modelDevices = [
   { deviceId: 'door', name: 'Cửa thông minh', deviceType: 'DOOR', roomId: 'living' },
   { deviceId: 'window', name: 'Cửa sổ thông minh', deviceType: 'WINDOW', roomId: 'bedroom' },
   { deviceId: 'blind', name: 'Rèm thông minh', deviceType: 'BLIND', roomId: 'kitchen' },
-].map((d) => ({ ...d, icon: null, status: 'ONLINE' as const, currentState: { power: 'ON', open: false, position: 0, speed: 30 }, lastSeen: '2026-09-18T08:00:00Z', healthStatus: 'ACTIVE' as const }));
+  ...(appearanceModels ? [
+    { deviceId: 'named-ac', name: 'Điều hòa phòng khách', deviceType: 'IR_REMOTE', roomId: 'living' },
+    { deviceId: 'named-floor-lamp', name: 'Đèn cây cạnh sofa', deviceType: 'SMART_PLUG', roomId: 'living' },
+    { deviceId: 'named-table-lamp', name: 'Đèn bàn phòng ngủ', deviceType: 'LIGHT', roomId: 'bedroom' },
+    { deviceId: 'named-fan', name: 'Quạt đứng', deviceType: 'FAN', roomId: 'bedroom' },
+  ] : []),
+].map((d) => ({ ...d, icon: null, status: 'ONLINE' as const, currentState: { power: 'ON', open: false, position: 0, speed: 30, temperature: 23, fan: 'HIGH', swing: true }, lastSeen: '2026-09-18T08:00:00Z', healthStatus: 'ACTIVE' as const }));
 const demoSnapshot = multiFloor ? multiFloorSnapshot : extraModels ? { ...referenceSnapshot, rooms: referenceSnapshot.rooms.map((room) => ({ ...room, devices: [...room.devices, ...modelDevices.filter((d) => d.roomId === room.roomId)] })) } : referenceSnapshot;
 const demoLayout = multiFloor ? multiFloorLayout : extraModels ? { ...referenceLayout, nodes: [...referenceLayout.nodes, ...modelDevices.map((d, index) => ({ nodeType: 'DEVICE' as const, nodeId: d.deviceId, roomId: d.roomId, x: d.roomId === 'bedroom' ? .75 : .15 + index % 3 * .12, y: d.roomId === 'kitchen' ? .7 : .22 + index % 2 * .14 }))] } : referenceLayout;
 const referenceRoomIds = demoSnapshot.rooms.map((room) => room.roomId);
@@ -148,6 +155,7 @@ export function LayoutFixtureShell() {
     <button onClick={() => emit({ ...runtimeSensorFixture, data: { ...runtimeSensorFixture.data, latestValue: 31, observedAt: '2026-09-19T10:04:00Z' }, timestamp: '2026-09-19T10:04:00Z' })}>Sensor → 31</button>
     <button onClick={() => emit({ ...runtimeDeviceFixture, data: { ...runtimeDeviceFixture.data, currentState: { power: 'OFF' }, lastSeen: '2026-09-19T10:00:00Z' }, timestamp: '2026-09-19T10:00:00Z' })}>Device → OFF</button>
     <button onClick={() => emit({ ...runtimeDeviceFixture, data: { ...runtimeDeviceFixture.data, currentState: { power: 'ON', brightness: 35, color: { r: 255, g: 100, b: 45 } }, lastSeen: '2026-09-19T10:05:00Z' }, timestamp: '2026-09-19T10:05:00Z' })}>Device → RGB 35%</button>
+    {appearanceModels ? <>{(['OFF', 'ON'] as const).map((power) => <button key={power} onClick={() => window.__twinFixtureEmitDevice('named-ac', { power, temperature: 23, fan: 'HIGH', swing: true })}>Điều hòa mẫu → {power}</button>)}</> : null}
     {(['STALE', 'OFFLINE', 'ACTIVE'] as const).map((healthStatus, index) => <button key={healthStatus} onClick={() => emit({ ...runtimeHealthFixture, timestamp: `2026-09-19T10:0${index + 1}:00Z`, data: { ...runtimeHealthFixture.data, healthStatus, referenceTime: '2026-09-19T10:00:00Z', evaluatedAt: `2026-09-19T10:0${index + 1}:00Z` } })}>{healthStatus}</button>)}
     <button onClick={() => { saved = { ...saved, revision: saved.revision + 1 }; }}>Simulate concurrent save</button>
     <button onClick={() => { fail = !fail; }}>Toggle layout failure</button>

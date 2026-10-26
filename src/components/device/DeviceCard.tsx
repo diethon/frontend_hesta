@@ -35,7 +35,7 @@ export interface DeviceCardProps {
  * Modern Differentiated Smart Home Device Card.
  * Dispatches specialized UI cards with inline controls according to device type.
  */
-export const DeviceCard: React.FC<DeviceCardProps> = (props) => {
+const DeviceCardComponent: React.FC<DeviceCardProps> = (props) => {
   const effectiveType = resolveEffectiveType(props.device);
 
   switch (effectiveType) {
@@ -50,6 +50,8 @@ export const DeviceCard: React.FC<DeviceCardProps> = (props) => {
     case 'TEMP_HUMID_SENSOR':
     case 'MOTION_SENSOR':
     case 'SMOKE_SENSOR':
+    case 'LUX_SENSOR':
+    case 'LIGHT_SENSOR':
       return <SensorCard device={props.device} onClick={props.onClick} />;
 
     case 'GATE':
@@ -69,3 +71,14 @@ export const DeviceCard: React.FC<DeviceCardProps> = (props) => {
       return <GenericCard {...props} />;
   }
 };
+
+export const DeviceCard = React.memo(DeviceCardComponent, (prev, next) => {
+  return (
+    prev.device.id === next.device.id &&
+    prev.device.status === next.device.status &&
+    prev.powerPending === next.powerPending &&
+    prev.device.name === next.device.name &&
+    prev.device.manualOverrideUntil === next.device.manualOverrideUntil &&
+    JSON.stringify(prev.device.currentState) === JSON.stringify(next.device.currentState)
+  );
+});

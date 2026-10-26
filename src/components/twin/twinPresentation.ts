@@ -1,4 +1,4 @@
-import type { JsonValue, TwinHealthStatus } from '../../types/twin';
+import type { TwinHealthStatus } from '../../types/twin';
 
 export const healthSymbols: Record<TwinHealthStatus, string> = { ACTIVE: 'A', STALE: '!', OFFLINE: '×' };
 
@@ -11,7 +11,7 @@ export function deviceVisualKind(type: string) {
     case 'SMART_PLUG': case 'SOCKET': return 'plug';
     case 'LOCK': return 'lock';
     case 'IR_REMOTE': return 'remote';
-    case 'TEMP_HUMID_SENSOR': case 'SENSOR': return 'sensor';
+    case 'TEMP_HUMID_SENSOR': case 'LUX_SENSOR': case 'LIGHT_SENSOR': case 'SENSOR': return 'sensor';
     case 'MOTION_SENSOR': return 'motion';
     case 'SMOKE_SENSOR': return 'smoke';
     case 'CAMERA_AI': case 'CAMERA': return 'camera';
@@ -33,17 +33,17 @@ export function sensorVisualKind(metric: string) {
   }
 }
 
-export function knownPower(state: JsonValue): boolean | null {
+export function knownPower(state: unknown): boolean | null {
   if (!state || typeof state !== 'object' || Array.isArray(state)) return null;
-  const power = state.power;
+  const power = (state as Record<string, unknown>).power;
   if (power === true || power === 'ON') return true;
   if (power === false || power === 'OFF') return false;
   return null;
 }
 
-export function summarizeState(value: JsonValue, depth = 0): string {
-  if (value === null) return 'Chưa có dữ liệu';
-  if (typeof value === 'boolean') return value ? 'Có / ON' : 'Không / OFF';
+export function summarizeState(value: unknown, depth = 0): string {
+  if (value === null || value === undefined) return 'Chưa có dữ liệu';
+  if (typeof value === 'boolean') return value ? 'BẬT' : 'TẮT';
   if (typeof value !== 'object') return String(value);
   if (depth >= 2) return Array.isArray(value) ? `${value.length} giá trị` : `${Object.keys(value).length} thuộc tính`;
   if (Array.isArray(value)) return value.slice(0, 4).map((item) => summarizeState(item, depth + 1)).join(', ') || 'Trống';

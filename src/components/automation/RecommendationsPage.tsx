@@ -130,7 +130,7 @@ export function RecommendationsPage() {
 
   return (
     <div className="app-shell relative min-h-screen text-text">
-      <AppSidebar activeItem="automations" homeId={homeId} />
+      <HomeSidebar activeItem="automations" homeId={homeId} />
       <main className="min-w-0 flex-1 p-4 text-text sm:p-6 lg:pl-64">
         <div className="mx-auto max-w-5xl space-y-6">
           {/* Header */}

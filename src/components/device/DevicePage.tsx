@@ -1,35 +1,38 @@
 import React, { useCallback, useEffect, useState, useRef, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router';
-import { Plus } from 'lucide-react';
+import { Plus, ArrowUpDown } from 'lucide-react';
 import { DeviceCard } from './DeviceCard';
 import { DeviceDrawer } from './DeviceDrawer';
 import { AddDeviceModal } from './AddDeviceModal';
 import { StatusChips } from './StatusChips';
 import { DeviceFilters } from './DeviceFilters';
-import { SceneBar } from './SceneBar';
 import { DeviceGroupSection } from './DeviceGroupSection';
+import { RoomManagementModal } from './RoomManagementModal';
 import {
   getDevicesByHome,
   sendDeviceCommand,
   sendManualPowerCommand,
 } from '../../services/deviceApi';
-import { getHomeRooms } from '../../services/homeApi';
+import { getRooms } from '../../services/roomApi';
 import type { DeviceResponse } from '../../types/device';
-import { getErrorMessage } from '../../utils/errors';
-import { AppSidebar } from '../ui/AppSidebar';
+import type { RoomResponse } from '../../types/room';
+import { getErrorMessage, isDuplicateCommandError } from '../../utils/errors';
+import { HomeSidebar } from '../ui/HomeSidebar';
 import { NotificationBell } from '../notification/NotificationBell';
 import { VoiceAssistantButton } from '../ui/VoiceAssistant';
 import { currentHomeChanged, currentHomeCleared } from '../../store/homeSlice';
-import { useAppDispatch, useAppSelector } from '../../store/hooks';
+import { useAppDispatch } from '../../store/hooks';
 import { notify } from '../ui/notify';
 import { isAcDevice, isWideCard } from './deviceHelpers';
+import { realtimeEventDispatcher } from '../../realtime/realtimeEvents';
+import type { RealtimeEvent } from '../../realtime/realtimeTypes';
 
 // ──────────────────────────────────────────────────────────────────────
 // Category filter helpers
 // ──────────────────────────────────────────────────────────────────────
 
 const CATEGORY_TYPES: Record<string, string[]> = {
-  LIGHTS: ['LIGHT', 'LED_RGB', 'SMART_PLUG'],
+  LIGHTS: ['LIGHT', 'LED_RGB', 'SMART_PLUG', 'LUX_SENSOR', 'LIGHT_SENSOR'],
   CLIMATE: ['TEMP_HUMID_SENSOR', 'AIR_CONDITIONER'],
   SECURITY: ['MOTION_SENSOR', 'SMOKE_SENSOR', 'CAMERA_AI', 'GATE', 'ROLLING_DOOR'],
 };
@@ -61,41 +64,68 @@ export const DevicePage: React.FC = () => {
   const dispatch = useAppDispatch();
 
   // ── Core state ──
-  const [rooms, setRooms] = useState<{ id: string; name: string }[]>([]);
+  const [rooms, setRooms] = useState<RoomResponse[]>([]);
   const [selectedRoomId, setSelectedRoomId] = useState<string>('ALL');
   const [activeCategory, setActiveCategory] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [devices, setDevices] = useState<DeviceResponse[]>([]);
+  const devicesRef = useRef(devices);
+  devicesRef.current = devices;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [powerPendingId, setPowerPendingId] = useState<string | null>(null);
+  const [powerPendingIds, setPowerPendingIds] = useState<Record<string, boolean>>({});
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isRoomModalOpen, setIsRoomModalOpen] = useState(false);
 
   // ── Drawer state ──
   const [selectedDevice, setSelectedDevice] = useState<DeviceResponse | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const drawerCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // ── Drag-and-drop ordering ──
+  // ── Drag-and-drop ordering (Dedicated Reorder Mode) ──
   const [deviceOrder, setDeviceOrder] = useState<string[]>([]);
-  const dragItem = useRef<number | null>(null);
-  const dragOverItem = useRef<number | null>(null);
+  const [isReorderMode, setIsReorderMode] = useState<boolean>(false);
+  const draggedDeviceIdRef = useRef<string | null>(null);
+  const dragOverDeviceIdRef = useRef<string | null>(null);
 
-  // Load device order from local storage when homeId changes
+  // Clear drawer close timeout on unmount
   useEffect(() => {
+    return () => {
+      if (drawerCloseTimerRef.current) {
+        clearTimeout(drawerCloseTimerRef.current);
+      }
+    };
+  }, []);
+
+  // Reset page state and load device order from local storage when homeId changes
+  useEffect(() => {
+    // Reset home-scoped state to prevent cross-home data leaks
+    setSelectedRoomId('ALL');
+    setSelectedDevice(null);
+    setIsDrawerOpen(false);
+    setDevices([]);
+    setError('');
+    if (drawerCloseTimerRef.current) {
+      clearTimeout(drawerCloseTimerRef.current);
+      drawerCloseTimerRef.current = null;
+    }
+
     if (homeId) {
       const saved = localStorage.getItem(`deviceOrder_${homeId}`);
       if (saved) {
         try {
-          setDeviceOrder(JSON.parse(saved));
+          const parsed = JSON.parse(saved);
+          setDeviceOrder(Array.isArray(parsed) ? parsed : []);
         } catch {
           setDeviceOrder([]);
         }
+      } else {
+        setDeviceOrder([]);
       }
+    } else {
+      setDeviceOrder([]);
     }
   }, [homeId]);
-
-  // ── Realtime subscription ──
-  const realtimeEvents = useAppSelector((state) => state.realtime?.lastEvent);
 
   // ── Redux: set current home ──
   useEffect(() => {
@@ -105,57 +135,96 @@ export const DevicePage: React.FC = () => {
     };
   }, [dispatch, homeId]);
 
-  // ── Handle realtime device state changes ──
-  useEffect(() => {
-    if (!realtimeEvents) return;
-    const event = realtimeEvents;
-    if (event?.type === 'DEVICE_STATE_CHANGED' && event?.data) {
-      const data = event.data as { id?: string; deviceId?: string; currentState?: Record<string, unknown>; status?: string };
-      const targetId = data.id || data.deviceId || event.deviceId;
-      if (targetId) {
-        setDevices((prev) =>
-          prev.map((d) => {
-            if (d.id === targetId) {
-              return {
-                ...d,
-                currentState: data.currentState ?? d.currentState,
-                status: (data.status as DeviceResponse['status']) ?? d.status,
-              };
-            }
-            return d;
-          }),
-        );
-        // Also update the open drawer
-        if (selectedDevice?.id === targetId) {
-          setSelectedDevice((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  currentState: data.currentState ?? prev.currentState,
-                  status: (data.status as DeviceResponse['status']) ?? prev.status,
-                }
-              : prev,
-          );
-        }
-      }
+  // ── High-Performance Micro-batching Realtime Engine (requestAnimationFrame) ──
+  // Dồn các gói tin MQTT trong 1 khung hình (16.6ms) vào 1 lần render duy nhất, loại bỏ double-subscription
+  const pendingUpdatesRef = useRef<Map<string, { currentState?: Record<string, unknown>; status?: DeviceResponse['status'] }>>(new Map());
+  const rafIdRef = useRef<number | null>(null);
+
+  const flushDeviceUpdates = useCallback(() => {
+    rafIdRef.current = null;
+    if (pendingUpdatesRef.current.size === 0) return;
+
+    const updates = new Map(pendingUpdatesRef.current);
+    pendingUpdatesRef.current.clear();
+
+    setDevices((prev) => {
+      let hasChanges = false;
+      const next = prev.map((d) => {
+        const patch = updates.get(d.id);
+        if (!patch) return d;
+        hasChanges = true;
+        return {
+          ...d,
+          currentState: patch.currentState ? { ...d.currentState, ...patch.currentState } : d.currentState,
+          status: patch.status ?? d.status,
+        };
+      });
+      return hasChanges ? next : prev;
+    });
+
+    setSelectedDevice((prev) => {
+      if (!prev) return null;
+      const patch = updates.get(prev.id);
+      if (!patch) return prev;
+      return {
+        ...prev,
+        currentState: patch.currentState ? { ...prev.currentState, ...patch.currentState } : prev.currentState,
+        status: patch.status ?? prev.status,
+      };
+    });
+  }, []);
+
+  const handleDeviceStateChanged = useCallback((event: RealtimeEvent<any>) => {
+    if (!event || event.type !== 'DEVICE_STATE_CHANGED' || !event.data) return;
+    const data = event.data as { id?: string; deviceId?: string; currentState?: Record<string, unknown>; status?: string };
+    const targetId = data.id || data.deviceId || event.deviceId;
+    if (!targetId) return;
+
+    // Deep merge patch into pendingUpdates Map to avoid losing keys
+    const existing = pendingUpdatesRef.current.get(targetId);
+    pendingUpdatesRef.current.set(targetId, {
+      currentState: {
+        ...(existing?.currentState ?? {}),
+        ...(data.currentState ?? {}),
+      },
+      status: (data.status as DeviceResponse['status']) ?? existing?.status,
+    });
+
+    if (rafIdRef.current === null) {
+      rafIdRef.current = requestAnimationFrame(flushDeviceUpdates);
     }
-  }, [realtimeEvents, selectedDevice?.id]);
+  }, [flushDeviceUpdates]);
+
+  useEffect(() => {
+    return () => {
+      if (rafIdRef.current !== null) {
+        cancelAnimationFrame(rafIdRef.current);
+      }
+    };
+  }, []);
+
+  // Single source of truth: Realtime Event Dispatcher (Bỏ redundant Redux lastEvent)
+  useEffect(() => {
+    return realtimeEventDispatcher.register('DEVICE_STATE_CHANGED', handleDeviceStateChanged);
+  }, [handleDeviceStateChanged]);
 
   // ── Fetch rooms ──
   const fetchRooms = useCallback(async () => {
     if (!homeId) return;
     try {
-      const data = await getHomeRooms(homeId);
+      const data = await getRooms(homeId);
       setRooms(data || []);
     } catch (err: unknown) {
-      console.error('Lỗi tải phòng:', err);
+      console.error('Lỗi tải danh sách phòng:', err);
     }
   }, [homeId]);
 
   // ── Fetch devices ──
-  const fetchDevices = useCallback(async () => {
+  const fetchDevices = useCallback(async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) {
+        setLoading(true);
+      }
       setError('');
       if (homeId) {
         const data = await getDevicesByHome(homeId);
@@ -164,34 +233,40 @@ export const DevicePage: React.FC = () => {
     } catch (err: unknown) {
       setError(getErrorMessage(err, 'Lỗi tải danh sách thiết bị'));
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   }, [homeId]);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => void fetchRooms(), 0);
-    return () => window.clearTimeout(timer);
-  }, [fetchRooms]);
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => void fetchDevices(), 0);
-    return () => window.clearTimeout(timer);
-  }, [fetchDevices]);
+    void fetchRooms();
+    void fetchDevices();
+  }, [fetchRooms, fetchDevices]);
 
   // ── Toggle power (with 30-min automation override) ──
   const handleTogglePower = async (deviceId: string, currentPower: string) => {
-    setPowerPendingId(deviceId);
-    try {
-      const action = currentPower === 'ON' ? 'TURN_OFF' : 'TURN_ON';
-      // Optimistic update
-      setDevices((prev) =>
-        prev.map((d) =>
-          d.id === deviceId
-            ? { ...d, currentState: { ...d.currentState, power: action === 'TURN_ON' ? 'ON' : 'OFF' } }
-            : d,
-        ),
-      );
+    setPowerPendingIds((prev) => ({ ...prev, [deviceId]: true }));
+    const action = currentPower === 'ON' ? 'TURN_OFF' : 'TURN_ON';
+    const nextPower = action === 'TURN_ON' ? 'ON' : 'OFF';
 
+    // Optimistic update both devices list and selectedDevice
+    setDevices((prev) =>
+      prev.map((d) =>
+        d.id === deviceId
+          ? { ...d, currentState: { ...d.currentState, power: nextPower } }
+          : d,
+      ),
+    );
+    setSelectedDevice((prev) =>
+      prev && prev.id === deviceId
+        ? { ...prev, currentState: { ...prev.currentState, power: nextPower } }
+        : prev,
+    );
+
+    // Silent optimistic transition: Phản hồi vi mô tại công tắc, không bắn popup rác mắt
+
+    try {
       const result = await sendManualPowerCommand(deviceId, action);
       if (!result.command.success) {
         // Rollback
@@ -202,59 +277,130 @@ export const DevicePage: React.FC = () => {
               : d,
           ),
         );
-        notify.error('Thiết bị không nhận lệnh.');
-      } else {
-        notify.success(
-          action === 'TURN_ON' ? 'Đã bật thiết bị' : 'Đã tắt thiết bị',
-          'Tự động hóa tạm dừng 30 phút',
+        setSelectedDevice((prev) =>
+          prev && prev.id === deviceId
+            ? { ...prev, currentState: { ...prev.currentState, power: currentPower } }
+            : prev,
         );
-        // Refresh to get confirmed state
-        await fetchDevices();
+        if (result.command.errorCode === 'COMMAND_IN_PROGRESS_DUPLICATE_REJECTED' || isDuplicateCommandError(result.command)) {
+          notify.warning('Thiết bị đang thực thi lệnh trước, vui lòng không click liên tục.');
+        } else {
+          notify.error(result.command.message || 'Thiết bị không nhận lệnh.');
+        }
+      } else {
+        // Refresh silently in background so UI never reloads or flashes skeleton
+        void fetchDevices(true);
       }
     } catch (caught) {
-      notify.error(getErrorMessage(caught, 'Không thể điều khiển thiết bị.'));
-      await fetchDevices(); // Rollback via refetch
+      if (isDuplicateCommandError(caught)) {
+        notify.warning('Thiết bị đang thực thi lệnh trước, vui lòng không click liên tục.');
+      } else {
+        notify.error(getErrorMessage(caught, 'Không thể điều khiển thiết bị.'));
+      }
+      void fetchDevices(true); // Rollback silently via refetch
     } finally {
-      setPowerPendingId(null);
+      setPowerPendingIds((prev) => {
+        const next = { ...prev };
+        delete next[deviceId];
+        return next;
+      });
     }
   };
 
   // ── Color change (LED_RGB) ──
   const handleColorChange = async (deviceId: string, r: number, g: number, b: number) => {
+    const updatedStatePatch = {
+      power: 'ON',
+      r,
+      g,
+      b,
+      color: { r, g, b },
+    };
+
+    // Optimistic update immediately to both devices array and selectedDevice drawer
+    setDevices((prev) =>
+      prev.map((d) =>
+        d.id === deviceId
+          ? { ...d, currentState: { ...d.currentState, ...updatedStatePatch } }
+          : d,
+      ),
+    );
+    setSelectedDevice((prev) =>
+      prev && prev.id === deviceId
+        ? { ...prev, currentState: { ...prev.currentState, ...updatedStatePatch } }
+        : prev,
+    );
+
+    const targetDev = devicesRef.current.find((d) => d.id === deviceId) || selectedDevice;
+    const currentBrightness = typeof targetDev?.currentState?.brightness === 'number'
+      ? targetDev.currentState.brightness
+      : 100;
+
     try {
-      await sendDeviceCommand(deviceId, 'SET_COLOR', { r, g, b, brightness: 100 });
-      setDevices((prev) =>
-        prev.map((d) =>
-          d.id === deviceId
-            ? { ...d, currentState: { ...d.currentState, color: { r, g, b }, power: 'ON' } }
-            : d,
-        ),
-      );
+      const res = await sendDeviceCommand(deviceId, 'SET_RGB', { r, g, b, brightness: currentBrightness });
+      if (res && !res.success) {
+        if (res.errorCode === 'COMMAND_IN_PROGRESS_DUPLICATE_REJECTED' || isDuplicateCommandError(res)) {
+          return;
+        }
+        if (res.errorCode === 'TIMEOUT_NO_ACK' || res.status === 'SUPERSEDED') {
+          return;
+        }
+        notify.error(res.message || 'Lỗi khi đổi màu');
+      }
     } catch (err) {
+      if (isDuplicateCommandError(err)) {
+        return;
+      }
       notify.error(getErrorMessage(err, 'Lỗi khi đổi màu'));
     }
   };
 
   // ── Brightness change (LED_RGB) ──
   const handleBrightnessChange = async (deviceId: string, brightness: number) => {
+    const updatedStatePatch = { brightness };
+
+    // Optimistic update immediately to both devices array and selectedDevice drawer
+    setDevices((prev) =>
+      prev.map((d) =>
+        d.id === deviceId
+          ? { ...d, currentState: { ...d.currentState, ...updatedStatePatch } }
+          : d,
+      ),
+    );
+    setSelectedDevice((prev) =>
+      prev && prev.id === deviceId
+        ? { ...prev, currentState: { ...prev.currentState, ...updatedStatePatch } }
+        : prev,
+    );
+
     try {
-      await sendDeviceCommand(deviceId, 'SET_BRIGHTNESS', { brightness });
-      setDevices((prev) =>
-        prev.map((d) =>
-          d.id === deviceId
-            ? { ...d, currentState: { ...d.currentState, brightness } }
-            : d,
-        ),
-      );
+      const res = await sendDeviceCommand(deviceId, 'SET_BRIGHTNESS', { brightness });
+      if (res && !res.success) {
+        if (res.errorCode === 'COMMAND_IN_PROGRESS_DUPLICATE_REJECTED' || isDuplicateCommandError(res)) {
+          return;
+        }
+        if (res.errorCode === 'TIMEOUT_NO_ACK' || res.status === 'SUPERSEDED') {
+          return;
+        }
+        notify.error(res.message || 'Lỗi khi chỉnh độ sáng');
+      }
     } catch (err) {
+      if (isDuplicateCommandError(err)) {
+        return;
+      }
       notify.error(getErrorMessage(err, 'Lỗi khi chỉnh độ sáng'));
     }
   };
 
   // ── Device click → open drawer ──
   const handleDeviceClick = (deviceId: string) => {
+    if (isReorderMode) return; // Khóa mở drawer khi đang sắp xếp vị trí
     const device = devices.find((d) => d.id === deviceId);
     if (device) {
+      if (drawerCloseTimerRef.current) {
+        clearTimeout(drawerCloseTimerRef.current);
+        drawerCloseTimerRef.current = null;
+      }
       setSelectedDevice(device);
       setIsDrawerOpen(true);
     }
@@ -268,14 +414,10 @@ export const DevicePage: React.FC = () => {
   // ── Device updated ──
   const handleDeviceUpdated = (updatedDevice: DeviceResponse) => {
     setDevices((prev) => prev.map((d) => (d.id === updatedDevice.id ? updatedDevice : d)));
-    setSelectedDevice(updatedDevice);
+    setSelectedDevice((prev) => (prev && prev.id === updatedDevice.id ? updatedDevice : prev));
   };
 
-  // ── Scene activation (placeholder logic) ──
-  const handleSceneActivate = (sceneId: string) => {
-    notify.success('Đang kích hoạt', `Scene: ${sceneId}`);
-    // TODO: integrate with Scene API when available
-  };
+
 
   // ── Statistics & Counts ──
   const roomCounts = useMemo(() => {
@@ -289,11 +431,11 @@ export const DevicePage: React.FC = () => {
   }, [devices]);
 
   const activeCount = useMemo(() => {
-    return devices.filter(
-      (d) =>
-        d.status === 'ONLINE' &&
-        (d.currentState?.power === 'ON' || d.currentState?.power === true)
-    ).length;
+    return devices.filter((d) => {
+      if (d.status !== 'ONLINE') return false;
+      const p = d.currentState?.power;
+      return p === true || p === 'true' || p === 'ON' || p === 'on';
+    }).length;
   }, [devices]);
 
   const onlineCount = useMemo(() => {
@@ -301,11 +443,11 @@ export const DevicePage: React.FC = () => {
   }, [devices]);
 
   const handleTurnOffAllLights = async () => {
-    const onLights = devices.filter(
-      (d) =>
-        ['LIGHT', 'LED_RGB', 'SMART_PLUG'].includes(d.deviceType) &&
-        (d.currentState?.power === 'ON' || d.currentState?.power === true)
-    );
+    const onLights = devices.filter((d) => {
+      if (!['LIGHT', 'LED_RGB', 'SMART_PLUG'].includes(d.deviceType)) return false;
+      const p = d.currentState?.power;
+      return p === true || p === 'true' || p === 'ON' || p === 'on';
+    });
 
     if (onLights.length === 0) {
       notify.info('Không có đèn nào đang bật');
@@ -313,13 +455,13 @@ export const DevicePage: React.FC = () => {
     }
 
     notify.info(`Đang tắt ${onLights.length} đèn...`);
-    for (const light of onLights) {
-      try {
-        await sendManualPowerCommand(light.id, 'TURN_OFF');
-      } catch (e) {
-        console.error('Lỗi tắt đèn', light.name, e);
-      }
-    }
+    await Promise.allSettled(
+      onLights.map((light) =>
+        sendManualPowerCommand(light.id, 'TURN_OFF').catch((e) => {
+          console.error('Lỗi tắt đèn', light.name, e);
+        }),
+      ),
+    );
     notify.success('Đã tắt toàn bộ đèn');
     await fetchDevices();
   };
@@ -353,42 +495,48 @@ export const DevicePage: React.FC = () => {
     });
   }, [filteredDevices, deviceOrder]);
 
-  // ── Drag-and-drop handlers ──
-  const handleDragStart = (e: React.DragEvent, index: number) => {
-    dragItem.current = index;
+  // ── Drag-and-drop handlers (Dedicated Reorder Mode) ──
+  const toggleReorderMode = () => {
+    if (!isReorderMode) {
+      // Khi bật sắp xếp: Tự động đưa về Tất cả phòng và xóa tìm kiếm để thứ tự toàn cục không bị méo mó
+      setSelectedRoomId('ALL');
+      setSearchQuery('');
+      setIsReorderMode(true);
+      notify.info('Chế độ sắp xếp thiết bị', 'Nhấn giữ và kéo thẻ để đổi vị trí, bấm \'Xong\' khi hoàn tất.');
+    } else {
+      setIsReorderMode(false);
+      notify.success('Đã lưu thứ tự thiết bị');
+    }
+  };
+
+  const handleDragStart = (e: React.DragEvent, deviceId: string) => {
+    draggedDeviceIdRef.current = deviceId;
     e.currentTarget.classList.add('opacity-50');
   };
 
-  const handleDragEnter = (index: number) => {
-    dragOverItem.current = index;
+  const handleDragEnter = (deviceId: string) => {
+    dragOverDeviceIdRef.current = deviceId;
   };
 
   const handleDragEnd = (e: React.DragEvent) => {
     e.currentTarget.classList.remove('opacity-50');
-    if (
-      dragItem.current !== null &&
-      dragOverItem.current !== null &&
-      dragItem.current !== dragOverItem.current
-    ) {
-      const draggedId = sortedDevices[dragItem.current].id;
-      const targetId = sortedDevices[dragOverItem.current].id;
-
+    const draggedId = draggedDeviceIdRef.current;
+    const targetId = dragOverDeviceIdRef.current;
+    if (draggedId && targetId && draggedId !== targetId) {
       let currentGlobalOrder = [...deviceOrder];
-      // Ensure all current devices are in the global order array
       devices.forEach((d) => {
         if (!currentGlobalOrder.includes(d.id)) {
           currentGlobalOrder.push(d.id);
         }
       });
 
-      // Remove dragged item from its current position
       currentGlobalOrder = currentGlobalOrder.filter((id) => id !== draggedId);
 
-      // Find target position
       const targetGlobalIndex = currentGlobalOrder.indexOf(targetId);
       if (targetGlobalIndex !== -1) {
-        // If moving down, insert AFTER target. If moving up, insert BEFORE target.
-        const isMovingDown = dragItem.current < dragOverItem.current;
+        const fromSortedIdx = sortedDevices.findIndex((d) => d.id === draggedId);
+        const toSortedIdx = sortedDevices.findIndex((d) => d.id === targetId);
+        const isMovingDown = fromSortedIdx !== -1 && toSortedIdx !== -1 ? fromSortedIdx < toSortedIdx : true;
         const insertIndex = isMovingDown ? targetGlobalIndex + 1 : targetGlobalIndex;
         currentGlobalOrder.splice(insertIndex, 0, draggedId);
       } else {
@@ -400,8 +548,8 @@ export const DevicePage: React.FC = () => {
         localStorage.setItem(`deviceOrder_${homeId}`, JSON.stringify(currentGlobalOrder));
       }
     }
-    dragItem.current = null;
-    dragOverItem.current = null;
+    draggedDeviceIdRef.current = null;
+    dragOverDeviceIdRef.current = null;
   };
 
   // ──────────────────────────────────────────────────────────────────
@@ -410,10 +558,7 @@ export const DevicePage: React.FC = () => {
 
   return (
     <div className="app-shell">
-      <AppSidebar
-        activeItem="devices"
-        homeId={homeId}
-      />
+      <HomeSidebar activeItem="devices" homeId={homeId} />
 
       <main id="main-content" className="lg:pl-64">
         <div className="mx-auto max-w-7xl space-y-5 p-4 sm:p-6 lg:p-8">
@@ -471,6 +616,19 @@ export const DevicePage: React.FC = () => {
             )}
             <button
               type="button"
+              onClick={toggleReorderMode}
+              className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-bold shadow-xs transition-all active:scale-95 cursor-pointer ${
+                isReorderMode
+                  ? 'bg-amber-500 hover:bg-amber-600 text-white ring-2 ring-amber-400/40 shadow-amber-500/20'
+                  : 'bg-sidebar border border-line text-text hover:bg-sidebar-hover'
+              }`}
+              title={isReorderMode ? 'Lưu và hoàn tất đổi vị trí' : 'Sắp xếp lại thứ tự thiết bị trên màn hình'}
+            >
+              <ArrowUpDown className="w-4 h-4" />
+              <span>{isReorderMode ? 'Xong' : 'Sắp xếp'}</span>
+            </button>
+            <button
+              type="button"
               onClick={() => setIsAddModalOpen(true)}
               className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-primary hover:bg-primary-hover text-white text-xs sm:text-sm font-bold shadow-xs transition-all active:scale-95 cursor-pointer"
               title="Ghép nối thiết bị mới qua Token hoặc QR Code"
@@ -482,14 +640,11 @@ export const DevicePage: React.FC = () => {
             <NotificationBell />
           </div>
 
-          {/* ───── Scene Quick Bar ───── */}
-          <section aria-label="Kịch bản nhanh">
-            <SceneBar onSceneActivate={handleSceneActivate} />
-          </section>
 
-          {/* ───── Virtual Device Groups (Master Control) ───── */}
+
+          {/* ───── Smart Device Groups ───── */}
           {homeId && (
-            <section aria-label="Nhóm thiết bị ảo">
+            <section aria-label="Nhóm thiết bị thông minh">
               <DeviceGroupSection
                 homeId={homeId}
                 availableDevices={devices}
@@ -516,10 +671,11 @@ export const DevicePage: React.FC = () => {
             totalDeviceCount={devices.length}
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
+            onOpenRoomManagement={() => setIsRoomModalOpen(true)}
           />
 
           {/* ───── Device Grid ───── */}
-          {loading ? (
+          {loading && devices.length === 0 ? (
             <div
               className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 grid-flow-dense gap-4"
               aria-label="Đang tải thiết bị"
@@ -575,23 +731,62 @@ export const DevicePage: React.FC = () => {
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 grid-flow-dense gap-4 p-1">
-              {sortedDevices.map((device, index) => {
+              {isReorderMode && (
+                <div className="col-span-full mb-1 flex items-center justify-between p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-400 text-xs font-semibold animate-pulse">
+                  <span className="flex items-center gap-1.5">
+                    <ArrowUpDown className="w-4 h-4 text-amber-500" />
+                    Đang ở chế độ sắp xếp vị trí: Nhấn giữ và kéo thẻ thiết bị đến vị trí mong muốn.
+                  </span>
+                  <button
+                    type="button"
+                    onClick={toggleReorderMode}
+                    className="px-3 py-1 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
+                  >
+                    Xong
+                  </button>
+                </div>
+              )}
+              {sortedDevices.map((device) => {
                 const wide = isWideCard(device);
                 return (
                   <div
                     key={device.id}
-                    draggable
-                    onDragStart={(e) => handleDragStart(e, index)}
-                    onDragEnter={() => handleDragEnter(index)}
+                    draggable={isReorderMode}
+                    onDragStart={(e) => {
+                      if (!isReorderMode) {
+                        e.preventDefault();
+                        return;
+                      }
+                      handleDragStart(e, device.id);
+                    }}
+                    onDragEnter={() => {
+                      if (draggedDeviceIdRef.current !== null) {
+                        handleDragEnter(device.id);
+                      }
+                    }}
                     onDragEnd={handleDragEnd}
-                    onDragOver={(e: React.DragEvent) => e.preventDefault()}
-                    className={`cursor-move transition-all ${
+                    onDragOver={(e: React.DragEvent) => {
+                      if (draggedDeviceIdRef.current !== null) {
+                        e.preventDefault();
+                      }
+                    }}
+                    className={`transition-all select-none ${
                       wide ? 'col-span-1 sm:col-span-2' : 'col-span-1'
+                    } ${
+                      isReorderMode
+                        ? 'cursor-grab active:cursor-grabbing ring-2 ring-amber-400/80 rounded-3xl shadow-lg scale-[0.99] hover:scale-[1.0] z-10'
+                        : ''
                     }`}
                   >
+                    {isReorderMode && (
+                      <div className="mb-2 flex items-center justify-between px-3 py-1 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-[11px] font-semibold">
+                        <span>⋮⋮ Giữ để kéo thẻ này</span>
+                        <span className="text-[10px] text-muted">Kéo & Thả</span>
+                      </div>
+                    )}
                     <DeviceCard
                       device={device}
-                      powerPending={powerPendingId === device.id}
+                      powerPending={!!powerPendingIds[device.id]}
                       onTogglePower={handleTogglePower}
                       onClick={handleDeviceClick}
                       onStateChange={handleDeviceUpdated}
@@ -609,15 +804,22 @@ export const DevicePage: React.FC = () => {
         key={selectedDevice?.id ?? 'closed'}
         isOpen={isDrawerOpen}
         onClose={() => {
+          if (drawerCloseTimerRef.current) {
+            clearTimeout(drawerCloseTimerRef.current);
+          }
           setIsDrawerOpen(false);
-          setTimeout(() => setSelectedDevice(null), 300);
+          drawerCloseTimerRef.current = setTimeout(() => {
+            setSelectedDevice(null);
+            drawerCloseTimerRef.current = null;
+          }, 300);
         }}
-        device={selectedDevice}
+        device={selectedDevice ? (devices.find((d) => d.id === selectedDevice.id) ?? selectedDevice) : null}
         onDeviceRemoved={handleDeviceRemoved}
         onDeviceUpdated={handleDeviceUpdated}
         onTogglePower={handleTogglePower}
         onColorChange={handleColorChange}
         onBrightnessChange={handleBrightnessChange}
+        isPowerPending={!!selectedDevice && !!powerPendingIds[selectedDevice.id]}
       />
 
       {/* ───── Add Device Modal ───── */}
@@ -630,6 +832,24 @@ export const DevicePage: React.FC = () => {
           selectedRoomId={selectedRoomId}
           onSuccess={() => {
             void fetchDevices();
+          }}
+        />
+      )}
+
+      {/* ───── Room Management Modal ───── */}
+      {homeId && (
+        <RoomManagementModal
+          isOpen={isRoomModalOpen}
+          onClose={() => setIsRoomModalOpen(false)}
+          homeId={homeId}
+          onRoomsChanged={() => {
+            void fetchRooms();
+            void fetchDevices(true);
+          }}
+          onRoomDeleted={(deletedRoomId) => {
+            if (selectedRoomId === deletedRoomId) {
+              setSelectedRoomId('ALL');
+            }
           }}
         />
       )}

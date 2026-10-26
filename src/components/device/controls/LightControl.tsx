@@ -1,5 +1,5 @@
 import React from 'react';
-import { Power, Wifi, WifiOff } from 'lucide-react';
+import { Power, Wifi, WifiOff, Loader2 } from 'lucide-react';
 import type { DeviceResponse } from '../../../types/device';
 
 export interface LightControlProps {
@@ -38,7 +38,11 @@ export const LightControl: React.FC<LightControlProps> = ({ device, onTogglePowe
             : 'bg-surface text-icon border border-line shadow-sm'
         } ${(!isOnline || isPending) ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105 active:scale-95'}`}
       >
-        <Power className={`w-16 h-16 ${isPending ? 'animate-pulse' : ''}`} />
+        {isPending ? (
+          <Loader2 className="w-16 h-16 animate-spin text-primary" />
+        ) : (
+          <Power className="w-16 h-16" />
+        )}
       </button>
 
       <div className="text-center">
