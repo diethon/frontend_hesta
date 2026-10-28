@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./components/home/dashboard.css";
 
 .hesta-toast {
   opacity: 1;
@@ -414,7 +415,6 @@ textarea:disabled {
 }
 
 .auth-surface {
-  max-width: calc(100vw - 2rem);
   min-width: 0;
   border: 1px solid #dceaf2;
   border-radius: 1.5rem;

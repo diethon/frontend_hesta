@@ -124,7 +124,7 @@ export const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
           qrbox: { width: 220, height: 220 },
           aspectRatio: 1.333333,
         },
-        async (decodedText) => {
+        async (decodedText: string) => {
           if (decodedText && decodedText.trim()) {
             setQrTokenInput(decodedText.trim());
             await resolveToken(decodedText.trim());

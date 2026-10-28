@@ -13,7 +13,7 @@ export function UserAvatar({
   src,
   name,
   size,
-  className = 'h-full w-full object-cover',
+  className = '',
   fallbackClassName = '',
   loading = 'eager',
 }: UserAvatarProps) {
@@ -21,19 +21,33 @@ export function UserAvatar({
   const showImage = Boolean(src && failedSource !== src);
   const initial = name.trim().charAt(0).toUpperCase() || '?';
 
-  if (!showImage) {
-    return <span className={fallbackClassName}>{initial}</span>;
-  }
-
   return (
-    <img
-      src={src!}
-      alt={`Ảnh đại diện của ${name}`}
-      width={size}
-      height={size}
-      loading={loading}
-      className={className}
-      onError={() => setFailedSource(src!)}
-    />
+    <div
+      style={{
+        width: `${size}px`,
+        height: `${size}px`,
+        minWidth: `${size}px`,
+        minHeight: `${size}px`,
+      }}
+      className={`relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full ${className}`}
+    >
+      {showImage ? (
+        <img
+          src={src!}
+          alt={`Ảnh đại diện của ${name}`}
+          width={size}
+          height={size}
+          loading={loading}
+          className="h-full w-full object-cover rounded-full"
+          onError={() => setFailedSource(src!)}
+        />
+      ) : (
+        <span
+          className={`flex h-full w-full items-center justify-center select-none font-bold ${fallbackClassName}`}
+        >
+          {initial}
+        </span>
+      )}
+    </div>
   );
 }
