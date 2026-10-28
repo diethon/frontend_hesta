@@ -29,11 +29,11 @@ export const AUTOMATION_TEMPLATES: AutomationTemplate[] = [
   },
   {
     id: 'door-ac',
-    name: 'Tắt điều hòa khi mở cửa',
-    description: 'Cửa mở, tự động tắt điều hòa tiết kiệm điện',
+    name: 'Tắt điều hòa khi có sự kiện mở cửa',
+    description: 'Nhận sự kiện mở cửa, tự động tắt điều hòa tiết kiệm điện',
     triggerType: 'EVENT',
     icon: 'door',
-    sampleCondition: { attribute: 'eventType', operator: 'EQ', expected: 'DOOR_OPENED' },
+    sampleCondition: { attribute: 'eventType', operator: 'EQ', expected: 'EVENT' },
     sampleAction: { action: 'TURN_OFF' },
   },
   {
@@ -43,14 +43,6 @@ export const AUTOMATION_TEMPLATES: AutomationTemplate[] = [
     triggerType: 'SCHEDULE',
     icon: 'clock',
     sampleAction: { action: 'TURN_ON' },
-  },
-  {
-    id: 'gas-alert',
-    name: 'Cảnh báo rò rỉ khí gas',
-    description: 'Khi phát hiện nồng độ gas tăng cao, gửi cảnh báo',
-    triggerType: 'EVENT',
-    icon: 'zap',
-    sampleCondition: { attribute: 'eventType', operator: 'EQ', expected: 'GAS_LEAK_DETECTED' },
   },
 ];
 

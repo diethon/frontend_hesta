@@ -88,7 +88,7 @@ export const SummarySentence: React.FC<SummarySentenceProps> = ({
   className = '',
 }) => {
   // ── 1. Format Trigger Phrase ──
-  let triggerPhrase: React.ReactNode = null;
+  let triggerPhrase: React.ReactNode;
 
   if (triggerType === 'SCHEDULE') {
     const isEveryday = !scheduleDays || scheduleDays.toLowerCase() === 'hằng ngày';
@@ -144,7 +144,7 @@ export const SummarySentence: React.FC<SummarySentenceProps> = ({
   }
 
   // ── 2. Format Actions Phrase ──
-  let actionsPhrase: React.ReactNode = null;
+  let actionsPhrase: React.ReactNode;
   if (!actions.length) {
     actionsPhrase = <span className="text-[var(--tertiary)] italic">…thêm hành động…</span>;
   } else {

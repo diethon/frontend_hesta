@@ -10,51 +10,15 @@ export interface SystemEventOption {
 
 export const SYSTEM_EVENTS: SystemEventOption[] = [
   {
+    code: 'EVENT',
+    name: 'Sự kiện thiết bị (IoT Event)',
+    description: 'Phát sinh khi thiết bị trong nhà (công tắc, rèm, khóa, cổng) thay đổi trạng thái và gửi bản tin sự kiện',
+    icon: 'zap',
+  },
+  {
     code: 'DEVICE_STATE_CHANGED',
-    name: 'Thay đổi trạng thái thiết bị',
-    description: 'Khi một thiết bị trong nhà thay đổi trạng thái hoạt động',
-    icon: 'activity',
-  },
-  {
-    code: 'SECURITY_ALERT',
-    name: 'Cảnh báo an ninh',
-    description: 'Khi hệ thống an ninh kích hoạt báo động khẩn cấp',
-    icon: 'shield',
-  },
-  {
-    code: 'SECURITY_EVENT',
-    name: 'Sự kiện an ninh',
-    description: 'Khi ghi nhận sự kiện liên quan đến an ninh trong nhà',
-    icon: 'shield',
-  },
-  {
-    code: 'GAS_LEAK_DETECTED',
-    name: 'Phát hiện rò rỉ khí gas',
-    description: 'Khi cảm biến khí gas phát hiện nồng độ nguy hiểm',
-    icon: 'flame',
-  },
-  {
-    code: 'DOOR_OPENED',
-    name: 'Cửa mở',
-    description: 'Khi cửa chính hoặc cửa các phòng được mở',
-    icon: 'door',
-  },
-  {
-    code: 'GATE_OPENED',
-    name: 'Cổng mở',
-    description: 'Khi cổng ra vào chính được mở',
-    icon: 'gate',
-  },
-  {
-    code: 'MANUAL_OVERRIDE',
-    name: 'Ghi đè thủ công thiết bị',
-    description: 'Khi người dùng bật/tắt thiết bị thủ công tại chỗ',
-    icon: 'power',
-  },
-  {
-    code: 'MOTION_DETECTED',
-    name: 'Phát hiện chuyển động',
-    description: 'Khi cảm biến chuyển động phát hiện có người',
+    name: 'Thay đổi trạng thái thiết bị (Realtime)',
+    description: 'Sự kiện phát sinh trên luồng realtime khi thiết bị thay đổi trạng thái hoạt động',
     icon: 'activity',
   },
 ];
@@ -156,13 +120,30 @@ export const EventPickerSheet: React.FC<EventPickerSheetProps> = ({
             );
           })}
 
-          {filtered.length === 0 && (
+          {filtered.length === 0 && query.trim() ? (
+            <div className="p-4 rounded-2xl bg-[var(--solid)] border border-[var(--border)] text-center space-y-2">
+              <p className="text-xs text-[var(--secondary)]">
+                Dùng mã sự kiện tùy chỉnh: <strong className="text-[var(--text)]">{query.trim()}</strong>
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  onSelect(query.trim());
+                  onClose();
+                }}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-[var(--accent)] text-white hover:opacity-90 cursor-pointer"
+              >
+                Sử dụng mã sự kiện này
+              </button>
+            </div>
+          ) : filtered.length === 0 ? (
             <div className="p-8 text-center text-xs text-[var(--tertiary)]">
               Không tìm thấy sự kiện nào phù hợp.
             </div>
-          )}
+          ) : null}
         </div>
       </div>
     </div>
   );
 };
+
