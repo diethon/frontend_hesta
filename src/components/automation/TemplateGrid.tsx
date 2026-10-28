@@ -31,9 +31,9 @@ export const AUTOMATION_TEMPLATES: AutomationTemplate[] = [
     id: 'door-ac',
     name: 'Tắt điều hòa khi mở cửa',
     description: 'Cửa mở, tự động tắt điều hòa tiết kiệm điện',
-    triggerType: 'SENSOR',
+    triggerType: 'EVENT',
     icon: 'door',
-    sampleCondition: { attribute: 'state', operator: 'EQ', expected: 'OPEN' },
+    sampleCondition: { attribute: 'eventType', operator: 'EQ', expected: 'DOOR_OPENED' },
     sampleAction: { action: 'TURN_OFF' },
   },
   {
@@ -56,7 +56,7 @@ export const AUTOMATION_TEMPLATES: AutomationTemplate[] = [
 
 export interface TemplateGridProps {
   onSelectTemplate: (template: AutomationTemplate) => void;
-  onSelectBlank: () => void;
+  onSelectBlank?: () => void;
   className?: string;
 }
 
@@ -74,23 +74,34 @@ export const TemplateGrid: React.FC<TemplateGridProps> = ({
         </p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-2.5">
         {AUTOMATION_TEMPLATES.map((tmpl) => (
           <button
             key={tmpl.id}
             type="button"
             onClick={() => onSelectTemplate(tmpl)}
-            className="p-3.5 rounded-2xl border border-[var(--border)] glass-g1 hover:border-[var(--accent)] hover:shadow-xs text-left transition-all group flex flex-col justify-between gap-2.5 cursor-pointer"
+            className="p-3.5 rounded-2xl border border-[var(--border)] bg-[var(--solid)] hover:bg-[var(--g1)] hover:border-[var(--accent)] text-left transition-all space-y-2 cursor-pointer group"
           >
-            <div className="flex items-center gap-2.5">
-              <span className="w-9 h-9 rounded-xl bg-[var(--muted)] text-[var(--accent)] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+            <div className="flex items-center justify-between">
+              <span className="w-9 h-9 rounded-xl bg-[var(--accent-soft)] text-[var(--accent)] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
                 <Icon name={tmpl.icon} size={18} />
               </span>
-              <strong className="text-xs font-semibold text-[var(--text)] line-clamp-1">
+              <span className="text-[10px] font-bold text-[var(--tertiary)] uppercase tracking-wider">
+                {tmpl.triggerType === 'SENSOR'
+                  ? 'Cảm biến'
+                  : tmpl.triggerType === 'EVENT'
+                  ? 'Sự kiện'
+                  : 'Lịch giờ'}
+              </span>
+            </div>
+
+            <div>
+              <strong className="text-xs font-bold text-[var(--text)] block truncate">
                 {tmpl.name}
               </strong>
             </div>
-            <p className="text-[11px] text-[var(--tertiary)] line-clamp-2 leading-relaxed">
+
+            <p className="text-[11px] text-[var(--secondary)] line-clamp-2 leading-relaxed">
               {tmpl.description}
             </p>
           </button>
@@ -99,7 +110,18 @@ export const TemplateGrid: React.FC<TemplateGridProps> = ({
 
       <button
         type="button"
-        onClick={onSelectBlank}
+        onClick={
+          onSelectBlank
+            ? onSelectBlank
+            : () =>
+                onSelectTemplate({
+                  id: 'blank',
+                  name: 'Quy tắc trống',
+                  description: 'Tự thiết lập điều kiện và hành động tùy ý',
+                  triggerType: 'SENSOR',
+                  icon: 'power',
+                })
+        }
         className="w-full p-3.5 rounded-2xl border border-dashed border-[var(--border)] hover:border-[var(--accent)] bg-[var(--solid)] hover:bg-[var(--g1)] text-left transition-all flex items-center justify-between gap-3 cursor-pointer group"
       >
         <div className="flex items-center gap-3">
@@ -122,4 +144,3 @@ export const TemplateGrid: React.FC<TemplateGridProps> = ({
     </div>
   );
 };
-

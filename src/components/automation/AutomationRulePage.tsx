@@ -24,7 +24,7 @@ import { Icon, IconButton } from '../home/HomeIcons';
 import { AutomationTopBar } from './AutomationTopBar';
 import { AutomationEmpty } from './AutomationEmpty';
 import { RuleCard } from './RuleCard';
-import { RuleEditorPlaceholderPanel } from './RuleEditorPlaceholderPanel';
+import { RuleEditorPanel } from './RuleEditorPanel';
 import { ConfirmModal } from '../ui/ConfirmModal';
 import { notify } from '../ui/notify';
 import { SchedulePanel } from '../ui/SchedulePanel';
@@ -395,16 +395,15 @@ export function AutomationRulePage() {
       {/* Mobile Bottom Navigation */}
       <DashboardBottomNav activeItem="more" homeId={homeId} />
 
-      {/* ── Rule Editor Panel (Placeholder Shell for Phase 2, Full Editor in Phase 3) ── */}
-      <RuleEditorPlaceholderPanel
+      {/* ── Rule Editor Panel (Phase 3 Full Editor) ── */}
+      <RuleEditorPanel
         rule={editorRule}
         isOpen={editorRule !== undefined}
         onClose={() => setEditorRule(undefined)}
+        onSaved={loadData}
         devices={devices}
         scenes={scenes}
-        onSelectTemplate={(tmpl) => {
-          notify.success(`Đã chọn mẫu: ${tmpl.name}`);
-        }}
+        homeId={homeId}
       />
 
       {/* ── Delete Confirmation Dialog ── */}

@@ -49,7 +49,14 @@ export type IconName =
   | "copy"
   | "clock"
   | "zap"
-  | "test";
+  | "test"
+  | "x"
+  | "chevronUp"
+  | "arrowUp"
+  | "arrowDown"
+  | "alert"
+  | "flame"
+  | "gate";
 
 export const iconPaths: Record<IconName, React.ReactNode> = {
   car: (
@@ -309,6 +316,21 @@ export const iconPaths: Record<IconName, React.ReactNode> = {
   cloud: (
     <path d="M17.5 19H7a5 5 0 1 1 1.5-9.8A6 6 0 0 1 20 12a3.5 3.5 0 0 1-2.5 7Z" />
   ),
+  x: <path d="M18 6 6 18M6 6l12 12" />,
+  chevronUp: <path d="m18 15-6-6-6 6" />,
+  arrowUp: <path d="m5 12 7-7 7 7M12 19V5" />,
+  arrowDown: <path d="m19 12-7 7-7-7M12 5v14" />,
+  alert: (
+    <>
+      <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+      <line x1="12" y1="9" x2="12" y2="13" />
+      <line x1="12" y1="17" x2="12.01" y2="17" />
+    </>
+  ),
+  flame: (
+    <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
+  ),
+  gate: <path d="M3 3h4v18H3zM17 3h4v18h-4zM7 7h10M7 12h10M7 17h10" />,
 };
 
 export function Icon({

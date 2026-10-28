@@ -6,9 +6,11 @@ export interface PickerFieldProps {
   placeholder?: string;
   value?: string;
   subtitle?: string;
+  caption?: string; // alias for subtitle
   icon?: IconName;
   statusDot?: 'online' | 'offline' | 'none';
   error?: string;
+  hasError?: boolean;
   disabled?: boolean;
   onClick?: () => void;
   className?: string;
@@ -19,77 +21,74 @@ export const PickerField: React.FC<PickerFieldProps> = ({
   placeholder = 'Chọn một mục...',
   value,
   subtitle,
+  caption,
   icon,
   statusDot = 'none',
   error,
+  hasError = false,
   disabled = false,
   onClick,
   className = '',
 }) => {
+  const displaySubtitle = subtitle || caption;
+  const isError = Boolean(error || hasError);
+
   return (
     <div className={`space-y-1 ${className}`}>
-      {label && (
-        <label className="block text-[11px] font-bold text-[var(--secondary)] uppercase tracking-wider">
-          {label}
-        </label>
-      )}
-
       <button
         type="button"
         disabled={disabled}
         onClick={onClick}
-        className={`w-full min-h-[46px] px-3.5 py-2.5 rounded-2xl border text-left transition-all flex items-center justify-between gap-3 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 ${
-          error
-            ? 'border-rose-400 bg-rose-50/20'
-            : 'border-[var(--border)] bg-[var(--solid)] hover:border-[var(--accent)]'
-        } ${disabled ? 'opacity-50 cursor-not-allowed bg-slate-50' : ''}`}
+        className={`w-full min-h-[44px] px-3.5 py-2.5 rounded-2xl border transition-all flex items-center justify-between text-left cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
+          isError
+            ? 'border-rose-300 bg-rose-50/50'
+            : 'border-[var(--border)] bg-[var(--solid)] hover:bg-[var(--muted)]/60'
+        }`}
       >
-        <div className="flex items-center gap-3 min-w-0 flex-1">
+        <div className="flex items-center gap-3 min-w-0 pr-2">
           {icon && (
-            <div className="w-8 h-8 rounded-xl bg-[var(--muted)] flex items-center justify-center shrink-0 text-[var(--secondary)]">
+            <div
+              className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+                isError
+                  ? 'bg-rose-100 text-rose-600'
+                  : 'bg-[var(--accent-soft)] text-[var(--accent)]'
+              }`}
+            >
               <Icon name={icon} size={16} />
             </div>
           )}
 
           <div className="min-w-0 flex-1">
-            {value ? (
-              <span className="text-xs font-semibold text-[var(--text)] block truncate">
-                {value}
-              </span>
-            ) : (
-              <span className="text-xs text-[var(--tertiary)] italic block truncate">
-                {placeholder}
-              </span>
-            )}
+            <span
+              className={`text-xs block truncate ${
+                label ? 'font-bold text-[var(--text)]' : 'text-[var(--tertiary)] italic'
+              }`}
+            >
+              {label || value || placeholder}
+            </span>
 
-            {(subtitle || statusDot !== 'none') && (
-              <div className="flex items-center gap-1.5 mt-0.5">
-                {statusDot !== 'none' && (
-                  <span
-                    className={`w-1.5 h-1.5 rounded-full ${
-                      statusDot === 'online' ? 'bg-emerald-500' : 'bg-slate-400'
-                    }`}
-                  />
-                )}
-                {subtitle && (
-                  <span className="text-[10px] text-[var(--tertiary)] truncate">
-                    {subtitle}
-                  </span>
-                )}
-              </div>
+            {displaySubtitle && (
+              <span className="text-[11px] text-[var(--secondary)] block truncate mt-0.5">
+                {displaySubtitle}
+              </span>
             )}
           </div>
         </div>
 
-        <div className="text-[var(--tertiary)] shrink-0">
-          <Icon name="chevronDown" size={16} />
+        <div className="flex items-center gap-2 shrink-0">
+          {statusDot !== 'none' && (
+            <span
+              className={`w-2 h-2 rounded-full ${
+                statusDot === 'online' ? 'bg-emerald-500' : 'bg-slate-400'
+              }`}
+              title={statusDot === 'online' ? 'Trực tuyến' : 'Ngoại tuyến'}
+            />
+          )}
+          <Icon name="chevron" size={15} className="text-[var(--tertiary)]" />
         </div>
       </button>
 
-      {error && (
-        <span className="block text-[11px] text-rose-500 font-medium">{error}</span>
-      )}
+      {error && <p className="text-[10px] text-rose-500 font-semibold">{error}</p>}
     </div>
   );
 };
-

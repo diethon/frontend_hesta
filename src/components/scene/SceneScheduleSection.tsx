@@ -6,8 +6,11 @@ import { notify } from '../ui/notify';
 
 interface SceneScheduleSectionProps {
   homeId: string;
-  sceneId?: string; // Scene ID if editing existing scene, otherwise draft schedules in-memory
+  sceneId?: string; // Scene or rule ID if editing existing entity
+  targetId?: string; // Explicit target ID
+  targetKind?: 'scenes' | 'automation-rules'; // Default: 'scenes'
   onScheduleCountChange?: (count: number) => void;
+  onSchedulesChange?: (schedules: Schedule[]) => void;
 }
 
 const DAY_LABELS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
@@ -27,8 +30,12 @@ export function formatRepeatDays(days: number[]): string {
 export const SceneScheduleSection: React.FC<SceneScheduleSectionProps> = ({
   homeId,
   sceneId,
+  targetId,
+  targetKind = 'scenes',
   onScheduleCountChange,
+  onSchedulesChange,
 }) => {
+  const effectiveTargetId = targetId || sceneId;
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [loading, setLoading] = useState(false);
   const [adding, setAdding] = useState(false);
@@ -40,22 +47,23 @@ export const SceneScheduleSection: React.FC<SceneScheduleSectionProps> = ({
   const [selectedDays, setSelectedDays] = useState<number[]>([]);
   const [saving, setSaving] = useState(false);
 
-  // Fetch schedules if sceneId exists
+  // Fetch schedules if effectiveTargetId exists
   const fetchSchedules = useCallback(async () => {
-    if (!homeId || !sceneId) return;
+    if (!homeId || !effectiveTargetId) return;
     setLoading(true);
     try {
-      const data = await getSchedules(homeId, 'scenes', sceneId);
+      const data = await getSchedules(homeId, targetKind, effectiveTargetId);
       const list = data || [];
       setSchedules(list);
       onScheduleCountChange?.(list.length);
+      onSchedulesChange?.(list);
     } catch {
       // Fallback empty
       setSchedules([]);
     } finally {
       setLoading(false);
     }
-  }, [homeId, sceneId, onScheduleCountChange]);
+  }, [homeId, targetKind, effectiveTargetId, onScheduleCountChange, onSchedulesChange]);
 
   useEffect(() => {
     void fetchSchedules();
@@ -127,8 +135,8 @@ export const SceneScheduleSection: React.FC<SceneScheduleSectionProps> = ({
       active: true,
     };
 
-    if (!sceneId) {
-      // In-memory mode for draft scene before creation
+    if (!effectiveTargetId) {
+      // In-memory mode for draft before creation
       const draftSch: Schedule = {
         id: editingId || `temp_${Date.now()}`,
         scheduledTime: timeString,
@@ -140,6 +148,7 @@ export const SceneScheduleSection: React.FC<SceneScheduleSectionProps> = ({
           ? prev.map((s) => (s.id === editingId ? draftSch : s))
           : [...prev, draftSch];
         onScheduleCountChange?.(next.length);
+        onSchedulesChange?.(next);
         return next;
       });
       handleCloseForm();
@@ -149,7 +158,7 @@ export const SceneScheduleSection: React.FC<SceneScheduleSectionProps> = ({
 
     setSaving(true);
     try {
-      await saveSchedule(homeId, 'scenes', sceneId, payload, editingId || undefined);
+      await saveSchedule(homeId, targetKind, effectiveTargetId, payload, editingId || undefined);
       await fetchSchedules();
       handleCloseForm();
       notify.success('Đã lưu lịch tự động');
@@ -165,16 +174,18 @@ export const SceneScheduleSection: React.FC<SceneScheduleSectionProps> = ({
   const handleToggleSchedule = async (sch: Schedule) => {
     const nextState = !sch.active;
     // Optimistic
-    setSchedules((prev) =>
-      prev.map((s) => (s.id === sch.id ? { ...s, active: nextState } : s))
-    );
+    setSchedules((prev) => {
+      const next = prev.map((s) => (s.id === sch.id ? { ...s, active: nextState } : s));
+      onSchedulesChange?.(next);
+      return next;
+    });
 
-    if (sceneId && !sch.id.startsWith('temp_')) {
+    if (effectiveTargetId && !sch.id.startsWith('temp_')) {
       try {
         await saveSchedule(
           homeId,
-          'scenes',
-          sceneId,
+          targetKind,
+          effectiveTargetId,
           {
             scheduledTime: sch.scheduledTime,
             repeatDays: sch.repeatDays,
@@ -184,9 +195,11 @@ export const SceneScheduleSection: React.FC<SceneScheduleSectionProps> = ({
         );
       } catch {
         // Revert
-        setSchedules((prev) =>
-          prev.map((s) => (s.id === sch.id ? { ...s, active: sch.active } : s))
-        );
+        setSchedules((prev) => {
+          const reverted = prev.map((s) => (s.id === sch.id ? { ...s, active: sch.active } : s));
+          onSchedulesChange?.(reverted);
+          return reverted;
+        });
         notify.error('Không thể cập nhật trạng thái lịch');
       }
     }
@@ -199,232 +212,207 @@ export const SceneScheduleSection: React.FC<SceneScheduleSectionProps> = ({
     setSchedules((prev) => {
       const next = prev.filter((s) => s.id !== sch.id);
       onScheduleCountChange?.(next.length);
+      onSchedulesChange?.(next);
       return next;
     });
 
-    if (sceneId && !sch.id.startsWith('temp_')) {
+    if (effectiveTargetId && !sch.id.startsWith('temp_')) {
       try {
-        await deleteSchedule(homeId, 'scenes', sceneId, sch.id);
+        await deleteSchedule(homeId, targetKind, effectiveTargetId, sch.id);
         notify.success('Đã xóa lịch chạy');
       } catch {
-        await fetchSchedules();
-        notify.error('Lỗi khi xóa lịch chạy');
+        void fetchSchedules();
+        notify.error('Không thể xóa lịch chạy');
       }
     }
   };
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <strong className="text-sm font-bold text-[var(--text)] block">Lịch chạy</strong>
-          <small className="text-[11px] text-[var(--tertiary)]">
-            Tự động chạy kịch bản vào giờ cố định
-          </small>
-        </div>
-        {!adding && (
-          <button
-            type="button"
-            className="scene-ghost text-xs h-9 px-3.5"
-            onClick={handleOpenAdd}
-          >
-            + Thêm lịch
-          </button>
-        )}
-      </div>
-
-      {/* Inline Add / Edit Card */}
-      {adding && (
-        <form onSubmit={handleSaveSchedule} className="schedule-card-inline animate-in fade-in">
-          <div className="flex items-center justify-between">
-            <strong className="text-xs font-bold text-[var(--text)]">
-              {editingId ? 'Chỉnh sửa lịch chạy' : 'Thêm lịch chạy mới'}
-            </strong>
-            <button
-              type="button"
-              className="text-xs text-[var(--tertiary)] hover:text-[var(--text)]"
-              onClick={handleCloseForm}
-            >
-              Đóng
-            </button>
-          </div>
-
-          {/* Time Wheel / Steppers (24h) */}
-          <div className="flex flex-col items-center gap-1.5 py-2">
-            <div className="flex items-center gap-2">
-              <input
-                type="number"
-                min="0"
-                max="23"
-                value={hour}
-                onChange={(e) => {
-                  const val = Math.max(0, Math.min(23, Number(e.target.value) || 0));
-                  setHour(String(val).padStart(2, '0'));
-                }}
-                className="w-16 h-14 rounded-2xl bg-[var(--solid)] border border-[var(--border)] text-center text-2xl font-bold text-[var(--text)] outline-none focus:border-[var(--accent)]"
-              />
-              <span className="text-2xl font-bold text-[var(--secondary)]">:</span>
-              <input
-                type="number"
-                min="0"
-                max="59"
-                value={minute}
-                onChange={(e) => {
-                  const val = Math.max(0, Math.min(59, Number(e.target.value) || 0));
-                  setMinute(String(val).padStart(2, '0'));
-                }}
-                className="w-16 h-14 rounded-2xl bg-[var(--solid)] border border-[var(--border)] text-center text-2xl font-bold text-[var(--text)] outline-none focus:border-[var(--accent)]"
-              />
-            </div>
-            <span className="text-[10px] text-[var(--tertiary)]">Định dạng 24 giờ (Giờ : Phút)</span>
-          </div>
-
-          {/* Presets */}
-          <div className="flex items-center gap-2 justify-center">
-            <button
-              type="button"
-              className={`command-chip ${selectedDays.length === 0 ? 'active' : ''}`}
-              onClick={() => applyPreset('all')}
-            >
-              Hằng ngày
-            </button>
-            <button
-              type="button"
-              className={`command-chip ${
-                selectedDays.length === 5 && [1, 2, 3, 4, 5].every((d) => selectedDays.includes(d))
-                  ? 'active'
-                  : ''
-              }`}
-              onClick={() => applyPreset('weekdays')}
-            >
-              Ngày thường
-            </button>
-            <button
-              type="button"
-              className={`command-chip ${
-                selectedDays.length === 2 && [6, 7].every((d) => selectedDays.includes(d))
-                  ? 'active'
-                  : ''
-              }`}
-              onClick={() => applyPreset('weekend')}
-            >
-              Cuối tuần
-            </button>
-          </div>
-
-          {/* 7 Round Day Toggles */}
-          <div>
-            <div className="day-chips-grid">
-              {DAY_LABELS.map((label, idx) => {
-                const dayNum = idx + 1;
-                const isSelected = selectedDays.includes(dayNum);
-                return (
-                  <button
-                    key={label}
-                    type="button"
-                    className={`day-chip-toggle ${isSelected ? 'active' : ''}`}
-                    onClick={() => handleToggleDay(dayNum)}
-                    title={DAY_NAMES[idx]}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
-            <p className="text-[10px] text-[var(--tertiary)] text-center mt-2">
-              Không chọn ngày = chạy hằng ngày
-            </p>
-          </div>
-
-          {/* Overlap Warning */}
-          {overlappingSchedule && (
-            <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-600 text-xs text-center font-medium">
-              Trùng với lịch {overlappingSchedule.scheduledTime.slice(0, 5)} đã có
-            </div>
-          )}
-
-          {/* Card Buttons */}
-          <div className="flex justify-end gap-2 pt-2 border-t border-[var(--border)]">
-            <button
-              type="button"
-              className="scene-ghost h-9 px-4 text-xs"
-              onClick={handleCloseForm}
-            >
-              Hủy
-            </button>
-            <button
-              type="submit"
-              className="add-device h-9 px-4 text-xs"
-              disabled={saving}
-            >
-              {saving ? 'Đang lưu…' : 'Lưu lịch'}
-            </button>
-          </div>
-        </form>
-      )}
-
-      {/* Existing Schedules List */}
+    <div className="space-y-3">
+      {/* List of Schedules */}
       {loading ? (
-        <div className="p-6 text-center text-xs text-[var(--tertiary)]">
-          Đang tải lịch chạy...
-        </div>
-      ) : schedules.length === 0 && !adding ? (
-        <div className="p-6 rounded-2xl border border-dashed border-[var(--border)] text-center text-xs text-[var(--tertiary)]">
-          Chưa có lịch · Kịch bản chỉ chạy khi bạn bấm Chạy.
-        </div>
-      ) : (
+        <div className="p-4 text-center text-xs text-[var(--secondary)]">Đang tải lịch chạy...</div>
+      ) : schedules.length > 0 ? (
         <div className="space-y-2">
           {schedules.map((sch) => {
-            const timeStr = (sch.scheduledTime || '07:00').slice(0, 5);
-            const repeatStr = formatRepeatDays(sch.repeatDays);
-
+            const timeStr = (sch.scheduledTime || '').slice(0, 5);
             return (
-              <div key={sch.id} className="schedule-item-row glass-g1">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="action-step-bubble-36">
+              <div
+                key={sch.id}
+                className="action-step-card glass-g1 p-3.5 rounded-2xl border border-[var(--border)] flex items-center justify-between"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="action-step-bubble-36 w-9 h-9 rounded-xl bg-[var(--solid)] text-[var(--accent)] border border-[var(--border)] flex items-center justify-center shrink-0">
                     <Icon name="clock" size={18} />
                   </div>
-                  <div className="min-w-0">
-                    <span className="time-title block">{timeStr}</span>
-                    <span className="text-[11px] text-[var(--secondary)] block truncate">
-                      {repeatStr}
+                  <div>
+                    <strong className="text-sm font-bold text-[var(--text)] block">{timeStr}</strong>
+                    <span className="text-[11px] text-[var(--secondary)] block">
+                      {formatRepeatDays(sch.repeatDays || [])}
                     </span>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3 shrink-0">
+                <div className="flex items-center gap-2">
+                  {/* Inline Toggle */}
                   <button
                     type="button"
-                    className={`toggle ${sch.active ? 'active' : ''}`}
                     onClick={() => handleToggleSchedule(sch)}
-                    title={sch.active ? 'Tắt lịch' : 'Bật lịch'}
+                    className={`device-toggle-pill scale-80 cursor-pointer ${sch.active ? 'active' : ''}`}
+                    aria-label={sch.active ? 'Tắt lịch' : 'Bật lịch'}
                   >
                     <span />
                   </button>
 
                   <button
                     type="button"
-                    className="p-1 rounded-lg text-[var(--tertiary)] hover:text-[var(--text)] transition-colors"
                     onClick={() => handleOpenEdit(sch)}
-                    title="Chỉnh sửa lịch"
+                    className="w-7 h-7 rounded-lg hover:bg-[var(--border)] flex items-center justify-center text-[var(--secondary)] cursor-pointer"
+                    aria-label="Sửa lịch"
                   >
-                    <Icon name="pencil" size={15} />
+                    <Icon name="pencil" size={13} />
                   </button>
 
                   <button
                     type="button"
-                    className="p-1 rounded-lg text-[var(--tertiary)] hover:text-rose-500 transition-colors"
                     onClick={() => handleDeleteSchedule(sch)}
-                    title="Xóa lịch"
+                    className="w-7 h-7 rounded-lg hover:bg-[var(--border)] flex items-center justify-center text-rose-500 cursor-pointer"
+                    aria-label="Xóa lịch"
                   >
-                    <Icon name="trash" size={15} />
+                    <Icon name="trash" size={13} />
                   </button>
                 </div>
               </div>
             );
           })}
         </div>
+      ) : !adding ? (
+        <div className="p-4 rounded-2xl border border-dashed border-[var(--border)] text-center text-xs text-[var(--tertiary)]">
+          Chưa thiết lập lịch chạy tự động.
+        </div>
+      ) : null}
+
+      {/* Inline Add / Edit Form Card */}
+      {adding ? (
+        <form onSubmit={handleSaveSchedule} className="action-step-card glass-g1 p-4 rounded-2xl border border-[var(--border)] space-y-3">
+          <div className="flex items-center justify-between">
+            <strong className="text-xs text-[var(--text)]">
+              {editingId ? 'Chỉnh sửa lịch chạy' : 'Thêm giờ chạy'}
+            </strong>
+            <button
+              type="button"
+              onClick={handleCloseForm}
+              className="text-[11px] text-[var(--tertiary)] hover:text-[var(--text)] cursor-pointer"
+            >
+              Hủy
+            </button>
+          </div>
+
+          {/* Time Picker 24h */}
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-[var(--secondary)] uppercase tracking-wider block">
+              Giờ kích hoạt (24h)
+            </label>
+            <div className="flex items-center gap-2 justify-center py-2 bg-[var(--solid)] rounded-xl border border-[var(--border)]">
+              <input
+                type="number"
+                min="0"
+                max="23"
+                value={hour}
+                onChange={(e) => setHour(e.target.value.slice(-2))}
+                className="w-12 text-center text-lg font-bold bg-transparent text-[var(--text)] focus:outline-none"
+              />
+              <span className="text-lg font-bold text-[var(--tertiary)]">:</span>
+              <input
+                type="number"
+                min="0"
+                max="59"
+                value={minute}
+                onChange={(e) => setMinute(e.target.value.slice(-2))}
+                className="w-12 text-center text-lg font-bold bg-transparent text-[var(--text)] focus:outline-none"
+              />
+            </div>
+          </div>
+
+          {/* Day Pills */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <label className="text-[10px] font-bold text-[var(--secondary)] uppercase tracking-wider block">
+                Lặp lại vào
+              </label>
+              <div className="flex items-center gap-1.5 text-[10px] text-[var(--accent)] font-medium">
+                <button type="button" onClick={() => applyPreset('all')} className="hover:underline cursor-pointer">
+                  Mỗi ngày
+                </button>
+                <span>·</span>
+                <button type="button" onClick={() => applyPreset('weekdays')} className="hover:underline cursor-pointer">
+                  T2–T6
+                </button>
+                <span>·</span>
+                <button type="button" onClick={() => applyPreset('weekend')} className="hover:underline cursor-pointer">
+                  T7, CN
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-7 gap-1">
+              {DAY_LABELS.map((dayLabel, idx) => {
+                const dayNum = idx + 1;
+                const isSelected = selectedDays.includes(dayNum);
+                return (
+                  <button
+                    key={dayLabel}
+                    type="button"
+                    onClick={() => handleToggleDay(dayNum)}
+                    className={`py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer border ${
+                      isSelected
+                        ? 'bg-[var(--accent)] text-white border-[var(--accent)]'
+                        : 'bg-[var(--solid)] text-[var(--secondary)] border-[var(--border)] hover:bg-[var(--muted)]'
+                    }`}
+                    title={DAY_NAMES[idx]}
+                  >
+                    {dayLabel}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-[10px] text-[var(--tertiary)]">
+              {selectedDays.length === 0 ? 'Không chọn ngày = chạy lặp lại hằng ngày' : formatRepeatDays(selectedDays)}
+            </p>
+          </div>
+
+          {overlappingSchedule && (
+            <p className="text-[10px] text-amber-600 font-medium">
+              Trùng giờ với một lịch chạy hiện có ({overlappingSchedule.scheduledTime.slice(0, 5)}).
+            </p>
+          )}
+
+          <div className="pt-2 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={handleCloseForm}
+              className="px-3 py-1.5 rounded-xl text-xs font-semibold text-[var(--secondary)] hover:bg-[var(--muted)] cursor-pointer"
+            >
+              Hủy
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="px-4 py-1.5 rounded-xl text-xs font-bold bg-[var(--accent)] text-white hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50"
+            >
+              {saving ? 'Đang lưu...' : 'Lưu lịch'}
+            </button>
+          </div>
+        </form>
+      ) : (
+        <button
+          type="button"
+          onClick={handleOpenAdd}
+          className="w-full py-2.5 rounded-2xl border border-dashed border-[var(--border)] text-xs font-bold text-[var(--accent)] hover:bg-[var(--accent-soft)] transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+        >
+          <Icon name="plus" size={14} />
+          <span>+ Thêm giờ chạy</span>
+        </button>
       )}
     </div>
   );

@@ -7,14 +7,16 @@ export interface SummaryCondition {
   deviceId?: string;
   attribute?: string;
   operator?: string;
-  expected?: string;
+  expected?: unknown;
+  logicalOperator?: 'AND' | 'OR';
 }
 
 export interface SummaryAction {
   deviceId?: string;
   sceneId?: string;
   action?: string;
-  value?: string;
+  value?: unknown;
+  parameters?: Record<string, unknown>;
 }
 
 export interface SummarySentenceProps {
@@ -25,6 +27,7 @@ export interface SummarySentenceProps {
   scenes: SceneResponse[];
   scheduleTime?: string;
   scheduleDays?: string;
+  globalLogicalOperator?: 'AND' | 'OR';
   className?: string;
 }
 
@@ -42,9 +45,20 @@ const attributeLabels: Record<string, string> = {
   humidity: 'độ ẩm',
   motion: 'chuyển động',
   light: 'ánh sáng',
-  power: 'nguồn điện',
+  power: 'công suất',
   state: 'trạng thái',
   eventType: 'sự kiện',
+};
+
+const EVENT_FRIENDLY_NAMES: Record<string, string> = {
+  DEVICE_STATE_CHANGED: 'thiết bị thay đổi trạng thái',
+  SECURITY_ALERT: 'có cảnh báo an ninh',
+  SECURITY_EVENT: 'có sự kiện an ninh',
+  GAS_LEAK_DETECTED: 'phát hiện rò rỉ khí gas',
+  DOOR_OPENED: 'Cửa mở',
+  GATE_OPENED: 'Cổng mở',
+  MANUAL_OVERRIDE: 'điều khiển thủ công thiết bị',
+  MOTION_DETECTED: 'phát hiện chuyển động',
 };
 
 const actionLabels: Record<string, string> = {
@@ -54,11 +68,11 @@ const actionLabels: Record<string, string> = {
   OPEN: 'Mở',
   CLOSE: 'Đóng',
   STOP: 'Dừng',
-  SET_BRIGHTNESS: 'Độ sáng',
+  SET_BRIGHTNESS: 'Đặt độ sáng',
   SET_RGB: 'Đổi màu',
   SET_COLOR: 'Đổi màu',
   SET_TEMPERATURE: 'Cài nhiệt độ',
-  SET_SPEED: 'Tốc độ quạt',
+  SET_SPEED: 'Đặt tốc độ',
   EXECUTE_SCENE: 'Chạy kịch bản',
 };
 
@@ -70,23 +84,34 @@ export const SummarySentence: React.FC<SummarySentenceProps> = ({
   scenes,
   scheduleTime = '07:00',
   scheduleDays = 'hằng ngày',
+  globalLogicalOperator = 'AND',
   className = '',
 }) => {
-  // Format trigger clause
+  // ── 1. Format Trigger Phrase ──
   let triggerPhrase: React.ReactNode = null;
 
   if (triggerType === 'SCHEDULE') {
+    const isEveryday = !scheduleDays || scheduleDays.toLowerCase() === 'hằng ngày';
     triggerPhrase = (
       <span>
-        Vào lúc <strong className="text-[var(--text)]">{scheduleTime}</strong> ({scheduleDays})
+        {isEveryday ? 'Mỗi ngày' : scheduleDays} lúc{' '}
+        <strong className="text-[var(--text)]">{scheduleTime}</strong>
       </span>
     );
   } else if (triggerType === 'EVENT') {
     const firstCond = conditions[0];
-    const eventName = firstCond?.expected || firstCond?.attribute || 'sự kiện hệ thống';
+    const rawVal = String(firstCond?.expected || firstCond?.attribute || '');
+    const friendly = EVENT_FRIENDLY_NAMES[rawVal] || rawVal || 'sự kiện hệ thống';
+    const dev = firstCond?.deviceId ? devices.find((d) => d.id === firstCond.deviceId) : undefined;
+
     triggerPhrase = (
       <span>
-        Khi xảy ra sự kiện <strong className="text-[var(--text)]">{eventName}</strong>
+        Khi <strong className="text-[var(--text)]">{friendly}</strong>
+        {dev && (
+          <span>
+            {' '}từ <strong className="text-[var(--text)]">{dev.name}</strong>
+          </span>
+        )}
       </span>
     );
   } else {
@@ -99,12 +124,16 @@ export const SummarySentence: React.FC<SummarySentenceProps> = ({
         const devName = dev?.name || 'cảm biến';
         const attr = attributeLabels[cond.attribute || ''] || cond.attribute || 'chỉ số';
         const op = operatorLabels[cond.operator || ''] || cond.operator || '>';
-        const exp = cond.expected !== undefined && cond.expected !== '' ? cond.expected : '…';
+        let exp = cond.expected !== undefined && cond.expected !== '' ? String(cond.expected) : '…';
+        if (exp === 'true') exp = 'Có';
+        else if (exp === 'false') exp = 'Không';
+
+        const joinWord = cond.logicalOperator === 'OR' || globalLogicalOperator === 'OR' ? ' hoặc ' : ' và ';
 
         return (
           <span key={idx}>
-            {idx > 0 && <span className="text-[var(--tertiary)]"> và </span>}
-            <strong className="text-[var(--text)]">{attr}</strong> của{' '}
+            {idx > 0 && <span className="text-[var(--tertiary)] font-bold">{joinWord}</span>}
+            <strong className="text-[var(--text)]">{attr}</strong>{' '}
             <strong className="text-[var(--text)]">{devName}</strong> {op}{' '}
             <strong className="text-[var(--text)]">{exp}</strong>
           </span>
@@ -114,32 +143,39 @@ export const SummarySentence: React.FC<SummarySentenceProps> = ({
     }
   }
 
-  // Format actions clause
+  // ── 2. Format Actions Phrase ──
   let actionsPhrase: React.ReactNode = null;
   if (!actions.length) {
     actionsPhrase = <span className="text-[var(--tertiary)] italic">…thêm hành động…</span>;
   } else {
     const actionParts = actions.map((act, idx) => {
+      const prefix = idx === 0 ? '' : idx === actions.length - 1 ? ', rồi ' : ', ';
+
       if (act.action === 'EXECUTE_SCENE') {
         const sc = scenes.find((s) => s.id === act.sceneId);
         const scName = sc?.name || 'kịch bản';
         return (
           <span key={idx}>
-            {idx > 0 && <span className="text-[var(--tertiary)]">, </span>}
-            chạy kịch bản <strong className="text-[var(--text)]">{scName}</strong>
+            {prefix}chạy kịch bản <strong className="text-[var(--text)]">{scName}</strong>
           </span>
         );
       }
+
       const dev = devices.find((d) => d.id === act.deviceId);
       const devName = dev?.name || 'thiết bị';
       const actLabel = actionLabels[act.action || ''] || act.action || 'điều khiển';
-      const extraVal = act.value ? ` ${act.value}` : '';
+
+      let paramSummary = '';
+      if (act.parameters) {
+        if (act.parameters.level !== undefined) paramSummary = ` ${act.parameters.level}%`;
+        else if (act.parameters.temperature !== undefined) paramSummary = ` ${act.parameters.temperature}°C`;
+        else if (act.parameters.speed !== undefined) paramSummary = ` ${act.parameters.speed}%`;
+      }
 
       return (
         <span key={idx}>
-          {idx > 0 && <span className="text-[var(--tertiary)]">, </span>}
-          {actLabel} <strong className="text-[var(--text)]">{devName}</strong>
-          {extraVal}
+          {prefix}{actLabel} <strong className="text-[var(--text)]">{devName}</strong>
+          {paramSummary}
         </span>
       );
     });
@@ -164,4 +200,3 @@ export const SummarySentence: React.FC<SummarySentenceProps> = ({
     </div>
   );
 };
-
