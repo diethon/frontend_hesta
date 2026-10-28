@@ -33,6 +33,7 @@ import { VoiceAssistantButton } from '../ui/VoiceAssistant';
 import { NotificationBell } from '../notification/NotificationBell';
 import { notify } from '../ui/notify';
 import { getErrorMessage } from '../../utils/errors';
+import { SceneEditor } from './SceneEditor';
 
 // ──────────────────────────────────────────────────────────────────────────
 // Icon Mapping Helpers
@@ -300,7 +301,7 @@ function PanelShell({
   );
 }
 
-function SceneHistory({
+export function SceneHistory({
   scene,
   homeId,
   onRerun,
@@ -520,383 +521,8 @@ function AiSuggestions({
   );
 }
 
-function SceneEditorPanel({
-  scene,
-  homeId,
-  devices,
-  actionTypes,
-  onClose,
-  onSaved,
-}: {
-  scene?: SceneResponse | null;
-  homeId: string;
-  devices: DeviceSummary[];
-  actionTypes: SceneActionType[];
-  onClose: () => void;
-  onSaved: (savedScene: SceneResponse) => void;
-}) {
-  const isEdit = Boolean(scene?.id);
-  const [name, setName] = useState(scene?.name || '');
-  const [description, setDescription] = useState(scene?.description || '');
-  const [icon, setIcon] = useState<IconName>(
-    scene ? getFigmaIconForScene(scene.name, scene.icon) : 'sun'
-  );
-  const [enabled, setEnabled] = useState(scene ? scene.enabled : true);
-  const [actions, setActions] = useState<DraftSceneAction[]>(
-    scene ? sceneActionsToDraft(scene.actions) : []
-  );
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
 
-  const handleAddAction = () => {
-    const firstDev = devices.find((d) => getSceneDeviceActions(d, actionTypes).length > 0) || devices[0];
-    const available = firstDev ? getSceneDeviceActions(firstDev, actionTypes) : [];
-    const firstOpt = available[0];
 
-    const newAction: DraftSceneAction = {
-      deviceId: firstDev ? firstDev.id : '',
-      action: firstOpt ? firstOpt.code : 'TURN_ON',
-      value: '',
-    };
-    setActions((prev) => [...prev, newAction]);
-  };
-
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name.trim()) {
-      setError('Vui lòng nhập tên kịch bản');
-      return;
-    }
-    setSaving(true);
-    setError('');
-
-    try {
-      const payloadActions = actions.map((a, idx) => buildSceneActionInput(a, idx, devices as AnyDevice[]));
-      let result: SceneResponse;
-
-      if (isEdit && scene?.id) {
-        result = await updateScene(homeId, scene.id, {
-          name: name.trim(),
-          description: description.trim() || undefined,
-          icon,
-          enabled,
-          actions: payloadActions,
-        });
-        notify.success('Cập nhật kịch bản thành công');
-      } else {
-        result = await createScene(homeId, {
-          name: name.trim(),
-          description: description.trim() || undefined,
-          icon,
-          enabled,
-          actions: payloadActions,
-        });
-        notify.success('Tạo kịch bản mới thành công');
-      }
-      onSaved(result);
-      onClose();
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Lỗi lưu kịch bản';
-      setError(msg);
-      notify.error('Lỗi lưu kịch bản', msg);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const iconOptions: IconName[] = [
-    'sun',
-    'moon',
-    'home',
-    'door',
-    'film',
-    'briefcase',
-    'lamp',
-    'snowflake',
-    'sparkles',
-    'energy',
-    'shield',
-    'lock',
-  ];
-
-  const handleDeviceChange = (idx: number, newDevId: string) => {
-    const dev = devices.find((d) => d.id === newDevId);
-    const available = dev ? getSceneDeviceActions(dev, actionTypes) : [];
-    const firstOpt = available[0];
-    setActions((prev) =>
-      prev.map((a, i) =>
-        i === idx
-          ? {
-              deviceId: newDevId,
-              action: firstOpt ? firstOpt.code : 'TURN_ON',
-              value: firstOpt?.defaultValue != null ? String(firstOpt.defaultValue) : '',
-            }
-          : a
-      )
-    );
-  };
-
-  const handleActionChange = (idx: number, newAction: string) => {
-    setActions((prev) =>
-      prev.map((a, i) => {
-        if (i !== idx) return a;
-        const dev = devices.find((d) => d.id === a.deviceId);
-        const opt = dev
-          ? getSceneDeviceActions(dev, actionTypes).find((o) => o.code === newAction)
-          : undefined;
-        return {
-          ...a,
-          action: newAction,
-          value: opt?.defaultValue != null ? String(opt.defaultValue) : '',
-        };
-      })
-    );
-  };
-
-  const handleValueChange = (idx: number, val: string) => {
-    setActions((prev) =>
-      prev.map((a, i) => (i === idx ? { ...a, value: val } : a))
-    );
-  };
-
-  return (
-    <PanelShell
-      title={isEdit ? scene?.name || 'Chỉnh sửa kịch bản' : 'Tạo kịch bản mới'}
-      caption={isEdit ? 'Chỉnh sửa kịch bản' : 'Thiết lập kịch bản thông minh'}
-      onClose={onClose}
-    >
-      <form onSubmit={handleSave} className="space-y-5">
-        {error && (
-          <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">
-            {error}
-          </div>
-        )}
-
-        {/* Name input */}
-        <div className="color-name-field">
-          <span>Tên kịch bản</span>
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="VD: Chào buổi sáng, Xem phim..."
-            maxLength={40}
-            required
-            autoFocus
-          />
-        </div>
-
-        {/* Icon picker */}
-        <div>
-          <label className="text-xs font-semibold text-[var(--text)] block mb-2">
-            Biểu tượng
-          </label>
-          <div className="flex flex-wrap gap-2">
-            {iconOptions.map((ic) => (
-              <button
-                key={ic}
-                type="button"
-                className={`w-10 h-10 rounded-xl border flex items-center justify-center transition-all ${
-                  icon === ic
-                    ? 'border-blue-500 bg-blue-50 text-blue-600 shadow-xs'
-                    : 'border-[var(--border)] bg-[var(--solid)] text-[var(--secondary)] hover:bg-[var(--muted)]'
-                }`}
-                onClick={() => setIcon(ic)}
-              >
-                <Icon name={ic} size={18} />
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Description */}
-        <div className="color-name-field">
-          <span>Mô tả kịch bản (tùy chọn)</span>
-          <input
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Mô tả ngắn gọn mục đích kịch bản..."
-            maxLength={100}
-          />
-        </div>
-
-        {/* Enabled toggle */}
-        <div className="flex items-center justify-between p-3.5 rounded-2xl bg-[var(--muted)] border border-[var(--border)]">
-          <div>
-            <strong className="text-xs font-semibold text-[var(--text)] block">
-              Kích hoạt kịch bản
-            </strong>
-            <small className="text-[11px] text-[var(--tertiary)]">
-              Cho phép kịch bản sẵn sàng chạy
-            </small>
-          </div>
-          <button
-            type="button"
-            className={`toggle ${enabled ? 'active' : ''}`}
-            onClick={() => setEnabled(!enabled)}
-          >
-            <span />
-          </button>
-        </div>
-
-        {/* Actions list */}
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-[var(--text)]">
-              Hành động thiết bị ({actions.length})
-            </span>
-            <button
-              type="button"
-              className="text-xs text-[var(--accent)] font-semibold hover:underline"
-              onClick={handleAddAction}
-            >
-              + Thêm hành động
-            </button>
-          </div>
-
-          {actions.length === 0 ? (
-            <div className="p-4 rounded-2xl border border-dashed border-[var(--border)] text-center text-xs text-[var(--tertiary)]">
-              Chưa có hành động nào. Nhấn "+ Thêm hành động" để cấu hình thiết bị.
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {actions.map((act, index) => {
-                const dev = devices.find((d) => d.id === act.deviceId);
-                const availableActions = dev
-                  ? getSceneDeviceActions(dev, actionTypes)
-                  : [];
-                const currentOpt = availableActions.find((o) => o.code === act.action);
-                const needsValue =
-                  currentOpt?.valueKind === 'percentage' ||
-                  currentOpt?.valueKind === 'number' ||
-                  currentOpt?.valueKind === 'color' ||
-                  currentOpt?.valueKind === 'text';
-
-                return (
-                  <div
-                    key={index}
-                    className="p-3.5 rounded-2xl border border-[var(--border)] bg-[var(--muted)] space-y-2.5"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-[11px] font-semibold text-[var(--tertiary)] uppercase tracking-wider">
-                        Hành động #{index + 1}
-                      </span>
-                      <button
-                        type="button"
-                        className="w-7 h-7 rounded-lg text-[var(--tertiary)] hover:text-rose-500 hover:bg-[var(--solid)] flex items-center justify-center text-sm font-bold transition-colors"
-                        onClick={() =>
-                          setActions((prev) => prev.filter((_, i) => i !== index))
-                        }
-                        title="Xóa hành động"
-                      >
-                        ×
-                      </button>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      <div>
-                        <label className="text-[11px] text-[var(--secondary)] block mb-1">
-                          Thiết bị
-                        </label>
-                        <select
-                          className="scene-select"
-                          value={act.deviceId}
-                          onChange={(e) => handleDeviceChange(index, e.target.value)}
-                        >
-                          {devices.map((d) => (
-                            <option key={d.id} value={d.id}>
-                              {d.name} ({d.deviceType || 'Thiết bị'})
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="text-[11px] text-[var(--secondary)] block mb-1">
-                          Lệnh thực thi
-                        </label>
-                        <select
-                          className="scene-select"
-                          value={act.action}
-                          onChange={(e) => handleActionChange(index, e.target.value)}
-                        >
-                          {availableActions.map((opt) => (
-                            <option key={opt.code} value={opt.code}>
-                              {opt.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-
-                    {needsValue && (
-                      <div>
-                        <label className="text-[11px] text-[var(--secondary)] block mb-1">
-                          {currentOpt?.valueLabel || 'Giá trị tham số'}
-                        </label>
-                        {currentOpt?.valueKind === 'color' ? (
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="color"
-                              className="w-10 h-10 rounded-xl cursor-pointer border border-[var(--border)] p-1 bg-[var(--solid)]"
-                              value={act.value || currentOpt.defaultValue || '#ffc107'}
-                              onChange={(e) => handleValueChange(index, e.target.value)}
-                            />
-                            <input
-                              type="text"
-                              className="scene-select flex-1 font-mono text-xs uppercase"
-                              value={act.value || currentOpt.defaultValue || '#ffc107'}
-                              onChange={(e) => handleValueChange(index, e.target.value)}
-                              placeholder="#RRGGBB"
-                            />
-                          </div>
-                        ) : (
-                          <input
-                            type={
-                              currentOpt?.valueKind === 'number' ||
-                              currentOpt?.valueKind === 'percentage'
-                                ? 'number'
-                                : 'text'
-                            }
-                            className="scene-select"
-                            value={act.value}
-                            onChange={(e) => handleValueChange(index, e.target.value)}
-                            placeholder={
-                              currentOpt?.valueKind === 'percentage'
-                                ? '0 - 100%'
-                                : 'Giá trị...'
-                            }
-                          />
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Footer buttons */}
-        <div className="flex justify-end gap-2 pt-4 border-t border-[var(--border)]">
-          <button
-            type="button"
-            className="scene-ghost"
-            onClick={onClose}
-          >
-            Hủy
-          </button>
-          <button
-            type="submit"
-            className="add-device"
-            disabled={saving || !name.trim()}
-          >
-            {saving ? 'Đang lưu…' : isEdit ? 'Cập nhật' : 'Tạo kịch bản'}
-          </button>
-        </div>
-      </form>
-    </PanelShell>
-  );
-}
 
 
 function ScenesEmpty({
@@ -1307,7 +933,7 @@ export function ScenePage() {
           )}
 
           {sheet.type === 'editor' && (
-            <SceneEditorPanel
+            <SceneEditor
               scene={sheet.scene}
               homeId={homeId}
               devices={devices}
@@ -1320,6 +946,8 @@ export function ScenePage() {
                   return [...prev, saved];
                 });
               }}
+              onDuplicate={(s) => void handleDuplicate(s)}
+              onDelete={(s) => setDeletingScene(s)}
             />
           )}
         </>
