@@ -23,6 +23,8 @@ import { ConfirmModal } from '../ui/ConfirmModal';
 import { createAutomationRule, updateAutomationRule, deleteAutomationRule } from '../../services/automationApi';
 import { saveSchedule } from '../../services/scheduleApi';
 import { notify } from '../ui/notify';
+import { RuleHistoryPanel } from './RuleHistoryPanel';
+import { RuleTestSheet } from './RuleTestSheet';
 
 export interface RuleEditorPanelProps {
   rule?: AutomationRule | null; // null = create mode, AutomationRule = edit mode, undefined = closed
@@ -32,6 +34,8 @@ export interface RuleEditorPanelProps {
   devices: DeviceSummary[];
   scenes: SceneResponse[];
   homeId: string;
+  onDuplicate?: (rule: AutomationRule) => void;
+  initialScrollToTrigger?: boolean;
 }
 
 export const RuleEditorPanel: React.FC<RuleEditorPanelProps> = ({
@@ -42,8 +46,17 @@ export const RuleEditorPanel: React.FC<RuleEditorPanelProps> = ({
   devices,
   scenes,
   homeId,
+  onDuplicate,
+  initialScrollToTrigger = false,
 }) => {
   const isEdit = Boolean(rule && rule.id);
+
+  // ── Tab State [Thiết lập | Lịch sử] ──
+  const [activeTab, setActiveTab] = useState<'setup' | 'history'>('setup');
+  const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
+  const [testSheetOpen, setTestSheetOpen] = useState(false);
+  const headerMenuRef = useRef<HTMLDivElement>(null);
+  const triggerSectionRef = useRef<HTMLElement>(null);
 
   // ── Step 0: Create Mode Starts from TemplateGrid ──
   const [showTemplateGrid, setShowTemplateGrid] = useState(!isEdit);
@@ -159,6 +172,28 @@ export const RuleEditorPanel: React.FC<RuleEditorPanelProps> = ({
       setScheduleSaveError(null);
     }
   }, [rule, isOpen]);
+
+  // Click outside for header ⋯ menu
+  useEffect(() => {
+    if (!headerMenuOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (headerMenuRef.current && !headerMenuRef.current.contains(e.target as Node)) {
+        setHeaderMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [headerMenuOpen]);
+
+  // Auto-scroll to trigger section if initialScrollToTrigger is requested
+  useEffect(() => {
+    if (isOpen && initialScrollToTrigger && triggerSectionRef.current) {
+      const timer = setTimeout(() => {
+        triggerSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 350);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, initialScrollToTrigger]);
 
   // Mark dirty
   const markDirty = () => {
@@ -599,21 +634,95 @@ export const RuleEditorPanel: React.FC<RuleEditorPanelProps> = ({
 
             {/* ⋯ Menu */}
             {currentRuleId && (
-              <button
-                type="button"
-                onClick={() => setConfirmDeleteOpen(true)}
-                className="w-8 h-8 rounded-full hover:bg-[var(--border)] flex items-center justify-center text-rose-500 cursor-pointer"
-                title="Xóa quy tắc"
-                aria-label="Xóa quy tắc"
-              >
-                <Icon name="trash" size={15} />
-              </button>
+              <div ref={headerMenuRef} className="relative scene-menu-wrap">
+                <button
+                  type="button"
+                  onClick={() => setHeaderMenuOpen((prev) => !prev)}
+                  className="card-affordance w-8 h-8 rounded-full hover:bg-[var(--border)] flex items-center justify-center text-[var(--secondary)] cursor-pointer"
+                  title="Thao tác khác"
+                  aria-label="Thao tác khác"
+                >
+                  <Icon name="more" size={16} />
+                </button>
+
+                {headerMenuOpen && (
+                  <div
+                    className="scene-menu glass-g2 z-30"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {onDuplicate && rule && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setHeaderMenuOpen(false);
+                          onDuplicate(rule);
+                        }}
+                      >
+                        <Icon name="copy" size={13} />
+                        <span>Nhân bản</span>
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      className="danger"
+                      onClick={() => {
+                        setHeaderMenuOpen(false);
+                        setConfirmDeleteOpen(true);
+                      }}
+                    >
+                      <Icon name="trash" size={13} />
+                      <span>Xóa quy tắc</span>
+                    </button>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </header>
 
+        {/* ── Segmented Control [Thiết lập | Lịch sử] for saved rules ── */}
+        {currentRuleId && (
+          <div className="px-4 py-2 border-b border-[var(--border)] bg-[var(--solid)] shrink-0">
+            <div className="grid grid-cols-2 gap-1 p-0.5 rounded-xl bg-[var(--muted)] border border-[var(--border)]">
+              <button
+                type="button"
+                onClick={() => setActiveTab('setup')}
+                className={`py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                  activeTab === 'setup'
+                    ? 'bg-[var(--solid)] text-[var(--text)] shadow-xs'
+                    : 'text-[var(--secondary)] hover:text-[var(--text)]'
+                }`}
+              >
+                Thiết lập
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('history')}
+                className={`py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                  activeTab === 'history'
+                    ? 'bg-[var(--solid)] text-[var(--text)] shadow-xs'
+                    : 'text-[var(--secondary)] hover:text-[var(--text)]'
+                }`}
+              >
+                Lịch sử
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* ── Scrollable Body ── */}
         <div className="flex-1 overflow-y-auto p-4 space-y-6">
+          {activeTab === 'history' && rule ? (
+            <RuleHistoryPanel
+              isInline
+              homeId={homeId}
+              rule={rule}
+              devices={devices}
+              scenes={scenes}
+            />
+          ) : (
+            <>
           {/* Partial-failure banner for SCHEDULE */}
           {scheduleSaveError && (
             <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between text-xs text-amber-700">
@@ -710,7 +819,7 @@ export const RuleEditorPanel: React.FC<RuleEditorPanelProps> = ({
               </section>
 
               {/* ── Section 2: Khi nào (Trigger) ── */}
-              <section className="space-y-4">
+              <section ref={triggerSectionRef} className="space-y-4">
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-bold text-[var(--secondary)] uppercase tracking-wider block">
                     2. Khi nào (Kích hoạt)
@@ -991,11 +1100,13 @@ export const RuleEditorPanel: React.FC<RuleEditorPanelProps> = ({
               </section>
             </>
           )}
+          </>
+          )}
         </div>
 
         {/* ── Sticky Footer ── */}
         <footer className="scene-panel-footer shrink-0 p-4 border-t border-[var(--border)] bg-[var(--solid)]/80 backdrop-blur-md space-y-2">
-          {validationError && (
+          {validationError && activeTab === 'setup' && (
             <p className="text-center text-xs text-amber-600 font-medium">
               {validationError}
             </p>
@@ -1005,27 +1116,48 @@ export const RuleEditorPanel: React.FC<RuleEditorPanelProps> = ({
             <button
               type="button"
               onClick={handleRequestClose}
-              className="flex-1 py-3 rounded-2xl text-xs font-semibold text-[var(--secondary)] hover:bg-[var(--muted)] border border-[var(--border)] transition-colors cursor-pointer"
+              className="px-4 py-3 rounded-2xl text-xs font-semibold text-[var(--secondary)] hover:bg-[var(--muted)] border border-[var(--border)] transition-colors cursor-pointer"
             >
-              Hủy
+              Đóng
             </button>
 
-            <button
-              type="button"
-              disabled={!isValid || saving}
-              onClick={handleSaveRule}
-              className="flex-1 py-3 rounded-2xl text-xs font-bold bg-[var(--accent)] text-white hover:opacity-90 transition-opacity flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 relative"
-            >
-              {isDirty && <span className="w-2 h-2 rounded-full bg-amber-400 absolute left-4" />}
-              {saving ? (
-                <>
-                  <Icon name="clock" size={14} className="animate-spin" />
-                  <span>Đang lưu quy tắc...</span>
-                </>
-              ) : (
-                <span>{currentRuleId ? 'Lưu quy tắc' : 'Tạo quy tắc'}</span>
-              )}
-            </button>
+            {/* Secondary "Kiểm tra" button (hide for SCHEDULE rules) */}
+            {triggerType !== 'SCHEDULE' && (
+              <div className="flex-1 flex flex-col items-center">
+                <button
+                  type="button"
+                  disabled={!currentRuleId}
+                  onClick={() => setTestSheetOpen(true)}
+                  className="w-full py-3 rounded-2xl text-xs font-semibold text-[var(--text)] bg-[var(--muted)] hover:bg-[var(--border)] border border-[var(--border)] transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Kiểm tra
+                </button>
+                {!currentRuleId ? (
+                  <span className="text-[10px] text-[var(--tertiary)] mt-1">Lưu quy tắc để kiểm tra</span>
+                ) : isDirty ? (
+                  <span className="text-[10px] text-[var(--tertiary)] mt-1">Kiểm tra dựa trên bản đã lưu</span>
+                ) : null}
+              </div>
+            )}
+
+            {activeTab === 'setup' && (
+              <button
+                type="button"
+                disabled={!isValid || saving}
+                onClick={handleSaveRule}
+                className="flex-1 py-3 rounded-2xl text-xs font-bold bg-[var(--accent)] text-white hover:opacity-90 transition-opacity flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 relative"
+              >
+                {isDirty && <span className="w-2 h-2 rounded-full bg-[var(--accent)] absolute left-4" />}
+                {saving ? (
+                  <>
+                    <Icon name="clock" size={14} className="animate-spin" />
+                    <span>Đang lưu quy tắc...</span>
+                  </>
+                ) : (
+                  <span>{currentRuleId ? 'Lưu quy tắc' : 'Tạo quy tắc'}</span>
+                )}
+              </button>
+            )}
           </div>
         </footer>
       </aside>
@@ -1113,6 +1245,17 @@ export const RuleEditorPanel: React.FC<RuleEditorPanelProps> = ({
             setScenePickerIndex(null);
           }}
           onClose={() => setScenePickerIndex(null)}
+        />
+      )}
+
+      {/* ── Sub-Sheet: RuleTestSheet ── */}
+      {testSheetOpen && rule && (
+        <RuleTestSheet
+          homeId={homeId}
+          rule={rule}
+          devices={devices}
+          scenes={scenes}
+          onClose={() => setTestSheetOpen(false)}
         />
       )}
 

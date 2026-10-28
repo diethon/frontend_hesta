@@ -6,15 +6,12 @@ import {
   toggleAutomationRule,
   deleteAutomationRule,
   createAutomationRule,
-  getAutomationExecutions,
-  testAutomationRule,
 } from '../../services/automationApi';
 import { getDevices, getScenes } from '../../services/sceneApi';
 import { getSchedules, saveSchedule } from '../../services/scheduleApi';
 import type {
   AutomationRule,
   AutomationRuleInput,
-  AutomationExecution,
   DeviceSummary,
 } from '../../types/automation';
 import type { SceneResponse } from '../../types/scene';
@@ -25,9 +22,10 @@ import { AutomationTopBar } from './AutomationTopBar';
 import { AutomationEmpty } from './AutomationEmpty';
 import { RuleCard } from './RuleCard';
 import { RuleEditorPanel } from './RuleEditorPanel';
+import { RuleTestSheet } from './RuleTestSheet';
+import { RuleHistoryPanel } from './RuleHistoryPanel';
 import { ConfirmModal } from '../ui/ConfirmModal';
 import { notify } from '../ui/notify';
-import { SchedulePanel } from '../ui/SchedulePanel';
 
 export function AutomationRulePage() {
   const { homeId = '' } = useParams();
@@ -49,14 +47,10 @@ export function AutomationRulePage() {
 
   // Modals & Panels
   const [editorRule, setEditorRule] = useState<AutomationRule | null | undefined>(undefined); // undefined = closed
+  const [scrollToTrigger, setScrollToTrigger] = useState(false);
   const [ruleToDelete, setRuleToDelete] = useState<AutomationRule | null>(null);
-  const [scheduleModalRule, setScheduleModalRule] = useState<AutomationRule | null>(null);
   const [testModalRule, setTestModalRule] = useState<AutomationRule | null>(null);
   const [historyModalRule, setHistoryModalRule] = useState<AutomationRule | null>(null);
-
-  // History & Test state
-  const [executions, setExecutions] = useState<AutomationExecution[]>([]);
-  const [loadingExecutions, setLoadingExecutions] = useState(false);
 
   // Load data
   const loadData = useCallback(async () => {
@@ -193,20 +187,6 @@ export function AutomationRulePage() {
       await loadData();
     } catch {
       notify.error('Không thể xóa quy tắc');
-    }
-  };
-
-  // Open History sheet
-  const handleOpenHistory = async (rule: AutomationRule) => {
-    setHistoryModalRule(rule);
-    setLoadingExecutions(true);
-    try {
-      const execs = await getAutomationExecutions(homeId, rule.id);
-      setExecutions(execs || []);
-    } catch {
-      setExecutions([]);
-    } finally {
-      setLoadingExecutions(false);
     }
   };
 
@@ -380,10 +360,16 @@ export function AutomationRulePage() {
                 devices={devices}
                 scenes={scenes}
                 onToggle={(nextEnabled) => handleToggleRule(rule.id, nextEnabled)}
-                onEdit={() => setEditorRule(rule)}
+                onEdit={() => {
+                  setScrollToTrigger(false);
+                  setEditorRule(rule);
+                }}
                 onTest={() => setTestModalRule(rule)}
-                onHistory={() => handleOpenHistory(rule)}
-                onSchedule={() => setScheduleModalRule(rule)}
+                onHistory={() => setHistoryModalRule(rule)}
+                onSchedule={() => {
+                  setScrollToTrigger(true);
+                  setEditorRule(rule);
+                }}
                 onDuplicate={() => handleDuplicateRule(rule)}
                 onDelete={() => setRuleToDelete(rule)}
               />
@@ -395,15 +381,20 @@ export function AutomationRulePage() {
       {/* Mobile Bottom Navigation */}
       <DashboardBottomNav activeItem="more" homeId={homeId} />
 
-      {/* ── Rule Editor Panel (Phase 3 Full Editor) ── */}
+      {/* ── Rule Editor Panel (Phase 3 & 4) ── */}
       <RuleEditorPanel
         rule={editorRule}
         isOpen={editorRule !== undefined}
-        onClose={() => setEditorRule(undefined)}
+        onClose={() => {
+          setEditorRule(undefined);
+          setScrollToTrigger(false);
+        }}
         onSaved={loadData}
         devices={devices}
         scenes={scenes}
         homeId={homeId}
+        onDuplicate={handleDuplicateRule}
+        initialScrollToTrigger={scrollToTrigger}
       />
 
       {/* ── Delete Confirmation Dialog ── */}
@@ -420,189 +411,26 @@ export function AutomationRulePage() {
         />
       )}
 
-      {/* ── Schedule Modal for SCHEDULE rules ── */}
-      {scheduleModalRule && (
-        <div className="scene-layer">
-          <button
-            type="button"
-            className="detail-scrim"
-            onClick={() => setScheduleModalRule(null)}
-            aria-label="Đóng lịch chạy"
-          />
-          <aside className="scene-panel scene-editor-panel glass-g2">
-            <header className="scene-panel-header">
-              <button
-                type="button"
-                className="detail-icon-button"
-                onClick={() => setScheduleModalRule(null)}
-              >
-                ×
-              </button>
-              <div>
-                <strong>Lịch chạy quy tắc</strong>
-                <small>{scheduleModalRule.name}</small>
-              </div>
-            </header>
-            <div className="scene-panel-scroll p-4">
-              <SchedulePanel
-                homeId={homeId}
-                kind="automation-rules"
-                targetId={scheduleModalRule.id}
-              />
-            </div>
-          </aside>
-        </div>
-      )}
-
-      {/* ── Test Simulation Sheet (Kiểm tra điều kiện) ── */}
+      {/* ── Rule Test Simulation Sheet ── */}
       {testModalRule && (
-        <div className="scene-layer">
-          <button
-            type="button"
-            className="detail-scrim"
-            onClick={() => setTestModalRule(null)}
-            aria-label="Đóng kiểm tra"
-          />
-          <aside className="scene-panel scene-editor-panel glass-g2">
-            <header className="scene-panel-header">
-              <button
-                type="button"
-                className="detail-icon-button"
-                onClick={() => setTestModalRule(null)}
-              >
-                ×
-              </button>
-              <div>
-                <strong>Kiểm tra quy tắc</strong>
-                <small>{testModalRule.name} (Mô phỏng điều kiện)</small>
-              </div>
-            </header>
-            <div className="scene-panel-scroll p-5 space-y-4">
-              <div className="p-3.5 rounded-2xl border border-[var(--border)] glass-g1 text-xs text-[var(--secondary)]">
-                Kiểm tra xem điều kiện của quy tắc có khớp với dữ liệu giả lập hay không. Hành động sẽ <strong>không được gửi</strong> tới thiết bị thật.
-              </div>
-
-              <div className="space-y-3">
-                <span className="text-[11px] font-bold text-[var(--secondary)] uppercase tracking-wider block">
-                  Hành động dự kiến ({testModalRule.actions.length})
-                </span>
-                <div className="space-y-1.5">
-                  {testModalRule.actions.map((act, i) => (
-                    <div
-                      key={i}
-                      className="px-3 py-2 rounded-xl border border-[var(--border)] bg-[var(--solid)] text-xs font-medium text-[var(--text)] flex items-center justify-between"
-                    >
-                      <span>Hành động {i + 1}: {act.action}</span>
-                      <span className="text-[10px] text-[var(--tertiary)] font-mono">
-                        {act.sceneId ? 'Kịch bản' : 'Thiết bị'}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <button
-                type="button"
-                className="w-full py-2.5 rounded-2xl bg-[var(--accent)] text-white text-xs font-semibold hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
-                onClick={async () => {
-                  try {
-                    const res = await testAutomationRule(homeId, testModalRule.id, {
-                      sourceDeviceId: testModalRule.conditions[0]?.deviceId,
-                      eventType: testModalRule.triggerType === 'SENSOR' ? 'SENSOR_READING' : 'EVENT',
-                      data: {},
-                    });
-                    if (res.matched) {
-                      notify.success('Điều kiện khớp: quy tắc sẽ kích hoạt', `${res.proposedActions?.length || 0} hành động dự kiến.`);
-                    } else {
-                      notify.info('Điều kiện không khớp với dữ liệu thử nghiệm.');
-                    }
-                  } catch {
-                    notify.error('Không thể kiểm tra điều kiện.');
-                  }
-                }}
-              >
-                Bắt đầu kiểm tra
-              </button>
-            </div>
-          </aside>
-        </div>
+        <RuleTestSheet
+          homeId={homeId}
+          rule={testModalRule}
+          devices={devices}
+          scenes={scenes}
+          onClose={() => setTestModalRule(null)}
+        />
       )}
 
-      {/* ── History Sheet ── */}
+      {/* ── Rule Execution History Panel ── */}
       {historyModalRule && (
-        <div className="scene-layer">
-          <button
-            type="button"
-            className="detail-scrim"
-            onClick={() => setHistoryModalRule(null)}
-            aria-label="Đóng lịch sử"
-          />
-          <aside className="scene-panel scene-editor-panel glass-g2">
-            <header className="scene-panel-header">
-              <button
-                type="button"
-                className="detail-icon-button"
-                onClick={() => setHistoryModalRule(null)}
-              >
-                ×
-              </button>
-              <div>
-                <strong>Lịch sử chạy quy tắc</strong>
-                <small>{historyModalRule.name}</small>
-              </div>
-            </header>
-            <div className="scene-panel-scroll p-5 space-y-3">
-              {loadingExecutions ? (
-                <div className="p-8 text-center text-xs text-[var(--tertiary)]">
-                  Đang tải lịch sử thực thi...
-                </div>
-              ) : executions.length === 0 ? (
-                <div className="p-8 text-center text-xs text-[var(--tertiary)]">
-                  Chưa có lần thực thi nào được ghi nhận.
-                </div>
-              ) : (
-                executions.map((item) => (
-                  <div
-                    key={item.id}
-                    className="p-3.5 rounded-2xl border border-[var(--border)] bg-[var(--solid)] space-y-2 text-xs"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold text-[var(--text)]">
-                        {new Date(item.matchedAt || item.startedAt || '').toLocaleString('vi-VN')}
-                      </span>
-                      <span
-                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                          item.status === 'SUCCESS'
-                            ? 'bg-emerald-100 text-emerald-700'
-                            : 'bg-rose-100 text-rose-700'
-                        }`}
-                      >
-                        {item.status === 'SUCCESS' ? 'Thành công' : item.status}
-                      </span>
-                    </div>
-
-                    <div className="text-[11px] text-[var(--tertiary)]">
-                      Nguồn: <strong className="text-[var(--secondary)]">{item.triggerSource}</strong>
-                    </div>
-
-                    {item.resultDetail && item.resultDetail.length > 0 && (
-                      <div className="space-y-1 pt-1 border-t border-[var(--border)]">
-                        {item.resultDetail.map((res, i) => (
-                          <div key={i} className="flex items-center justify-between text-[11px]">
-                            <span>Lệnh: {res.action}</span>
-                            <span className={res.success ? 'text-emerald-600 font-bold' : 'text-rose-500 font-bold'}>
-                              {res.success ? 'Thành công' : res.status}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))
-              )}
-            </div>
-          </aside>
-        </div>
+        <RuleHistoryPanel
+          homeId={homeId}
+          rule={historyModalRule}
+          devices={devices}
+          scenes={scenes}
+          onClose={() => setHistoryModalRule(null)}
+        />
       )}
     </div>
   );

@@ -185,19 +185,21 @@ export const RuleCard: React.FC<RuleCardProps> = ({
         </span>
 
         <div className="flex items-center gap-1.5">
-          {/* Round 40px "Kiểm tra" button */}
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onTest?.();
-            }}
-            className="w-8 h-8 rounded-full bg-[var(--g1)] hover:bg-[var(--border)] text-[var(--text)] flex items-center justify-center transition-colors cursor-pointer"
-            title="Kiểm tra quy tắc (mô phỏng điều kiện)"
-            aria-label="Kiểm tra quy tắc"
-          >
-            <Icon name="test" size={14} />
-          </button>
+          {/* Round 32px "Kiểm tra" button (hide for SCHEDULE rules) */}
+          {!isSchedule && onTest && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onTest();
+              }}
+              className="w-8 h-8 rounded-full bg-[var(--g1)] hover:bg-[var(--border)] text-[var(--text)] flex items-center justify-center transition-colors cursor-pointer"
+              title="Kiểm tra quy tắc (mô phỏng điều kiện)"
+              aria-label="Kiểm tra quy tắc"
+            >
+              <Icon name="test" size={14} />
+            </button>
+          )}
 
           {/* ⋯ Menu */}
           <div ref={menuRef} className="relative scene-menu-wrap">
@@ -228,6 +230,19 @@ export const RuleCard: React.FC<RuleCardProps> = ({
                   <Icon name="pencil" size={13} />
                   <span>Sửa</span>
                 </button>
+
+                {!isSchedule && onTest && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      onTest();
+                    }}
+                  >
+                    <Icon name="test" size={13} />
+                    <span>Kiểm tra</span>
+                  </button>
+                )}
 
                 <button
                   type="button"
