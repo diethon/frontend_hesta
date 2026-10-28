@@ -121,7 +121,7 @@ export const RuleCard: React.FC<RuleCardProps> = ({
       onKeyDown={(e) => {
         if (e.key === 'Enter') onEdit?.();
       }}
-      className={`scenario-card glass-g1 min-h-[175px] transition-all flex flex-col justify-between cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40 ${
+      className={`scenario-card rule-card glass-g1 min-h-[190px] h-auto transition-all flex flex-col justify-between cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40 ${
         rule.enabled ? 'on' : 'off'
       } ${lastRunFailed ? 'failed' : ''}`}
     >
@@ -156,15 +156,15 @@ export const RuleCard: React.FC<RuleCardProps> = ({
 
       {/* Middle: Title, trigger line, result line */}
       <div className="scenario-copy py-1">
-        <h3 className="text-sm font-bold text-[var(--text)] line-clamp-1">
+        <h3 className="text-sm font-bold text-[var(--text)] line-clamp-1 break-words" title={rule.name}>
           {rule.name}
         </h3>
 
-        <p className="text-[11px] font-medium text-[var(--secondary)] line-clamp-1 mt-0.5">
+        <p className="text-[11px] font-medium text-[var(--secondary)] line-clamp-1 break-words mt-0.5" title={triggerSummary}>
           {triggerSummary}
         </p>
 
-        <p className="text-[11px] text-[var(--tertiary)] line-clamp-1 mt-0.5 font-medium">
+        <p className="text-[11px] text-[var(--tertiary)] line-clamp-1 break-words mt-0.5 font-medium" title={resultSummary}>
           {isIncomplete ? (
             <span className="text-amber-600 font-semibold">Chưa hoàn tất · Thiếu hành động</span>
           ) : lastRunFailed ? (
@@ -283,3 +283,4 @@ export const RuleCard: React.FC<RuleCardProps> = ({
     </article>
   );
 };
+

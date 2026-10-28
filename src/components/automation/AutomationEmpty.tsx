@@ -67,3 +67,4 @@ export const AutomationEmpty: React.FC<AutomationEmptyProps> = ({
     </div>
   );
 };
+

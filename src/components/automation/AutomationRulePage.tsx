@@ -10,6 +10,7 @@ import {
   testAutomationRule,
 } from '../../services/automationApi';
 import { getDevices, getScenes } from '../../services/sceneApi';
+import { getSchedules, saveSchedule } from '../../services/scheduleApi';
 import type {
   AutomationRule,
   AutomationRuleInput,
@@ -135,7 +136,7 @@ export function AutomationRulePage() {
   const handleDuplicateRule = async (rule: AutomationRule) => {
     try {
       const input: AutomationRuleInput = {
-        name: `${rule.name} (Bản sao)`,
+        name: `${rule.name} (bản sao)`,
         description: rule.description,
         triggerType: rule.triggerType,
         enabled: false,
@@ -155,7 +156,26 @@ export function AutomationRulePage() {
           order: i,
         })),
       };
-      await createAutomationRule(homeId, input);
+      const created = await createAutomationRule(homeId, input);
+
+      // If this is a SCHEDULE rule, also copy its schedules
+      if (rule.triggerType === 'SCHEDULE' && created?.id) {
+        try {
+          const existingSchedules = await getSchedules(homeId, 'automation-rules', rule.id);
+          if (Array.isArray(existingSchedules) && existingSchedules.length > 0) {
+            for (const sched of existingSchedules) {
+              await saveSchedule(homeId, 'automation-rules', created.id, {
+                scheduledTime: sched.scheduledTime,
+                repeatDays: sched.repeatDays || [],
+                active: false,
+              });
+            }
+          }
+        } catch (schedErr) {
+          console.warn('Could not copy schedules during duplicate:', schedErr);
+        }
+      }
+
       notify.success('Đã nhân bản quy tắc', `Đã tạo bản sao cho “${rule.name}”`);
       await loadData();
     } catch {

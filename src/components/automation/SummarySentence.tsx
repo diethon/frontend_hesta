@@ -164,3 +164,4 @@ export const SummarySentence: React.FC<SummarySentenceProps> = ({
     </div>
   );
 };
+
