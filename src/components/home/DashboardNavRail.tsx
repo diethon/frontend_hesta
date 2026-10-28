@@ -1,3 +1,4 @@
+import { useAppSelector } from '../../store/hooks';
 import React from 'react';
 import { useNavigate } from 'react-router';
 import { Icon, type IconName } from './HomeIcons';
@@ -39,6 +40,9 @@ export const DashboardNavRail: React.FC<DashboardNavRailProps> = ({
   onSelectOverview,
   onOpenProfile,
 }) => {
+  const reduxUser = useAppSelector((state) => state.auth.user);
+  const currentUser = user ?? reduxUser ?? undefined;
+  const isAdmin = currentUser?.platformRole === 'ADMIN';
   const navigate = useNavigate();
 
   const handleNavClick = (item: NavItemDef) => {
@@ -121,6 +125,17 @@ export const DashboardNavRail: React.FC<DashboardNavRailProps> = ({
             </button>
           );
         })}
+        {isAdmin && (
+          <button
+            type="button"
+            className="nav-item"
+            title="Quản trị hệ thống"
+            aria-label="Quản trị hệ thống"
+            onClick={() => navigate('/admin')}
+          >
+            <Icon name="shield" />
+          </button>
+        )}
       </nav>
 
       <div className="nav-bottom">

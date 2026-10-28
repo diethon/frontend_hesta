@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState, useRef, useMemo } from 'react';
-import { useNavigate, useParams, Navigate } from 'react-router';
+import { useNavigate, useParams } from 'react-router';
 import { Icon, IconButton, type IconName } from '../home/HomeIcons';
 import { DashboardNavRail } from '../home/DashboardNavRail';
 import { DashboardBottomNav } from '../home/DashboardBottomNav';
@@ -531,9 +531,6 @@ export const DevicePage: React.FC = () => {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const currentUser = useAppSelector((state) => state.auth.user);
-  if (currentUser?.platformRole === 'ADMIN') {
-    return <Navigate to="/admin" replace />;
-  }
 
   // Core state
   const [rooms, setRooms] = useState<RoomResponse[]>([]);
