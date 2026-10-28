@@ -1,1420 +1,1351 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { Link, useNavigate, useParams } from 'react-router';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useNavigate, useParams } from 'react-router';
+import { useAppSelector } from '../../store/hooks';
 import {
-  Play,
-  Plus,
-  Check,
-  Search,
-  Sparkles,
-  Sliders,
-  Layers,
-  ArrowUp,
-  ArrowDown,
-  Trash2,
-  AlertCircle,
-  CheckCircle2,
-  Loader2,
-  Home,
-  Zap,
-  Palette,
-  Sun,
-  Thermometer,
-} from 'lucide-react';
-import {
+  getScenes,
+  getScene,
   createScene,
+  updateScene,
   deleteScene,
   executeScene,
-  getCachedScenes,
-  getDevices,
-  getScene,
-  getSceneActionTypes,
   getSceneExecutions,
-  getScenes,
-  updateScene,
+  getDevices,
+  getSceneActionTypes,
 } from '../../services/sceneApi';
-import type { SceneActionType, SceneExecutionResponse, SceneResponse } from '../../types/scene';
-import { HomeSidebar } from '../ui/HomeSidebar';
+import type {
+  SceneResponse,
+  SceneExecutionResponse,
+  SceneActionType,
+  DeviceResponse,
+} from '../../types/scene';
 import type { DeviceSummary } from '../../types/automation';
 import {
-  buildSceneActionInput,
-  formatSceneAction,
-  getSceneDeviceActions,
   sceneActionsToDraft,
+  buildSceneActionInput,
   sceneToggleInput,
+  getSceneDeviceActions,
   type DraftSceneAction,
+  type AnyDevice,
 } from './sceneActions';
-import { SchedulePanel } from '../ui/SchedulePanel';
-import { SceneIcon } from './SceneIcon';
-import { AVAILABLE_ICONS, SCENE_PRESETS, detectSceneTheme, getDeviceTypeIcon } from './sceneConstants';
+import { DashboardNavRail } from '../home/DashboardNavRail';
+import { Icon, IconButton, type IconName } from '../home/HomeIcons';
+import { VoiceAssistantButton } from '../ui/VoiceAssistant';
+import { NotificationBell } from '../notification/NotificationBell';
 import { notify } from '../ui/notify';
-import { ConfirmModal } from '../ui/ConfirmModal';
+import { getErrorMessage } from '../../utils/errors';
 
-export function ScenePage() {
-  const { homeId = '', sceneId } = useParams();
-  return <SceneWorkspace key={homeId} homeId={homeId} sceneId={sceneId} />;
+// ──────────────────────────────────────────────────────────────────────────
+// Icon Mapping Helpers
+// ──────────────────────────────────────────────────────────────────────────
+
+export function getFigmaIconForScene(name?: string, icon?: string | null): IconName {
+  const text = `${name ?? ''} ${icon ?? ''}`.toLowerCase();
+  if (text.includes('sáng') || text.includes('sun') || text.includes('morning')) return 'sun';
+  if (text.includes('ngủ') || text.includes('moon') || text.includes('tối') || text.includes('night')) return 'moon';
+  if (text.includes('rời') || text.includes('ra ngoài') || text.includes('away') || text.includes('door') || text.includes('cổng')) return 'door';
+  if (text.includes('về') || text.includes('home') || text.includes('nhà')) return 'home';
+  if (text.includes('phim') || text.includes('film') || text.includes('movie') || text.includes('cinema')) return 'film';
+  if (text.includes('việc') || text.includes('work') || text.includes('briefcase')) return 'briefcase';
+  if (text.includes('thư giãn') || text.includes('relax') || text.includes('coffee') || text.includes('đọc sách')) return 'lamp';
+  if (text.includes('tiệc') || text.includes('party')) return 'sparkles';
+  if (text.includes('năng lượng') || text.includes('tiết kiệm') || text.includes('energy')) return 'energy';
+  return 'sparkles';
 }
 
-function SceneWorkspace({ homeId, sceneId }: { homeId: string; sceneId?: string }) {
-  const navigate = useNavigate();
-  const cached = useMemo(() => getCachedScenes(homeId), [homeId]);
-  const [scenes, setScenes] = useState<SceneResponse[]>(cached || []);
-  const [loadingScenes, setLoadingScenes] = useState(!cached?.length);
-  const [devices, setDevices] = useState<DeviceSummary[]>([]);
-  const [actionTypes, setActionTypes] = useState<SceneActionType[]>([]);
-  const [loadingOptions, setLoadingOptions] = useState(true);
+export function getFigmaIconForDevice(action?: string, deviceName?: string): IconName {
+  const text = `${action ?? ''} ${deviceName ?? ''}`.toUpperCase();
+  if (text.includes('LIGHT') || text.includes('LED') || text.includes('ĐÈN') || text.includes('LAMP') || text.includes('RGB')) return 'lamp';
+  if (text.includes('AC') || text.includes('AIR') || text.includes('LẠNH') || text.includes('ĐIỀU HÒA') || text.includes('CASPER')) return 'snowflake';
+  if (text.includes('GATE') || text.includes('DOOR') || text.includes('CỔNG') || text.includes('CỬA') || text.includes('OPEN') || text.includes('CLOSE')) return 'door';
+  if (text.includes('LOCK') || text.includes('KHÓA')) return 'lock';
+  if (text.includes('CAMERA')) return 'camera';
+  if (text.includes('BƠM') || text.includes('PUMP')) return 'droplet';
+  if (text.includes('TEMP') || text.includes('HUMID') || text.includes('NHIỆT')) return 'thermometer';
+  if (text.includes('MOTION') || text.includes('CHUYỂN ĐỘNG')) return 'activity';
+  if (text.includes('FAN') || text.includes('QUẠT') || text.includes('SPEED')) return 'automation';
+  return 'grid';
+}
 
-  // Pre-fill scene data immediately if sceneId is in cached or scenes
-  const initialScene = useMemo(() => {
-    if (!sceneId) return null;
-    return (cached || scenes).find((s) => s.id === sceneId) || null;
-  }, [sceneId, cached, scenes]);
+// ──────────────────────────────────────────────────────────────────────────
+// Subcomponents matching Figma Design v3
+// ──────────────────────────────────────────────────────────────────────────
 
-  const [editingScene, setEditingScene] = useState<SceneResponse | null>(initialScene);
-  const [loadingScene, setLoadingScene] = useState(Boolean(sceneId && !initialScene));
-  const [togglingSceneId, setTogglingSceneId] = useState<string | null>(null);
-  const [name, setName] = useState(initialScene?.name ?? '');
-  const [icon, setIcon] = useState(initialScene?.icon ?? 'home');
-  const [description, setDescription] = useState(initialScene?.description ?? '');
-  const [enabled, setEnabled] = useState(initialScene?.enabled ?? true);
-  const [actions, setActions] = useState<DraftSceneAction[]>(
-    initialScene ? sceneActionsToDraft(initialScene.actions) : [],
+function ScenesTopBar({
+  totalCount,
+  activeCount,
+  userInitial = 'M',
+}: {
+  totalCount: number;
+  activeCount: number;
+  userInitial?: string;
+}) {
+  return (
+    <header className="topbar scenes-topbar">
+      <div>
+        <span className="eyebrow">
+          {totalCount} KỊCH BẢN · {activeCount} ĐANG BẬT
+        </span>
+        <h2>Kịch bản</h2>
+      </div>
+      <div className="top-actions">
+        <VoiceAssistantButton />
+        <NotificationBell />
+        <div className="avatar">{userInitial}</div>
+      </div>
+    </header>
   );
-  const [error, setError] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [runningId, setRunningId] = useState<string | null>(null);
-  const [historyId, setHistoryId] = useState<string | null>(null);
-  const [scheduleId, setScheduleId] = useState<string | null>(null);
+}
+
+function ScenarioCard({
+  scene,
+  onToggle,
+  onOpen,
+  onHistory,
+  onDuplicate,
+  onDelete,
+  onRun,
+  running,
+  runSuccess,
+  hasFailed,
+}: {
+  scene: SceneResponse;
+  onToggle: () => void;
+  onOpen: () => void;
+  onHistory: () => void;
+  onDuplicate: () => void;
+  onDelete: () => void;
+  onRun: () => void;
+  running: boolean;
+  runSuccess: boolean;
+  hasFailed?: boolean;
+}) {
+  const [menu, setMenu] = useState(false);
+  const actionCount = scene.actions?.length || 0;
+
+  // Extract unique device icons from scene actions
+  const deviceIcons = useMemo(() => {
+    if (!scene.actions || scene.actions.length === 0) {
+      return ['lamp', 'snowflake'] as IconName[];
+    }
+    const icons: IconName[] = [];
+    scene.actions.forEach((a) => {
+      const ic = getFigmaIconForDevice(a.action, a.targetDeviceName);
+      if (!icons.includes(ic)) icons.push(ic);
+    });
+    return icons.length > 0 ? icons : (['lamp'] as IconName[]);
+  }, [scene.actions]);
+
+  const sceneIcon = getFigmaIconForScene(scene.name, scene.icon);
+
+  const caption = running
+    ? `Đang chạy 1/${Math.max(1, actionCount)}…`
+    : hasFailed
+    ? 'Lần chạy gần nhất lỗi'
+    : actionCount
+    ? `${actionCount} hành động · Chạy thủ công`
+    : 'Chưa có hành động';
+
+  return (
+    <article
+      className={`scenario-card glass-g1 ${scene.enabled ? 'on' : 'off'} ${
+        hasFailed ? 'failed' : ''
+      } ${running ? 'running' : ''}`}
+      onClick={onOpen}
+      tabIndex={0}
+      onKeyDown={(e) => e.key === 'Enter' && onOpen()}
+    >
+      <div className="scenario-top">
+        <span className="scenario-icon">
+          <Icon name={sceneIcon} />
+        </span>
+        <button
+          type="button"
+          className={`toggle ${scene.enabled ? 'active' : ''}`}
+          aria-pressed={scene.enabled}
+          onClick={(event) => {
+            event.stopPropagation();
+            onToggle();
+          }}
+          title={scene.enabled ? 'Tắt kịch bản' : 'Bật kịch bản'}
+        >
+          <span />
+        </button>
+      </div>
+
+      <div className="scenario-copy">
+        <h3>{scene.name}</h3>
+        <p>{caption}</p>
+      </div>
+
+      <div className="scenario-bottom">
+        <div className="scenario-devices">
+          {deviceIcons.slice(0, 3).map((icon, index) => (
+            <span key={`${icon}-${index}`}>
+              <Icon name={icon} size={13} />
+            </span>
+          ))}
+          {deviceIcons.length > 3 && <b>+{deviceIcons.length - 3}</b>}
+        </div>
+
+        <button
+          type="button"
+          className="run-scene"
+          disabled={!actionCount || running}
+          onClick={(e) => {
+            e.stopPropagation();
+            onRun();
+          }}
+          title="Chạy kịch bản ngay"
+        >
+          {running ? <i /> : runSuccess ? '✓' : '▶'}
+        </button>
+
+        <span className="scene-menu-wrap">
+          <button
+            type="button"
+            className="card-affordance"
+            onClick={(event) => {
+              event.stopPropagation();
+              setMenu(!menu);
+            }}
+            title="Tùy chọn kịch bản"
+          >
+            <Icon name="more" size={19} />
+          </button>
+          {menu && (
+            <span className="scene-menu glass-g2">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setMenu(false);
+                  onOpen();
+                }}
+              >
+                Chỉnh sửa
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setMenu(false);
+                  onHistory();
+                }}
+              >
+                Xem lịch sử
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setMenu(false);
+                  onDuplicate();
+                }}
+              >
+                Nhân bản
+              </button>
+              <button
+                type="button"
+                className="danger"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setMenu(false);
+                  onDelete();
+                }}
+              >
+                Xóa kịch bản
+              </button>
+            </span>
+          )}
+        </span>
+      </div>
+
+      {running && (
+        <span className="scenario-progress">
+          <i />
+        </span>
+      )}
+    </article>
+  );
+}
+
+function PanelShell({
+  title,
+  caption,
+  onClose,
+  children,
+}: {
+  title: string;
+  caption: string;
+  onClose: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="scene-layer">
+      <button className="detail-scrim" onClick={onClose} aria-label="Đóng" type="button" />
+      <aside className="scene-panel glass-g2">
+        <div className="sheet-handle" />
+        <header className="scene-panel-header">
+          <button className="detail-icon-button" onClick={onClose} type="button">
+            ×
+          </button>
+          <div>
+            <strong>{title}</strong>
+            <small>{caption}</small>
+          </div>
+        </header>
+        <div className="scene-panel-scroll">{children}</div>
+      </aside>
+    </div>
+  );
+}
+
+function SceneHistory({
+  scene,
+  homeId,
+  onRerun,
+}: {
+  scene: SceneResponse;
+  homeId: string;
+  onRerun?: () => void;
+}) {
+  const [filter, setFilter] = useState<'Tất cả' | 'Thành công' | 'Có lỗi'>('Tất cả');
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [executions, setExecutions] = useState<SceneExecutionResponse[]>([]);
-  const [success, setSuccess] = useState('');
-  const [selectedSceneId, setSelectedSceneId] = useState(sceneId);
+  const [loading, setLoading] = useState(true);
 
-  // Filters & Search
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterTab, setFilterTab] = useState<'all' | 'enabled' | 'disabled'>('all');
-  const [showIconPicker, setShowIconPicker] = useState(false);
-
-  // Reset editor when navigating; keep the workspace data mounted.
-  if (selectedSceneId !== sceneId) {
-    setSelectedSceneId(sceneId);
-    const existing = (cached || scenes).find((s) => s.id === sceneId);
-    if (existing) {
-      setEditingScene(existing);
-      setName(existing.name);
-      setIcon(existing.icon ?? 'home');
-      setDescription(existing.description ?? '');
-      setEnabled(existing.enabled);
-      setActions(sceneActionsToDraft(existing.actions));
-      setLoadingScene(false);
-    } else {
-      setEditingScene(null);
-      setLoadingScene(Boolean(sceneId));
-      setName('');
-      setIcon('home');
-      setDescription('');
-      setEnabled(true);
-      setActions([]);
-    }
-    setError('');
-    setSuccess('');
-  }
-
-  // 1. Fast path: load scenes list first
   useEffect(() => {
     let active = true;
-    if (!scenes.length) setLoadingScenes(true);
-
-    getScenes(homeId)
-      .then((sceneResult) => {
-        if (!active) return;
-        setScenes(sceneResult);
-        setLoadingScenes(false);
+    setLoading(true);
+    getSceneExecutions(homeId, scene.id)
+      .then((res) => {
+        if (active) setExecutions(res || []);
       })
-      .catch((caught: unknown) => {
-        if (active) setError(caught instanceof Error ? caught.message : 'Không thể tải danh sách kịch bản');
+      .catch((err) => {
+        console.warn('Lỗi tải lịch sử kịch bản:', err);
       })
       .finally(() => {
-        if (active) setLoadingScenes(false);
+        if (active) setLoading(false);
       });
-
     return () => {
       active = false;
     };
-  }, [homeId]);
+  }, [homeId, scene.id]);
 
-  // 2. Background path: load devices and action types
-  useEffect(() => {
-    let active = true;
-    Promise.all([
-      getDevices(homeId).catch(() => []),
-      getSceneActionTypes(homeId).catch(() => []),
-    ])
-      .then(([devs, types]) => {
-        if (!active) return;
-        setDevices(devs);
-        setActionTypes(types);
-      })
-      .finally(() => {
-        if (active) setLoadingOptions(false);
-      });
+  const filtered = useMemo(() => {
+    return executions.filter((ex) => {
+      const isSuccess = ex.status === 'SUCCESS' || ex.resultDetail?.every((r) => r.success);
+      if (filter === 'Thành công') return isSuccess;
+      if (filter === 'Có lỗi') return !isSuccess;
+      return true;
+    });
+  }, [executions, filter]);
 
-    return () => {
-      active = false;
-    };
-  }, [homeId]);
-
-  // 3. Scene detail fetching: fast memory lookup first, network fallback
-  useEffect(() => {
-    if (!sceneId) {
-      setEditingScene(null);
-      setName('');
-      setIcon('home');
-      setDescription('');
-      setEnabled(true);
-      setActions([]);
-      setLoadingScene(false);
-      return;
+  const formatTime = (iso: string) => {
+    try {
+      const d = new Date(iso);
+      return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    } catch {
+      return '00:00';
     }
+  };
 
-    const foundInState = (cached || scenes).find((s) => s.id === sceneId);
-    if (foundInState) {
-      setEditingScene(foundInState);
-      setName(foundInState.name);
-      setIcon(foundInState.icon ?? 'home');
-      setDescription(foundInState.description ?? '');
-      setEnabled(foundInState.enabled);
-      setActions(sceneActionsToDraft(foundInState.actions));
-      setLoadingScene(false);
-      return;
+  const formatTrigger = (trigger: string) => {
+    switch (trigger) {
+      case 'MANUAL': return 'Chạy thủ công';
+      case 'SCHEDULE': return 'Theo lịch trình';
+      case 'AUTOMATION': return 'Theo tự động hóa';
+      case 'VOICE': return 'Giọng nói AI';
+      default: return 'Kích hoạt';
     }
+  };
 
-    let active = true;
-    setLoadingScene(true);
-    getScene(homeId, sceneId)
-      .then((scene) => {
-        if (!active) return;
-        setEditingScene(scene);
-        setName(scene.name);
-        setIcon(scene.icon ?? 'home');
-        setDescription(scene.description ?? '');
-        setEnabled(scene.enabled);
-        setActions(sceneActionsToDraft(scene.actions));
-      })
-      .catch((caught: unknown) => {
-        if (active) {
-          setError(caught instanceof Error ? caught.message : 'Không thể tải kịch bản.');
-        }
-      })
-      .finally(() => {
-        if (active) setLoadingScene(false);
-      });
+  return (
+    <div className="scene-panel-content">
+      <div className="history-filters">
+        {(['Tất cả', 'Thành công', 'Có lỗi'] as const).map((item) => (
+          <button
+            key={item}
+            type="button"
+            className={filter === item ? 'active' : ''}
+            onClick={() => setFilter(item)}
+          >
+            {item}
+          </button>
+        ))}
+      </div>
 
-    return () => {
-      active = false;
-    };
-  }, [homeId, sceneId]);
+      {loading ? (
+        <div className="p-8 text-center text-xs text-slate-400">
+          Đang tải lịch sử thực thi...
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="p-8 text-center text-xs text-slate-400">
+          Chưa có lịch sử thực thi nào cho kịch bản này.
+        </div>
+      ) : (
+        <>
+          <h3>Lần chạy gần đây</h3>
+          {filtered.map((ex) => {
+            const isSuccess = ex.status === 'SUCCESS' || ex.resultDetail?.every((r) => r.success);
+            const totalActions = ex.resultDetail?.length || scene.actions?.length || 1;
+            const successActions = ex.resultDetail?.filter((r) => r.success).length || (isSuccess ? totalActions : 0);
+            const isExp = expandedId === ex.id;
 
-  const addAction = () => {
-    const firstDev =
-      devices.find((d) => getSceneDeviceActions(d, actionTypes).length > 0) || devices[0];
+            return (
+              <div className="scene-run" key={ex.id}>
+                <button
+                  type="button"
+                  onClick={() => setExpandedId(isExp ? null : ex.id)}
+                >
+                  <span className={isSuccess ? '' : 'error'}>
+                    {isSuccess ? '✓' : '!'}
+                  </span>
+                  <strong>{formatTime(ex.startedAt)}</strong>
+                  <p>{formatTrigger(ex.triggerSource)}</p>
+                  <small>{`${successActions}/${totalActions} hành động`}</small>
+                </button>
+
+                {isExp && (
+                  <div className="run-actions">
+                    {ex.resultDetail && ex.resultDetail.length > 0 ? (
+                      ex.resultDetail.map((act, idx) => (
+                        <p key={idx}>
+                          <span>{`Thiết bị ${act.deviceId?.slice(0, 8) || ''} · ${act.action}`}</span>
+                          <b className={act.success ? 'text-emerald-600' : 'text-rose-500'}>
+                            {act.success ? 'Thành công' : act.message || 'Không phản hồi'}
+                          </b>
+                        </p>
+                      ))
+                    ) : (
+                      <p>
+                        <span>{scene.name}</span>
+                        <b>{isSuccess ? 'Thành công' : 'Có lỗi'}</b>
+                      </p>
+                    )}
+                    {!isSuccess && onRerun && (
+                      <button type="button" onClick={onRerun}>
+                        Chạy lại kịch bản
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </>
+      )}
+    </div>
+  );
+}
+
+function AiSuggestions({
+  onClose,
+  onApplySuggestion,
+}: {
+  onClose: () => void;
+  onApplySuggestion: (name: string, description: string, icon: IconName) => void;
+}) {
+  const [list, setList] = useState<[IconName, string, string, string][]>([
+    [
+      'moon',
+      'Chuẩn bị đi ngủ',
+      'Bạn thường tắt đèn lúc 23:00',
+      'Tắt đèn · Khóa cửa',
+    ],
+    [
+      'energy',
+      'Tiết kiệm điện',
+      'Điều hòa thường bật khi không có người',
+      'Tắt điều hòa · Tắt đèn',
+    ],
+    [
+      'home',
+      'Chào đón về nhà',
+      'Bạn thường về nhà lúc 18:15',
+      'Mở đèn · Bật điều hòa',
+    ],
+    [
+      'film',
+      'Xem phim cuối tuần',
+      'Thường kích hoạt vào tối thứ Bảy',
+      'Đổi màu đèn sang Điện ảnh · Bật quạt',
+    ],
+  ]);
+
+  const handleDismiss = (name: string) => {
+    setList((prev) => prev.filter((item) => item[1] !== name));
+  };
+
+  return (
+    <PanelShell
+      title="Gợi ý cho bạn"
+      caption="Dựa trên thói quen gần đây"
+      onClose={onClose}
+    >
+      <div className="ai-list">
+        {list.map(([icon, name, reason, actions]) => (
+          <article className="ai-card glass-g1" key={name}>
+            <span>
+              <Icon name={icon} />
+            </span>
+            <div>
+              <strong>{name}</strong>
+              <p>{reason}</p>
+            </div>
+            <small>{actions}</small>
+            <footer>
+              <button type="button" onClick={() => handleDismiss(name)}>
+                Bỏ qua
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onApplySuggestion(name, reason, icon);
+                  onClose();
+                }}
+              >
+                Thêm kịch bản
+              </button>
+            </footer>
+          </article>
+        ))}
+        {list.length === 0 && (
+          <div className="p-8 text-center text-xs text-slate-400">
+            Không còn gợi ý nào mới.
+          </div>
+        )}
+      </div>
+    </PanelShell>
+  );
+}
+
+function SceneEditorPanel({
+  scene,
+  homeId,
+  devices,
+  actionTypes,
+  onClose,
+  onSaved,
+}: {
+  scene?: SceneResponse | null;
+  homeId: string;
+  devices: DeviceSummary[];
+  actionTypes: SceneActionType[];
+  onClose: () => void;
+  onSaved: (savedScene: SceneResponse) => void;
+}) {
+  const isEdit = Boolean(scene?.id);
+  const [name, setName] = useState(scene?.name || '');
+  const [description, setDescription] = useState(scene?.description || '');
+  const [icon, setIcon] = useState<IconName>(
+    scene ? getFigmaIconForScene(scene.name, scene.icon) : 'sun'
+  );
+  const [enabled, setEnabled] = useState(scene ? scene.enabled : true);
+  const [actions, setActions] = useState<DraftSceneAction[]>(
+    scene ? sceneActionsToDraft(scene.actions) : []
+  );
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleAddAction = () => {
+    const firstDev = devices.find((d) => getSceneDeviceActions(d, actionTypes).length > 0) || devices[0];
     const available = firstDev ? getSceneDeviceActions(firstDev, actionTypes) : [];
     const firstOpt = available[0];
-    setActions((current) => [
-      ...current,
-      {
-        deviceId: firstDev?.id ?? '',
-        action: firstOpt?.code ?? '',
-        value: firstOpt?.defaultValue ?? '',
-      },
-    ]);
+
+    const newAction: DraftSceneAction = {
+      deviceId: firstDev ? firstDev.id : '',
+      action: firstOpt ? firstOpt.code : 'TURN_ON',
+      value: '',
+    };
+    setActions((prev) => [...prev, newAction]);
   };
 
-  const updateAction = (index: number, patch: Partial<DraftSceneAction>) =>
-    setActions((current) =>
-      current.map((item, itemIndex) => (itemIndex === index ? { ...item, ...patch } : item)),
-    );
-
-  const changeActionDevice = (index: number, deviceId: string) => {
-    const selected = devices.find((device) => device.id === deviceId);
-    const available = getSceneDeviceActions(selected, actionTypes);
-    const option = available[0];
-    updateAction(index, { deviceId, action: option?.code ?? '', value: option?.defaultValue ?? '' });
-  };
-
-  const changeActionType = (index: number, actionCode: string) => {
-    const selected = devices.find((device) => device.id === actions[index]?.deviceId);
-    const option = getSceneDeviceActions(selected, actionTypes).find(
-      (candidate) => candidate.code === actionCode,
-    );
-    updateAction(index, { action: actionCode, value: option?.defaultValue ?? '' });
-  };
-
-  const moveAction = (index: number, direction: -1 | 1) =>
-    setActions((current) => {
-      const target = index + direction;
-      if (target < 0 || target >= current.length) return current;
-      const next = [...current];
-      [next[index], next[target]] = [next[target], next[index]];
-      return next;
-    });
-
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) {
+      setError('Vui lòng nhập tên kịch bản');
+      return;
+    }
     setSaving(true);
     setError('');
-    setSuccess('');
+
     try {
-      const input = {
-        name: name.trim(),
-        icon,
-        description: description.trim(),
-        enabled,
-        actions: actions.map((action, order) =>
-          buildSceneActionInput(action, order, devices, actionTypes),
-        ),
-      };
-      if (sceneId) {
-        const updated = await updateScene(homeId, sceneId, input);
-        setEditingScene(updated);
-        setActions(sceneActionsToDraft(updated.actions));
-        setScenes((current) => current.map((s) => (s.id === updated.id ? updated : s)));
-        notify.success('Lưu kịch bản thành công', `Đã cập nhật kịch bản "${updated.name}".`);
+      const payloadActions = actions.map((a, idx) => buildSceneActionInput(a, idx, devices as AnyDevice[]));
+      let result: SceneResponse;
+
+      if (isEdit && scene?.id) {
+        result = await updateScene(homeId, scene.id, {
+          name: name.trim(),
+          description: description.trim() || undefined,
+          icon,
+          enabled,
+          actions: payloadActions,
+        });
+        notify.success('Cập nhật kịch bản thành công');
       } else {
-        const created = await createScene(homeId, input);
-        setScenes((current) => [...current, created].sort((a, b) => a.name.localeCompare(b.name)));
-        setName('');
-        setDescription('');
-        setActions([]);
-        notify.success('Tạo kịch bản thành công', `Đã tạo kịch bản "${input.name}" với ${input.actions.length} hành động.`);
+        result = await createScene(homeId, {
+          name: name.trim(),
+          description: description.trim() || undefined,
+          icon,
+          enabled,
+          actions: payloadActions,
+        });
+        notify.success('Tạo kịch bản mới thành công');
       }
-    } catch (caught) {
-      const msg = caught instanceof Error
-        ? caught.message
-        : 'Không thể lưu kịch bản. Vui lòng kiểm tra hành động.';
+      onSaved(result);
+      onClose();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Lỗi lưu kịch bản';
       setError(msg);
-      notify.error('Lưu kịch bản thất bại', msg);
+      notify.error('Lỗi lưu kịch bản', msg);
     } finally {
       setSaving(false);
     }
   };
 
-  const [deletingScene, setDeletingScene] = useState<SceneResponse | null>(null);
-  const [deleteLoading, setDeleteLoading] = useState(false);
+  const iconOptions: IconName[] = [
+    'sun',
+    'moon',
+    'home',
+    'door',
+    'film',
+    'briefcase',
+    'lamp',
+    'snowflake',
+    'sparkles',
+    'energy',
+    'shield',
+    'lock',
+  ];
 
-  const handleConfirmDelete = async () => {
-    if (!deletingScene) return;
-    setDeleteLoading(true);
+  const handleDeviceChange = (idx: number, newDevId: string) => {
+    const dev = devices.find((d) => d.id === newDevId);
+    const available = dev ? getSceneDeviceActions(dev, actionTypes) : [];
+    const firstOpt = available[0];
+    setActions((prev) =>
+      prev.map((a, i) =>
+        i === idx
+          ? {
+              deviceId: newDevId,
+              action: firstOpt ? firstOpt.code : 'TURN_ON',
+              value: firstOpt?.defaultValue != null ? String(firstOpt.defaultValue) : '',
+            }
+          : a
+      )
+    );
+  };
+
+  const handleActionChange = (idx: number, newAction: string) => {
+    setActions((prev) =>
+      prev.map((a, i) => {
+        if (i !== idx) return a;
+        const dev = devices.find((d) => d.id === a.deviceId);
+        const opt = dev
+          ? getSceneDeviceActions(dev, actionTypes).find((o) => o.code === newAction)
+          : undefined;
+        return {
+          ...a,
+          action: newAction,
+          value: opt?.defaultValue != null ? String(opt.defaultValue) : '',
+        };
+      })
+    );
+  };
+
+  const handleValueChange = (idx: number, val: string) => {
+    setActions((prev) =>
+      prev.map((a, i) => (i === idx ? { ...a, value: val } : a))
+    );
+  };
+
+  return (
+    <PanelShell
+      title={isEdit ? scene?.name || 'Chỉnh sửa kịch bản' : 'Tạo kịch bản mới'}
+      caption={isEdit ? 'Chỉnh sửa kịch bản' : 'Thiết lập kịch bản thông minh'}
+      onClose={onClose}
+    >
+      <form onSubmit={handleSave} className="space-y-5">
+        {error && (
+          <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">
+            {error}
+          </div>
+        )}
+
+        {/* Name input */}
+        <div className="color-name-field">
+          <span>Tên kịch bản</span>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="VD: Chào buổi sáng, Xem phim..."
+            maxLength={40}
+            required
+            autoFocus
+          />
+        </div>
+
+        {/* Icon picker */}
+        <div>
+          <label className="text-xs font-semibold text-[var(--text)] block mb-2">
+            Biểu tượng
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {iconOptions.map((ic) => (
+              <button
+                key={ic}
+                type="button"
+                className={`w-10 h-10 rounded-xl border flex items-center justify-center transition-all ${
+                  icon === ic
+                    ? 'border-blue-500 bg-blue-50 text-blue-600 shadow-xs'
+                    : 'border-[var(--border)] bg-[var(--solid)] text-[var(--secondary)] hover:bg-[var(--muted)]'
+                }`}
+                onClick={() => setIcon(ic)}
+              >
+                <Icon name={ic} size={18} />
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Description */}
+        <div className="color-name-field">
+          <span>Mô tả kịch bản (tùy chọn)</span>
+          <input
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Mô tả ngắn gọn mục đích kịch bản..."
+            maxLength={100}
+          />
+        </div>
+
+        {/* Enabled toggle */}
+        <div className="flex items-center justify-between p-3.5 rounded-2xl bg-[var(--muted)] border border-[var(--border)]">
+          <div>
+            <strong className="text-xs font-semibold text-[var(--text)] block">
+              Kích hoạt kịch bản
+            </strong>
+            <small className="text-[11px] text-[var(--tertiary)]">
+              Cho phép kịch bản sẵn sàng chạy
+            </small>
+          </div>
+          <button
+            type="button"
+            className={`toggle ${enabled ? 'active' : ''}`}
+            onClick={() => setEnabled(!enabled)}
+          >
+            <span />
+          </button>
+        </div>
+
+        {/* Actions list */}
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-semibold text-[var(--text)]">
+              Hành động thiết bị ({actions.length})
+            </span>
+            <button
+              type="button"
+              className="text-xs text-[var(--accent)] font-semibold hover:underline"
+              onClick={handleAddAction}
+            >
+              + Thêm hành động
+            </button>
+          </div>
+
+          {actions.length === 0 ? (
+            <div className="p-4 rounded-2xl border border-dashed border-[var(--border)] text-center text-xs text-[var(--tertiary)]">
+              Chưa có hành động nào. Nhấn "+ Thêm hành động" để cấu hình thiết bị.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {actions.map((act, index) => {
+                const dev = devices.find((d) => d.id === act.deviceId);
+                const availableActions = dev
+                  ? getSceneDeviceActions(dev, actionTypes)
+                  : [];
+                const currentOpt = availableActions.find((o) => o.code === act.action);
+                const needsValue =
+                  currentOpt?.valueKind === 'percentage' ||
+                  currentOpt?.valueKind === 'number' ||
+                  currentOpt?.valueKind === 'color' ||
+                  currentOpt?.valueKind === 'text';
+
+                return (
+                  <div
+                    key={index}
+                    className="p-3.5 rounded-2xl border border-[var(--border)] bg-[var(--muted)] space-y-2.5"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] font-semibold text-[var(--tertiary)] uppercase tracking-wider">
+                        Hành động #{index + 1}
+                      </span>
+                      <button
+                        type="button"
+                        className="w-7 h-7 rounded-lg text-[var(--tertiary)] hover:text-rose-500 hover:bg-[var(--solid)] flex items-center justify-center text-sm font-bold transition-colors"
+                        onClick={() =>
+                          setActions((prev) => prev.filter((_, i) => i !== index))
+                        }
+                        title="Xóa hành động"
+                      >
+                        ×
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[11px] text-[var(--secondary)] block mb-1">
+                          Thiết bị
+                        </label>
+                        <select
+                          className="scene-select"
+                          value={act.deviceId}
+                          onChange={(e) => handleDeviceChange(index, e.target.value)}
+                        >
+                          {devices.map((d) => (
+                            <option key={d.id} value={d.id}>
+                              {d.name} ({d.deviceType || 'Thiết bị'})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="text-[11px] text-[var(--secondary)] block mb-1">
+                          Lệnh thực thi
+                        </label>
+                        <select
+                          className="scene-select"
+                          value={act.action}
+                          onChange={(e) => handleActionChange(index, e.target.value)}
+                        >
+                          {availableActions.map((opt) => (
+                            <option key={opt.code} value={opt.code}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    {needsValue && (
+                      <div>
+                        <label className="text-[11px] text-[var(--secondary)] block mb-1">
+                          {currentOpt?.valueLabel || 'Giá trị tham số'}
+                        </label>
+                        {currentOpt?.valueKind === 'color' ? (
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="color"
+                              className="w-10 h-10 rounded-xl cursor-pointer border border-[var(--border)] p-1 bg-[var(--solid)]"
+                              value={act.value || currentOpt.defaultValue || '#ffc107'}
+                              onChange={(e) => handleValueChange(index, e.target.value)}
+                            />
+                            <input
+                              type="text"
+                              className="scene-select flex-1 font-mono text-xs uppercase"
+                              value={act.value || currentOpt.defaultValue || '#ffc107'}
+                              onChange={(e) => handleValueChange(index, e.target.value)}
+                              placeholder="#RRGGBB"
+                            />
+                          </div>
+                        ) : (
+                          <input
+                            type={
+                              currentOpt?.valueKind === 'number' ||
+                              currentOpt?.valueKind === 'percentage'
+                                ? 'number'
+                                : 'text'
+                            }
+                            className="scene-select"
+                            value={act.value}
+                            onChange={(e) => handleValueChange(index, e.target.value)}
+                            placeholder={
+                              currentOpt?.valueKind === 'percentage'
+                                ? '0 - 100%'
+                                : 'Giá trị...'
+                            }
+                          />
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Footer buttons */}
+        <div className="flex justify-end gap-2 pt-4 border-t border-[var(--border)]">
+          <button
+            type="button"
+            className="scene-ghost"
+            onClick={onClose}
+          >
+            Hủy
+          </button>
+          <button
+            type="submit"
+            className="add-device"
+            disabled={saving || !name.trim()}
+          >
+            {saving ? 'Đang lưu…' : isEdit ? 'Cập nhật' : 'Tạo kịch bản'}
+          </button>
+        </div>
+      </form>
+    </PanelShell>
+  );
+}
+
+
+function ScenesEmpty({
+  mode,
+  onCreate,
+  onQuickCreate,
+}: {
+  mode: 'empty' | 'search' | 'active';
+  onCreate: () => void;
+  onQuickCreate: (name: string) => void;
+}) {
+  if (mode !== 'empty') {
+    return (
+      <div className="scenes-empty">
+        <strong>
+          {mode === 'search'
+            ? 'Không tìm thấy kịch bản'
+            : 'Chưa có kịch bản đang bật'}
+        </strong>
+        <p>
+          {mode === 'search'
+            ? 'Thử từ khóa khác hoặc xóa bộ lọc.'
+            : 'Bật một kịch bản để hiển thị tại đây.'}
+        </p>
+      </div>
+    );
+  }
+  return (
+    <div className="scenes-empty">
+      <strong>Chưa có kịch bản nào</strong>
+      <p>Kịch bản giúp điều khiển nhiều thiết bị chỉ với một lần chạm</p>
+      <div>
+        {['Chào buổi sáng', 'Chúc ngủ ngon', 'Rời khỏi nhà', 'Về đến nhà'].map(
+          (item) => (
+            <button key={item} type="button" onClick={() => onQuickCreate(item)}>
+              {item}
+            </button>
+          )
+        )}
+      </div>
+      <button className="add-device" type="button" onClick={onCreate}>
+        + Tạo kịch bản
+      </button>
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Main ScenePage Component
+// ──────────────────────────────────────────────────────────────────────────
+
+export function ScenePage() {
+  const navigate = useNavigate();
+  const { homeId: routeHomeId, sceneId } = useParams<{ homeId?: string; sceneId?: string }>();
+  const authUser = useAppSelector((state) => state.auth.user);
+  const currentReduxHomeId = useAppSelector((state) => state.auth.currentHomeId);
+  const homeId = routeHomeId || currentReduxHomeId || authUser?.homeId || '';
+
+  const [scenes, setScenes] = useState<SceneResponse[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<'Tất cả' | 'Đang bật' | 'Đang tắt'>('Tất cả');
+  const [query, setQuery] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
+
+  // Devices & Action Types for Editor
+  const [devices, setDevices] = useState<DeviceSummary[]>([]);
+  const [actionTypes, setActionTypes] = useState<SceneActionType[]>([]);
+
+  // Execution states
+  const [runningId, setRunningId] = useState<string | null>(null);
+  const [successId, setSuccessId] = useState<string | null>(null);
+  const [failedIds, setFailedIds] = useState<Record<string, boolean>>({});
+
+  // Sheets & Dialogs
+  type SheetType =
+    | null
+    | { type: 'editor'; scene?: SceneResponse | null }
+    | { type: 'history'; scene: SceneResponse }
+    | { type: 'ai' };
+
+  const [sheet, setSheet] = useState<SheetType>(null);
+  const [deletingScene, setDeletingScene] = useState<SceneResponse | null>(null);
+
+  // Fetch scenes from backend
+  const fetchScenes = useCallback(async (silent = false) => {
+    if (!homeId) return;
     try {
-      await deleteScene(homeId, deletingScene.id);
-      setScenes((current) => current.filter((scene) => scene.id !== deletingScene.id));
-      if (deletingScene.id === editingScene?.id) navigate(`/homes/${homeId}/scenes`);
-      notify.success('Xóa kịch bản thành công', `Kịch bản "${deletingScene.name}" đã được xóa khỏi hệ thống.`);
-      setDeletingScene(null);
-    } catch (caught) {
-      const msg = caught instanceof Error ? caught.message : 'Không thể xóa kịch bản';
-      setError(msg);
-      notify.error('Xóa kịch bản thất bại', msg);
+      if (!silent) setLoading(true);
+      const data = await getScenes(homeId);
+      setScenes(data || []);
+    } catch (err: unknown) {
+      notify.error(getErrorMessage(err, 'Lỗi tải danh sách kịch bản'));
     } finally {
-      setDeleteLoading(false);
+      if (!silent) setLoading(false);
+    }
+  }, [homeId]);
+
+  // Initial load
+  useEffect(() => {
+    void fetchScenes();
+    if (homeId) {
+      Promise.all([
+        getDevices(homeId).catch(() => []),
+        getSceneActionTypes(homeId).catch(() => []),
+      ]).then(([devs, types]) => {
+        setDevices(devs);
+        setActionTypes(types);
+      });
+    }
+  }, [fetchScenes, homeId]);
+
+  // Handle sceneId param from URL if navigated directly
+  useEffect(() => {
+    if (sceneId && scenes.length > 0) {
+      const found = scenes.find((s) => s.id === sceneId);
+      if (found) {
+        setSheet({ type: 'editor', scene: found });
+      }
+    }
+  }, [sceneId, scenes]);
+
+  // Toggle active/inactive
+  const handleToggle = async (scene: SceneResponse) => {
+    const nextState = !scene.enabled;
+    // Optimistic UI update
+    setScenes((prev) =>
+      prev.map((s) => (s.id === scene.id ? { ...s, enabled: nextState } : s))
+    );
+
+    try {
+      const updated = await updateScene(homeId, scene.id, sceneToggleInput(scene));
+      setScenes((prev) =>
+        prev.map((s) => (s.id === updated.id ? updated : s))
+      );
+      notify.success(
+        updated.enabled ? `Đã bật "${scene.name}"` : `Đã tắt "${scene.name}"`
+      );
+    } catch (err: unknown) {
+      // Revert optimistic update
+      setScenes((prev) =>
+        prev.map((s) => (s.id === scene.id ? { ...s, enabled: scene.enabled } : s))
+      );
+      notify.error(getErrorMessage(err, 'Không thể cập nhật trạng thái kịch bản'));
     }
   };
 
-  const run = async (scene: SceneResponse) => {
+  // Run scene
+  const handleRun = async (scene: SceneResponse) => {
+    if (!scene.actions?.length) {
+      notify.info('Kịch bản chưa có hành động nào để thực thi');
+      return;
+    }
     setRunningId(scene.id);
-    setError('');
-    setSuccess('');
     try {
-      const result = await executeScene(homeId, scene.id);
-      const successCount = result.resultDetail.filter((item) => item.success).length;
-      const totalCount = result.resultDetail.length;
-      if (result.status === 'SUCCESS' || (totalCount > 0 && successCount === totalCount)) {
-        notify.success(
-          'Kích hoạt kịch bản thành công',
-          `Kịch bản "${scene.name}": hoàn thành ${successCount}/${totalCount} hành động.`,
-        );
+      const res = await executeScene(homeId, scene.id);
+      const isOk = res.status === 'SUCCESS' || res.resultDetail?.every((r) => r.success);
+      if (isOk) {
+        setSuccessId(scene.id);
+        setFailedIds((prev) => ({ ...prev, [scene.id]: false }));
+        notify.success(`Đã kích hoạt "${scene.name}" thành công`);
+        window.setTimeout(() => setSuccessId(null), 1400);
       } else {
-        notify.warning(
-          `Kịch bản "${scene.name}": ${result.status}`,
-          `${successCount}/${totalCount} hành động thành công.`,
-        );
+        setFailedIds((prev) => ({ ...prev, [scene.id]: true }));
+        notify.warning(`Kịch bản "${scene.name}" chạy với một số lỗi`);
       }
-      if (historyId === scene.id) setExecutions(await getSceneExecutions(homeId, scene.id));
-    } catch (caught) {
-      const msg = caught instanceof Error ? caught.message : 'Không thể chạy kịch bản.';
-      setError(msg);
-      notify.error('Kích hoạt kịch bản thất bại', msg);
+    } catch (err: unknown) {
+      setFailedIds((prev) => ({ ...prev, [scene.id]: true }));
+      notify.error(getErrorMessage(err, 'Lỗi khi kích hoạt kịch bản'));
     } finally {
       setRunningId(null);
     }
   };
 
-  const viewHistory = async (selectedIdForHistory: string) => {
-    if (historyId === selectedIdForHistory) {
-      setHistoryId(null);
-      return;
-    }
-    setHistoryId(selectedIdForHistory);
-    setExecutions([]);
+  // Duplicate scene
+  const handleDuplicate = async (scene: SceneResponse) => {
     try {
-      setExecutions(await getSceneExecutions(homeId, selectedIdForHistory));
-    } catch (caught) {
-      const msg = caught instanceof Error ? caught.message : 'Không thể tải lịch sử.';
-      setError(msg);
-      notify.error('Không thể tải lịch sử thực thi', msg);
+      const duplicatePayload = {
+        name: `${scene.name} (Bản sao)`,
+        description: scene.description || undefined,
+        icon: scene.icon,
+        enabled: scene.enabled,
+        actions: (scene.actions || []).map((a, idx) => ({
+          targetDeviceId: a.targetDeviceId,
+          action: a.action,
+          value: a.value,
+          order: idx,
+        })),
+      };
+      const created = await createScene(homeId, duplicatePayload);
+      setScenes((prev) => [...prev, created]);
+      notify.success(`Đã nhân bản kịch bản "${created.name}"`);
+    } catch (err: unknown) {
+      notify.error(getErrorMessage(err, 'Không thể nhân bản kịch bản'));
     }
   };
 
-  const toggle = async (scene: SceneResponse) => {
-    const nextState = !scene.enabled;
-    setTogglingSceneId(scene.id);
-    setError('');
-
-    // Optimistic UI update: flip switch immediately
-    setScenes((current) =>
-      current.map((item) => (item.id === scene.id ? { ...item, enabled: nextState } : item))
-    );
-    if (scene.id === editingScene?.id) {
-      setEnabled(nextState);
-      setEditingScene((prev) => (prev ? { ...prev, enabled: nextState } : null));
-    }
-
+  // Delete scene
+  const handleDeleteConfirm = async () => {
+    if (!deletingScene) return;
     try {
-      const updated = await updateScene(homeId, scene.id, sceneToggleInput(scene));
-      setScenes((current) => current.map((item) => (item.id === updated.id ? updated : item)));
-      if (scene.id === editingScene?.id) {
-        setEditingScene(updated);
-        setEnabled(updated.enabled);
-      }
-      notify.success(
-        updated.enabled ? 'Đã kích hoạt kịch bản' : 'Đã tạm dừng kịch bản',
-        `Kịch bản "${scene.name}" hiện đang ${updated.enabled ? 'bật' : 'tắt'}.`,
-      );
-    } catch (caught) {
-      // Revert optimistic toggle
-      setScenes((current) =>
-        current.map((item) => (item.id === scene.id ? { ...item, enabled: scene.enabled } : item))
-      );
-      if (scene.id === editingScene?.id) {
-        setEnabled(scene.enabled);
-        setEditingScene((prev) => (prev ? { ...prev, enabled: scene.enabled } : null));
-      }
-      const msg = caught instanceof Error ? caught.message : 'Không thể đổi trạng thái kịch bản.';
-      setError(msg);
-      notify.error('Lỗi khi đổi trạng thái kịch bản', msg);
-    } finally {
-      setTogglingSceneId(null);
+      await deleteScene(homeId, deletingScene.id);
+      setScenes((prev) => prev.filter((s) => s.id !== deletingScene.id));
+      notify.success(`Đã xóa kịch bản "${deletingScene.name}"`);
+      setDeletingScene(null);
+    } catch (err: unknown) {
+      notify.error(getErrorMessage(err, 'Không thể xóa kịch bản'));
     }
   };
 
-  const filteredScenes = useMemo(() => {
+  // Quick create from empty state or suggestions
+  const handleQuickCreate = (name: string, reason?: string, ic?: IconName) => {
+    setSheet({
+      type: 'editor',
+      scene: {
+        id: '',
+        homeId,
+        name,
+        description: reason || '',
+        icon: ic || getFigmaIconForScene(name),
+        enabled: true,
+        actions: [],
+        createdAt: '',
+        updatedAt: '',
+      },
+    });
+  };
+
+  const handleCreateScene = () => {
+    setSheet({ type: 'editor', scene: null });
+  };
+
+  // Filtered list
+  const visibleScenes = useMemo(() => {
     return scenes.filter((scene) => {
       const matchesSearch =
-        scene.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (scene.description || '').toLowerCase().includes(searchQuery.toLowerCase());
+        scene.name.toLowerCase().includes(query.toLowerCase()) ||
+        (scene.description || '').toLowerCase().includes(query.toLowerCase());
       if (!matchesSearch) return false;
-      if (filterTab === 'enabled') return scene.enabled;
-      if (filterTab === 'disabled') return !scene.enabled;
+      if (filter === 'Đang bật') return scene.enabled;
+      if (filter === 'Đang tắt') return !scene.enabled;
       return true;
     });
-  }, [scenes, searchQuery, filterTab]);
+  }, [scenes, query, filter]);
 
   const activeCount = scenes.filter((s) => s.enabled).length;
-  const totalActionsCount = scenes.reduce((acc, cur) => acc + cur.actions.length, 0);
+  const totalActions = scenes.reduce((acc, cur) => acc + (cur.actions?.length || 0), 0);
+  const userInitial = authUser?.fullName
+    ? authUser.fullName.trim().split(' ').slice(-1)[0]?.charAt(0).toUpperCase() || 'M'
+    : 'M';
 
   return (
-    <FeatureShell title="Kịch bản" homeId={homeId}>
-      {/* Alert Notices */}
-      {error && (
-        <div
-          role="alert"
-          className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-xs font-medium text-rose-700 flex items-center justify-between gap-3 shadow-xs"
-        >
-          <div className="flex items-center gap-2">
-            <AlertCircle size={16} className="text-rose-600 shrink-0" />
-            <span>{error}</span>
-          </div>
-          <button onClick={() => setError('')} className="text-rose-500 hover:text-rose-700">
-            ✕
-          </button>
-        </div>
-      )}
+    <div className="app-shell scenes-page">
+      {/* 3 Pastel glowing background meshes */}
+      <div className="mesh mesh-one" />
+      <div className="mesh mesh-two" />
+      <div className="mesh mesh-three" />
 
-      {success && (
-        <div
-          role="status"
-          className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-xs font-semibold text-emerald-800 flex items-center justify-between gap-3 shadow-xs"
-        >
-          <div className="flex items-center gap-2">
-            <CheckCircle2 size={16} className="text-emerald-600 shrink-0 stroke-[2.5]" />
-            <span>{success}</span>
-          </div>
-          <button onClick={() => setSuccess('')} className="text-emerald-600 hover:text-emerald-800">
-            ✕
-          </button>
-        </div>
-      )}
-
-      {/* Modern Dashboard Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="surface-card p-4 flex items-center gap-3.5">
-          <div className="w-11 h-11 rounded-2xl bg-primary/10 text-primary flex items-center justify-center font-bold">
-            <Layers size={20} />
-          </div>
-          <div>
-            <span className="text-xs text-muted block font-medium">Tổng kịch bản</span>
-            {loadingScenes ? (
-              <span className="h-6 w-10 bg-sidebar rounded animate-pulse block mt-1" />
-            ) : (
-              <span className="text-xl font-bold text-text">{scenes.length}</span>
-            )}
-          </div>
-        </div>
-
-        <div className="surface-card p-4 flex items-center gap-3.5">
-          <div className="w-11 h-11 rounded-2xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center font-bold">
-            <Check size={20} />
-          </div>
-          <div>
-            <span className="text-xs text-muted block font-medium">Đang hoạt động</span>
-            {loadingScenes ? (
-              <span className="h-6 w-10 bg-sidebar rounded animate-pulse block mt-1" />
-            ) : (
-              <span className="text-xl font-bold text-text">{activeCount}</span>
-            )}
-          </div>
-        </div>
-
-        <div className="surface-card p-4 flex items-center gap-3.5">
-          <div className="w-11 h-11 rounded-2xl bg-indigo-500/10 text-indigo-600 flex items-center justify-center font-bold">
-            <Zap size={20} />
-          </div>
-          <div>
-            <span className="text-xs text-muted block font-medium">Tổng lệnh liên kết</span>
-            {loadingScenes ? (
-              <span className="h-6 w-10 bg-sidebar rounded animate-pulse block mt-1" />
-            ) : (
-              <span className="text-xl font-bold text-text">{totalActionsCount}</span>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Main Workspace Layout */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Left Column: Scene List */}
-        <section className="surface-card p-5 sm:p-6 space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-4">
-            <div>
-              <h2 className="text-lg font-bold text-text tracking-tight">Danh sách kịch bản</h2>
-              <p className="text-xs text-muted">
-                Bấm vào kịch bản để xem và chỉnh sửa luồng thiết bị.
-              </p>
-            </div>
-            {!sceneId && (
-              <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-primary/10 text-primary border border-primary/20">
-                {scenes.length} kịch bản
-              </span>
-            )}
-          </div>
-
-          {/* Search & Filter Bar */}
-          <div className="flex flex-wrap items-center justify-between gap-2.5">
-            <div className="relative flex-1 min-w-[180px]">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
-              <input
-                type="text"
-                placeholder="Tìm kịch bản..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-line bg-surface text-xs text-text placeholder-muted focus:border-primary focus:outline-none"
-              />
-            </div>
-
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() => setFilterTab('all')}
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${
-                  filterTab === 'all'
-                    ? 'bg-primary text-white shadow-xs'
-                    : 'text-muted hover:text-text'
-                }`}
-              >
-                Tất cả
-              </button>
-              <button
-                type="button"
-                onClick={() => setFilterTab('enabled')}
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${
-                  filterTab === 'enabled'
-                    ? 'bg-emerald-600 text-white shadow-xs'
-                    : 'text-muted hover:text-text'
-                }`}
-              >
-                Bật
-              </button>
-              <button
-                type="button"
-                onClick={() => setFilterTab('disabled')}
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${
-                  filterTab === 'disabled'
-                    ? 'bg-slate-600 text-white shadow-xs'
-                    : 'text-muted hover:text-text'
-                }`}
-              >
-                Tắt
-              </button>
-            </div>
-          </div>
-
-          {/* Scenes List */}
-          <div className="space-y-3.5 pt-1">
-            {loadingScenes && !scenes.length ? (
-              <div className="space-y-3">
-                {[1, 2, 3].map((i) => (
-                  <div
-                    key={i}
-                    className="rounded-3xl border border-line bg-surface p-4 sm:p-5 animate-pulse space-y-3"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="h-4 w-32 bg-sidebar rounded" />
-                      <div className="h-5 w-16 bg-sidebar rounded-full" />
-                    </div>
-                    <div className="h-3 w-48 bg-sidebar/60 rounded" />
-                    <div className="h-8 bg-sidebar/40 rounded-xl mt-2" />
-                  </div>
-                ))}
-              </div>
-            ) : filteredScenes.map((scene) => {
-              const isSelected = scene.id === sceneId;
-              const theme = detectSceneTheme(scene.name, scene.icon);
-
-              return (
-                <article
-                  key={scene.id}
-                  className={`relative overflow-hidden rounded-3xl border p-4 sm:p-5 transition-all duration-300 ${
-                    isSelected
-                      ? 'border-primary ring-4 ring-primary/15 bg-primary/5 shadow-md'
-                      : 'border-line bg-surface hover:border-primary/40 shadow-2xs hover:shadow-xs'
-                  }`}
-                >
-                  {/* Subtle top gradient accent */}
-                  <div
-                    className={`absolute inset-x-0 top-0 h-16 bg-gradient-to-b ${theme.bgGradient} opacity-70 pointer-events-none`}
-                    aria-hidden="true"
-                  />
-
-                  <Link
-                    to={`/homes/${homeId}/scenes/${scene.id}`}
-                    className="relative z-10 block rounded-2xl focus-visible:outline-2 focus-visible:outline-primary"
-                    aria-label={`Mở kịch bản ${scene.name} để sửa`}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-center gap-3.5">
-                        <SceneIcon iconKey={scene.icon} name={scene.name} size="md" />
-                        <div>
-                          <h3 className="font-bold text-sm text-text flex items-center gap-1.5">
-                            <span>{scene.name}</span>
-                          </h3>
-                          <p className="text-[11px] text-muted mt-0.5 font-medium">
-                            {scene.actions.length} lệnh ·{' '}
-                            {scene.enabled ? 'Đang bật' : 'Đang tắt'}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* State tag */}
-                      <span
-                        className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
-                          scene.enabled
-                            ? 'bg-emerald-500/10 text-emerald-700 border border-emerald-300/60'
-                            : 'bg-slate-200/80 text-slate-600'
-                        }`}
-                      >
-                        {scene.enabled ? 'SẴN SÀNG' : 'TẠM TẮT'}
-                      </span>
-                    </div>
-
-                    {/* Actions summary preview */}
-                    {scene.actions.length > 0 && (
-                      <ol className="mt-3.5 space-y-1.5 rounded-2xl bg-sidebar/60 p-3 text-xs text-text border border-line/70">
-                        {scene.actions.slice(0, 3).map((action) => {
-                          const DevIcon = getDeviceTypeIcon(action.targetDeviceType);
-                          return (
-                            <li
-                              key={action.id}
-                              className="truncate text-[11px] flex items-center gap-2"
-                            >
-                              <DevIcon size={13} className="text-primary shrink-0" />
-                              <span className="font-bold text-text truncate max-w-[120px]">
-                                {action.targetDeviceName}:
-                              </span>
-                              <span className="text-muted truncate">
-                                {formatSceneAction(action, devices)}
-                              </span>
-                            </li>
-                          );
-                        })}
-                        {scene.actions.length > 3 && (
-                          <li className="text-[10px] text-primary font-bold pl-5">
-                            +{scene.actions.length - 3} lệnh khác...
-                          </li>
-                        )}
-                      </ol>
-                    )}
-                  </Link>
-
-                  {/* Card Controls Footer */}
-                  <div className="relative z-10 mt-4 flex flex-wrap items-center justify-between border-t border-line/70 pt-3 gap-2">
-                    {/* Toggle Switch */}
-                    <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-bold text-text">
-                      <span className="text-[11px] text-muted">{scene.enabled ? 'Bật' : 'Tắt'}</span>
-                      <input
-                        type="checkbox"
-                        role="switch"
-                        aria-label={`Bật hoặc tắt kịch bản ${scene.name}`}
-                        checked={scene.enabled}
-                        disabled={togglingSceneId === scene.id || (saving && sceneId === scene.id)}
-                        onChange={() => void toggle(scene)}
-                        className="peer sr-only"
-                      />
-                      <span
-                        aria-hidden="true"
-                        className="relative h-5 w-10 rounded-full bg-slate-300 transition-colors after:absolute after:left-1 after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-transform peer-checked:bg-emerald-500 peer-checked:after:translate-x-5 peer-focus-visible:ring-2 peer-focus-visible:ring-primary shadow-xs"
-                      />
-                    </label>
-
-                    {/* Action buttons */}
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <button
-                        type="button"
-                        disabled={!scene.enabled || runningId === scene.id}
-                        onClick={() => void run(scene)}
-                        className="inline-flex items-center gap-1.5 rounded-xl bg-primary hover:bg-primary-hover px-3.5 py-1.5 text-xs font-bold text-white shadow-xs disabled:opacity-50 transition-all active:scale-95"
-                      >
-                        {runningId === scene.id ? (
-                          <Loader2 size={12} className="animate-spin" />
-                        ) : (
-                          <Play size={11} className="fill-current" />
-                        )}
-                        <span>{runningId === scene.id ? 'Đang chạy...' : 'Chạy ngay'}</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => void viewHistory(scene.id)}
-                        className="rounded-xl border border-line bg-surface hover:bg-sidebar px-2.5 py-1.5 text-xs font-semibold text-text transition-colors shadow-2xs"
-                      >
-                        Lịch sử
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setScheduleId(scheduleId === scene.id ? null : scene.id)}
-                        className={`rounded-xl border border-line px-2.5 py-1.5 text-xs font-semibold transition-colors shadow-2xs ${
-                          scheduleId === scene.id
-                            ? 'bg-amber-500 text-white border-amber-500'
-                            : 'bg-surface hover:bg-sidebar text-text'
-                        }`}
-                      >
-                        Lịch chạy
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setDeletingScene(scene)}
-                        className="rounded-xl bg-rose-50 hover:bg-rose-100 px-2.5 py-1.5 text-xs font-semibold text-rose-600 transition-colors border border-rose-200/60 cursor-pointer"
-                      >
-                        Xóa
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Inline History Accordion */}
-                  {historyId === scene.id && (
-                    <section
-                      aria-label={`Lịch sử kịch bản ${scene.name}`}
-                      className="mt-3.5 rounded-2xl bg-sidebar/70 p-4 text-xs text-text border border-line space-y-2 animate-in fade-in"
-                    >
-                      <div className="flex items-center justify-between font-bold text-xs pb-1 border-b border-line/60">
-                        <span>Lịch sử chạy gần đây</span>
-                        <span className="text-[11px] text-muted">
-                          {executions.length} lần thực thi
-                        </span>
-                      </div>
-                      {!executions.length ? (
-                        <p className="text-muted italic py-2">Chưa có lần chạy nào.</p>
-                      ) : (
-                        executions.map((item) => (
-                          <div key={item.id} className="border-b border-line/60 py-2 last:border-0">
-                            <div className="flex items-center justify-between">
-                              <span className="font-semibold text-text">
-                                {new Date(item.startedAt).toLocaleString('vi-VN')}
-                              </span>
-                              <span
-                                className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                                  item.status === 'SUCCESS'
-                                    ? 'bg-emerald-100 text-emerald-700'
-                                    : 'bg-amber-100 text-amber-700'
-                                }`}
-                              >
-                                {item.status}
-                              </span>
-                            </div>
-                            <p className="text-[11px] text-muted mt-0.5">
-                              Nguồn: {item.triggerSource === 'MANUAL' ? 'Thủ công' : item.triggerSource === 'AUTOMATION' ? 'Quy tắc tự động' : 'Theo lịch'} ·{' '}
-                              {item.resultDetail.filter((result) => result.success).length}/
-                              {item.resultDetail.length} hành động thành công
-                            </p>
-                          </div>
-                        ))
-                      )}
-                    </section>
-                  )}
-
-                  {/* Inline Schedule Panel */}
-                  {scheduleId === scene.id && (
-                    <div className="mt-3.5 pt-3 border-t border-line">
-                      <SchedulePanel homeId={homeId} kind="scenes" targetId={scene.id} />
-                    </div>
-                  )}
-                </article>
-              );
-            })}
-
-            {!loadingScenes && !filteredScenes.length && (
-              <p className="text-xs text-muted italic p-6 text-center bg-sidebar/20 rounded-2xl border border-dashed border-line">
-                Chưa có kịch bản.
-              </p>
-            )}
-          </div>
-        </section>
-
-        {/* Right Column: Visual Scene Editor Form */}
-        {loadingScene ? (
-          <section className="surface-card p-6 flex flex-col items-center justify-center min-h-[300px]">
-            <Loader2 size={32} className="animate-spin text-primary mb-3" />
-            <p className="text-sm font-semibold text-text">Đang tải kịch bản...</p>
-          </section>
-        ) : sceneId && !editingScene ? (
-          <section className="surface-card p-6 text-center space-y-3">
-            <AlertCircle size={32} className="mx-auto text-amber-500" />
-            <p className="text-sm font-bold text-text">Không thể mở kịch bản này.</p>
-            <Link to={`/homes/${homeId}/scenes`} className="text-xs font-semibold text-primary underline">
-              Về danh sách kịch bản
-            </Link>
-          </section>
-        ) : (
-          <form
-            onSubmit={submit}
-            className="surface-card p-5 sm:p-6 space-y-5 transition-all shadow-soft"
-          >
-            {/* Editor Header */}
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-4">
-              <div className="flex items-center gap-3">
-                <SceneIcon iconKey={icon} name={name} size="md" />
-                <div>
-                  <h2 className="text-lg font-bold text-text">
-                    {sceneId ? 'Sửa kịch bản' : 'Tạo kịch bản'}
-                  </h2>
-                  <p className="text-xs text-muted">
-                    {sceneId ? 'Cập nhật chuỗi lệnh cho kịch bản đã chọn.' : 'Tạo mới một kịch bản thông minh.'}
-                  </p>
-                </div>
-              </div>
-
-              {sceneId && (
-                <Link
-                  to={`/homes/${homeId}/scenes`}
-                  className="inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline bg-primary/10 px-3 py-1.5 rounded-xl border border-primary/20"
-                >
-                  <Plus size={13} />
-                  <span>Tạo kịch bản mới</span>
-                </Link>
-              )}
-            </div>
-
-            {/* Quick Templates Bar (if creating new) */}
-            {!sceneId && (
-              <div className="space-y-1.5 bg-sidebar/50 p-3 rounded-2xl border border-line">
-                <span className="text-[11px] font-bold text-muted flex items-center gap-1">
-                  <Sparkles size={12} className="text-amber-500" /> Mẫu thông dụng:
-                </span>
-                <div className="flex flex-wrap gap-1.5">
-                  {SCENE_PRESETS.slice(0, 4).map((p) => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => {
-                        setName(p.name);
-                        setIcon(p.icon);
-                        setDescription(p.description);
-                      }}
-                      className="px-2.5 py-1 rounded-lg bg-surface hover:bg-sidebar text-xs text-text border border-line transition-all hover:scale-102"
-                    >
-                      {p.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Name input */}
-            <Field label="Tên">
-              <input
-                required
-                maxLength={150}
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Ví dụ: Chào buổi sáng"
-                className="w-full rounded-xl border border-line bg-surface px-3 py-2 text-xs text-text focus:border-primary focus:outline-none"
-              />
-            </Field>
-
-            {/* Icon picker */}
-            <Field label="Biểu tượng">
-              <div className="relative">
-                <div className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setShowIconPicker(!showIconPicker)}
-                    className="flex items-center gap-2.5 px-3 py-2 rounded-xl border border-line bg-surface hover:bg-sidebar text-xs font-semibold text-text transition-all cursor-pointer shadow-2xs"
-                    title="Bấm để đổi biểu tượng"
-                  >
-                    <SceneIcon iconKey={icon} name={name} size="xs" />
-                    <span>{AVAILABLE_ICONS.find((i) => i.key === icon)?.label || 'Chọn biểu tượng'}</span>
-                  </button>
-                  <span className="text-[11px] text-muted">Bấm vào nút để chọn biểu tượng kịch bản</span>
-                </div>
-
-                {showIconPicker && (
-                  <div className="absolute left-0 top-full mt-2 z-50 w-72 max-h-64 overflow-y-auto rounded-2xl border border-line bg-surface p-3 shadow-xl grid grid-cols-4 gap-1.5 backdrop-blur-md">
-                    {AVAILABLE_ICONS.map((item) => {
-                      const isSelected = icon === item.key;
-                      const IconComp = item.icon;
-                      return (
-                        <button
-                          key={item.key}
-                          type="button"
-                          onClick={() => {
-                            setIcon(item.key);
-                            setShowIconPicker(false);
-                          }}
-                          className={`flex flex-col items-center justify-center p-2 rounded-xl transition-all cursor-pointer ${
-                            isSelected
-                              ? 'bg-primary text-white shadow-xs scale-105'
-                              : 'hover:bg-sidebar text-text'
-                          }`}
-                          title={item.label}
-                        >
-                          <IconComp size={18} />
-                          <span className="text-[10px] mt-1 font-medium truncate max-w-full">
-                            {item.label}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </Field>
-
-            {/* Description input */}
-            <Field label="Mô tả">
-              <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Mô tả tóm tắt mục đích kịch bản..."
-                rows={2}
-                className="w-full rounded-xl border border-line bg-surface px-3 py-2 text-xs text-text focus:border-primary focus:outline-none resize-none"
-              />
-            </Field>
-
-            {/* Enabled checkbox */}
-            <label className="flex items-center gap-2 text-xs font-semibold text-text cursor-pointer p-3 rounded-xl bg-sidebar/40 border border-line">
-              <input
-                type="checkbox"
-                checked={enabled}
-                onChange={(e) => setEnabled(e.target.checked)}
-                className="rounded accent-primary w-4 h-4 cursor-pointer"
-              />
-              <span>Bật kịch bản</span>
-            </label>
-
-            {/* Action sequence builder */}
-            <div className="space-y-3 pt-3 border-t border-line">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-bold text-xs text-text flex items-center gap-1.5">
-                    <Sliders size={14} className="text-primary" />
-                    <span>Hành động ({actions.length})</span>
-                  </h3>
-                  <p className="text-[11px] text-muted">
-                    Các lệnh thiết bị chạy tuần tự khi kịch bản được kích hoạt.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={addAction}
-                  disabled={saving || loadingOptions || !devices.length}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-primary hover:bg-primary-hover px-3.5 py-1.5 text-xs font-bold text-white shadow-xs transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
-                >
-                  <Plus size={14} />
-                  <span>Thêm hành động</span>
-                </button>
-              </div>
-
-              {loadingOptions ? (
-                <p className="text-xs text-muted py-3">Đang tải thiết bị và hành động...</p>
-              ) : !devices.length ? (
-                <p className="text-xs text-muted py-3 italic">
-                  Chưa có thiết bị đã ghép nối trong nhà này.
-                </p>
-              ) : null}
-
-              <div className="space-y-2.5">
-                {actions.map((action, index) => {
-                  const selectedDevice = devices.find((device) => device.id === action.deviceId);
-                  const availableActions = getSceneDeviceActions(selectedDevice, actionTypes);
-                  const selectedOption = availableActions.find(
-                    (option) => option.code === action.action,
-                  );
-
-                  const DevIcon = getDeviceTypeIcon(selectedDevice?.deviceType);
-
-                  return (
-                    <div
-                      key={index}
-                      className="space-y-3 rounded-2xl border border-line bg-surface p-4 shadow-2xs hover:border-primary/50 transition-all"
-                    >
-                      <div className="flex items-center justify-between border-b border-line/60 pb-2.5">
-                        <span className="text-xs font-bold text-text flex items-center gap-2">
-                          <span className="w-6 h-6 rounded-xl bg-primary/10 text-primary text-[11px] font-bold flex items-center justify-center border border-primary/20">
-                            {index + 1}
-                          </span>
-                          <span>Bước {index + 1}</span>
-                        </span>
-
-                        <div className="flex items-center gap-1">
-                          <button
-                            type="button"
-                            aria-label={`Đưa hành động ${index + 1} lên`}
-                            disabled={index === 0}
-                            onClick={() => moveAction(index, -1)}
-                            className="p-1.5 rounded-lg text-muted hover:text-text hover:bg-sidebar disabled:opacity-25 transition-colors"
-                            title="Di chuyển lên"
-                          >
-                            <ArrowUp size={13} />
-                          </button>
-                          <button
-                            type="button"
-                            aria-label={`Đưa hành động ${index + 1} xuống`}
-                            disabled={index === actions.length - 1}
-                            onClick={() => moveAction(index, 1)}
-                            className="p-1.5 rounded-lg text-muted hover:text-text hover:bg-sidebar disabled:opacity-25 transition-colors"
-                            title="Di chuyển xuống"
-                          >
-                            <ArrowDown size={13} />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setActions((items) => items.filter((_, i) => i !== index))}
-                            className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 text-xs font-semibold ml-1 transition-colors"
-                            title="Xóa bước này"
-                          >
-                            <Trash2 size={13} />
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        <div>
-                          <label className="block text-[11px] font-bold text-muted mb-1 flex items-center gap-1">
-                            <DevIcon size={12} className="text-primary" />
-                            <span>Thiết bị</span>
-                          </label>
-                          <select
-                            required
-                            value={action.deviceId}
-                            onChange={(e) => changeActionDevice(index, e.target.value)}
-                            className="w-full rounded-xl border border-line bg-surface px-3 py-2 text-xs font-semibold text-text focus:border-primary focus:outline-none shadow-2xs"
-                          >
-                            <option value="" disabled>
-                              Chọn thiết bị đã ghép nối
-                            </option>
-                            {devices.map((device) => (
-                              <option key={device.id} value={device.id}>
-                                {device.name}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        <div>
-                          <label className="block text-[11px] font-bold text-muted mb-1">
-                            Lệnh thực thi
-                          </label>
-                          <select
-                            required
-                            value={action.action}
-                            onChange={(e) => changeActionType(index, e.target.value)}
-                            disabled={!selectedDevice || !availableActions.length}
-                            className="w-full rounded-xl border border-line bg-surface px-3 py-2 text-xs font-semibold text-text focus:border-primary focus:outline-none disabled:opacity-50 shadow-2xs"
-                          >
-                            {!selectedDevice && <option value="">Chọn thiết bị trước</option>}
-                            {selectedDevice && !availableActions.length && (
-                              <option value="">Không có hành động phù hợp</option>
-                            )}
-                            {availableActions.map((option) => (
-                              <option key={option.code} value={option.code}>
-                                {option.label}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-
-                      {selectedOption?.valueKind === 'none' && (
-                        <p className="text-[11px] text-muted italic pt-1">
-                          Lệnh này không cần tham số giá trị bổ sung.
-                        </p>
-                      )}
-
-                      {/* 1. POWER (TURN_ON / TURN_OFF / TOGGLE) quick toggle buttons */}
-                      {(action.action === 'TURN_ON' || action.action === 'TURN_OFF' || action.action === 'TOGGLE') && (
-                        <div className="space-y-1.5 pt-2">
-                          <span className="text-[11px] font-bold text-muted uppercase tracking-wider block">
-                            Chế độ nguồn:
-                          </span>
-                          <div className="grid grid-cols-3 gap-2">
-                            <button
-                              type="button"
-                              onClick={() => changeActionType(index, 'TURN_ON')}
-                              className={`py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                                action.action === 'TURN_ON'
-                                  ? 'bg-emerald-600 text-white shadow-xs'
-                                  : 'bg-surface hover:bg-sidebar text-text border border-line'
-                              }`}
-                            >
-                              Bật nguồn (ON)
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => changeActionType(index, 'TURN_OFF')}
-                              className={`py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                                action.action === 'TURN_OFF'
-                                  ? 'bg-slate-700 text-white shadow-xs'
-                                  : 'bg-surface hover:bg-sidebar text-text border border-line'
-                              }`}
-                            >
-                              Tắt nguồn (OFF)
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => changeActionType(index, 'TOGGLE')}
-                              className={`py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                                action.action === 'TOGGLE'
-                                  ? 'bg-primary text-white shadow-xs'
-                                  : 'bg-surface hover:bg-sidebar text-text border border-line'
-                              }`}
-                            >
-                              Đảo bật/tắt
-                            </button>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* 2. BRIGHTNESS / PERCENTAGE */}
-                      {selectedOption?.valueKind === 'percentage' && (
-                        <div className="pt-2 bg-sidebar/30 p-3 rounded-xl border border-line/60 space-y-2">
-                          <div className="flex justify-between items-center text-xs font-bold text-text mb-1.5">
-                            <span className="flex items-center gap-1.5">
-                              <Sun size={14} className="text-amber-500" />
-                              <span>{selectedOption.valueLabel || 'Mức độ (%)'}</span>
-                            </span>
-                            <span className="font-extrabold text-primary text-sm px-2 py-0.5 rounded-lg bg-primary/10 border border-primary/20">
-                              {action.value || 0}%
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <input
-                              type="range"
-                              min={0}
-                              max={100}
-                              step={1}
-                              value={action.value || '50'}
-                              onChange={(e) => updateAction(index, { value: e.target.value })}
-                              className="flex-1 accent-primary cursor-pointer h-2 bg-slate-200 rounded-lg"
-                            />
-                            <input
-                              required
-                              type="number"
-                              min={0}
-                              max={100}
-                              value={action.value}
-                              onChange={(e) => updateAction(index, { value: e.target.value })}
-                              className="w-16 rounded-xl border border-line px-2 py-1.5 text-xs text-center font-bold bg-surface"
-                            />
-                          </div>
-                          {/* Quick presets for brightness */}
-                          <div className="flex flex-wrap gap-1.5 pt-1">
-                            {[
-                              { label: '25% (Ngủ)', val: '25' },
-                              { label: '50% (Dịu)', val: '50' },
-                              { label: '75% (Chuẩn)', val: '75' },
-                              { label: '100% (Sáng)', val: '100' },
-                            ].map((preset) => (
-                              <button
-                                key={preset.val}
-                                type="button"
-                                onClick={() => updateAction(index, { value: preset.val })}
-                                className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
-                                  action.value === preset.val
-                                    ? 'bg-amber-500 text-white'
-                                    : 'bg-surface hover:bg-sidebar text-text border border-line'
-                                }`}
-                              >
-                                {preset.label}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* 3. TEMPERATURE / NUMBER */}
-                      {selectedOption?.valueKind === 'number' && (
-                        <div className="pt-2 bg-sidebar/30 p-3 rounded-xl border border-line/60">
-                          <label className="block text-[11px] font-bold text-muted mb-1.5 flex items-center gap-1.5">
-                            <Thermometer size={14} className="text-primary" />
-                            <span>{selectedOption.valueLabel || 'Nhiệt độ (°C)'}</span>
-                          </label>
-                          <div className="flex items-center gap-2 max-w-[220px]">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const val = Number(action.value || 25);
-                                updateAction(index, { value: String(Math.max(16, val - 1)) });
-                              }}
-                              className="w-9 h-9 rounded-xl border border-line bg-surface font-extrabold text-base text-text flex items-center justify-center hover:bg-sidebar active:scale-95 shadow-2xs"
-                            >
-                              -
-                            </button>
-                            <input
-                              required
-                              type="number"
-                              value={action.value}
-                              onChange={(e) => updateAction(index, { value: e.target.value })}
-                              className="w-20 rounded-xl border border-line px-2 py-1.5 text-sm text-center font-bold bg-surface"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const val = Number(action.value || 25);
-                                updateAction(index, { value: String(Math.min(32, val + 1)) });
-                              }}
-                              className="w-9 h-9 rounded-xl border border-line bg-surface font-extrabold text-base text-text flex items-center justify-center hover:bg-sidebar active:scale-95 shadow-2xs"
-                            >
-                              +
-                            </button>
-                            <span className="text-xs font-bold text-muted ml-1">°C</span>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* 4. JSON */}
-                      {selectedOption?.valueKind === 'json' && (
-                        <div className="pt-1">
-                          <label className="block text-[11px] font-bold text-muted mb-1">
-                            {selectedOption.valueLabel}
-                          </label>
-                          <textarea
-                            required
-                            value={action.value}
-                            onChange={(e) => updateAction(index, { value: e.target.value })}
-                            className="w-full rounded-xl border border-line bg-surface px-3 py-2 text-xs font-mono text-text focus:border-primary focus:outline-none"
-                            placeholder='{"power": "ON"}'
-                            rows={2}
-                          />
-                        </div>
-                      )}
-
-                      {/* 5. COLOR (SET_RGB / SET_COLOR / valueKind === 'color') */}
-                      {(selectedOption?.valueKind === 'color' || action.action === 'SET_RGB' || action.action === 'SET_COLOR') && (
-                        <div className="pt-2 bg-sidebar/30 p-3 rounded-xl border border-line/60 space-y-2">
-                          <div className="flex items-center justify-between">
-                            <label className="text-[11px] font-bold text-muted flex items-center gap-1.5">
-                              <Palette size={14} className="text-primary" />
-                              <span>{selectedOption?.valueLabel || 'Màu sắc RGB'}</span>
-                            </label>
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="color"
-                                value={action.value?.startsWith('#') ? action.value : '#ffc107'}
-                                onChange={(e) => updateAction(index, { value: e.target.value })}
-                                className="w-7 h-7 rounded-lg border border-line cursor-pointer p-0.5 bg-surface"
-                              />
-                              <span className="text-xs font-mono font-bold text-text uppercase">
-                                {action.value || '#ffc107'}
-                              </span>
-                            </div>
-                          </div>
-                          {/* Color swatches with checkmarks */}
-                          <div className="flex flex-wrap gap-1.5 pt-1">
-                            {[
-                              { label: 'Trắng ấm', hex: '#fff4e5' },
-                              { label: 'Vàng nắng', hex: '#ffc107' },
-                              { label: 'Cam hoàng hôn', hex: '#ff7043' },
-                              { label: 'Đỏ', hex: '#f44336' },
-                              { label: 'Xanh lá', hex: '#4caf50' },
-                              { label: 'Xanh băng', hex: '#00bcd4' },
-                              { label: 'Xanh dương', hex: '#2196f3' },
-                              { label: 'Tím', hex: '#9c27b0' },
-                              { label: 'Hồng', hex: '#e91e63' },
-                            ].map((preset) => {
-                              const isSelected = (action.value || '#ffc107').toLowerCase() === preset.hex.toLowerCase();
-                              return (
-                                <button
-                                  key={preset.hex}
-                                  type="button"
-                                  onClick={() => updateAction(index, { value: preset.hex })}
-                                  className={`px-2 py-1 rounded-lg text-[11px] font-medium border transition-all flex items-center gap-1.5 cursor-pointer ${
-                                    isSelected
-                                      ? 'border-primary bg-primary/10 text-primary font-bold shadow-2xs ring-1 ring-primary/40'
-                                      : 'border-line/70 bg-surface text-text hover:border-line'
-                                  }`}
-                                >
-                                  <span
-                                    className="w-3 h-3 rounded-full inline-flex items-center justify-center border border-black/10 shrink-0"
-                                    style={{ backgroundColor: preset.hex }}
-                                  >
-                                    {isSelected && <Check size={8} className="text-slate-800" />}
-                                  </span>
-                                  {preset.label}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* 6. GENERAL TEXT (not color) */}
-                      {selectedOption?.valueKind === 'text' && action.action !== 'SET_COLOR' && action.action !== 'SET_RGB' && (
-                        <div className="pt-1">
-                          <label className="block text-[11px] font-bold text-muted mb-1">
-                            {selectedOption.valueLabel}
-                          </label>
-                          <input
-                            required
-                            type="text"
-                            value={action.value}
-                            onChange={(e) => updateAction(index, { value: e.target.value })}
-                            className="w-full rounded-xl border border-line bg-surface px-3 py-2 text-xs font-semibold text-text focus:border-primary focus:outline-none"
-                            placeholder="Nhập giá trị..."
-                          />
-                        </div>
-                      )}
-
-                      {selectedDevice && !selectedOption && (
-                        <p className="text-[11px] text-amber-600">
-                          Thiết bị này chưa hỗ trợ hành động hợp lệ cho kịch bản. Hãy chọn thiết bị khác.
-                        </p>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Submit button */}
-            <button
-              disabled={
-                saving ||
-                actions.some(
-                  (item) =>
-                    !getSceneDeviceActions(
-                      devices.find((device) => device.id === item.deviceId),
-                      actionTypes,
-                    ).some((option) => option.code === item.action),
-                )
-              }
-              className="w-full py-2.5 px-4 rounded-xl bg-primary hover:bg-primary-hover active:scale-98 text-white font-bold text-xs shadow-sm transition-all disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
-            >
-              {saving && <Loader2 size={14} className="animate-spin" />}
-              <span>{saving ? 'Đang lưu...' : sceneId ? 'Lưu thay đổi' : 'Tạo kịch bản'}</span>
-            </button>
-          </form>
-        )}
-      </div>
-
-      {/* Confirm Delete Modal */}
-      <ConfirmModal
-        isOpen={!!deletingScene}
-        title="Xóa kịch bản"
-        description={`Bạn có chắc chắn muốn xóa kịch bản "${deletingScene?.name || ''}" không? Hành động này không thể hoàn tác.`}
-        confirmText="Xóa kịch bản"
-        loading={deleteLoading}
-        onConfirm={handleConfirmDelete}
-        onCancel={() => setDeletingScene(null)}
+      {/* Unified NavRail sidebar */}
+      <DashboardNavRail
+        homeId={homeId}
+        activeItem="scenes"
+        user={authUser || undefined}
+        onSelectOverview={() => navigate('/home')}
       />
-    </FeatureShell>
-  );
-}
 
-function FeatureShell({
-  title,
-  homeId,
-  children,
-}: {
-  title: string;
-  homeId: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="app-shell relative min-h-screen text-text">
-      <HomeSidebar activeItem="scenes" homeId={homeId} />
-      <main className="min-w-0 flex-1 p-4 sm:p-7 lg:pl-64 space-y-6 max-w-7xl mx-auto transition-colors">
-        <header className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-primary" />
-              <h1 className="text-2xl font-black text-text tracking-tight">{title}</h1>
-            </div>
-            <p className="text-xs text-muted mt-0.5">Mã nhà: {homeId}</p>
+      <main>
+        {/* Topbar */}
+        <ScenesTopBar
+          totalCount={scenes.length}
+          activeCount={activeCount}
+          userInitial={userInitial}
+        />
+
+        {/* Actions Bar */}
+        <div className="scenes-actions">
+          <div className="scene-filter">
+            {(['Tất cả', 'Đang bật', 'Đang tắt'] as const).map((item) => (
+              <button
+                key={item}
+                type="button"
+                className={filter === item ? 'active' : ''}
+                onClick={() => setFilter(item)}
+              >
+                {item}
+              </button>
+            ))}
           </div>
 
-          <nav aria-label="Điều hướng tự động hóa" className="flex items-center gap-2">
-            <Link
-              to={`/homes/${homeId}/automation-rules`}
-              className="rounded-xl border border-line bg-surface hover:bg-sidebar px-3.5 py-2 text-xs font-semibold text-text transition-colors shadow-xs"
+          <div className="scene-actions-right">
+            {searchOpen && (
+              <input
+                autoFocus
+                className="inline-search"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Tìm kịch bản"
+              />
+            )}
+            <IconButton
+              icon="search"
+              label="Tìm kiếm"
+              onClick={() => setSearchOpen(!searchOpen)}
+            />
+            <button
+              type="button"
+              className="scene-ghost"
+              onClick={() => navigate(homeId ? `/homes/${homeId}/automation-rules` : '/home')}
             >
               Quy tắc
-            </Link>
-            <Link
-              to={`/homes/${homeId}/recommendations`}
-              className="rounded-xl border border-line bg-surface hover:bg-sidebar px-3.5 py-2 text-xs font-semibold text-text transition-colors shadow-xs"
+            </button>
+            <button
+              type="button"
+              className="scene-ghost"
+              onClick={() => setSheet({ type: 'ai' })}
             >
+              <Icon name="sparkles" size={17} />
               Gợi ý AI
-            </Link>
-            <Link
-              to="/home"
-              className="button inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold shadow-xs"
+            </button>
+            <button
+              type="button"
+              className="add-device"
+              onClick={handleCreateScene}
             >
-              <Home size={13} />
-              <span>Về trang chủ</span>
-            </Link>
-          </nav>
-        </header>
+              + Tạo kịch bản
+            </button>
+          </div>
+        </div>
 
-        {children}
+        {/* Summary Strip */}
+        <div className="scene-summary">
+          <span className="stat">{scenes.length} kịch bản</span>
+          <span className="stat">{activeCount} đang bật</span>
+          <span className="stat">{totalActions} hành động</span>
+        </div>
+
+        {/* Main Content: Skeleton, Empty, or Grid */}
+        {loading && scenes.length === 0 ? (
+          <div className="scenarios-grid">
+            {Array.from({ length: 6 }, (_, index) => (
+              <div className="scenario-skeleton glass-g1" key={index}>
+                <i />
+                <i />
+                <i />
+              </div>
+            ))}
+          </div>
+        ) : query && visibleScenes.length === 0 ? (
+          <ScenesEmpty
+            mode="search"
+            onCreate={handleCreateScene}
+            onQuickCreate={handleQuickCreate}
+          />
+        ) : filter === 'Đang bật' && visibleScenes.length === 0 ? (
+          <ScenesEmpty
+            mode="active"
+            onCreate={handleCreateScene}
+            onQuickCreate={handleQuickCreate}
+          />
+        ) : scenes.length === 0 ? (
+          <ScenesEmpty
+            mode="empty"
+            onCreate={handleCreateScene}
+            onQuickCreate={handleQuickCreate}
+          />
+        ) : (
+          <div className="scenarios-grid">
+            {visibleScenes.map((scene) => (
+              <ScenarioCard
+                key={scene.id}
+                scene={scene}
+                onToggle={() => handleToggle(scene)}
+                onOpen={() => setSheet({ type: 'editor', scene })}
+                onHistory={() => setSheet({ type: 'history', scene })}
+                onDuplicate={() => handleDuplicate(scene)}
+                onDelete={() => setDeletingScene(scene)}
+                onRun={() => handleRun(scene)}
+                running={runningId === scene.id}
+                runSuccess={successId === scene.id}
+                hasFailed={failedIds[scene.id]}
+              />
+            ))}
+          </div>
+        )}
       </main>
+
+      {/* Side Panels / Sheets */}
+      {sheet && (
+        <>
+          {sheet.type === 'ai' && (
+            <AiSuggestions
+              onClose={() => setSheet(null)}
+              onApplySuggestion={handleQuickCreate}
+            />
+          )}
+
+          {sheet.type === 'history' && (
+            <PanelShell
+              title={sheet.scene.name}
+              caption="Lịch sử thực thi"
+              onClose={() => setSheet(null)}
+            >
+              <SceneHistory
+                scene={sheet.scene}
+                homeId={homeId}
+                onRerun={() => handleRun(sheet.scene)}
+              />
+            </PanelShell>
+          )}
+
+          {sheet.type === 'editor' && (
+            <SceneEditorPanel
+              scene={sheet.scene}
+              homeId={homeId}
+              devices={devices}
+              actionTypes={actionTypes}
+              onClose={() => setSheet(null)}
+              onSaved={(saved) => {
+                setScenes((prev) => {
+                  const exists = prev.some((s) => s.id === saved.id);
+                  if (exists) return prev.map((s) => (s.id === saved.id ? saved : s));
+                  return [...prev, saved];
+                });
+              }}
+            />
+          )}
+        </>
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      {deletingScene && (
+        <div className="delete-dialog glass-g2">
+          <strong>Xóa {deletingScene.name}?</strong>
+          <p>Kịch bản sẽ bị xóa khỏi ngôi nhà này.</p>
+          <div>
+            <button type="button" onClick={() => setDeletingScene(null)}>
+              Hủy
+            </button>
+            <button
+              type="button"
+              className="danger"
+              onClick={handleDeleteConfirm}
+            >
+              Xóa kịch bản
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block space-y-1">
-      <span className="text-xs font-semibold text-text">{label}</span>
-      {children}
-    </label>
-  );
-}
+export default ScenePage;
