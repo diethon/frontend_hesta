@@ -95,7 +95,8 @@ test('Twin Adapter preserves HESTA state and suppresses active effects on offlin
   assert.equal(view.state, device.currentState);
   assert.equal(view.powered, true);
   assert.equal(adaptTwinDevice({ ...device, status: 'OFFLINE' }).powered, false);
-  assert.equal(adaptTwinDevice({ ...device, healthStatus: 'STALE' }).powered, false);
+  assert.equal(adaptTwinDevice({ ...device, healthStatus: 'STALE', lastSeen: null }).powered, true);
+  assert.equal(adaptTwinDevice({ ...device, healthStatus: 'OFFLINE', lastSeen: null }).online, true);
   assert.equal(adaptTwinDevice({ ...device, currentState: null }).powered, false);
 });
 
@@ -277,18 +278,20 @@ test('backend snapshot normalizes rooms, devices and exact canonical sensor IDs;
   assert.equal(state.initialized, true);
 });
 
-test('one device event replaces exactly its node, leaves sensors/other devices untouched and accepts equal lastSeen', async () => {
+test('device events follow connection status and event timestamps without lastSeen', async () => {
   const store = await ready(); const before = store.getState().twin;
   emit(store, { ...deviceEvent, data: { ...deviceEvent.data, currentState: { power: false, mode: 'eco' }, healthStatus: 'STALE' } });
   const after = store.getState().twin;
   assert.deepEqual(after.devicesById[deviceId].currentState, { power: false, mode: 'eco' });
   assert.equal(after.devicesById[deviceId].status, 'ONLINE');
-  assert.equal(after.devicesById[deviceId].healthStatus, 'STALE');
+  assert.equal(after.devicesById[deviceId].healthStatus, 'ACTIVE');
   for (const id of before.deviceIds.filter((id) => id !== deviceId)) assert.equal(after.devicesById[id], before.devicesById[id]);
   assert.equal(after.sensorsById, before.sensorsById);
   assert.equal(after.roomsById, before.roomsById);
-  emit(store, { ...deviceEvent, data: { ...deviceEvent.data, lastSeen: '2026-09-17T08:00:00Z' } });
+  emit(store, { ...deviceEvent, data: { ...deviceEvent.data, lastSeen: null }, timestamp: '2026-09-17T08:00:00Z' });
   assert.equal(store.getState().twin, after);
+  emit(store, { ...deviceEvent, data: { ...deviceEvent.data, status: 'OFFLINE', lastSeen: null }, timestamp: later });
+  assert.equal(store.getState().twin.devicesById[deviceId].status, 'OFFLINE');
 });
 
 test('one sensor event changes only its node and rejects older observedAt without fetching', async () => {
@@ -304,13 +307,13 @@ test('one sensor event changes only its node and rejects older observedAt withou
   assert.equal(requests.length, 1);
 });
 
-test('initial health remains authoritative; device room movement updates only its own membership', async () => {
+test('device status and sensor freshness remain independent when room membership changes', async () => {
   const data = structuredClone(snapshot);
   data.rooms[0].devices[0].healthStatus = 'STALE';
   data.rooms[1].sensors[1].healthStatus = 'OFFLINE';
   apiClient.defaults.adapter = async (config) => response(config, data);
   const store = await ready();
-  assert.equal(store.getState().twin.devicesById[deviceId].healthStatus, 'STALE');
+  assert.equal(store.getState().twin.devicesById[deviceId].healthStatus, 'ACTIVE');
   assert.equal(store.getState().twin.sensorsById[sensorId].healthStatus, 'OFFLINE');
   const sensors = store.getState().twin.sensorsById;
   emit(store, { ...deviceEvent, data: { ...deviceEvent.data, roomId: null } });
@@ -365,13 +368,13 @@ test('health evaluation order and delayed complete payloads cannot undo newer he
   assert.equal(store.getState().twin.sensorsById[sensorId].healthStatus, 'ACTIVE');
 });
 
-for (const nodeType of ['DEVICE', 'SENSOR']) test(`health event patches only one ${nodeType} health field`, async () => {
+for (const nodeType of ['DEVICE', 'SENSOR']) test(`freshness event affects sensors only (${nodeType})`, async () => {
   const store = await ready(); const before = store.getState().twin;
   const key = nodeType === 'DEVICE' ? 'devicesById' : 'sensorsById';
   const nodeId = nodeType === 'DEVICE' ? deviceId : sensorId;
   emit(store, { ...healthEvent, data: { ...healthEvent.data, nodeType, nodeId, healthStatus: 'OFFLINE' } });
   const after = store.getState().twin;
-  assert.deepEqual(after[key][nodeId], { ...before[key][nodeId], healthStatus: 'OFFLINE' });
+  assert.deepEqual(after[key][nodeId], nodeType === 'DEVICE' ? before[key][nodeId] : { ...before[key][nodeId], healthStatus: 'OFFLINE' });
   for (const id of Object.keys(before[key]).filter((id) => id !== nodeId)) assert.equal(before[key][id], after[key][id]);
   assert.equal(after[nodeType === 'DEVICE' ? 'sensorsById' : 'devicesById'], before[nodeType === 'DEVICE' ? 'sensorsById' : 'devicesById']);
   assert.equal(requests.length, 1);
@@ -441,10 +444,11 @@ test('events received during initial snapshot load are applied after normalizati
 test('UI renders home/rooms/nodes, values, business state and all backend health statuses after events', async () => {
   const store = await ready();
   let html = render(store);
-  for (const text of ['My Home', 'Living Room', 'Bedroom', 'Ceiling light', 'TEMPERATURE', '26.4', '°C', 'ONLINE', 'ON', 'ACTIVE', 'Lần thấy cuối', 'Cập nhật']) assert.ok(html.includes(text), text);
+  for (const text of ['My Home', 'Living Room', 'Bedroom', 'Ceiling light', 'TEMPERATURE', '26.4', '°C', 'ONLINE', 'ON', 'ACTIVE', 'Cập nhật']) assert.ok(html.includes(text), text);
+  assert.ok(!html.includes('Lần thấy cuối'));
   emit(store, { ...sensorEvent, data: { ...sensorEvent.data, latestValue: 30, healthStatus: 'STALE' } });
   emit(store, { ...deviceEvent, data: { ...deviceEvent.data, currentState: { power: 'OFF' } } });
-  emit(store, { ...healthEvent, data: { ...healthEvent.data, nodeType: 'DEVICE', nodeId: deviceId, healthStatus: 'OFFLINE' } });
+  emit(store, { ...deviceEvent, data: { ...deviceEvent.data, status: 'OFFLINE', currentState: { power: 'OFF' } }, timestamp: later });
   html = render(store);
   assert.match(html, />30</); assert.match(html, />OFF</);
   for (const health of ['ACTIVE', 'STALE', 'OFFLINE']) assert.ok(html.includes(health));

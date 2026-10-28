@@ -29,6 +29,11 @@ import { Block } from '../interior/ApartmentInterior';
 import { readApartmentPalette } from '../interior/apartmentPalette';
 import { InteriorFurniture } from '../interior/InteriorFurniture';
 import { hasApartmentModel, interiorRugs } from '../interior/interiorLayout';
+import { V2Furniture } from '../v2/V2Furniture';
+import { hasV2Furniture } from '../v2/furnitureSupport';
+import { palette as finishPalette } from '../v2/materials';
+import { ArchitecturalDetails } from '../v2/ArchitecturalDetails';
+import { GardenFinish } from '../v2/GardenFinish';
 
 export interface FloorProps {
   floor: TwinFloorView; drafting: TwinDraftingMetadata; selection: TwinLayoutSelection | null;
@@ -40,22 +45,22 @@ export const FloorScene = memo(function FloorScene({ floor, drafting, selection,
   const names = useAppSelector((state) => Object.fromEntries(floor.rooms.map((room) => [room.roomId, state.twin.roomsById[room.roomId]?.name ?? ''])), shallowEqual);
   const architecture = useMemo(() => adaptTwinArchitecture(floor, drafting, names), [floor, drafting, names]);
   const interiorPalette = useMemo(() => {
-    const p = readApartmentPalette(palette);
+    const p = { ...readApartmentPalette(palette), wall: finishPalette.wall, rug: finishPalette.fabric };
     return theme === 'BLUEPRINT' || theme === 'NIGHT' ? { ...p, wall: palette.wall, sofa: palette.fabricAccent, cushion: palette.fabric, rug: palette.rug } : p;
   }, [palette, theme]);
-  const furniture = useMemo(() => architecture.floor.furniture.filter((item) => hasApartmentModel(item.type)), [architecture]);
+  const furniture = useMemo(() => architecture.floor.furniture.filter((item) => hasV2Furniture(item.type) || hasApartmentModel(item.type)), [architecture]);
   const rugs = useMemo(() => architecture.floor.rooms.flatMap((room) => interiorRugs(room, furniture.filter((item) => architecture.furnitureRooms.get(item.id) === room.id))), [architecture, furniture]);
-  const built = useMemo(() => buildFloorGeometry({ ...architecture.floor, furniture: architecture.floor.furniture.filter((item) => !hasApartmentModel(item.type)) }, architecture.exteriorThickness, architecture.interiorThickness), [architecture]);
+  const built = useMemo(() => buildFloorGeometry({ ...architecture.floor, furniture: architecture.floor.furniture.filter((item) => !hasV2Furniture(item.type) && !hasApartmentModel(item.type)) }, architecture.exteriorThickness, architecture.interiorThickness), [architecture]);
   useEffect(() => {
     const p = readApartmentPalette();
     const walls = built.walls.getAttribute('color'), floorColors = built.floor.getAttribute('color');
-    const wallColor = new Color(p.wall);
+    const wallColor = new Color(finishPalette.wall);
     // Only architectural vertices are recoloured; unsupported authored objects retain their materials.
     const firstFurniture = built.furnitureTris.length ? built.furnitureTris[0].start * 3 : walls.count;
     for (let i = 0; i < firstFurniture; i++) walls.setXYZ(i, wallColor.r, wallColor.g, wallColor.b);
     for (const range of built.roomTris) {
       const room = architecture.floor.rooms.find((item) => item.id === range.roomId);
-      const color = new Color(room?.floor_material === 'tiles' ? p.wall : p.floor);
+      const color = new Color(room?.floor_material === 'tiles' ? p.wall : room?.floor_material === 'concrete' || room?.floor_material === 'stone' ? p.surface : p.floor);
       for (let i = range.start * 3; i < range.end * 3; i++) floorColors.setXYZ(i, color.r, color.g, color.b);
     }
     walls.needsUpdate = true;
@@ -76,7 +81,7 @@ export const FloorScene = memo(function FloorScene({ floor, drafting, selection,
     }
     return result;
   }, [built, floor.nodes, deviceTypes]);
-  const roomNodeGroups = useMemo(() => floor.rooms.map((room) => ({ room, nodes: floor.nodes.filter((node) => node.roomId === room.roomId) })), [floor.rooms, floor.nodes]);
+  const roomNodeGroups = useMemo(() => floor.rooms.map((room) => ({ room, architectureRoom: architecture.floor.rooms.find((item) => item.id === room.roomId), nodes: floor.nodes.filter((node) => node.roomId === room.roomId) })), [floor.rooms, floor.nodes, architecture.floor.rooms]);
   const unassignedNodes = useMemo(() => floor.nodes.filter((node) => !floor.rooms.some((room) => room.roomId === node.roomId)), [floor.rooms, floor.nodes]);
   const openings = useMemo(() => buildOpeningParts(built.openings.filter((info) => ![...openingBindings.values()].includes(info)), new Map(), architecture.floor.cut_height), [built, architecture, openingBindings]);
   const masks = useMemo<FoldMasks>(() => ({ standing: { value: 0xffff }, glass: { value: 0 } }), []);
@@ -122,6 +127,8 @@ export const FloorScene = memo(function FloorScene({ floor, drafting, selection,
     <ApartmentFoundation rooms={architecture.floor.rooms} holes={built.holes} color={interiorPalette.wall} />
     <mesh geometry={built.floor} material={materials.floor} receiveShadow castShadow />
     <mesh geometry={built.floor} material={pattern.material} raycast={() => undefined} />
+    <ArchitecturalDetails rooms={architecture.floor.rooms} holes={built.holes} openings={built.openings.filter(info => ![...openingBindings.values()].includes(info))} />
+    <GardenFinish rooms={architecture.floor.rooms.filter(room => drafting.rooms[room.id]?.autoFurniture !== false)} />
     <mesh geometry={built.walls} material={materials.walls} customDepthMaterial={materials.depth} castShadow receiveShadow raycast={raycast} onClick={(event) => selectArchitecture(event, false)} onDoubleClick={(event) => selectArchitecture(event, true)} />
     <mesh geometry={built.walls} material={materials.glassWalls} raycast={() => undefined} renderOrder={3} />
     <lineSegments geometry={built.lines} material={materials.lines} raycast={() => undefined} />
@@ -131,9 +138,10 @@ export const FloorScene = memo(function FloorScene({ floor, drafting, selection,
     <mesh geometry={openings.blinds} material={materials.blinds} raycast={() => undefined} />
     <mesh geometry={lamps} castShadow><meshStandardMaterial vertexColors roughness={.75} /></mesh>
     {rugs.map((rug) => <group key={rug.id} position={[rug.x, .02, rug.z]} rotation={[0, -rug.rotation * Math.PI / 180, 0]}><Block at={[0, 0, 0]} size={[rug.w, rug.h, rug.d]} radius={.1} color={interiorPalette.rug} /></group>)}
-    {furniture.map((item) => <InteriorFurniture key={item.id} item={item} palette={interiorPalette} roomId={architecture.furnitureRooms.get(item.id)} onSelect={(id) => onSelect({ kind: 'room', id })} onFocus={(id) => onFocus({ kind: 'room', id })} />)}
-    {architecture.floor.rooms.map((room) => <RoomScene key={room.id} room={room} selected={selection?.kind === 'room' && selection.id === room.id} showLabel={showLabels} palette={palette} heatmapMode={heatmapMode} onSelect={onSelect} onFocus={onFocus} />)}
-    {roomNodeGroups.map(({ room, nodes }) => <RoomMarkerCluster key={room.roomId} room={room} nodes={nodes} selection={selection} markerMode={markerMode} onFocus={onFocus}>{nodes.map((node) => {
+    {furniture.map((item) => hasV2Furniture(item.type) ? <group key={item.id} name={`interior:${item.id}`} userData={{ interiorModel: item.type, roomId: architecture.furnitureRooms.get(item.id) }} onClick={event => { const id = architecture.furnitureRooms.get(item.id); if (event.delta > 3 || !id) return; event.stopPropagation(); onSelect({ kind: 'room', id }); }} onDoubleClick={event => { const id = architecture.furnitureRooms.get(item.id); if (!id) return; event.stopPropagation(); onFocus({ kind: 'room', id }); }}><V2Furniture item={item} /></group> : <InteriorFurniture key={item.id} item={item} palette={interiorPalette} roomId={architecture.furnitureRooms.get(item.id)} onSelect={(id) => onSelect({ kind: 'room', id })} onFocus={(id) => onFocus({ kind: 'room', id })} />)}
+    {roomNodeGroups.map(({ room, nodes, architectureRoom }) => <RoomMarkerCluster key={room.roomId} room={room} nodes={nodes} selection={selection} markerMode={markerMode} onFocus={onFocus}>
+      {architectureRoom ? <RoomScene room={architectureRoom} selected={selection?.kind === 'room' && selection.id === room.roomId} showLabel={showLabels} palette={palette} heatmapMode={heatmapMode} onSelect={onSelect} onFocus={onFocus} /> : null}
+      {nodes.map((node) => {
       const room = floor.rooms.find((r) => r.roomId === node.roomId), selected = selection?.kind === 'node' && selection.id === `${node.nodeType}:${node.nodeId}`;
       return node.nodeType === 'DEVICE'
         ? <Twin3DDevice key={`DEVICE:${node.nodeId}`} node={node} room={room} opening={openingBindings.get(node.nodeId)} rotation={drafting.nodeRotations?.[`DEVICE:${node.nodeId}`] ?? 0} selected={selected} markerMode={markerMode} houseOverview={mode === 'house' && !showLabels} palette={palette} onSelect={onSelect} onFocus={onFocus} />

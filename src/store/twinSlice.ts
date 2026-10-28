@@ -6,6 +6,7 @@ import { isTwinEvent, type TwinEvent } from '../realtime/twinEvents';
 import { realtimeEventReceived } from './realtimeSlice';
 import { currentHomeChanged, currentHomeCleared } from './homeSlice';
 import { sessionEnded } from './authSlice';
+import { deviceConnectionHealth } from '../services/twinDeviceStatus';
 
 export interface TwinRoom extends Omit<TwinRoomSnapshotResponse, 'devices' | 'sensors'> {
   deviceIds: string[];
@@ -29,12 +30,13 @@ export interface TwinState {
   requestId: string | null;
   pendingEvents: TwinEvent[];
   healthUpdates: Record<string, TwinHealthStatusChangedPayload>;
+  deviceEventTimes: Record<string, string>;
 }
 
 export const emptyTwinState = (homeId: string | null = null): TwinState => ({
   homeId, home: null, roomIds: [], roomsById: {}, deviceIds: [], devicesById: {},
   sensorIds: [], sensorsById: {}, unassignedDeviceIds: [], unassignedSensorIds: [],
-  loading: false, error: null, initialized: false, requestId: null, pendingEvents: [], healthUpdates: {},
+  loading: false, error: null, initialized: false, requestId: null, pendingEvents: [], healthUpdates: {}, deviceEventTimes: {},
 });
 
 function membership(state: TwinState, kind: 'deviceIds' | 'sensorIds', roomId: string | null) {
@@ -63,7 +65,7 @@ export function normalizeTwinSnapshot(snapshot: TwinHomeSnapshotResponse): TwinS
   for (const group of [...snapshot.rooms, { devices: snapshot.unassignedDevices, sensors: snapshot.unassignedSensors }]) {
     for (const device of group.devices) {
       state.deviceIds.push(device.deviceId);
-      state.devicesById[device.deviceId] = device;
+      state.devicesById[device.deviceId] = { ...device, healthStatus: deviceConnectionHealth(device) };
       membership(state, 'deviceIds', device.roomId).push(device.deviceId);
     }
     for (const sensor of group.sensors) {
@@ -89,9 +91,11 @@ function older(incoming: string | null, current: string | null) {
 function applyEvent(state: TwinState, event: TwinEvent) {
   if (event.type === 'TWIN_HEALTH_STATUS_CHANGED') {
     const data = event.data;
-    const node = data.nodeType === 'DEVICE' ? state.devicesById[data.nodeId] : state.sensorsById[data.nodeId];
+    // Legacy device freshness events cannot override authoritative connection status.
+    if (data.nodeType === 'DEVICE') return;
+    const node = state.sensorsById[data.nodeId];
     if (!node) return;
-    const reference = 'lastSeen' in node ? node.lastSeen : node.observedAt;
+    const reference = node.observedAt;
     const key = `${data.nodeType}:${data.nodeId}`;
     const previous = state.healthUpdates[key];
     if (older(data.referenceTime, reference) || (previous && older(data.evaluatedAt, previous.evaluatedAt))) return;
@@ -102,12 +106,12 @@ function applyEvent(state: TwinState, event: TwinEvent) {
   if (event.type === 'DEVICE_STATE_CHANGED') {
     const data = event.data;
     const previous = state.devicesById[data.deviceId];
-    // lastSeen is freshness, not a command sequence: accept equal timestamps.
-    if (previous && older(data.lastSeen, previous.lastSeen)) return;
+    const previousEvent = state.deviceEventTimes[data.deviceId];
+    if (previousEvent && older(event.timestamp, previousEvent)) return;
     moveNode(state, 'deviceIds', data.deviceId, previous?.roomId, data.roomId);
     if (!previous) state.deviceIds.push(data.deviceId);
-    state.devicesById[data.deviceId] = { ...data };
-    preserveNewerHealth(state, `DEVICE:${data.deviceId}`, state.devicesById[data.deviceId], data.lastSeen, event.timestamp);
+    state.devicesById[data.deviceId] = { ...data, healthStatus: deviceConnectionHealth(data) };
+    state.deviceEventTimes[data.deviceId] = event.timestamp;
   } else {
     const data = event.data;
     const previous = state.sensorsById[data.sensorId];

@@ -4,10 +4,10 @@ import { knownPower, sensorVisualKind } from '../twinPresentation';
 export function deviceHealthCounts(devices: TwinDeviceSnapshotResponse[]) {
   const counts = { total: devices.length, online: 0, on: 0, off: 0, offline: 0, warning: 0, unknown: 0 };
   for (const device of devices) {
-    const live = device.status === 'ONLINE' && device.healthStatus === 'ACTIVE';
+    const live = device.status === 'ONLINE';
     if (live) counts.online++;
-    if (device.status === 'OFFLINE' || device.healthStatus === 'OFFLINE') counts.offline++;
-    if (device.status === 'ERROR' || device.healthStatus === 'STALE') counts.warning++;
+    if (device.status === 'OFFLINE') counts.offline++;
+    if (device.status === 'ERROR') counts.warning++;
     const power = live ? knownPower(device.currentState) : null;
     if (power === true) counts.on++;
     else if (power === false) counts.off++;
@@ -41,7 +41,6 @@ export function latestDashboardMetric(sensors: TwinSensorSnapshotResponse[], met
 
 export function deviceAlert(device: TwinDeviceSnapshotResponse) {
   if (device.status === 'ERROR') return 'Thiết bị báo lỗi';
-  if (device.status === 'OFFLINE' || device.healthStatus === 'OFFLINE') return 'Thiết bị ngoại tuyến';
-  if (device.healthStatus === 'STALE') return 'Dữ liệu thiết bị đã cũ';
+  if (device.status === 'OFFLINE') return 'Thiết bị ngoại tuyến';
   return null;
 }

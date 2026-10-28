@@ -14,6 +14,7 @@ import { VoiceAssistantButton } from "../ui/VoiceAssistant";
 import { Link } from "react-router";
 import { notify } from '../ui/notify';
 import { UserAvatar } from '../ui/UserAvatar';
+import { ArrowUpRight, Box, Layers3 } from 'lucide-react';
 
 interface HomePageProps {
   user: UserResponse;
@@ -354,6 +355,12 @@ export const HomePage: React.FC<HomePageProps> = ({
               </div>
             )}
           </div>
+
+        {userHome ? <Link to={`/home/${encodeURIComponent(userHome.homeId)}/digital-twin`} className="surface-card group flex min-w-0 flex-wrap items-center gap-4 border-primary/30 bg-info-soft p-5 transition-transform hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-primary sm:p-6">
+          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-surface text-primary-hover shadow-soft"><Box size={28} aria-hidden="true" /></span>
+          <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h3 className="text-lg font-semibold text-text">Digital Twin V2</h3><span className="rounded-full bg-surface px-2 py-1 text-[10px] font-semibold text-primary-hover">3D tương tác</span></div><p className="mt-1 break-words text-sm text-muted">Khám phá {userHome.homeName} theo từng tầng, phòng và thiết bị thực tế.</p></div>
+          <span className="flex min-h-11 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-white"><Layers3 size={17} aria-hidden="true" />Mở không gian<ArrowUpRight size={16} aria-hidden="true" /></span>
+        </Link> : null}
 
         {/* Dashboard Grid */}
         <div className="grid grid-cols-1 gap-4 md:grid-cols-6">

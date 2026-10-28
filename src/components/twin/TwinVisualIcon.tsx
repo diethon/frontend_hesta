@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { Activity, Armchair, Bath, BedDouble, Camera, Cloud, CookingPot, Cpu, DoorClosed, Droplets, Fan, Flame, House, Lightbulb, Monitor, PlugZap, Radio, Snowflake, Sun, Thermometer, Wind } from 'lucide-react';
+import { Activity, Armchair, Bath, BedDouble, Camera, Car, Cloud, CookingPot, Cpu, DoorClosed, Droplets, Fan, Flame, House, Leaf, Lightbulb, Monitor, PlugZap, Radio, Snowflake, Sun, Thermometer, Wind } from 'lucide-react';
 import type { TwinDeviceSnapshotResponse } from '../../types/twin';
 import { deviceVisualKind, sensorVisualKind } from './twinPresentation';
 
@@ -14,6 +14,7 @@ const sensorIcons: Record<ReturnType<typeof sensorVisualKind>, LucideIcon> = {
 };
 
 const roomIcons: Array<[string, LucideIcon]> = [
+  ['garage', Car], ['gara', Car], ['nhà xe', Car], ['garden', Leaf], ['vườn', Leaf], ['ban công', Leaf],
   ['living', Armchair], ['khách', Armchair], ['bed', BedDouble], ['ngủ', BedDouble], ['kitchen', CookingPot], ['bếp', CookingPot], ['bath', Bath], ['tắm', Bath], ['vệ sinh', Bath], ['office', Monitor], ['study', Monitor], ['làm việc', Monitor],
 ];
 

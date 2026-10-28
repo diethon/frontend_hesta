@@ -7,6 +7,7 @@ import { useAppSelector } from '../../../store/hooks';
 import type { TwinLayoutSelection } from '../../../types/twinLayout';
 import type { Twin3DNodeGeometry, Twin3DShapedRoomGeometry } from '../twin3dGeometry';
 import { knownPower } from '../twinPresentation';
+import { deviceConnectionHealth } from '../../../services/twinDeviceStatus';
 import type { TwinMarkerMode } from './architectureMaterials';
 import { MarkerClusterContext } from './MarkerClusterContext';
 import { isMarkerCandidate, markerStatus, shouldClusterRoom } from './markerClustering';
@@ -31,7 +32,7 @@ export const RoomMarkerCluster = memo(function RoomMarkerCluster({ room, nodes, 
       const sensor = node.nodeType === 'SENSOR' ? state.twin.sensorsById[node.nodeId] : undefined;
       if (!device && !sensor) continue;
       const command = device ? state.twinCommand.byId[node.nodeId] : undefined;
-      const health = device?.status === 'OFFLINE' ? 'OFFLINE' : (device ?? sensor)!.healthStatus;
+      const health = device ? deviceConnectionHealth(device) : sensor!.healthStatus;
       const status = markerStatus(health, device ? knownPower(device.currentState) : null, !!command?.pending, !!command?.error || device?.status === 'ERROR');
       if (isMarkerCandidate(markerMode, status, selected)) {
         count++;
@@ -50,7 +51,7 @@ export const RoomMarkerCluster = memo(function RoomMarkerCluster({ room, nodes, 
     group.current.getWorldPosition(worldCenter);
     const worldHeight = viewport.getCurrentViewport(camera, worldCenter).height;
     const pixels = Math.max(room.width, room.depth) * size.height / worldHeight;
-    const next = shouldClusterRoom(pixels, lastDistant.current);
+    const next = shouldClusterRoom(pixels, lastDistant.current, Number(count));
     if (next !== lastDistant.current) {
       lastDistant.current = next;
       setDistant(next);
@@ -64,7 +65,7 @@ export const RoomMarkerCluster = memo(function RoomMarkerCluster({ room, nodes, 
           aria-label={`${name}, ${count} thiết bị và cảm biến. Xem gần phòng`} title={`${name} · ${count} thiết bị và cảm biến · Nhấn để xem gần`}
           onPointerDown={(event) => event.stopPropagation()}
           onClick={(event) => { event.stopPropagation(); onFocus({ kind: 'room', id: room.roomId }); }}>
-          <Layers3 size={16} aria-hidden="true" /><span>{count}</span>
+          <Layers3 size={16} className="shrink-0" aria-hidden="true" /><span className="min-w-0 text-left"><strong className="block max-w-32 truncate text-xs font-semibold">{name}</strong><span className="block text-[10px] font-medium text-muted">{count} vị trí</span></span>
         </button>
       </Html> : null}
     </group>

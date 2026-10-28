@@ -68,6 +68,10 @@ try {
     const found = await evaluate(`(() => { const e = [...document.querySelectorAll('button,a,summary')].find(e => e.textContent.trim() === ${JSON.stringify(text)} || e.getAttribute('aria-label') === ${JSON.stringify(text)}); if (!e) return false; e.click(); return true; })()`);
     assert.ok(found, `Control exists: ${text}`); await delay(120);
   };
+  const setTheme = async (theme) => {
+    await evaluate(`(() => { const select = document.querySelector('select[aria-label="Ánh sáng mô hình 3D"]'); select.value = '${theme}'; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    await waitFor(`document.querySelector('.twin-3d-stage').dataset.theme === '${theme}'`);
+  };
   const screenshot = async (name, fullPage = true) => {
     await evaluate('window.scrollTo(0, 0)');
     await evaluate('window.__twinFixtureFlushFrame()');
@@ -88,7 +92,7 @@ try {
     await evaluate(`(()=>{const marker=document.querySelector('.twin-3d-marker[data-node-id="${id}"]');const row=[...document.querySelectorAll('button')].find(b=>b.getAttribute('aria-label')==='Chọn thiết bị '+window.__twinFixtureScene().devices['${id}'].name);(marker||row).click()})()`);
   };
   await Promise.all([send('Page.enable'), send('Runtime.enable'), send('Log.enable')]);
-  await send('Emulation.setDeviceMetricsOverride', { width: 1600, height: 1050, deviceScaleFactor: 1, mobile: false });
+  await send('Emulation.setDeviceMetricsOverride', { width: 1920, height: 1050, deviceScaleFactor: 1, mobile: false });
   await send('Page.navigate', { url: testUrl });
   await waitFor(`window.__twinFixtureScene?.()?.deviceModels.length === 13`);
   await settle();
@@ -98,6 +102,19 @@ try {
   check('Twin content clears the fixed application sidebar', await evaluate(`document.querySelector('.twin-premium-dashboard').getBoundingClientRect().left>=256`));
   check('sensor history is never replaced with fabricated charts', await evaluate(`document.querySelectorAll('[aria-label="Thống kê ngôi nhà"] canvas,[aria-label="Thống kê ngôi nhà"] svg polyline').length===0`));
   await screenshot('desktop-overview');
+  const roomCamera = (await scene()).camera;
+  const roomGeometry = (await scene()).meshes.filter(mesh => mesh.role === 'solid').map(mesh => mesh.geometry);
+  await click('Xem phòng Phòng ngủ');
+  await settle();
+  check('room selection preserves camera and architectural geometry', (await scene()).camera.every((value, index) => Math.abs(value-roomCamera[index]) < .01) && JSON.stringify((await scene()).meshes.filter(mesh => mesh.role === 'solid').map(mesh => mesh.geometry)) === JSON.stringify(roomGeometry));
+  check('room info follows the selected business room', await evaluate(`document.querySelector('[aria-label="Thông tin phòng"]').textContent.includes('Phòng ngủ')`));
+  await click('Đóng chi tiết');
+  const expandedWidth = (await rect('.twin-3d-stage')).width;
+  await click('Ẩn hoặc hiện bảng điều khiển');
+  await settle();
+  check('hiding controls gives the scene more space', (await rect('.twin-3d-stage')).width > expandedWidth && await evaluate(`!document.querySelector('.twin-controls-column')`));
+  await click('Ẩn hoặc hiện bảng điều khiển');
+  await settle();
   if (!process.env.TWIN_DASHBOARD_ONLY) {
   const snapshotCount = (await scene()).snapshotRequests;
   const cameraBefore = (await scene()).camera;
@@ -122,7 +139,7 @@ try {
   await waitFor(`!!document.querySelector('[aria-label="Điều khiển thiết bị"] button[aria-label="Tắt"]')`);
   check('WebSocket state changes physical illumination', (await scene()).lights.some((light) => light.intensity > 0 && light.color === '285ab4'));
   const wallsBeforeColors = (await scene()).meshes.filter((mesh) => mesh.role === 'solid').map((mesh) => mesh.geometry);
-  await click('Không gian ấm');
+  await setTheme('COZY');
   for (const [name, r, g, b, hex] of [['red',255,40,30,'ff281e'],['green',30,230,70,'1ee646'],['blue',35,90,255,'235aff']]) {
     await evaluate(`window.__twinFixtureEmitDevice('main-light',{power:'ON',brightness:'75',color:{r:${r},g:${g},b:${b}}})`);
     await waitFor(`window.__twinFixtureScene().deviceModels.find(d=>d.id==='DEVICE:main-light').diffusers.includes('${hex}')`);
@@ -139,7 +156,7 @@ try {
   check('OFF removes actual colored light and emission', (await scene()).deviceModels.find((model) => model.id === 'DEVICE:main-light').emissive === 0);
   await screenshot('confirmed-light-off');
   await evaluate(`window.__twinFixtureEmitDevice('main-light',{power:'ON',brightness:35,r:40,g:90,b:180})`);
-  await click('Ban ngày');
+  await setTheme('DAYLIGHT');
   await waitFor(`window.__twinFixtureScene().lights.some(l=>l.color==='285ab4')`);
   const colorsBefore = await evaluate(`window.__twinFixtureRequests().filter(r=>r.method==='post').length`);
   await evaluate(`(() => {const input=document.querySelector('input[type="color"]'); const set=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;set.call(input,'#ad7240');input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));})()`);
@@ -161,7 +178,7 @@ try {
   await waitFor(`document.querySelector('[aria-label="Điều khiển thiết bị"]').textContent.includes('Thiết bị đã xác nhận')`);
   const doorBefore = (await scene()).deviceModels.find((item) => item.id === 'DEVICE:door').geometry;
   await evaluate(`window.__twinFixtureEmitDevice('door', {state:'OPEN',open:true})`);
-  await delay(900);
+  await waitFor(`JSON.stringify(window.__twinFixtureScene().deviceModels.find(item => item.id === 'DEVICE:door').geometry) !== ${JSON.stringify(JSON.stringify(doorBefore))}`);
   check('confirmed opening state changes actual door geometry', JSON.stringify((await scene()).deviceModels.find((item) => item.id === 'DEVICE:door').geometry) !== JSON.stringify(doorBefore));
   await evaluate(`window.__twinFixtureCommandFailure=true`);
   await click('Đóng cửa');
@@ -170,7 +187,7 @@ try {
   await evaluate(`window.__twinFixtureCommandFailure=false`);
   await click('Đóng chi tiết');
   await clickNode('camera');
-  await waitFor(`document.querySelector('[aria-label="Điều khiển thiết bị"]')?.textContent.includes('chỉ đọc')`);
+  await waitFor(`document.querySelector('[aria-label="Điều khiển thiết bị"]')?.textContent.includes('chưa hỗ trợ điều khiển từ xa')`);
   check('read-only camera never gains invented power controls', await evaluate(`document.querySelectorAll('[aria-label="Điều khiển thiết bị"] button').length===0`));
   await screenshot('desktop-interactions');
   await click('Đóng chi tiết');
@@ -200,8 +217,11 @@ try {
   await click('Đóng chi tiết');
   await send('Emulation.setDeviceMetricsOverride', {width:1440,height:1050,deviceScaleFactor:1,mobile:false});
   await settle();
-  check('laptop prioritizes the scene and controls inside the shared shell', await evaluate(`document.querySelector('.twin-3d-stage').getBoundingClientRect().width>=600 && !document.querySelector('.twin-explorer-column') && !!document.querySelector('.twin-controls-column') && document.documentElement.scrollWidth<=window.innerWidth+1`));
+  check('1440px displays explorer, scene and controls without overflow', await evaluate(`document.querySelector('.twin-3d-stage').getBoundingClientRect().width>=500 && !!document.querySelector('.twin-explorer-column') && !!document.querySelector('.twin-controls-column') && document.documentElement.scrollWidth<=window.innerWidth+1`));
   await screenshot('laptop-with-hesta-navigation');
+  check('clustered rooms show their name without a duplicate room label', await evaluate(`(()=>{const clusters=[...document.querySelectorAll('[data-twin-marker-cluster]')];return clusters.every(cluster=>cluster.querySelector('strong')?.textContent.trim() && ![...document.querySelectorAll('[data-twin-room-id]')].some(label=>label.dataset.twinRoomId===cluster.dataset.twinMarkerCluster));})()`));
+  await send('Emulation.setDeviceMetricsOverride', {width:1280,height:1050,deviceScaleFactor:1,mobile:false});
+  await settle();
   await click('Danh sách tầng và phòng');
   check('laptop floor explorer remains accessible in a modal', await evaluate(`!!document.querySelector('dialog[open].twin-panel-left')`));
   await click('Đóng bảng điều khiển');

@@ -14,6 +14,7 @@ import type { TwinMarkerMode } from './architectureMaterials';
 import { devicePlacement } from './devicePlacement';
 import type { OpeningInfo } from '../neonplan/viewer/build';
 import { knownPower } from '../twinPresentation';
+import { deviceConnectionHealth } from '../../../services/twinDeviceStatus';
 import { useReducedMotion } from '../useTwinMotion';
 import { MarkerClusterContext } from './MarkerClusterContext';
 import { isFreshMotionEvent, isImportantMarker, markerStatus } from './markerClustering';
@@ -59,7 +60,7 @@ export const Twin3DDevice = memo(function Twin3DDevice({ node, room, opening, ro
   if (!device) return null;
   const placement = opening ? { x: opening.start[0] + opening.axis[0] * opening.width / 2, y: 0, z: opening.start[1] + opening.axis[1] * opening.width / 2, rotation: 0 } : devicePlacement(node, room, device.deviceType, rotation, device.name);
   const localOpening = opening ? { ...opening, start: [opening.start[0] - placement.x, opening.start[1] - placement.z] as [number, number] } : undefined;
-  return <MarkerShell node={node} selected={selected} pending={pending} error={!!error || device.status === 'ERROR'} powered={knownPower(device.currentState)} healthStatus={device.status === 'OFFLINE' ? 'OFFLINE' : device.healthStatus} label={device.name} detail={pending ? 'Đang chờ xác nhận…' : device.status} placement={placement} palette={palette} markerMode={markerMode} houseOverview={houseOverview} visual={<Twin3DDeviceVisual device={device} palette={palette} opening={localOpening} />} onSelect={onSelect} onFocus={onFocus}><DeviceGlyph deviceType={device.deviceType} size={17} /></MarkerShell>;
+  return <MarkerShell node={node} selected={selected} pending={pending} error={!!error || device.status === 'ERROR'} powered={knownPower(device.currentState)} healthStatus={deviceConnectionHealth(device)} label={device.name} detail={pending ? 'Đang chờ xác nhận…' : device.status} placement={placement} palette={palette} markerMode={markerMode} houseOverview={houseOverview} visual={<Twin3DDeviceVisual device={device} palette={palette} opening={localOpening} />} onSelect={onSelect} onFocus={onFocus}><DeviceGlyph deviceType={device.deviceType} size={17} /></MarkerShell>;
 });
 
 function MotionPulse({ metric, value, observedAt, color }: { metric: string; value: number | null; observedAt: string | null; color: string }) {

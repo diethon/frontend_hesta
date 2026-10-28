@@ -20,8 +20,9 @@ export function isMarkerCandidate(mode: TwinMarkerMode, status: MarkerStatus, se
 }
 
 /** Screen-space hysteresis prevents marker flicker during small orbit/zoom changes. */
-export function shouldClusterRoom(projectedPixels: number, clustered: boolean) {
-  const threshold = clustered ? 238 : 190;
+export function shouldClusterRoom(projectedPixels: number, clustered: boolean, markerCount = 1) {
+  const density = Math.min(2.2, Math.max(1, Math.sqrt(markerCount / 3)));
+  const threshold = (clustered ? 238 : 190) * density;
   return Number.isFinite(projectedPixels) && projectedPixels < threshold;
 }
 

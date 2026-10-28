@@ -16,19 +16,25 @@ const connectionLabels = {
   disconnected: 'Đã ngắt kết nối', error: 'Kết nối bị gián đoạn',
 };
 
-export function DigitalTwinView({ homeId, initialMode }: { homeId: string; initialMode?: TwinViewMode }) {
+export function DigitalTwinView({ homeId, initialMode, navigationOpen, onToggleNavigation }: { homeId: string; initialMode?: TwinViewMode; navigationOpen?: boolean; onToggleNavigation?: () => void }) {
   const dispatch = useAppDispatch();
   const [theme, setTheme] = useState<TwinRendererTheme>('DAYLIGHT');
   const matchesHome = useAppSelector((state) => state.twin.homeId === homeId);
   const loading = useAppSelector((state) => state.twin.loading);
   const initialized = useAppSelector((state) => state.twin.initialized);
   const error = useAppSelector((state) => state.twin.error);
+  const editingLayout = useAppSelector((state) => state.twinLayout.homeId === homeId && !!state.twinLayout.draft);
   const status = useAppSelector((state) => state.realtime.status);
   const subscribedHome = useAppSelector((state) => state.realtime.activeHomeId);
   const connected = status === 'connected' && subscribedHome === homeId;
   const connectionLabel = status === 'connected' && !connected ? 'Đang đăng ký nhà…' : connectionLabels[status];
-  return <div className="twin-premium-dashboard min-w-0 space-y-4 bg-app p-3 text-text sm:p-5">
-    <TwinDashboardHeader homeId={homeId} connected={connected} connectionLabel={connectionLabel} loading={loading} canReload={matchesHome} onReload={() => void dispatch(loadTwinSnapshot(homeId))} theme={theme} onThemeChange={setTheme} />
+  const reload = () => {
+    void dispatch(loadTwinSnapshot(homeId));
+    if (!editingLayout) void dispatch(loadTwinLayout(homeId));
+  };
+  return <div className="twin-premium-dashboard twin-v2-dashboard min-w-0 bg-app text-text">
+    <TwinDashboardHeader homeId={homeId} connected={connected} connectionLabel={connectionLabel} loading={loading} canReload={matchesHome} onReload={reload} theme={theme} onThemeChange={setTheme} navigationOpen={navigationOpen} onToggleNavigation={onToggleNavigation} />
+    <div className="v2-workspace">
     {!connected && matchesHome && initialized ? <p className="rounded-xl bg-warning-soft px-4 py-3 text-sm text-text">Đang hiển thị dữ liệu gần nhất. Sau khi kết nối lại, chọn “Đồng bộ lại” để nhận những thay đổi đã bỏ lỡ.</p> : null}
     {matchesHome && error ? <div role="alert" className="rounded-2xl border border-error bg-error-soft p-5 text-text">
       <p>{error}</p><button type="button" disabled={loading} onClick={() => void dispatch(loadTwinSnapshot(homeId))} className="mt-3 rounded-xl bg-surface px-4 py-3 text-sm font-semibold disabled:opacity-50">Thử lại</button>
@@ -38,6 +44,7 @@ export function DigitalTwinView({ homeId, initialMode }: { homeId: string; initi
     </div> : initialized ? <>
       <TwinLayoutEditor key={homeId} homeId={homeId} initialMode={initialMode} rendererTheme={theme} onRendererThemeChange={setTheme} />
     </> : null}
+    </div>
   </div>;
 }
 
@@ -45,6 +52,7 @@ export function DigitalTwinPage() {
   useLayoutNavigationGuard();
   const { homeId = '' } = useParams<{ homeId: string }>();
   const dispatch = useAppDispatch();
+  const [navigationOpen, setNavigationOpen] = useState(false);
   useEffect(() => {
     dispatch(currentHomeChanged(homeId));
     dispatch(twinOpened(homeId));
@@ -60,7 +68,7 @@ export function DigitalTwinPage() {
     };
   }, [dispatch, homeId]);
   return <div className="app-shell">
-    <HomeSidebar activeItem="twin" homeId={homeId} showSystemSummary={false} />
-    <main id="main-content" className="min-w-0 lg:pl-64"><DigitalTwinView homeId={homeId} /></main>
+    <HomeSidebar activeItem="twin" homeId={homeId} showSystemSummary={false} compact={!navigationOpen} onToggleCompact={() => setNavigationOpen(value => !value)} />
+    <main id="main-content" className={`min-w-0 ${navigationOpen ? 'lg:pl-64' : 'lg:pl-20'}`}><DigitalTwinView homeId={homeId} navigationOpen={navigationOpen} onToggleNavigation={() => setNavigationOpen(value => !value)} /></main>
   </div>;
 }

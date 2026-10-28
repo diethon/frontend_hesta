@@ -12,6 +12,7 @@ import { healthSymbols } from './twinPresentation';
 import { useTwinUpdateMotion } from './useTwinMotion';
 import { TWIN_WORLD_WIDTH, TWIN_WORLD_DEPTH } from './twin3dGeometry';
 import { TwinObjectPlan } from './TwinObjectPlan';
+import { deviceConnectionHealth } from '../../services/twinDeviceStatus';
 
 type Interaction = { pointerId: number; startX: number; startY: number; width: number; height: number; selection: TwinLayoutSelection; resize: boolean; origin: TwinLayoutGeometry; preview: TwinLayoutGeometry; commit: TwinLayoutGeometry; guides: TwinSnapGuides };
 type VertexInteraction = { pointerId: number; roomId: string; pointIndex: number; origin: TwinDraftingMetadata; preview: TwinDraftingMetadata };
@@ -39,10 +40,10 @@ const markerPosition = (coordinate: number) => `clamp(1.5rem, ${coordinate * 100
 export function TwinNodeSummary({ node }: { node: TwinNodeLayout }) {
   const device = useAppSelector((state) => node.nodeType === 'DEVICE' ? state.twin.devicesById[node.nodeId] : undefined);
   const sensor = useAppSelector((state) => node.nodeType === 'SENSOR' ? state.twin.sensorsById[node.nodeId] : undefined);
-  const motionRef = useTwinUpdateMotion<HTMLSpanElement>(JSON.stringify([device?.currentState, device?.healthStatus, device?.lastSeen, sensor?.latestValue, sensor?.healthStatus, sensor?.observedAt]));
+  const motionRef = useTwinUpdateMotion<HTMLSpanElement>(JSON.stringify([device?.currentState, device?.status, sensor?.latestValue, sensor?.healthStatus, sensor?.observedAt]));
   if (!device && !sensor) return <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-off-soft text-xs font-semibold text-muted">?</span>;
   const power = device?.currentState && typeof device.currentState === 'object' && !Array.isArray(device.currentState) ? device.currentState.power : null;
-  const healthStatus = (device ?? sensor)!.healthStatus;
+  const healthStatus = device ? deviceConnectionHealth(device) : sensor!.healthStatus;
   return <span ref={motionRef} className="relative flex h-8 w-8 items-center justify-center">
     {device ? <DeviceGlyph deviceType={device.deviceType} size={17} /> : <SensorGlyph metricType={sensor!.metricType} size={17} />}
     <span aria-hidden="true" className={`absolute -bottom-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full border-2 text-[8px] font-bold text-text ${healthDotStyles[healthStatus]}`}>{healthSymbols[healthStatus]}</span>
@@ -51,7 +52,7 @@ export function TwinNodeSummary({ node }: { node: TwinNodeLayout }) {
       <span className="mt-0.5 block text-xs font-medium text-muted">
         {device ? `${power === true ? 'ON' : power === false ? 'OFF' : typeof power === 'string' ? power : '—'} · ${device.status}` : `${sensor!.latestValue ?? '—'}${sensor!.unit ? ` ${sensor!.unit}` : ''}`}
       </span>
-      <span className="mt-1 block text-[10px] font-semibold text-muted">{`${healthStatus} · ${healthLabels[healthStatus]}`}</span>
+      <span className="mt-1 block text-[10px] font-semibold text-muted">{device ? device.status : `${healthStatus} · ${healthLabels[healthStatus]}`}</span>
     </span>
   </span>;
 }
@@ -216,11 +217,14 @@ export function TwinCanvas({ geometry, drafting, editable, selection, onSelect, 
           onPointerDown={(event) => begin(event, { kind: 'room', id: room.roomId })} {...handlers}
           style={{ clipPath: polygon }} className={`relative h-full w-full overflow-hidden p-3 text-left align-top text-sm font-semibold shadow-soft ${roomTint} ${selected ? 'ring-2 ring-primary ring-inset' : ''} ${editable ? 'touch-none cursor-move' : ''}`}>
           {roomMeta.autoFurniture !== false ? <RoomFurnishing name={name} /> : null}
-          <TwinObjectPlan room={room} metadata={roomMeta} />
           <span data-room-header className="twin-room-header" style={{ height: roomHeaderHeight(room.height * fit.canvasHeight) - 10 }}><RoomGlyph name={name} size={17} /><span className="min-w-0"><span className="block truncate text-xs font-semibold text-text sm:text-sm">{name}</span>{room.height * fit.canvasHeight >= 120 || !viewportSize.height ? <span className="mt-1 block truncate text-[10px] font-medium text-muted">{roomsById[room.roomId]?.deviceIds.length ?? 0} thiết bị · {roomsById[room.roomId]?.sensorIds.length ?? 0} cảm biến</span> : null}</span></span>
           {preview && selected && dragFeedback?.resize ? <output aria-label="Kích thước phòng khi resize" className="absolute bottom-3 left-3 rounded-lg bg-surface/95 px-2 py-1 text-xs font-semibold text-text">Rộng {(room.width * 100).toFixed(1)}% · Cao {(room.height * 100).toFixed(1)}%</output> : null}
           {roomMeta.widthMeters || roomMeta.depthMeters ? <span className="absolute bottom-3 left-3 rounded-lg bg-surface/90 px-2 py-1 text-[10px] font-semibold text-text">{roomMeta.widthMeters ? `${roomMeta.widthMeters} m` : 'Chưa đo rộng'} × {roomMeta.depthMeters ? `${roomMeta.depthMeters} m` : 'chưa đo sâu'}</span> : null}
         </button>
+        <TwinObjectPlan room={room} metadata={roomMeta} editable={editable && !!onDraftingChange} selected={selected}
+          gridStep={drafting.settings.gridSnap ? drafting.settings.gridMeters ?? .5 : undefined}
+          onSelectRoom={() => onSelect({ kind: 'room', id: room.roomId })}
+          onChange={(next) => onDraftingChange?.(changeRoomDrafting(shownDrafting, room.roomId, next))} />
         {editable && selected ? roomMeta.points.map((point, pointIndex) => <button key={`${room.roomId}-${pointIndex}`} type="button" aria-label={`Kéo đỉnh ${pointIndex + 1} của ${name}`} onPointerDown={(event) => beginVertex(event, room.roomId, pointIndex)} onPointerMove={moveVertex} onPointerUp={(event) => finishVertex(event)} onPointerCancel={(event) => finishVertex(event, true)} onLostPointerCapture={(event) => finishVertex(event, true)} className="absolute z-30 h-6 w-6 touch-none rounded-full border-2 border-surface bg-primary shadow-soft focus-visible:ring-2 focus-visible:ring-primary" style={{ left: `${point.x * 100}%`, top: `${point.y * 100}%`, transform: 'translate(-50%, -50%)' }} />) : null}
         {editable ? <button type="button" aria-label={`Đổi kích thước ${roomsById[room.roomId]?.name ?? room.roomId}`}
           onClick={() => onSelect({ kind: 'room', id: room.roomId })} onPointerDown={(event) => begin(event, { kind: 'room', id: room.roomId }, true)} {...handlers}
@@ -232,7 +236,7 @@ export function TwinCanvas({ geometry, drafting, editable, selection, onSelect, 
       const device = node.nodeType === 'DEVICE' ? devicesById[node.nodeId] : undefined;
       const sensor = node.nodeType === 'SENSOR' ? sensorsById[node.nodeId] : undefined;
       const label = device
-        ? `${device.name}, ${device.status}, ${device.healthStatus}`
+        ? `${device.name}, ${device.status}`
         : sensor ? `${sensor.metricType}, ${sensor.latestValue ?? 'chưa có dữ liệu'}${sensor.unit ? ` ${sensor.unit}` : ''}, ${sensor.healthStatus}` : 'Đối tượng không còn trong dữ liệu';
       return <button type="button" key={nodeKey(node)} data-node-key={nodeKey(node)} data-x={node.x} data-y={node.y}
       aria-label={`Chọn ${node.nodeType === 'DEVICE' ? 'thiết bị' : 'cảm biến'} ${label}`}

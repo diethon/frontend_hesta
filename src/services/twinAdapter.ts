@@ -6,7 +6,7 @@ import { roomDrafting, type TwinDraftingMetadata } from '../components/twin/twin
 import { knownPower } from '../components/twin/twinPresentation';
 
 export function adaptTwinDevice(device: TwinDeviceSnapshotResponse): TwinDeviceView {
-  const online = device.status === 'ONLINE' && device.healthStatus === 'ACTIVE';
+  const online = device.status === 'ONLINE';
   const state = device.currentState;
   return {
     id: device.deviceId, name: device.name, type: device.deviceType, roomId: device.roomId,

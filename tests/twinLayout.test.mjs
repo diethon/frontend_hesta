@@ -895,6 +895,52 @@ test('unassigned devices stay in a separate list and new devices are automatical
   assert.equal(puts().length, 0);
 });
 
+test('2D furniture movement uses metres, snaps at drop and preserves identity and dimensions', () => {
+  const { positionSceneObject } = loadSource('src/components/twin/twinObjectPlacement.ts');
+  const { roomShapePoints } = loadSource('src/components/twin/twinDrafting.ts');
+  const object = { id: 'chair', kind: 'CHAIR', x: 1, z: 1, width: .45, depth: .5, height: .9, rotation: 45 };
+  const room = { shape: 'RECTANGLE', points: roomShapePoints('RECTANGLE') };
+  const before = structuredClone(object);
+  const preview = positionSceneObject(object, 2.17, 3.36, room, 6, 5);
+  assert.equal(preview.x, 2.17);
+  assert.equal(preview.z, 3.36);
+  const drop = positionSceneObject(preview, preview.x, preview.z, room, 6, 5, .5);
+  assert.deepEqual(drop, { ...object, x: 2, z: 3.5 });
+  assert.deepEqual(object, before);
+});
+
+test('2D furniture cannot drop into the cutout of an L-shaped room', () => {
+  const { positionSceneObject } = loadSource('src/components/twin/twinObjectPlacement.ts');
+  const { roomShapePoints, pointInPolygon } = loadSource('src/components/twin/twinDrafting.ts');
+  const room = { shape: 'L_SHAPE', points: roomShapePoints('L_SHAPE') };
+  const object = { id: 'table', kind: 'TABLE', x: 1, z: 1, width: 1, depth: 1, height: .75, rotation: 0 };
+  for (const [x, z] of [[5, 5], [-100, -100], [100, 100]]) {
+    const moved = positionSceneObject(object, x, z, room, 6, 6, .5);
+    assert.ok(pointInPolygon({ x: moved.x / 6, y: moved.z / 6 }, room.points));
+  }
+});
+
+test('2D opening movement attaches to diagonal walls and preserves opening properties', () => {
+  const { positionSceneObject } = loadSource('src/components/twin/twinObjectPlacement.ts');
+  const room = { shape: 'CUSTOM', points: [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 0, y: 1 }] };
+  const door = { id: 'door', kind: 'DOOR', x: 1, z: 0, width: .9, depth: .12, height: 2.1, rotation: 0 };
+  const moved = positionSceneObject(door, 2.6, 2.5, room, 5, 5);
+  assert.ok(Math.abs(moved.x + moved.z - 5) < .001);
+  assert.ok(Math.abs(moved.rotation + 135) < .001);
+  assert.equal(moved.height, 2.1);
+  assert.equal(moved.id, door.id);
+});
+
+test('furniture move handles are exclusive to edit mode and have accessible names', () => {
+  const { TwinObjectPlan } = loadSource('src/components/twin/TwinObjectPlan.tsx');
+  const { roomShapePoints } = loadSource('src/components/twin/twinDrafting.ts');
+  const props = { room: { roomId: 'living', x: .1, y: .1, width: .4, height: .4 }, metadata: { shape: 'RECTANGLE', points: roomShapePoints('RECTANGLE'), objects: [{ id: 'chair', kind: 'CHAIR', x: 1, z: 1, width: .45, depth: .5, height: .9, rotation: 0 }] } };
+  const view = renderToString(React.createElement(TwinObjectPlan, props));
+  const edit = renderToString(React.createElement(TwinObjectPlan, { ...props, editable: true }));
+  assert.ok(!view.includes('<button'));
+  assert.ok(edit.includes('aria-label="Di chuyển ghế"'));
+});
+
 test('demo furniture keeps the saved world footprint, rotation and explicit mounting height', () => {
   const { interiorTransform } = loadSource('src/components/twin/interior/interiorLayout.ts');
   const { furnitureFootprint } = loadSource('src/components/twin/neonplan/model.ts');

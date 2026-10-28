@@ -65,3 +65,17 @@ export function fitDistance(box: Box3, target: Vector3, theta: number, phi: numb
   }
   return Math.max(3, distance);
 }
+
+/** Orthographic framing preserves parallel architectural edges at every orbit angle. */
+export function fitOrthographicZoom(box: Box3, target: Vector3, theta: number, phi: number, width: number, height: number) {
+  const direction = new Vector3().setFromSpherical(new Spherical(1, phi, theta));
+  const right = new Vector3().crossVectors(new Vector3(0, 1, 0), direction).normalize();
+  const up = new Vector3().crossVectors(direction, right).normalize();
+  let halfWidth = .1, halfHeight = .1;
+  for (const x of [box.min.x, box.max.x]) for (const y of [box.min.y, box.max.y]) for (const z of [box.min.z, box.max.z]) {
+    const point = new Vector3(x, y, z).sub(target);
+    halfWidth = Math.max(halfWidth, Math.abs(point.dot(right)));
+    halfHeight = Math.max(halfHeight, Math.abs(point.dot(up)));
+  }
+  return Math.max(.1, Math.min(width / (halfWidth * 2), height / (halfHeight * 2)) * CAMERA_FILL);
+}

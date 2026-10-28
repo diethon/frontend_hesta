@@ -10,6 +10,7 @@ import React from 'react';
 import { renderToString } from 'react-dom/server';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
+import { Box3, OrthographicCamera, Spherical, Vector3 } from 'three';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const require = createRequire(import.meta.url);
@@ -33,6 +34,118 @@ function loadSource(path) {
   return module.exports;
 }
 const { latestDashboardMetric, deviceHealthCounts, deviceAlert } = loadSource('src/components/twin/dashboard/twinDashboardData.ts');
+const { scopeTwinHouse } = loadSource('src/services/twinSceneScope.ts');
+const { fitOrthographicZoom } = loadSource('src/components/twin/scene/cameraFraming.ts');
+const { adaptTwinArchitecture, twinRoomCategory } = loadSource('src/services/twinArchitectureAdapter.ts');
+const { createV2Illustration, roomNameFloorHint } = loadSource('src/services/twinV2Illustration.ts');
+const { materializeTwinArchitecture } = loadSource('src/services/twinLayoutMaterialize.ts');
+const { draftingFromArchitecture } = loadSource('src/components/twin/twinDrafting.ts');
+const { adaptTwinHouse } = loadSource('src/services/twinAdapter.ts');
+
+test('V2 illustrative plan composes only API rooms and preserves device membership without saving', () => {
+  const names = { bedroom: 'Phòng ngủ', living: 'Phòng khách', garage: 'Garage', garden: 'Garden', kitchen: 'Phòng bếp' };
+  const identities = [{ nodeType: 'DEVICE', nodeId: 'real-light', roomId: 'living' }, { nodeType: 'DEVICE', nodeId: 'unassigned', roomId: null }];
+  const result = createV2Illustration(Object.keys(names), identities, names);
+  assert.deepEqual(result.rooms.map(room => room.roomId), Object.keys(names));
+  assert.equal(result.nodes.length, 1);
+  assert.equal(result.nodes[0].roomId, 'living');
+  assert.equal(result.nodes[0].nodeId, 'real-light');
+  const garden = result.rooms.find(room => room.roomId === 'garden');
+  const living = result.rooms.find(room => room.roomId === 'living');
+  assert.ok(garden.x >= living.x + living.width);
+  assert.ok(result.rooms.every(room => room.floor === 1));
+  assert.ok(result.rooms.every(room => room.x >= 0 && room.y >= 0 && room.x + room.width <= 1 && room.y + room.height <= 1));
+  const expandedNames = { ...names, office: 'Phòng làm việc', guest: 'Phòng ngủ khách', bath: 'Phòng tắm' };
+  const expanded = createV2Illustration(Object.keys(expandedNames), identities, expandedNames);
+  assert.equal(expanded.rooms.length, 8);
+  assert.ok(expanded.rooms.every(room => room.x >= 0 && room.y >= 0 && room.x + room.width <= 1.001 && room.y + room.height <= 1.001));
+  assert.equal(expanded.rooms.find(room => room.roomId === 'garden').height, .84);
+});
+
+test('V2 furniture survives the existing layout document without unsupported backend model variants', () => {
+  const names = { bedroom: 'Phòng ngủ', living: 'Phòng khách', garage: 'Garage', garden: 'Garden', kitchen: 'Phòng bếp' };
+  const geometry = createV2Illustration(Object.keys(names), [], names);
+  const metadata = { version: 1, settings: { gridSnap: true, edgeSnap: true }, rooms: {}, blueprints: {} };
+  const saved = materializeTwinArchitecture('real-home', geometry, metadata, names);
+  const allowed = new Set(['armchair', 'coffee_table', 'nightstand', 'office_chair', 'shelf', 'washbasin']);
+  assert.ok(Object.values(saved.rooms).flatMap(room => room.objects).every(item => !item.model || allowed.has(item.model)));
+  const drafting = draftingFromArchitecture(saved);
+  const view = adaptTwinHouse('real-home', { ...geometry, architecture: saved }, drafting, [], [], 'all', false);
+  const restored = view.floors.flatMap(floor => adaptTwinArchitecture(floor, drafting, names).floor.furniture);
+  for (const type of ['car', 'stove', 'table_round', 'sideboard']) assert.ok(restored.some(item => item.type === type), type);
+});
+
+test('unsaved V2 floors use explicit room-name hints without creating domain rooms', () => {
+  assert.equal(roomNameFloorHint('Hành lang tầng 2'), 2);
+  assert.equal(roomNameFloorHint('Ban công tầng 3'), 3);
+  assert.equal(roomNameFloorHint('Bedroom floor 4'), 4);
+  assert.equal(roomNameFloorHint('Phòng 305'), 1);
+  assert.equal(roomNameFloorHint('Tầng 999'), 1);
+  const names = { living: 'Phòng khách', hall: 'Hành lang tầng 2', balcony: 'Ban công tầng 3' };
+  const result = createV2Illustration(Object.keys(names), [{ nodeType: 'DEVICE', nodeId: 'hall-lamp', roomId: 'hall' }], names);
+  assert.deepEqual(result.rooms.map(room => [room.roomId, room.floor]), [['living', 1], ['hall', 2], ['balcony', 3]]);
+  assert.deepEqual(result.nodes.map(node => [node.nodeId, node.roomId]), [['hall-lamp', 'hall']]);
+  assert.equal(twinRoomCategory(names.hall), 'hallway');
+});
+
+test('real garage and garden rooms receive appropriate illustrative furnishings without replacing authored layouts', () => {
+  assert.equal(twinRoomCategory('Sân vườn'), 'garden');
+  assert.equal(twinRoomCategory('Nhà xe'), 'garage');
+  const rooms = ['garage-id', 'garden-id'].map((roomId, index) => ({ roomId, x: index * 7, y: 0, z: 0, width: 6, depth: 6, wallHeight: 2.6, wallThickness: .12, outline: [{ x: -3, z: -3 }, { x: 3, z: -3 }, { x: 3, z: 3 }, { x: -3, z: 3 }] }));
+  const floor = { id: 'real-floor', name: 'Actual floor', level: 1, rooms, nodes: [] };
+  const names = { 'garage-id': 'Garage', 'garden-id': 'Garden' };
+  const result = adaptTwinArchitecture(floor, { rooms: {} }, names);
+  const garage = result.floor.furniture.filter(item => result.furnitureRooms.get(item.id) === 'garage-id');
+  const garden = result.floor.furniture.filter(item => result.furnitureRooms.get(item.id) === 'garden-id');
+  assert.ok(garage.some(item => item.type === 'car'));
+  assert.ok(garden.some(item => item.type === 'plant'));
+  assert.ok([...garage, ...garden].every(item => item.type !== 'sofa' && item.type !== 'bed'));
+  assert.equal(result.floor.rooms[0].floor_material, 'concrete');
+  const authored = adaptTwinArchitecture(floor, { rooms: { 'garden-id': { autoFurniture: false, objects: [] }, 'garage-id': { autoFurniture: false, objects: [] } } }, names);
+  assert.equal(authored.floor.furniture.length, 0);
+  assert.deepEqual(authored.floor.rooms[1].wall_heights, [2.6, 2.6, 2.6, 2.6]);
+});
+
+test('V2 room detail isolates real IDs without changing saved geometry or device membership', () => {
+  const living = { roomId: 'actual-living', x: 3, z: -2, outline: [{ x: 1, z: 2 }] };
+  const bedroom = { roomId: 'actual-bed', x: -4, z: 5 };
+  const device = { nodeId: 'real-lamp', roomId: living.roomId, x: 4, z: -1 };
+  const house = { id: 'real-home', floors: [
+    { id: 'floor-a', rooms: [living], nodes: [device, { nodeId: 'other', roomId: null }] },
+    { id: 'floor-b', rooms: [bedroom], nodes: [{ nodeId: 'fan', roomId: bedroom.roomId }] },
+  ] };
+  const scoped = scopeTwinHouse(house, living.roomId);
+  assert.equal(scoped.id, house.id);
+  assert.deepEqual(scoped.floors.map(floor => floor.id), ['floor-a']);
+  assert.equal(scoped.floors[0].rooms[0], living);
+  assert.equal(scoped.floors[0].nodes[0], device);
+  assert.equal(scoped.floors[0].nodes.length, 1);
+  assert.equal(house.floors[0].nodes.length, 2);
+  assert.equal(scopeTwinHouse(house, null), house);
+  assert.equal(scopeTwinHouse(house, 'deleted-room'), house);
+});
+
+test('V2 orthographic fit keeps every architecture corner inside wide and narrow viewports', () => {
+  const box = new Box3(new Vector3(-8, -.2, -5), new Vector3(9, 5, 6));
+  const target = box.getCenter(new Vector3());
+  for (const [width, height] of [[1440, 720], [320, 580], [840, 800]]) {
+    for (const theta of [-2.8, .68, 2.1]) {
+      const phi = 1;
+      const camera = new OrthographicCamera(-width / 2, width / 2, height / 2, -height / 2, .05, 1000);
+      camera.position.copy(target).add(new Vector3().setFromSpherical(new Spherical(80, phi, theta)));
+      camera.lookAt(target);
+      camera.zoom = fitOrthographicZoom(box, target, theta, phi, width, height);
+      camera.updateProjectionMatrix(); camera.updateMatrixWorld();
+      let fill = 0;
+      for (const x of [box.min.x, box.max.x]) for (const y of [box.min.y, box.max.y]) for (const z of [box.min.z, box.max.z]) {
+        const corner = new Vector3(x, y, z).project(camera);
+        assert.ok(Math.abs(corner.x) <= .841 && Math.abs(corner.y) <= .841);
+        fill = Math.max(fill, Math.abs(corner.x), Math.abs(corner.y));
+      }
+      assert.ok(fill >= .839, 'House fills the limiting axis rather than appearing too small');
+    }
+  }
+});
 const sensor = (overrides = {}) => ({ sensorId: 'sensor-1', deviceId: 'device-1', roomId: 'room-1',
   metricType: 'TEMPERATURE', unit: '°C', latestValue: 26.4, healthStatus: 'ACTIVE',
   observedAt: '2026-10-20T09:00:00Z', ...overrides });
@@ -90,22 +203,23 @@ test('device health separates unknown power from explicit off', () => {
   assert.deepEqual(result, { total: 4, online: 4, on: 1, off: 1, offline: 0, warning: 0, unknown: 2 });
 });
 
-test('device health never presents offline or stale last-known power as currently operating', () => {
+test('device connectivity follows status even when legacy freshness is stale', () => {
   const result = deviceHealthCounts([device({ status: 'OFFLINE', currentState: { power: true } }),
     device({ healthStatus: 'STALE', currentState: { power: false } }), device({ status: 'ERROR', currentState: { power: true } })]);
   assert.equal(result.on, 0);
-  assert.equal(result.off, 0);
-  assert.equal(result.online, 0);
+  assert.equal(result.off, 1);
+  assert.equal(result.online, 1);
   assert.equal(result.offline, 1);
-  assert.equal(result.warning, 2);
-  assert.equal(result.unknown, 3);
+  assert.equal(result.warning, 1);
+  assert.equal(result.unknown, 2);
 });
 
-test('device alerts preserve error priority and distinguish health from connectivity', () => {
+test('device alerts use connection status and ignore legacy freshness', () => {
   assert.equal(deviceAlert(device()), null);
   assert.match(deviceAlert(device({ status: 'ERROR', healthStatus: 'OFFLINE' })), /lỗi/);
-  assert.match(deviceAlert(device({ healthStatus: 'OFFLINE' })), /ngoại tuyến/);
-  assert.match(deviceAlert(device({ healthStatus: 'STALE' })), /đã cũ/);
+  assert.match(deviceAlert(device({ status: 'OFFLINE' })), /ngoại tuyến/);
+  assert.equal(deviceAlert(device({ healthStatus: 'OFFLINE' })), null);
+  assert.equal(deviceAlert(device({ healthStatus: 'STALE' })), null);
 });
 
 // Render real dashboard panels against the same normalized slice shape as the
@@ -122,6 +236,7 @@ runInThisContext(`(function(require, module, exports) { ${apiOutput}\n})`, { fil
   name.startsWith('.') ? loadSource(resolve(dirname(sourceFilename), `${name}.ts`)) : require(name), apiModule, apiModule.exports);
 modules.set(sourceFilename, apiModule);
 const { TwinControlSidebar } = loadSource('src/components/twin/dashboard/TwinControlSidebar.tsx');
+const { TwinRoomInfo } = loadSource('src/components/twin/dashboard/TwinRoomInfo.tsx');
 
 function dashboardStore() {
   const devices = [device({ deviceId: 'd1', roomId: 'room-1', name: 'Floor One Lamp', currentState: { power: true } }),
@@ -191,4 +306,19 @@ test('actual empty floor scope stays empty instead of silently showing whole-hou
   assert.doesNotMatch(analytics, /21,2|28,9|39,8/);
   assert.match(analytics, /Đang chờ dữ liệu từ HESTA/);
   assert.match(analytics, /\/ 0 trực tuyến/);
+});
+
+test('room information counts business devices and sensors even when they have no geometry', () => {
+  const html = metricText(renderPanel(TwinRoomInfo, { roomId: 'room-1', geometry: { rooms: [], nodes: [] } }));
+  assert.match(html, /Living Room/);
+  assert.match(html, /1 thiết bị/);
+  assert.match(html, /1 cảm biến/);
+  assert.match(html, /Chưa bố trí/);
+  assert.doesNotMatch(html, /Bedroom|Unassigned Lamp/);
+});
+
+test('room information asks for a selection instead of presenting unassigned devices as a room', () => {
+  const html = metricText(renderPanel(TwinRoomInfo, { roomId: null, geometry: { rooms: [], nodes: [] } }));
+  assert.match(html, /Chọn một phòng/);
+  assert.doesNotMatch(html, /Living Room|Bedroom|1 thiết bị/);
 });

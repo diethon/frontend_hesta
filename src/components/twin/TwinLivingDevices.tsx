@@ -18,7 +18,7 @@ export function TwinLivingDevices({ geometry, selection, onSelect }: {
       {visible.map((node) => {
         const device = devices[node.nodeId], appearance = resolveDeviceAppearance(device.deviceType, device.name);
         const Icon = applianceIcons[appearance.kind] ?? (appearance.kind.includes('light') || appearance.kind.includes('lamp') || appearance.kind === 'led-strip' ? Lightbulb : appearance.kind.includes('fan') ? Wind : appearance.kind.includes('sensor') ? Radio : Box);
-        const active = device.status === 'ONLINE' && device.healthStatus === 'ACTIVE', powered = active && knownPower(device.currentState) === true;
+        const active = device.status === 'ONLINE', powered = active && knownPower(device.currentState) === true;
         const selected = selection?.kind === 'node' && selection.id === `DEVICE:${device.deviceId}`;
         return <button type="button" key={device.deviceId} aria-pressed={selected} onClick={() => onSelect({ kind: 'node', id: `DEVICE:${device.deviceId}` })} className={`flex min-h-16 w-full items-center gap-3 rounded-xl border p-2.5 text-left transition-colors ${selected ? 'border-primary bg-info-soft' : 'border-transparent bg-surface hover:bg-app'}`}>
           <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${powered ? 'bg-warning-soft text-warning' : active ? 'bg-info-soft text-primary-hover' : 'bg-off-soft text-muted'}`}><Icon size={19} strokeWidth={1.8} /></span>

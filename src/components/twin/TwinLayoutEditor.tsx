@@ -19,6 +19,7 @@ import { TwinDraftingToolbar, type TwinDraftingMode } from './TwinDraftingToolba
 import { notify } from '../ui/notify';
 import { createTwinDraftingMetadata, draftingFromArchitecture, roomDrafting, loadTwinDrafting, sameTwinDrafting, type TwinDraftingMetadata } from './twinDrafting';
 import { reconcileTwinGeometry, twinGeometrySource } from '../../services/twinGeometrySource';
+import { createV2Illustration } from '../../services/twinV2Illustration';
 
 import type { TwinRendererTheme } from './scene/rendererTheme';
 
@@ -44,11 +45,14 @@ export function TwinLayoutEditor({ homeId, initialMode = '3d', rendererTheme, on
   const [draftingMode, setDraftingMode] = useState<TwinDraftingMode>('quick');
   const [drafting, setDrafting] = useState<TwinDraftingMetadata>(createTwinDraftingMetadata);
   const confirmedDrafting = useMemo(() => draftingFromArchitecture(state.confirmed?.architecture), [state.confirmed?.architecture]);
-  const confirmedGeometry = useMemo(() => reconcileTwinGeometry(state.confirmed, roomIds, JSON.parse(nodeRooms)), [state.confirmed, roomIds, nodeRooms]);
+  const confirmedGeometry = useMemo(() => state.confirmed && !state.confirmed.rooms.length && !state.confirmed.revision
+    ? createV2Illustration(roomIds, JSON.parse(nodeRooms), names)
+    : reconcileTwinGeometry(state.confirmed, roomIds, JSON.parse(nodeRooms)), [state.confirmed, roomIds, nodeRooms, names]);
   const reconciledDraft = useMemo(() => state.draft ? reconcileTwinGeometry(state.draft, roomIds, JSON.parse(nodeRooms), drafting) : null, [state.draft, roomIds, nodeRooms, drafting]);
   if (state.homeId !== homeId) return null;
   const { confirmed, draft, dirty, loading, saving, error, role, roleError, roleRequestId } = state;
   const source = twinGeometrySource(confirmed, roomCount);
+  const nameInferredFloors = !confirmed?.rooms.length && confirmedGeometry.rooms.some(room => (room.floor ?? 1) > 1);
   const geometry = reconciledDraft ?? confirmedGeometry;
   const displayedDrafting = draft ? drafting : confirmedDrafting;
   const viewMode: TwinViewMode = selectedViewMode ?? initialMode;
@@ -133,15 +137,17 @@ export function TwinLayoutEditor({ homeId, initialMode = '3d', rendererTheme, on
     if (floorLevels.length > 1 && active2DFloor === 'all') setSelected2DFloor(floorLevels[0]);
     void beginEditing();
   };
-  return <section aria-label="Sơ đồ Digital Twin" className="min-w-0 space-y-5">
-    {viewMode === '2d' && confirmed ? <p role="status" data-geometry-source={source} className={`rounded-xl border p-3 text-sm ${source === 'INFERRED' ? 'border-warning bg-warning-soft text-text' : 'border-line bg-info-soft text-muted'}`}>{source === 'PERSISTED' ? 'Bố cục đã lưu. Phòng và thiết bị được đồng bộ từ ngôi nhà.' : source === 'INFERRED' ? 'Bố cục tự xếp từ phòng và thiết bị hiện có.' : 'Chưa có dữ liệu phòng để hiển thị.'}</p> : null}
+  return <section aria-label="Sơ đồ Digital Twin" className={`twin-v2-layout-editor min-w-0 space-y-3 ${viewMode === '3d' ? 'twin-v2-layout-live' : ''}`}>
+    <div className={viewMode === '3d' ? 'twin-v2-layout-meta' : 'space-y-3'}>
+    {confirmed ? <p role="status" data-geometry-source={source} className={`rounded-xl border px-3 py-2 text-xs ${source === 'INFERRED' ? 'border-warning bg-warning-soft text-text' : 'border-line bg-info-soft text-muted'}`}><strong className="font-semibold">Dữ liệu HESTA</strong> · {source === 'PERSISTED' ? 'Bố cục đã lưu. Phòng và thiết bị được đồng bộ từ ngôi nhà.' : source === 'INFERRED' ? `Bố cục và nội thất minh họa từ phòng thật.${nameInferredFloors ? ' Tầng suy từ tên phòng.' : ''} Chưa phải bản đo thực tế.` : 'Chưa có dữ liệu phòng để hiển thị.'}</p> : null}
     <div className="flex flex-wrap items-center justify-between gap-4">
-      <div><h1 className="text-2xl font-semibold tracking-tight text-text">{viewMode === '3d' ? 'Không gian sống của bạn.' : 'Digital Twin'}</h1><p className="mt-2 text-sm text-muted">{viewMode === '3d' ? 'Khám phá từng phòng, chạm vào thiết bị và điều khiển ngôi nhà.' : 'Chọn tầng, căn chỉnh phòng và vị trí thiết bị có sẵn trong nhà.'}</p></div>
+      {viewMode === '3d' ? <p className="text-sm text-muted">Chọn phòng để xem thiết bị · Nhấp đúp để xem gần</p> : <div><h2 className="text-2xl font-semibold tracking-tight text-text">Sơ đồ Digital Twin</h2><p className="mt-2 text-sm text-muted">Chọn tầng, căn chỉnh phòng và vị trí thiết bị có sẵn trong nhà.</p></div>}
 
        <div className="flex flex-wrap items-center gap-2"><TwinViewSwitcher mode={viewMode} disabled={loading} onChange={setViewMode} />{viewMode === '3d' ? <TwinLayoutButton leadingIcon={<Pencil size={17} />} onClick={editIn2D}>{role === 'OWNER' ? 'Chỉnh sửa trong 2D' : 'Xem sơ đồ 2D'}</TwinLayoutButton> : null}{viewMode === '2d' && floorLevels.length > 1 ? <TwinFloorSelect floors={floorLevels} value={active2DFloor} allLabel="Tất cả tầng" ariaLabel="Chọn tầng trong sơ đồ 2D" onChange={(floor) => { setSelection(null); setSelected2DFloor(floor); }} /> : null}{viewMode === '2d' && draft ? <>
         <TwinLayoutButton disabled={blocked} onClick={cancel}>Hủy</TwinLayoutButton>
         <TwinLayoutButton variant="primary" leadingIcon={<Save size={18} />} disabled={!hasUnsavedChanges || blocked || role !== 'OWNER' || error?.kind === 'conflict' || error?.kind === 'forbidden'} onClick={() => void save()}>{saving ? 'Đang lưu…' : 'Lưu bố cục'}</TwinLayoutButton>
       </> : viewMode === '2d' && confirmed ? <TwinLayoutButton disabled={blocked} onClick={reload}>Tải mới nhất</TwinLayoutButton> : null}</div>
+    </div>
     </div>
     {viewMode === '2d' ? <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line">
       <div className="flex gap-4" aria-label="Chế độ sơ đồ">
@@ -168,7 +174,7 @@ export function TwinLayoutEditor({ homeId, initialMode = '3d', rendererTheme, on
         {draft ? <TwinDraftingToolbar metadata={drafting} selection={selection} floor={active2DFloor === 'all' ? floorLevels[0] ?? 1 : active2DFloor} disabled={!editable} mode={draftingMode} onModeChange={setDraftingMode} onChange={changeDrafting} /> : null}
         {draft ? <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
           <div className="twin-tool"><MousePointer2 size={20} aria-hidden="true" /><span><strong>Chọn tầng và phòng</strong><small>Dữ liệu tự đồng bộ từ nhà</small></span></div>
-          <div className="twin-tool"><Move size={20} aria-hidden="true" /><span><strong>Di chuyển</strong><small>Thiết bị đi theo phòng</small></span></div>
+          <div className="twin-tool"><Move size={20} aria-hidden="true" /><span><strong>Kéo bàn ghế & thiết bị</strong><small>Kéo nền trống để dời phòng</small></span></div>
           <div className="twin-tool"><Expand size={20} aria-hidden="true" /><span><strong>Kích thước</strong><small>Kéo góc hoặc nhập số</small></span></div>
 
          </div> : null}

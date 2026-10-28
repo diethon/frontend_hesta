@@ -35,6 +35,13 @@ test('room clustering uses screen-space hysteresis so slight zoom does not flick
   assert.equal(shouldClusterRoom(Number.NaN, true), false);
 });
 
+test('dense sensor rooms cluster before their important markers overlap in the overview', () => {
+  assert.equal(shouldClusterRoom(300, false, 11), true);
+  assert.equal(shouldClusterRoom(300, false, 2), false);
+  assert.equal(shouldClusterRoom(400, true, 11), true);
+  assert.equal(shouldClusterRoom(500, true, 11), false);
+});
+
 test('motion effects require a new and recent positive event instead of stale snapshots', () => {
   const now = Date.parse('2026-10-20T12:00:00Z');
   const latest = new Date(now - 1000).toISOString();

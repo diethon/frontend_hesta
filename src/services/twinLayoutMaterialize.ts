@@ -4,7 +4,7 @@ import { adaptTwinHouse } from './twinAdapter';
 import { adaptTwinArchitecture } from './twinArchitectureAdapter';
 import { locateOnWalls, generateWalls } from '../components/twin/neonplan/geometry/walls';
 
-const kinds: Record<string, TwinSceneObject['kind']> = { table:'TABLE',coffee_table:'TABLE',sofa:'SOFA',armchair:'CHAIR',bed:'BED',nightstand:'CABINET',wardrobe:'WARDROBE',chair:'CHAIR',office_chair:'CHAIR',desk:'DESK',shelf:'CABINET',tv_board:'TV_STAND',kitchen:'KITCHEN_COUNTER',sink:'SINK',washbasin:'SINK',wc:'TOILET',shower:'SHOWER',bathtub:'BATHTUB',plant:'PLANT',fridge:'REFRIGERATOR',lamp_floor:'LAMP' };
+const kinds: Record<string, TwinSceneObject['kind']> = { table:'TABLE',coffee_table:'TABLE',sofa:'SOFA',armchair:'CHAIR',bed:'BED',nightstand:'CABINET',wardrobe:'WARDROBE',chair:'CHAIR',office_chair:'CHAIR',desk:'DESK',shelf:'CABINET',tv_board:'TV_STAND',kitchen:'KITCHEN_COUNTER',sink:'SINK',washbasin:'SINK',wc:'TOILET',shower:'SHOWER',bathtub:'BATHTUB',plant:'PLANT',fridge:'REFRIGERATOR',lamp_floor:'LAMP',car:'CABINET',stove:'KITCHEN_COUNTER',table_round:'TABLE',sideboard:'CABINET' };
 const variants = new Set(['armchair','coffee_table','nightstand','office_chair','shelf','washbasin']);
 
 /** Freeze inferred furniture/openings into the same revisioned backend document on explicit Save. */

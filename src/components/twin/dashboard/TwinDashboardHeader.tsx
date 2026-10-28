@@ -1,6 +1,6 @@
-import { lazy, Suspense, useId, useRef, useState } from 'react';
+import { lazy, Suspense, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router';
-import { ChevronDown, Menu, RefreshCw, Sun } from 'lucide-react';
+import { ChevronDown, ChevronRight, House, Menu, PanelLeftClose, PanelLeftOpen, RefreshCw } from 'lucide-react';
 import { NotificationBell } from '../../notification/NotificationBell';
 import { UserAvatar } from '../../ui/UserAvatar';
 import { useAppDispatch, useAppSelector } from '../../../store/hooks';
@@ -8,13 +8,9 @@ import { selectCurrentUser } from '../../../store/selectors';
 import { currentUserUpdated } from '../../../store/authSlice';
 import { persistCurrentUser } from '../../../services/session';
 import type { TwinRendererTheme } from '../scene/rendererTheme';
+import { deviceHealthCounts } from './twinDashboardData';
 
 const ProfileModal = lazy(() => import('../../profile/ProfileModal').then((module) => ({ default: module.ProfileModal })));
-const rendererThemes: { value: TwinRendererTheme; label: string }[] = [
-  { value: 'DAYLIGHT', label: 'Daylight' }, { value: 'COZY', label: 'Cozy' },
-  { value: 'BLUEPRINT', label: 'Blueprint' }, { value: 'NIGHT', label: 'Night' },
-];
-
 interface Props {
   homeId: string;
   connected: boolean;
@@ -24,16 +20,22 @@ interface Props {
   onReload: () => void;
   theme: TwinRendererTheme;
   onThemeChange: (theme: TwinRendererTheme) => void;
+  navigationOpen?: boolean;
+  onToggleNavigation?: () => void;
 }
 
 /** The Twin page's single application header. Renderer themes never change the app theme. */
-export function TwinDashboardHeader({ homeId, connected, connectionLabel, loading, canReload, onReload, theme, onThemeChange }: Props) {
+export function TwinDashboardHeader({ homeId, connected, connectionLabel, loading, canReload, onReload, navigationOpen, onToggleNavigation }: Props) {
   const user = useAppSelector(selectCurrentUser);
+  const homeName = useAppSelector((state) => state.twin.homeId === homeId ? state.twin.home?.name : undefined);
+  const devices = useAppSelector((state) => state.twin.homeId === homeId ? state.twin.devicesById : null);
+  const health = useMemo(() => deviceHealthCounts(devices ? Object.values(devices) : []), [devices]);
   const dispatch = useAppDispatch();
   const [profileOpen, setProfileOpen] = useState(false);
   const profileButton = useRef<HTMLButtonElement>(null);
   const menu = useRef<HTMLDetailsElement>(null);
-  const themeId = useId();
+  const roomCount = useAppSelector((state) => state.twin.homeId === homeId ? state.twin.roomIds.length : 0);
+  const sensorCount = useAppSelector((state) => state.twin.homeId === homeId ? state.twin.sensorIds.length : 0);
   const encodedHome = encodeURIComponent(homeId);
   const links = [
     { label: 'Tổng quan', href: `/home?homeId=${encodedHome}` },
@@ -50,37 +52,27 @@ export function TwinDashboardHeader({ homeId, connected, connectionLabel, loadin
   };
 
   return <>
-    <header className="relative z-40 border-b border-line bg-surface px-4 py-3 shadow-soft sm:px-6">
-      <div className="flex min-w-0 items-center justify-between gap-3">
-        <div className="min-w-0"><p className="text-xs font-medium text-muted">Không gian sống</p><h1 className="mt-1 text-lg font-semibold tracking-tight text-text sm:text-xl">Digital Twin Dashboard</h1></div>
-        <div className="flex shrink-0 items-center gap-2">
-          <NotificationBell />
-          {user ? <button ref={profileButton} type="button" aria-label={`Mở hồ sơ ${user.fullName}`} aria-haspopup="dialog" onClick={() => setProfileOpen(true)} className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full border border-line bg-info-soft text-primary-hover transition-colors hover:bg-sidebar-hover focus-visible:outline-2 focus-visible:outline-primary"><UserAvatar src={user.avatarUrl} name={user.fullName} size={44} fallbackClassName="text-sm font-bold" /></button> : null}
-        </div>
-      </div>
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-3">
-          <details ref={menu} className="relative lg:hidden" onKeyDown={(event) => {
-            if (event.key === 'Escape' && menu.current?.open) {
-              menu.current.open = false;
-              menu.current.querySelector('summary')?.focus();
-            }
-          }}>
-            <summary aria-label="Điều hướng ứng dụng" className="flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-xl border border-line px-3 text-xs font-semibold text-text focus-visible:outline-2 focus-visible:outline-primary"><Menu size={16} aria-hidden="true" /><span className="hidden sm:inline">Điều hướng</span><ChevronDown size={12} aria-hidden="true" /></summary>
-            <nav aria-label="Điều hướng HESTA trên màn hình nhỏ" className="absolute left-0 top-full z-50 mt-2 w-56 rounded-2xl border border-line bg-surface p-2 shadow-float">{links.map(({ label, href }) => <Link key={href} to={href} onClick={() => { if (menu.current) menu.current.open = false; }} className="block rounded-xl px-3 py-3 text-sm text-text hover:bg-app focus-visible:outline-2 focus-visible:outline-primary">{label}</Link>)}<Link to="/home" className="block rounded-xl border-t border-line px-3 py-3 text-sm text-muted">Chọn ngôi nhà khác</Link></nav>
-          </details>
-          <p role="status" className="flex min-w-0 items-center gap-2 text-xs text-muted"><span aria-hidden="true" className={`h-2 w-2 shrink-0 rounded-full ${connected ? 'bg-success' : 'bg-warning'}`} /><span className="min-w-0 break-words"><span className="font-semibold text-text">Realtime</span> · {connectionLabel}</span></p>
-        </div>
-        <div className="flex max-w-full flex-wrap items-center gap-2">
-          <label htmlFor={themeId} className="sr-only">Ánh sáng mô hình 3D</label>
-          <div className="flex min-h-11 items-center gap-2 rounded-xl border border-line bg-surface pl-3"><Sun size={16} className="text-icon" aria-hidden="true" /><select id={themeId} aria-label="Ánh sáng mô hình 3D" value={theme} onChange={(event) => {
-            const selected = rendererThemes.find((item) => item.value === event.target.value);
-            if (selected) onThemeChange(selected.value);
-          }} className="min-h-11 rounded-xl bg-surface pr-3 text-xs font-semibold text-text focus-visible:outline-2 focus-visible:outline-primary">{rendererThemes.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}</select></div>
-          <button type="button" disabled={loading || !canReload} onClick={onReload} aria-label="Đồng bộ lại Digital Twin" className="flex min-h-11 items-center gap-2 rounded-xl border border-line bg-surface px-3 text-xs font-semibold text-text transition-colors hover:bg-app focus-visible:outline-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50"><RefreshCw size={15} aria-hidden="true" /><span>{loading ? 'Đang đồng bộ…' : 'Đồng bộ lại'}</span></button>
-        </div>
+    <header className="v2-topbar">
+      <Link to={`/home?homeId=${encodedHome}`} className="v2-brand" aria-label="HESTA · Về trang chính"><span className="v2-brand-mark"><House size={25} strokeWidth={2} aria-hidden="true" /></span><span>HESTA<span className="v2-brand-period">.</span></span></Link>
+      <span className="v2-topbar-divider" aria-hidden="true" />
+      <div className="v2-breadcrumb"><span>Không gian sống</span><ChevronRight size={13} aria-hidden="true" /><strong>Digital Twin</strong><span className="v2-version-tag">V2</span></div>
+      <span className="v2-data-badge"><span />DỮ LIỆU HESTA</span>
+      <div className="v2-topbar-right">
+        <p role="status" className="v2-connection"><span className={`v2-status-dot ${connected ? 'bg-success' : 'bg-warning'}`} /><span>{connectionLabel}</span></p>
+        <button type="button" disabled={loading || !canReload} onClick={onReload} aria-label="Đồng bộ lại Digital Twin" className="v2-icon-button" title={loading ? 'Đang đồng bộ…' : 'Đồng bộ lại'}><RefreshCw size={17} aria-hidden="true" /></button>
+        {onToggleNavigation ? <button type="button" aria-label={navigationOpen ? 'Thu gọn điều hướng HESTA' : 'Mở rộng điều hướng HESTA'} title={navigationOpen ? 'Thu gọn điều hướng HESTA' : 'Mở rộng điều hướng HESTA'} aria-expanded={!!navigationOpen} onClick={onToggleNavigation} className="v2-icon-button v2-navigation-toggle">{navigationOpen ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}</button> : null}
+        <details ref={menu} className="v2-navigation-menu" onKeyDown={(event) => { if (event.key === 'Escape' && menu.current?.open) { menu.current.open = false; menu.current.querySelector('summary')?.focus(); } }}>
+          <summary aria-label="Điều hướng ứng dụng" className="v2-icon-button"><Menu size={18} aria-hidden="true" /><ChevronDown size={10} aria-hidden="true" /></summary>
+          <nav aria-label="Điều hướng HESTA" className="v2-navigation-links">{links.map(({ label, href }) => <Link key={href} to={href} onClick={() => { if (menu.current) menu.current.open = false; }}>{label}</Link>)}<Link to="/home">Chọn ngôi nhà khác</Link></nav>
+        </details>
+        <NotificationBell />
+        {user ? <button ref={profileButton} type="button" aria-label={`Mở hồ sơ ${user.fullName}`} aria-haspopup="dialog" onClick={() => setProfileOpen(true)} className="v2-profile"><UserAvatar src={user.avatarUrl} name={user.fullName} size={34} fallbackClassName="text-xs font-semibold" /><span><strong>{user.fullName}</strong><small>Không gian cá nhân</small></span></button> : null}
       </div>
     </header>
+    <div className="v2-workspace-heading">
+      <div className="v2-heading-copy"><p className="v2-eyebrow"><span className="v2-status-dot" />YOUR HOME, CONNECTED</p><h1>{homeName ?? 'Ngôi nhà của bạn'}<span>.</span></h1><p>Một góc nhìn trực quan cho không gian sống thông minh.</p></div>
+      <dl className="v2-house-overview"><div><dt>Không gian</dt><dd>{roomCount}<small>phòng</small></dd></div><div><dt>Thiết bị kết nối</dt><dd>{health.online}<small>/ {health.total} trực tuyến</small><span className="v2-status-dot" /></dd></div><div><dt>Cảm biến</dt><dd>{sensorCount}<small>đã đăng ký</small></dd></div></dl>
+    </div>
     {profileOpen && user ? <Suspense fallback={<div role="status" className="fixed inset-x-4 top-4 z-50 mx-auto max-w-sm rounded-2xl border border-line bg-surface p-4 text-center text-sm text-muted shadow-float">Đang tải hồ sơ…<button type="button" onClick={closeProfile} className="ml-3 rounded-lg px-3 py-2 font-semibold text-primary-hover">Hủy</button></div>}><ProfileModal isOpen user={user} onClose={closeProfile} onProfileUpdate={(updatedUser) => {
       persistCurrentUser(updatedUser);
       dispatch(currentUserUpdated(updatedUser));
