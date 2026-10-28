@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { useLocation, useSearchParams, Navigate } from "react-router";
+import { useLocation, useSearchParams, Navigate, useNavigate } from "react-router";
 import type { UserResponse } from "../../types/auth";
 import type { DeviceResponse } from "../../types/device";
 import type { RoomResponse } from "../../types/room";
@@ -63,6 +63,7 @@ export const HomePage: React.FC<HomePageProps> = ({
   }
 
   const dispatch = useAppDispatch();
+  const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const requestedHomeId = searchParams.get("homeId");
@@ -154,11 +155,11 @@ export const HomePage: React.FC<HomePageProps> = ({
   useEffect(() => {
     if (!userHome) return;
     if (location.hash === "#scenes-section") {
-      setActiveTabSection('scenes');
+      navigate(`/homes/${encodeURIComponent(userHome.homeId)}/scenes`);
     } else if (location.hash === "#members-section") {
       setActiveTabSection('members');
     }
-  }, [location.hash, location.key, userHome]);
+  }, [location.hash, location.key, userHome, navigate]);
 
   useEffect(() => {
     dispatch(currentHomeChanged(userHome?.homeId ?? null));
@@ -366,7 +367,13 @@ export const HomePage: React.FC<HomePageProps> = ({
             <HomeQuickScenes
               homeId={userHome?.homeId}
               scenes={scenes}
-              onOpenSceneManagement={() => setActiveTabSection('scenes')}
+              onOpenSceneManagement={() => {
+                if (userHome?.homeId) {
+                  navigate(`/homes/${encodeURIComponent(userHome.homeId)}/scenes`);
+                } else {
+                  notify.info('Hãy chọn hoặc tạo một ngôi nhà trước.');
+                }
+              }}
             />
 
             <HomeFavoriteDevices

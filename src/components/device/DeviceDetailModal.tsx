@@ -227,7 +227,7 @@ function ColorCreationSheet({
         <div className="color-sheet-content">
           <div className="color-sheet-preview">
             <span style={{ background: color }}>
-              <Icon name="lamp" size={34} />
+              <Icon name="lamp" size={26} />
             </span>
             <strong>{color.toUpperCase()}</strong>
             <small>Xem trước</small>
