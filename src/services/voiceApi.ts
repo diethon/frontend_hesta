@@ -10,6 +10,14 @@ export interface VoiceCommandRequest {
   homeId: string;
 }
 
+export interface SubCommandResult {
+  message: string;
+  success: boolean;
+  action: string | null;
+  room: string | null;
+  deviceType: string | null;
+}
+
 export interface VoiceCommandResponse {
   success: boolean;
   message: string;
@@ -21,6 +29,7 @@ export interface VoiceCommandResponse {
   stepDurations: Record<string, number>;
   audioUrl?: string | null;
   audioData?: string | null;
+  subCommands?: SubCommandResult[];
 }
 
 /**
