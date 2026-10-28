@@ -1,6 +1,5 @@
 import React from 'react';
 import type { DeviceSummary } from '../../types/automation';
-import type { DraftSceneAction } from './sceneActions';
 import { Icon, type IconName } from '../home/HomeIcons';
 import { getFigmaIconForDevice } from './ScenePage';
 

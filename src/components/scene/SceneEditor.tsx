@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { HexColorPicker } from 'react-colorful';
 import type { DeviceSummary } from '../../types/automation';
 import type { SceneResponse, SceneActionType } from '../../types/scene';
@@ -7,7 +7,6 @@ import {
   type AnyDevice,
   buildSceneActionInput,
   sceneActionsToDraft,
-  getSceneDeviceActions,
 } from './sceneActions';
 import { Icon, type IconName } from '../home/HomeIcons';
 import { getFigmaIconForDevice, getFigmaIconForScene, SceneHistory } from './ScenePage';
@@ -66,7 +65,7 @@ export const COLOR_SWATCHES = [
 
 export function formatActionSummary(
   act: DraftSceneAction,
-  dev?: DeviceSummary
+  _dev?: DeviceSummary
 ): string {
   const code = act.action;
   if (code === 'TURN_ON') return 'Bật thiết bị';
@@ -105,7 +104,7 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
   scene,
   homeId,
   devices,
-  actionTypes,
+  actionTypes: _actionTypes,
   onClose,
   onSaved,
   onDuplicate,
@@ -206,7 +205,6 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
     const lightDev = ctrlDevs.find((d) => (d.deviceType || '').toUpperCase().includes('LIGHT') || (d.deviceType || '').toUpperCase().includes('LED'));
     const acDev = ctrlDevs.find((d) => (d.deviceType || '').toUpperCase().includes('AC') || (d.deviceType || '').toUpperCase().includes('AIR'));
     const gateDev = ctrlDevs.find((d) => (d.deviceType || '').toUpperCase().includes('GATE') || (d.deviceType || '').toUpperCase().includes('DOOR'));
-    const plugDev = ctrlDevs.find((d) => (d.deviceType || '').toUpperCase().includes('PLUG') || (d.deviceType || '').toUpperCase().includes('SOCKET'));
 
     if (templateKey === 'morning') {
       setName('Chào buổi sáng');

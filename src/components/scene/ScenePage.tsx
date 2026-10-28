@@ -3,7 +3,6 @@ import { useNavigate, useParams } from 'react-router';
 import { useAppSelector } from '../../store/hooks';
 import {
   getScenes,
-  getScene,
   createScene,
   updateScene,
   deleteScene,
@@ -16,16 +15,10 @@ import type {
   SceneResponse,
   SceneExecutionResponse,
   SceneActionType,
-  DeviceResponse,
 } from '../../types/scene';
 import type { DeviceSummary } from '../../types/automation';
 import {
-  sceneActionsToDraft,
-  buildSceneActionInput,
   sceneToggleInput,
-  getSceneDeviceActions,
-  type DraftSceneAction,
-  type AnyDevice,
 } from './sceneActions';
 import { DashboardNavRail } from '../home/DashboardNavRail';
 import { Icon, IconButton, type IconName } from '../home/HomeIcons';
@@ -578,8 +571,8 @@ export function ScenePage() {
   const navigate = useNavigate();
   const { homeId: routeHomeId, sceneId } = useParams<{ homeId?: string; sceneId?: string }>();
   const authUser = useAppSelector((state) => state.auth.user);
-  const currentReduxHomeId = useAppSelector((state) => state.auth.currentHomeId);
-  const homeId = routeHomeId || currentReduxHomeId || authUser?.homeId || '';
+  const currentReduxHomeId = useAppSelector((state) => state.home?.currentHomeId);
+  const homeId = routeHomeId || currentReduxHomeId || '';
 
   const [scenes, setScenes] = useState<SceneResponse[]>([]);
   const [loading, setLoading] = useState(true);

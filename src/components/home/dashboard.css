@@ -20,6 +20,27 @@
   --ease: cubic-bezier(0.2, 0, 0, 1);
 }
 
+html.dark, :root[data-theme="dark"], html.dark .app-shell, [data-theme="dark"] .app-shell {
+  --bg-base: #0b0f17;
+  --mesh-1: rgba(30, 58, 138, 0.35);
+  --mesh-2: rgba(88, 28, 135, 0.25);
+  --mesh-3: rgba(6, 78, 59, 0.25);
+  --g2: rgba(17, 24, 39, 0.72);
+  --g1: rgba(31, 41, 55, 0.75);
+  --border: rgba(255, 255, 255, 0.12);
+  --solid: #111827;
+  --muted: #1f2937;
+  --text: #f9fafb;
+  --secondary: #9ca3af;
+  --tertiary: #6b7280;
+  --accent: #3b82f6;
+  --accent-soft: rgba(59, 130, 246, 0.22);
+  --success: #22c55e;
+  --danger: #ef4444;
+  --card-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --glass-shadow: 0 16px 48px rgba(0, 0, 0, 0.65);
+}
+
 .app-shell {
   position: relative;
   min-height: 100vh;
@@ -4911,3 +4932,20 @@ main {
   }
 }
 
+
+/* Automation Rules Grid */
+.rules-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+@media (max-width: 1024px) {
+  .rules-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 640px) {
+  .rules-grid {
+    grid-template-columns: 1fr;
+  }
+}

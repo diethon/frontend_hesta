@@ -8,13 +8,22 @@ interface DevicePickerSheetProps {
   selectedDeviceId?: string;
   onSelect: (device: DeviceSummary) => void;
   onClose: () => void;
+  filterMode?: 'all' | 'sensors-only' | 'actionable-only';
+  title?: string;
 }
 
-const SENSOR_TYPES = ['SENSOR', 'TEMP_HUMID', 'MOTION', 'SMOKE', 'DOOR_SENSOR', 'WATER_LEAK'];
+const SENSOR_TYPES = ['SENSOR', 'TEMP_HUMID', 'MOTION', 'SMOKE', 'DOOR_SENSOR', 'WATER_LEAK', 'DHT', 'PIR', 'LDR'];
 
 export function isDeviceControllable(device: DeviceSummary): boolean {
+  if (device.sensor === true && !device.actionable) return false;
   const type = (device.deviceType || '').toUpperCase();
   return !SENSOR_TYPES.some((s) => type.includes(s));
+}
+
+export function isSensorDevice(device: DeviceSummary): boolean {
+  if (device.sensor === true) return true;
+  const type = (device.deviceType || '').toUpperCase();
+  return SENSOR_TYPES.some((s) => type.includes(s));
 }
 
 export function getDeviceTypeLabel(device: DeviceSummary): string {
@@ -36,6 +45,8 @@ export const DevicePickerSheet: React.FC<DevicePickerSheetProps> = ({
   selectedDeviceId,
   onSelect,
   onClose,
+  filterMode = 'all',
+  title,
 }) => {
   const [search, setSearch] = useState('');
   const [selectedRoom, setSelectedRoom] = useState<string>('Tất cả');
@@ -80,21 +91,28 @@ export const DevicePickerSheet: React.FC<DevicePickerSheetProps> = ({
     return { controllable: ctrl, sensors: sens };
   }, [devices, search, selectedRoom]);
 
-  // Group controllable devices by room
-  const groupedControllable = useMemo(() => {
+  // Choose selectable vs non-selectable based on filterMode
+  const isSensorsMode = filterMode === 'sensors-only';
+  const selectableDevices = isSensorsMode ? sensors : controllable;
+  const nonSelectableDevices = filterMode === 'actionable-only' ? [] : (isSensorsMode ? controllable : sensors);
+  const nonSelectableTitle = isSensorsMode ? `Thiết bị khác (${controllable.length})` : `Cảm biến (${sensors.length})`;
+  const nonSelectableCaption = isSensorsMode ? 'Không phải cảm biến' : 'Chỉ đọc · không thể điều khiển';
+
+  // Group selectable devices by room
+  const groupedSelectable = useMemo(() => {
     const groups: Record<string, DeviceSummary[]> = {};
-    controllable.forEach((d) => {
+    selectableDevices.forEach((d) => {
       const room = d.roomName || d.room || 'Phòng khác';
       if (!groups[room]) groups[room] = [];
       groups[room].push(d);
     });
     return groups;
-  }, [controllable]);
+  }, [selectableDevices]);
 
   return (
     <div className="sub-sheet-layer">
       <header className="sub-sheet-header">
-        <strong>Chọn thiết bị</strong>
+        <strong>{title || (isSensorsMode ? 'Chọn cảm biến' : 'Chọn thiết bị')}</strong>
         <button
           type="button"
           className="icon-button"
@@ -110,7 +128,7 @@ export const DevicePickerSheet: React.FC<DevicePickerSheetProps> = ({
         <input
           autoFocus
           className="picker-search"
-          placeholder="Tìm theo tên thiết bị hoặc phòng..."
+          placeholder={isSensorsMode ? "Tìm theo tên cảm biến hoặc phòng..." : "Tìm theo tên thiết bị hoặc phòng..."}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
@@ -129,9 +147,9 @@ export const DevicePickerSheet: React.FC<DevicePickerSheetProps> = ({
           ))}
         </div>
 
-        {/* Controllable Devices Grouped by Room */}
-        {Object.keys(groupedControllable).length > 0 ? (
-          Object.entries(groupedControllable).map(([roomName, roomDevs]) => (
+        {/* Selectable Devices Grouped by Room */}
+        {Object.keys(groupedSelectable).length > 0 ? (
+          Object.entries(groupedSelectable).map(([roomName, roomDevs]) => (
             <div key={roomName} className="space-y-2">
               <span className="text-[11px] font-bold text-[var(--secondary)] uppercase tracking-wider block">
                 {roomName} ({roomDevs.length})
@@ -140,7 +158,7 @@ export const DevicePickerSheet: React.FC<DevicePickerSheetProps> = ({
                 {roomDevs.map((dev) => {
                   const isSelected = dev.id === selectedDeviceId;
                   const isOnline = dev.online !== false && dev.status !== 'OFFLINE';
-                  const iconName: IconName = getFigmaIconForDevice(dev.deviceType, dev.name);
+                  const iconName: IconName = isSensorsMode ? 'activity' : getFigmaIconForDevice(dev.deviceType, dev.name);
 
                   return (
                     <div
@@ -197,40 +215,40 @@ export const DevicePickerSheet: React.FC<DevicePickerSheetProps> = ({
               </div>
             </div>
           ))
-        ) : controllable.length === 0 && sensors.length === 0 ? (
+        ) : selectableDevices.length === 0 && nonSelectableDevices.length === 0 ? (
           <div className="p-8 text-center text-xs text-[var(--tertiary)]">
             Không tìm thấy thiết bị nào phù hợp.
           </div>
         ) : null}
 
-        {/* Read-only Sensors Section (Dimmed, non-selectable) */}
-        {sensors.length > 0 && (
+        {/* Non-selectable Devices Section (Dimmed, non-selectable) */}
+        {nonSelectableDevices.length > 0 && (
           <div className="mt-4 pt-4 border-t border-[var(--border)] space-y-2 opacity-60">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold text-[var(--tertiary)] uppercase tracking-wider">
-                Cảm biến ({sensors.length})
+                {nonSelectableTitle}
               </span>
               <span className="text-[10px] text-[var(--tertiary)] italic">
-                Chỉ đọc · không thể điều khiển
+                {nonSelectableCaption}
               </span>
             </div>
             <div className="space-y-2">
-              {sensors.map((sensor) => (
+              {nonSelectableDevices.map((dev) => (
                 <div
-                  key={sensor.id}
+                  key={dev.id}
                   className="picker-device-row disabled"
-                  title="Cảm biến chỉ đọc, không thể đưa vào hành động kịch bản"
+                  title={`${dev.name} - ${nonSelectableCaption}`}
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="action-step-bubble-36">
-                      <Icon name="activity" size={18} />
+                      <Icon name={isSensorsMode ? getFigmaIconForDevice(dev.deviceType, dev.name) : 'activity'} size={18} />
                     </div>
                     <div className="min-w-0">
                       <strong className="text-xs text-[var(--text)] block truncate">
-                        {sensor.name}
+                        {dev.name}
                       </strong>
                       <span className="text-[10px] text-[var(--tertiary)]">
-                        {sensor.roomName || 'Cảm biến'} · Chỉ đọc
+                        {dev.roomName || 'Thiết bị'} · {nonSelectableCaption}
                       </span>
                     </div>
                   </div>

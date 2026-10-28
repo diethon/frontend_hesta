@@ -47,7 +47,9 @@ export type IconName =
   | "check"
   | "trash"
   | "copy"
-  | "clock";
+  | "clock"
+  | "zap"
+  | "test";
 
 export const iconPaths: Record<IconName, React.ReactNode> = {
   car: (
@@ -116,6 +118,14 @@ export const iconPaths: Record<IconName, React.ReactNode> = {
     <>
       <circle cx="12" cy="12" r="10" />
       <polyline points="12 6 12 12 16 14" />
+    </>
+  ),
+  zap: <path d="m13 2-9 12h7l-1 8 9-12h-7l1-8Z" />,
+  test: (
+    <>
+      <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+      <polyline points="14 2 14 8 20 8" />
+      <path d="m9 15 2 2 4-4" />
     </>
   ),
   home: (
