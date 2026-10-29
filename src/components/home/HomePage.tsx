@@ -177,7 +177,7 @@ export const HomePage: React.FC<HomePageProps> = ({
     setCreateLoading(true);
     try {
       await createHome(newHomeName.trim());
-      notify.success('Tạo nhà thành công', 'Bạn có thể mở Digital Twin để bắt đầu thiết kế sơ đồ.');
+      notify.success('Tạo nhà thành công', 'Bạn có thể mở Mô hình 3D để bắt đầu thiết kế sơ đồ.');
       setIsCreateModalOpen(false);
       setNewHomeName("");
       fetchHomes();
@@ -308,7 +308,12 @@ export const HomePage: React.FC<HomePageProps> = ({
           setActiveTabSection('dashboard');
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
-        onSelectMembers={() => setActiveTabSection('members')}
+        onSelectMembers={() => {
+          setActiveTabSection('members');
+          setTimeout(() => {
+            document.getElementById('members-section')?.scrollIntoView({ behavior: 'smooth' });
+          }, 50);
+        }}
         onOpenProfile={() => setIsProfileModalOpen(true)}
       />
 
@@ -334,7 +339,7 @@ export const HomePage: React.FC<HomePageProps> = ({
               className="flex items-center gap-2 text-xs font-bold text-accent hover:opacity-80 transition-all cursor-pointer"
             >
               <ArrowLeft className="w-4 h-4" />
-              <span>Quay lại Tổng quan Dashboard</span>
+              <span>Quay lại Màn hình tổng quan</span>
             </button>
             <span className="text-xs font-semibold text-secondary">
               {activeTabSection === 'scenes' ? 'Quản lý Kịch bản' : 'Thành viên gia đình'}
