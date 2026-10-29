@@ -1,4 +1,5 @@
 import { apiClient } from './apiClient';
+import type { DeviceEnergyBreakdown } from '../types/energy';
 import type {
   DeviceCommandResult,
   DeviceResponse,
@@ -52,6 +53,11 @@ export const getDevicesByRoom = async (roomId: string): Promise<DeviceResponse[]
   return response.data.result;
 };
 
+export const getDeviceEnergy = async (deviceId: string): Promise<DeviceEnergyBreakdown> => {
+  const response = await apiClient.get(`/devices/${deviceId}/energy`);
+  return response.data.result;
+};
+
 export const getDeviceDetail = async (deviceId: string): Promise<DeviceResponse> => {
   const response = await apiClient.get(`/devices/${deviceId}`);
   return response.data.result;
@@ -96,12 +102,15 @@ export const sendRoomCommand = async (
 };
 
 export const sendManualPowerCommand = async (deviceId: string, action: 'TURN_ON' | 'TURN_OFF'): Promise<ManualCommandResponse> => {
-  const response = await apiClient.post(`/devices/${deviceId}/commands`, { action });
-  return response.data.result;
+  const commandResult = await sendDeviceCommand(deviceId, action);
+  return {
+    command: commandResult,
+    overrideUntil: null as any,
+  };
 };
 
-export const cancelDeviceAutomation = async (deviceId: string): Promise<string> => {
-  const response = await apiClient.post(`/devices/${deviceId}/automation/cancel`);
+export const cancelDeviceAutomation = async (deviceId: string, minutes: number = 30): Promise<string> => {
+  const response = await apiClient.post(`/devices/${deviceId}/automation/cancel`, { minutes });
   return response.data.result;
 };
 

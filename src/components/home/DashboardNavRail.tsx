@@ -23,7 +23,7 @@ interface NavItemDef {
 const navItems: NavItemDef[] = [
   { id: 'overview', icon: 'home', label: 'Tổng quan' },
   { id: 'devices', icon: 'grid', label: 'Thiết bị' },
-  { id: 'twin', icon: 'cube', label: 'Digital Twin' },
+  { id: 'twin', icon: 'cube', label: 'Mô hình 3D' },
   { id: 'energy', icon: 'energy', label: 'Tiêu thụ điện' },
   { id: 'scenes', icon: 'sparkles', label: 'Kịch bản' },
   { id: 'automations', icon: 'automation', label: 'Tự động hóa' },
@@ -47,7 +47,7 @@ export const DashboardNavRail: React.FC<DashboardNavRailProps> = ({
         if (onSelectOverview) {
           onSelectOverview();
         } else {
-          window.scrollTo({ top: 0, behavior: 'smooth' });
+          navigate('/home');
         }
         break;
       case 'devices':
@@ -89,7 +89,7 @@ export const DashboardNavRail: React.FC<DashboardNavRailProps> = ({
         if (onSelectMembers) {
           onSelectMembers();
         } else {
-          document.getElementById('members-section')?.scrollIntoView({ behavior: 'smooth' });
+          navigate('/home#members-section');
         }
         break;
     }

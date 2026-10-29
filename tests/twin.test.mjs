@@ -490,7 +490,7 @@ test('invalid payloads are ignored; unknown event names rejected; Twin login ret
   const state = nav.readNavigationState({ returnTo: path });
   assert.equal(state.returnTo, path);
   assert.equal(nav.loginDestination({ platformRole: 'USER' }, '', state), path);
-  assert.equal(nav.loginDestination({ platformRole: 'ADMIN' }, '', state), path);
+  assert.equal(nav.loginDestination({ platformRole: 'ADMIN' }, '', state), '/admin');
   assert.equal(nav.loginDestination({ platformRole: 'USER' }, '?inviteToken=invite', state), '/join');
   assert.equal(nav.loginDestination({ platformRole: 'USER' }, '?token=invite', state), '/join');
   assert.equal(nav.loginDestination({ platformRole: 'USER' }, '?inviteToken=invite', {

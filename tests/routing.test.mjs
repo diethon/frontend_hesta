@@ -112,27 +112,28 @@ test('session restoration happens before protected routes render', () => {
   assert.equal(redirects.length, 0);
   assert.ok(renderRoute('/admin', admin).includes('HESTA Admin Center'));
   assert.equal(redirects.length, 0);
-  // ADMIN users can still visit /home explicitly.
-  assert.ok(renderRoute('/home', admin).includes('HESTA Smart Home'));
-  assert.equal(redirects.length, 0);
+  // ADMIN users are redirected to /admin (system admin only, not a homeowner).
+  renderRoute('/home', admin);
+  assert.equal(redirects[0]?.to, '/admin');
+  assert.equal(redirects[0]?.replace, true);
 });
 
 test('home navigation keeps all menu entries and the same order on feature pages', () => {
   const labels = ['Tổng quan', 'Thiết bị', 'Digital Twin', 'Tiêu thụ điện', 'Kịch bản', 'Tự động hóa', 'Thành viên'];
-  for (const account of [user, admin]) {
-    for (const path of ['/home', '/home/home-1/devices', '/home/home-1/energy', '/homes/home-1/scenes', '/homes/home-1/automation-rules', '/homes/home-1/recommendations']) {
-      const html = renderRoute(path, account);
-      assert.equal((html.match(/<nav aria-label="Điều hướng chính"/g) ?? []).length, 1, `Expected one sidebar on ${path}`);
-      const navigation = html.match(/<nav aria-label="Điều hướng chính"[^>]*>([\s\S]*?)<\/nav>/)?.[1];
-      assert.ok(navigation, `Main navigation missing on ${path}`);
-      let previousIndex = -1;
-      for (const label of labels) {
-        const index = navigation.indexOf(label);
-        assert.ok(index > previousIndex, `${label} missing or out of order on ${path}`);
-        previousIndex = index;
-      }
-      assert.equal(navigation.includes('Quản trị hệ thống'), account.platformRole === 'ADMIN');
+  for (const path of ['/home', '/home/home-1/devices', '/home/home-1/energy', '/homes/home-1/scenes', '/homes/home-1/automation-rules', '/homes/home-1/recommendations']) {
+    const html = renderRoute(path, user);
+    assert.equal((html.match(/<nav aria-label="Điều hướng chính"/g) ?? []).length, 1, `Expected one sidebar on ${path}`);
+    const navigation = html.match(/<nav aria-label="Điều hướng chính"[^>]*>([\s\S]*?)<\/nav>/)?.[1];
+    assert.ok(navigation, `Main navigation missing on ${path}`);
+    let previousIndex = -1;
+    for (const label of labels) {
+      const index = navigation.indexOf(label);
+      assert.ok(index > previousIndex, `${label} missing or out of order on ${path}`);
+      previousIndex = index;
     }
+    // Admin is redirected to /admin from all home feature pages
+    renderRoute(path, admin);
+    assert.equal(redirects[0]?.to, '/admin');
   }
 });
 
@@ -212,11 +213,14 @@ test('invitation aliases preserve encoded tokens and repeated unrelated query ke
 });
 
 test('post-login destinations respect invitations, completed registration, roles, and safe return paths', () => {
-  assert.equal(navigation.loginDestination(admin, search, { returnTo: '/admin' }), '/join');
-  assert.equal(navigation.loginDestination(user, search, { handledInviteToken: 'a+b&c', returnTo: '/join' }), '/home');
-  assert.equal(navigation.loginDestination(admin, '', { returnTo: '/home' }), '/home');
-  assert.equal(navigation.loginDestination(user, '', { returnTo: '/admin' }), '/home');
+  // Admin always goes to /admin
+  assert.equal(navigation.loginDestination(admin, search, { returnTo: '/admin' }), '/admin');
+  assert.equal(navigation.loginDestination(admin, '', { returnTo: '/home' }), '/admin');
   assert.equal(navigation.loginDestination(admin, '', {}), '/admin');
+  // User respects safe return paths and invitations
+  assert.equal(navigation.loginDestination(user, search, { returnTo: '/admin' }), '/join');
+  assert.equal(navigation.loginDestination(user, search, { handledInviteToken: 'a+b&c', returnTo: '/join' }), '/home');
+  assert.equal(navigation.loginDestination(user, '', { returnTo: '/admin' }), '/home');
   assert.equal(navigation.readNavigationState({ returnTo: '//untrusted.example' }).returnTo, undefined);
 });
 

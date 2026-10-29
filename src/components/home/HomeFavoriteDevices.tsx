@@ -382,9 +382,11 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
           device={selectedDetail}
           placement="center"
           onClose={() => setSelectedDetail(null)}
-          onDeviceUpdated={() => {
+          onDeviceUpdated={(updated) => {
             onRefreshDevices?.();
-            setSelectedDetail(null);
+            if (updated) {
+              setSelectedDetail((prev: any) => (prev ? { ...prev, ...updated } : prev));
+            }
           }}
           onDeviceRemoved={() => {
             onRefreshDevices?.();
