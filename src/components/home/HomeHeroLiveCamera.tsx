@@ -39,7 +39,7 @@ export const HomeHeroLiveCamera: React.FC<HomeHeroLiveCameraProps> = ({
     setIsSnapping(true);
     setTimeout(() => {
       setIsSnapping(false);
-      notify.success('Đã chụp ảnh snapshot', 'Hình ảnh camera an ninh đã được lưu vào nhật ký.');
+      notify.success('Đã chụp ảnh camera', 'Hình ảnh camera an ninh đã được lưu vào nhật ký.');
     }, 450);
   };
 
@@ -47,7 +47,7 @@ export const HomeHeroLiveCamera: React.FC<HomeHeroLiveCameraProps> = ({
     if (homeId) {
       navigate(`/home/${encodeURIComponent(homeId)}/digital-twin`);
     } else {
-      notify.info('Mở Digital Twin toàn màn hình.');
+      notify.info('Mở mô hình 3D toàn màn hình.');
     }
   };
 
@@ -138,7 +138,7 @@ export const HomeHeroLiveCamera: React.FC<HomeHeroLiveCameraProps> = ({
           <div className="camera-top-left">
             <span className="live-badge">
               <span className="live-dot" />
-              Live
+              Trực tiếp
             </span>
 
             <div className="relative">

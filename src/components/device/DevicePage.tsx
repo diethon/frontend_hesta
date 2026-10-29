@@ -23,6 +23,7 @@ import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { notify } from '../ui/notify';
 import { realtimeEventDispatcher } from '../../realtime/realtimeEvents';
 import type { RealtimeEvent } from '../../realtime/realtimeTypes';
+import { useOverrideCountdown } from './useOverrideCountdown';
 
 // ──────────────────────────────────────────────────────────────────────────
 // Device Mapping & Helper
@@ -41,6 +42,8 @@ export interface UIMappedDevice {
   offline?: boolean;
   sensor?: boolean;
   brightness?: number;
+  manualOverrideUntil?: string | null;
+  manualOverrideActive?: boolean;
   raw?: DeviceResponse;
 }
 
@@ -72,8 +75,8 @@ export function mapDeviceToUI(d: DeviceResponse, localPower: Record<string, bool
   ) {
     type = 'Điều hòa';
     icon = 'snowflake';
-    const temp = d.currentState?.temperature || 24;
-    valueStr = `${temp}°C`;
+    const temp = d.currentState?.temperature;
+    valueStr = temp !== undefined ? `${temp}°C` : undefined;
   } else if (typeUpper.includes('GATE') || typeUpper.includes('ROLLING') || nameLower.includes('cổng')) {
     type = 'Cổng';
     icon = 'door';
@@ -81,14 +84,14 @@ export function mapDeviceToUI(d: DeviceResponse, localPower: Record<string, bool
     type = 'Cảm biến';
     icon = 'thermometer';
     isSensor = true;
-    const temp = d.currentState?.temperature ?? 27.7;
-    valueStr = `${temp}°C`;
+    const temp = d.currentState?.temperature;
+    valueStr = temp !== undefined ? `${temp}°C` : undefined;
   } else if (typeUpper.includes('LUX') || typeUpper.includes('SUN') || typeUpper.includes('LIGHT_SENSOR')) {
     type = 'Cảm biến';
     icon = 'sun';
     isSensor = true;
-    const lux = d.currentState?.lux ?? 820;
-    valueStr = `${lux} lx`;
+    const lux = d.currentState?.lux;
+    valueStr = lux !== undefined ? `${lux} lx` : (d.currentState?.LIGHT_SENSOR !== undefined ? (Number(d.currentState.LIGHT_SENSOR) === 1 ? 'Sáng' : 'Tối') : undefined);
   } else if (typeUpper.includes('MOTION')) {
     type = 'Cảm biến';
     icon = 'activity';
@@ -121,10 +124,16 @@ export function mapDeviceToUI(d: DeviceResponse, localPower: Record<string, bool
     } else if (type === 'Điều hòa') {
       statusText = isPowerOn ? `Lạnh · Quạt tự động` : 'Đã tắt';
     } else if (type === 'Cảm biến' && icon === 'thermometer') {
-      const hum = d.currentState?.humidity ?? 61.8;
-      statusText = `Độ ẩm ${hum}%`;
+      const hum = d.currentState?.humidity;
+      statusText = hum !== undefined ? `Độ ẩm ${hum}%` : (d.currentState?.temperature !== undefined ? `Nhiệt độ ${d.currentState.temperature}°C` : 'Chưa có dữ liệu');
     } else if (type === 'Cảm biến' && icon === 'sun') {
-      statusText = Number(d.currentState?.lux ?? 820) > 200 ? 'Trời sáng' : 'Trời tối';
+      if (d.currentState?.lux !== undefined) {
+        statusText = Number(d.currentState.lux) > 200 ? 'Trời sáng' : 'Trời tối';
+      } else if (d.currentState?.LIGHT_SENSOR !== undefined) {
+        statusText = Number(d.currentState.LIGHT_SENSOR) === 1 ? 'Trời sáng' : 'Trời tối';
+      } else {
+        statusText = 'Chưa có dữ liệu';
+      }
     } else if (type === 'Cảm biến') {
       statusText = 'Bình thường';
     } else if (type === 'Cổng') {
@@ -135,7 +144,7 @@ export function mapDeviceToUI(d: DeviceResponse, localPower: Record<string, bool
   return {
     id: d.id,
     name: d.name,
-    room: d.roomName || 'Phòng khách',
+    room: d.roomName || 'Chưa phân phòng',
     roomId: d.roomId || undefined,
     type,
     icon,
@@ -145,99 +154,12 @@ export function mapDeviceToUI(d: DeviceResponse, localPower: Record<string, bool
     offline: isOffline,
     sensor: isSensor,
     brightness,
+    manualOverrideUntil: d.manualOverrideUntil,
+    manualOverrideActive: d.manualOverrideActive ?? (d.manualOverrideUntil ? new Date(d.manualOverrideUntil).getTime() > Date.now() : false),
     raw: d,
   };
 }
 
-const FIGMA_SEED_DEVICES: UIMappedDevice[] = [
-  {
-    id: 'seed-1',
-    name: 'Đèn ngủ',
-    room: 'Phòng của quán',
-    type: 'Đèn',
-    icon: 'lamp',
-    status: 'Đang bật · 12%',
-    on: true,
-    brightness: 12,
-  },
-  {
-    id: 'seed-2',
-    name: 'Điều hòa Casper',
-    room: 'Phòng khách',
-    type: 'Điều hòa',
-    icon: 'snowflake',
-    status: 'Hút ẩm · Quạt tự động',
-    value: '23°C',
-    on: true,
-  },
-  {
-    id: 'seed-3',
-    name: 'Cảm biến nhiệt ẩm',
-    room: 'Phòng khách',
-    type: 'Cảm biến',
-    icon: 'thermometer',
-    status: 'Độ ẩm 61.8%',
-    value: '27.7°C',
-    sensor: true,
-  },
-  {
-    id: 'seed-4',
-    name: 'Cảm biến ánh sáng',
-    room: 'Phòng của quán',
-    type: 'Cảm biến',
-    icon: 'sun',
-    status: 'Trời sáng',
-    value: '820 lx',
-    sensor: true,
-  },
-  {
-    id: 'seed-5',
-    name: 'Cảm biến chuyển động',
-    room: 'Phòng khách',
-    type: 'Cảm biến',
-    icon: 'activity',
-    status: 'Bình thường',
-    value: 'Tĩnh',
-    sensor: true,
-  },
-  {
-    id: 'seed-6',
-    name: 'Quạt trần',
-    room: 'Phòng khách',
-    type: 'Công tắc',
-    icon: 'automation',
-    status: 'Tắt',
-    on: false,
-  },
-  {
-    id: 'seed-7',
-    name: 'Cổng chính',
-    room: 'Garage',
-    type: 'Cổng',
-    icon: 'door',
-    status: 'Đã dừng',
-    on: false,
-  },
-  {
-    id: 'seed-8',
-    name: 'Máy bơm nước',
-    room: 'Garden',
-    type: 'Công tắc',
-    icon: 'droplet',
-    status: 'Tắt',
-    on: false,
-  },
-  {
-    id: 'seed-9',
-    name: 'Camera sân',
-    room: 'Garden',
-    type: 'Camera',
-    icon: 'camera',
-    status: 'Ngoại tuyến',
-    offline: true,
-    on: false,
-  },
-];
 
 // ──────────────────────────────────────────────────────────────────────────
 // Subcomponents
@@ -395,6 +317,7 @@ function DevicesDeviceCard({
   onGateCommand: (cmd: 'Mở' | 'Dừng' | 'Đóng') => void;
 }) {
   const [gate, setGate] = useState('Dừng');
+  const { isOverrideActive, formattedTime } = useOverrideCountdown(device.manualOverrideUntil);
 
   return (
     <article
@@ -409,32 +332,46 @@ function DevicesDeviceCard({
         <span className="device-icon">
           <Icon name={device.icon} />
         </span>
-        {!device.offline && !device.sensor && device.type !== 'Cổng' ? (
-          <button
-            type="button"
-            className={`toggle ${device.on ? 'active' : ''}`}
-            onClick={(event) => {
-              event.stopPropagation();
-              onToggle();
-            }}
-            aria-pressed={device.on}
-            aria-label={`${device.on ? 'Tắt' : 'Bật'} ${device.name}`}
-          >
-            <span />
-          </button>
-        ) : (
-          <button
-            type="button"
-            className="card-affordance"
-            aria-label={`Mở ${device.name}`}
-            onClick={(e) => {
-              e.stopPropagation();
-              onOpen();
-            }}
-          >
-            <Icon name="more" size={19} />
-          </button>
-        )}
+        <div className="flex items-center gap-1.5">
+          {isOverrideActive && (
+            <span
+              className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 animate-pulse cursor-pointer shrink-0"
+              title="Đang ưu tiên thủ công (Quy tắc tự động tạm dừng). Bấm để xem chi tiết"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpen();
+              }}
+            >
+              🔒 {formattedTime}
+            </span>
+          )}
+          {!device.offline && !device.sensor && device.type !== 'Cổng' ? (
+            <button
+              type="button"
+              className={`toggle ${device.on ? 'active' : ''}`}
+              onClick={(event) => {
+                event.stopPropagation();
+                onToggle();
+              }}
+              aria-pressed={device.on}
+              aria-label={`${device.on ? 'Tắt' : 'Bật'} ${device.name}`}
+            >
+              <span />
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="card-affordance"
+              aria-label={`Mở ${device.name}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpen();
+              }}
+            >
+              <Icon name="more" size={19} />
+            </button>
+          )}
+        </div>
       </div>
 
       {device.value && (
@@ -708,16 +645,7 @@ export const DevicePage: React.FC = () => {
 
   // Turn off all lights
   const handleTurnOffAllLights = async () => {
-    const isMock = devices.length === 0;
-    if (isMock) {
-      const nextPowerMap: Record<string, boolean> = { ...localPower };
-      FIGMA_SEED_DEVICES.filter((d) => d.type === 'Đèn').forEach((d) => {
-        nextPowerMap[d.id] = false;
-      });
-      setLocalPower(nextPowerMap);
-      notify.success('Đã tắt toàn bộ đèn');
-      return;
-    }
+
 
     const onLights = devices.filter((d) => {
       const isLight = (d.deviceType || '').toUpperCase().includes('LIGHT') || (d.deviceType || '').toUpperCase().includes('LED');
@@ -751,10 +679,7 @@ export const DevicePage: React.FC = () => {
   // Gate command
   const handleGateCommand = async (deviceId: string, cmd: 'Mở' | 'Dừng' | 'Đóng') => {
     const dev = devices.find((d) => d.id === deviceId);
-    if (!dev) {
-      notify.success(`Đã gửi lệnh ${cmd} cổng`);
-      return;
-    }
+    if (!dev) return;
     const action = cmd === 'Mở' ? 'OPEN' : cmd === 'Đóng' ? 'CLOSE' : 'STOP';
     try {
       await sendDeviceCommand(deviceId, action);
@@ -788,38 +713,13 @@ export const DevicePage: React.FC = () => {
     }
   };
 
-  // Fallback rooms matching Figma design if BE rooms are empty
+  // Display rooms directly from BE
   const displayRooms: RoomResponse[] = useMemo(() => {
-    if (rooms.length > 0) return rooms;
-    return [
-      { id: 'Phòng của quán', name: 'Phòng của quán', homeId: homeId || '', createdAt: '', updatedAt: '' },
-      { id: 'Phòng khách', name: 'Phòng khách', homeId: homeId || '', createdAt: '', updatedAt: '' },
-      { id: 'Garage', name: 'Garage', homeId: homeId || '', createdAt: '', updatedAt: '' },
-      { id: 'Garden', name: 'Garden', homeId: homeId || '', createdAt: '', updatedAt: '' },
-      { id: 'Phòng bếp', name: 'Phòng bếp', homeId: homeId || '', createdAt: '', updatedAt: '' },
-    ];
-  }, [rooms, homeId]);
+    return rooms;
+  }, [rooms]);
 
-  // Map all devices to UI representation (with fallback seeds if BE has 0 devices)
+  // Map all devices to UI representation directly from BE
   const uiDevices: UIMappedDevice[] = useMemo(() => {
-    if (devices.length === 0) {
-      return FIGMA_SEED_DEVICES.map((s) => {
-        const isPowerOn = localPower[s.id] !== undefined ? localPower[s.id] : s.on;
-        const curBrightness = localBrightness[s.id] !== undefined ? localBrightness[s.id] : s.brightness;
-        let statusText = s.status;
-        if (s.type === 'Đèn') {
-          statusText = isPowerOn ? `Đang bật · ${curBrightness ?? 80}%` : 'Đã tắt';
-        } else if (s.type === 'Công tắc') {
-          statusText = isPowerOn ? 'Đang bật' : 'Tắt';
-        }
-        return {
-          ...s,
-          on: isPowerOn,
-          brightness: curBrightness,
-          status: statusText,
-        };
-      });
-    }
     return devices.map((d) => mapDeviceToUI(d, localPower, localBrightness));
   }, [devices, localPower, localBrightness]);
 
@@ -1092,9 +992,11 @@ export const DevicePage: React.FC = () => {
           device={selectedDevice}
           placement="side"
           onClose={() => setSelectedDevice(null)}
-          onDeviceUpdated={() => {
+          onDeviceUpdated={(updated) => {
             void fetchDevices(true);
-            setSelectedDevice(null);
+            if (updated) {
+              setSelectedDevice(mapDeviceToUI(updated, localPower, localBrightness));
+            }
           }}
           onDeviceRemoved={(removedId) => {
             setDevices((prev) => prev.filter((d) => d.id !== removedId));

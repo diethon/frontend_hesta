@@ -854,6 +854,7 @@ export function ScenePage() {
         {/* Main Content: Skeleton, Empty, or Grid */}
         {loading && scenes.length === 0 ? (
           <div className="scenarios-grid">
+            {sceneId && <p className="text-sm font-semibold text-text">Đang tải kịch bản...</p>}
             {Array.from({ length: 6 }, (_, index) => (
               <div className="scenario-skeleton glass-g1" key={index}>
                 <i />
