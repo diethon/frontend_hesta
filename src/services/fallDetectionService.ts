@@ -104,7 +104,7 @@ export const fallDetectionService = {
   async triggerDemoFall(): Promise<boolean> {
     try {
       const res = await axios.post(`${AI_EDGE_BASE_URL}/api/trigger_demo_fall`, {}, { timeout: 2000 });
-      return res.data?.status === 'ok';
+      return Boolean(res.data?.success || res.data?.status === 'ok');
     } catch {
       return false;
     }
@@ -113,7 +113,7 @@ export const fallDetectionService = {
   async dismissAiLocal(): Promise<boolean> {
     try {
       const res = await axios.post(`${AI_EDGE_BASE_URL}/api/dismiss`, {}, { timeout: 1500 });
-      return res.data?.status === 'ok';
+      return Boolean(res.data?.success || res.data?.status === 'ok');
     } catch {
       return false;
     }

@@ -107,8 +107,10 @@ export const EmergencyFallModal: React.FC = () => {
   // --- STOMP WebSocket Subscription to Backend Spring Boot ---
   useEffect(() => {
     const wsUrl = getRealtimeWebSocketUrl();
+    const token = localStorage.getItem('accessToken');
     const client = new Client({
       brokerURL: wsUrl,
+      connectHeaders: token ? { Authorization: `Bearer ${token}` } : {},
       reconnectDelay: 5000,
       debug: () => undefined,
       onConnect: () => {
