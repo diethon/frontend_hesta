@@ -88,7 +88,7 @@ export const HomeHeroLiveCamera: React.FC<HomeHeroLiveCameraProps> = ({
             className={`camera-image transition-all duration-300 ${
               isSnapping ? 'brightness-150 scale-[1.01]' : ''
             }`}
-            src="https://images.unsplash.com/photo-1632829882891-5047ccc421bc?crop=entropy&cs=tinysrgb&fit=crop&fm=jpg&q=85&w=1600"
+            src="http://localhost:5000/video_feed"
             alt="Hình ảnh trực tiếp phòng khách sáng và yên tĩnh"
             onError={(e) => {
               // Fallback to local image if internet is slow
@@ -140,6 +140,15 @@ export const HomeHeroLiveCamera: React.FC<HomeHeroLiveCameraProps> = ({
               <span className="live-dot" />
               Trực tiếp
             </span>
+            <button
+              type="button"
+              onClick={() => navigate('/fall-detection')}
+              className="ml-2 px-2.5 py-1 rounded-full text-[11px] font-bold bg-red-600/90 hover:bg-red-700 text-white flex items-center gap-1 shadow transition-transform active:scale-95"
+              title="Mở Trung Tâm Giám Sát Thị Giác AI & Cứu Hộ Té Ngã"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+              AI Giám Sát Té Ngã
+            </button>
 
             <div className="relative">
               <button

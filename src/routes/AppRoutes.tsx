@@ -22,6 +22,7 @@ import { ScenePage } from '../components/scene/ScenePage';
 import { AutomationRulePage } from '../components/automation/AutomationRulePage';
 import { RecommendationsPage } from '../components/automation/RecommendationsPage';
 import { EnergyDashboardPage } from '../components/energy/EnergyDashboardPage';
+import { FallDetectionPage } from '../components/emergency/FallDetectionPage';
 
 export function AppRoutes() {
   const { initialized, user, login, logout, updateUser } = useRouteSession();
@@ -48,6 +49,8 @@ export function AppRoutes() {
 
   return (
     <Routes>
+      <Route path="/fall-detection" element={<FallDetectionPage />} />
+      <Route path="/camera-ai" element={<FallDetectionPage />} />
       <Route path="/twin-demo" element={<Suspense fallback={<p role="status" className="p-8 text-muted">Đang mở căn hộ mẫu…</p>}><TwinDemoPage /></Suspense>} />
       <Route path="/login" element={
         <LoginForm
