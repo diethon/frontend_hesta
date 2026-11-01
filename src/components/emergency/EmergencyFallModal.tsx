@@ -158,8 +158,8 @@ export const EmergencyFallModal: React.FC = () => {
               return {
                 id: `local-fall-${Date.now()}`,
                 deviceId: 'cam_livingroom_01',
-                roomName: status.safe_zone || 'Phòng khách',
-                incidentType: status.incident_type === 'SAFE_ZONE_IMPACT_FALL' ? 'SAFE_ZONE_IMPACT_FALL' : 'ACCIDENTAL_FALL',
+                roomName: status.safe_zone || 'Khu vực Camera quan sát',
+                incidentType: 'ACCIDENTAL_FALL',
                 state: 'DETECTED',
                 confidenceScore: 0.96,
                 metrics: status.metrics,
@@ -228,13 +228,11 @@ export const EmergencyFallModal: React.FC = () => {
 
   const formatClassification = (type: string) => {
     switch (type) {
-      case 'SAFE_ZONE_IMPACT_FALL':
-        return 'NGÃ VA CHẠM MẠNH VÀO NỘI THẤT GỖ';
       case 'HEAD_SLUMP_SUSPECTED':
         return 'NGHI NGỜ ĐỘT QUỴ / GỤC ĐẦU BẤT TỈNH';
       case 'ACCIDENTAL_FALL':
       default:
-        return 'NGÃ ĐẬP MẠNH XUỐNG MẶT SÀN';
+        return 'PHÁT HIỆN TÉ NGÃ KHẨN CẤP TRONG TẦM MẮT CAMERA';
     }
   };
 
@@ -402,11 +400,11 @@ export const EmergencyFallModal: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Safety Zone Status */}
+                  {/* Omnipresent Tracking Status */}
                   <div className="p-2.5 bg-slate-800/50 rounded-lg border border-slate-700/60 text-xs">
-                    <span className="text-gray-400 block text-[11px]">Bộ lọc vùng an toàn nội thất:</span>
+                    <span className="text-gray-400 block text-[11px]">Phạm vi theo dõi:</span>
                     <span className="text-emerald-400 font-semibold">
-                      Phát hiện nằm trên mặt phẳng nguy hiểm (Mặt sàn nhà gạch men)
+                      Toàn cảnh không gian Camera (Tracking 100% mọi vị trí)
                     </span>
                   </div>
                 </div>
