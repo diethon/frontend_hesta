@@ -4,6 +4,7 @@ import { apiClient } from './apiClient';
 export type FallIncidentState =
   | 'DETECTED'
   | 'COUNTDOWN_ACTIVE'
+  | 'SUSPECTED_COUNTDOWN'
   | 'FALSE_ALARM'
   | 'ACKNOWLEDGED'
   | 'ESCALATED_SOS'
@@ -43,6 +44,17 @@ export interface FallIncidentDTO {
   countdownRemainingSec?: number;
   metrics?: FallMetrics;
   snapshotUrl?: string;
+}
+
+export interface CameraHealthDTO {
+  name?: string;
+  source?: string;
+  status: 'ONLINE' | 'OFFLINE' | 'RECONNECTING' | 'CONNECTING';
+  is_online: boolean;
+  measured_fps: number;
+  last_frame_age_sec: number;
+  reconnect_count: number;
+  timestamp?: number;
 }
 
 const AI_EDGE_BASE_URL = 'http://localhost:5000';
@@ -92,6 +104,8 @@ export const fallDetectionService = {
     metrics: FallMetrics;
     safe_zone: string;
     fps: number;
+    is_camera_online?: boolean;
+    camera_health?: CameraHealthDTO;
   } | null> {
     try {
       const res = await axios.get(`${AI_EDGE_BASE_URL}/api/status`, { timeout: 1500 });

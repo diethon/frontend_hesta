@@ -19,6 +19,7 @@ import { fallDetectionService, type FallMetrics } from '../../services/fallDetec
 export const FallDetectionPage: React.FC = () => {
   const navigate = useNavigate();
   const [aiConnected, setAiConnected] = useState<boolean>(false);
+  const [isCameraOnline, setIsCameraOnline] = useState<boolean>(true);
   const [streamError, setStreamError] = useState<boolean>(false);
   const [state, setState] = useState<string>('IDLE');
   const [metrics, setMetrics] = useState<FallMetrics>({
@@ -28,7 +29,7 @@ export const FallDetectionPage: React.FC = () => {
     jerk_g_per_sec: 2.4,
     ptt_sec: 0.0,
   });
-  const [zone, setZone] = useState<string>('Khu Vực Camera (Toàn Cảnh)');
+  const [zone, setZone] = useState<string>('Khu Vực Sàn Nhà (FLOOR)');
   const [fps, setFps] = useState<number>(30.0);
   const [isAlert, setIsAlert] = useState<boolean>(false);
   const [isMuted, setIsMuted] = useState<boolean>(false);
@@ -39,6 +40,28 @@ export const FallDetectionPage: React.FC = () => {
   const audioCtxRef = useRef<AudioContext | null>(null);
   const oscRef = useRef<OscillatorNode | null>(null);
   const sirenIntervalRef = useRef<number | null>(null);
+
+  // Global AudioContext Unlocker on first user interaction
+  useEffect(() => {
+    const unlockAudio = () => {
+      try {
+        if (!audioCtxRef.current) {
+          const AudioContextClass =
+            window.AudioContext ||
+            (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+          audioCtxRef.current = new AudioContextClass();
+        }
+        if (audioCtxRef.current.state === 'suspended') {
+          void audioCtxRef.current.resume();
+        }
+      } catch (e) {
+        console.warn('AudioContext unlock failed:', e);
+      }
+    };
+    const events = ['click', 'keydown', 'touchstart', 'pointerdown'];
+    events.forEach((evt) => window.addEventListener(evt, unlockAudio, { once: true }));
+    return () => events.forEach((evt) => window.removeEventListener(evt, unlockAudio));
+  }, []);
 
   const startSiren = useCallback(() => {
     if (isMuted) return;
@@ -102,8 +125,17 @@ export const FallDetectionPage: React.FC = () => {
       if (status) {
         setAiConnected(true);
         setState(status.state);
-        setZone(status.safe_zone || 'Toàn Cảnh Camera');
+        setZone(status.safe_zone || 'Khu Vực Sàn Nhà (FLOOR)');
         setFps(status.fps || 30.0);
+        
+        if (typeof status.is_camera_online === 'boolean') {
+          setIsCameraOnline(status.is_camera_online);
+        } else if (status.camera_health) {
+          setIsCameraOnline(status.camera_health.is_online);
+        } else {
+          setIsCameraOnline(true);
+        }
+
         if (status.metrics) {
           setMetrics(status.metrics);
         }
@@ -116,6 +148,7 @@ export const FallDetectionPage: React.FC = () => {
         }
       } else {
         setAiConnected(false);
+        setIsCameraOnline(false);
       }
     }, 1000);
 
@@ -147,6 +180,12 @@ export const FallDetectionPage: React.FC = () => {
     stopSiren();
     setIsAlert(false);
     await fallDetectionService.dismissAiLocal();
+    const activeIncidents = await fallDetectionService.getActiveIncidents();
+    await Promise.all(
+      activeIncidents.map((inc) =>
+        fallDetectionService.dismissIncident(inc.id, 'Người dùng xác nhận an toàn từ trang Giám Sát AI')
+      )
+    );
   };
 
   const renderPostureBadge = () => {
@@ -166,11 +205,19 @@ export const FallDetectionPage: React.FC = () => {
         </span>
       );
     }
+    if (state === 'BENDING') {
+      return (
+        <span className="px-3 py-1.5 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1.5">
+          <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
+          ĐANG CÚI NGƯỜI (BENDING - AN TOÀN)
+        </span>
+      );
+    }
     if (state === 'CONTROLLED_REST' || state === 'LYING') {
       return (
         <span className="px-3 py-1.5 rounded-full text-xs font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 flex items-center gap-1.5">
           <span className="w-2.5 h-2.5 rounded-full bg-cyan-400" />
-          ĐANG NẰM (LYING DOWN)
+          ĐANG NẰM NGHỈ (LYING DOWN)
         </span>
       );
     }
@@ -206,16 +253,28 @@ export const FallDetectionPage: React.FC = () => {
           <div className="flex items-center gap-2">
             <ShieldAlert className="w-6 h-6 text-red-500" />
             <h1 className="text-base font-bold tracking-tight text-white flex items-center gap-2">
-              Trung Tâm Giám Sát Thị Giác AI & Cứu Hộ Té Ngã
+              Trung Tâm Giám Sát Thị Giác AI & Cứu Hộ Té Ngã v4.0
             </h1>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
+          {/* Camera Online / Offline Indicator */}
+          <span
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border shadow-sm ${
+              isCameraOnline
+                ? 'bg-emerald-950/80 text-emerald-400 border-emerald-500/40'
+                : 'bg-red-950/80 text-red-400 border-red-500/40 animate-pulse'
+            }`}
+          >
+            <span className={`w-2 h-2 rounded-full ${isCameraOnline ? 'bg-emerald-400' : 'bg-red-500'}`} />
+            {isCameraOnline ? `Cam IP Live (${fps.toFixed(1)} FPS)` : 'Cam IP Mất Tín Hiệu'}
+          </span>
+
           {aiConnected ? (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-emerald-950/80 text-emerald-400 border border-emerald-500/30 shadow-sm">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-              AI Edge Online (30 FPS)
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-900/90 text-cyan-400 border border-cyan-500/30 shadow-sm">
+              <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+              AI Edge v4.0 Active
             </span>
           ) : (
             <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-red-950/80 text-red-400 border border-red-500/30 shadow-sm">
@@ -238,9 +297,11 @@ export const FallDetectionPage: React.FC = () => {
       <main className="flex-1 p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 max-w-7xl mx-auto w-full">
         {/* Left Column: Live Video Feed (8 cols) */}
         <div className="lg:col-span-8 flex flex-col gap-4">
-          <div className={`relative rounded-2xl overflow-hidden bg-black border-2 transition-all aspect-video shadow-2xl flex items-center justify-center ${
-            isAlert ? 'border-red-500 ring-4 ring-red-500/30 alert-pulse' : 'border-slate-800'
-          }`}>
+          <div
+            className={`relative rounded-2xl overflow-hidden bg-black border-2 transition-all aspect-video shadow-2xl flex items-center justify-center ${
+              isAlert ? 'border-red-500 ring-4 ring-red-500/30 alert-pulse' : 'border-slate-800'
+            }`}
+          >
             {!streamError ? (
               <img
                 src="http://localhost:5000/video_feed"
@@ -252,7 +313,7 @@ export const FallDetectionPage: React.FC = () => {
               <div className="flex flex-col items-center justify-center p-8 text-center text-slate-400">
                 <Camera className="w-16 h-16 text-slate-600 mb-3" />
                 <p className="text-sm font-semibold text-slate-300">Không thể tải luồng video AI trực tiếp</p>
-                <p className="text-xs text-slate-500 mt-1">Đảm bảo bạn đã chạy file CHAY_DEMO_KHACH_HANG.bat hoặc python ai_hesta/app_server.py</p>
+                <p className="text-xs text-slate-500 mt-1">Đảm bảo bạn đã khởi động server bằng lệnh python ai_hesta/app_server.py</p>
                 <button
                   onClick={() => setStreamError(false)}
                   className="mt-4 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold text-white rounded-xl shadow transition-colors"
@@ -266,7 +327,7 @@ export const FallDetectionPage: React.FC = () => {
             <div className="absolute top-3 left-3 flex items-center gap-2">
               <span className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-black/60 backdrop-blur-md text-red-400 border border-red-500/30 flex items-center gap-1.5 shadow">
                 <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
-                LIVE YOLOv8 POSE
+                LIVE YOLOv8 POSE v4.0
               </span>
               <span className="px-2.5 py-1 rounded-lg text-[11px] font-mono font-bold bg-black/60 backdrop-blur-md text-emerald-400 border border-slate-700 shadow">
                 {fps.toFixed(1)} FPS
@@ -355,7 +416,13 @@ export const FallDetectionPage: React.FC = () => {
                     {(metrics.spine_angle ?? 88.5).toFixed(1)}°
                   </span>
                   <span className="text-[10px] text-slate-500 block mt-0.5">
-                    {(metrics.spine_angle ?? 88.5) > 65 ? 'Đứng thẳng' : (metrics.spine_angle ?? 88.5) > 35 ? 'Đang ngồi' : 'Đang nằm'}
+                    {(metrics.spine_angle ?? 88.5) > 65
+                      ? 'Đứng thẳng'
+                      : (metrics.spine_angle ?? 88.5) > 35
+                      ? 'Đang ngồi'
+                      : state === 'BENDING'
+                      ? 'Cúi người'
+                      : 'Đang nằm'}
                   </span>
                 </div>
 
@@ -395,21 +462,21 @@ export const FallDetectionPage: React.FC = () => {
           <div className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-xl space-y-3 text-xs">
             <h3 className="font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
               <Server className="w-4 h-4 text-indigo-400" />
-              Cấu Trúc Hệ Thống Biên (Edge Architecture)
+              Cấu Trúc Hệ Thống Biên v4.0 PROD
             </h3>
 
             <div className="space-y-2 text-slate-400">
               <div className="flex justify-between items-center py-1 border-b border-slate-800">
                 <span>Thiết bị AI xử lý:</span>
-                <strong className="text-slate-200">Orange Pi 5 Plus (6 TOPS NPU)</strong>
+                <strong className="text-slate-200">Orange Pi 5 Plus (6 TOPS NPU) / PC</strong>
               </div>
               <div className="flex justify-between items-center py-1 border-b border-slate-800">
                 <span>Mô hình thị giác:</span>
-                <strong className="text-indigo-400 font-mono">YOLOv8-pose (COCO 17 Kpts)</strong>
+                <strong className="text-indigo-400 font-mono">YOLOv8-pose + EMA Filter</strong>
               </div>
               <div className="flex justify-between items-center py-1 border-b border-slate-800">
-                <span>Nguồn Camera hiện tại:</span>
-                <span className="text-amber-300 font-semibold">Webcam Laptop (Chuyển RTSP trong config.py)</span>
+                <span>Bảo vệ luồng video:</span>
+                <span className="text-emerald-400 font-semibold">Bufferless Watchdog + Auto-Failover</span>
               </div>
               <div className="flex justify-between items-center py-1">
                 <span>Thiết bị cảnh báo ngoại vi:</span>

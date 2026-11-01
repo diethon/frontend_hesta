@@ -8,10 +8,12 @@ import {
   Eye,
   Activity,
   Flame,
+  Radio,
 } from 'lucide-react';
 import {
   fallDetectionService,
   type FallIncidentDTO,
+  type FallIncidentType,
 } from '../../services/fallDetectionService';
 import { Client } from '@stomp/stompjs';
 import { getRealtimeWebSocketUrl } from '../../services/apiClient';
@@ -22,6 +24,7 @@ export const EmergencyFallModal: React.FC = () => {
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [showLiveStream, setShowLiveStream] = useState<boolean>(true);
   const [aiConnected, setAiConnected] = useState<boolean>(false);
+  const [cameraOnline, setCameraOnline] = useState<boolean | null>(null);
   const [isDemoTriggering, setIsDemoTriggering] = useState<boolean>(false);
 
   // Audio Context for synthesized siren
@@ -31,12 +34,41 @@ export const EmergencyFallModal: React.FC = () => {
   const sirenIntervalRef = useRef<number | null>(null);
   const stompClientRef = useRef<Client | null>(null);
 
+  // --- Global Browser Autoplay Policy Unlocker ---
+  // Resumes AudioContext on the first click/touch/keypress anywhere on the screen
+  useEffect(() => {
+    const unlockAudio = () => {
+      try {
+        if (!audioCtxRef.current) {
+          const AudioContextClass =
+            window.AudioContext ||
+            (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+          audioCtxRef.current = new AudioContextClass();
+        }
+        if (audioCtxRef.current.state === 'suspended') {
+          void audioCtxRef.current.resume();
+        }
+      } catch (e) {
+        console.warn('AudioContext unlock failed:', e);
+      }
+    };
+
+    const events = ['click', 'keydown', 'touchstart', 'pointerdown'];
+    events.forEach((evt) => window.addEventListener(evt, unlockAudio, { once: true }));
+
+    return () => {
+      events.forEach((evt) => window.removeEventListener(evt, unlockAudio));
+    };
+  }, []);
+
   // --- Web Audio Siren Synthesizer ---
   const startSiren = useCallback(() => {
     if (isMuted) return;
     try {
       if (!audioCtxRef.current) {
-        const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+        const AudioContextClass =
+          window.AudioContext ||
+          (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
         audioCtxRef.current = new AudioContextClass();
       }
 
@@ -144,13 +176,26 @@ export const EmergencyFallModal: React.FC = () => {
     };
   }, [startSiren, stopSiren]);
 
-  // --- Local AI Edge Engine Polling (Fallback for Offline Local Demo) ---
+  // --- Local AI Edge Engine Polling (Dual-Link Failover) ---
   useEffect(() => {
     const pollInterval = window.setInterval(async () => {
       const status = await fallDetectionService.checkAiStatus();
       if (status) {
         setAiConnected(true);
+        if (typeof status.is_camera_online === 'boolean') {
+          setCameraOnline(status.is_camera_online);
+        } else if (status.camera_health) {
+          setCameraOnline(status.camera_health.is_online);
+        } else {
+          setCameraOnline(true);
+        }
+
         if (status.alert && status.state === 'CONFIRMED_FALL') {
+          const resolvedType = (
+            status.incident_type && status.incident_type !== 'NONE'
+              ? status.incident_type
+              : 'ACCIDENTAL_FALL'
+          ) as FallIncidentType;
           setActiveIncident((prev) => {
             if (!prev) {
               startSiren();
@@ -159,7 +204,7 @@ export const EmergencyFallModal: React.FC = () => {
                 id: `local-fall-${Date.now()}`,
                 deviceId: 'cam_livingroom_01',
                 roomName: status.safe_zone || 'Khu vực Camera quan sát',
-                incidentType: 'ACCIDENTAL_FALL',
+                incidentType: resolvedType,
                 state: 'DETECTED',
                 confidenceScore: 0.96,
                 metrics: status.metrics,
@@ -168,17 +213,27 @@ export const EmergencyFallModal: React.FC = () => {
             }
             return {
               ...prev,
+              incidentType: prev.incidentType || resolvedType,
               metrics: status.metrics,
             };
+          });
+        } else {
+          setActiveIncident((prev) => {
+            if (prev && prev.id.startsWith('local-fall-')) {
+              stopSiren();
+              return null;
+            }
+            return prev;
           });
         }
       } else {
         setAiConnected(false);
+        setCameraOnline(false);
       }
     }, 1500);
 
     return () => clearInterval(pollInterval);
-  }, [startSiren]);
+  }, [startSiren, stopSiren]);
 
   // --- Countdown Timer Logic ---
   useEffect(() => {
@@ -187,8 +242,7 @@ export const EmergencyFallModal: React.FC = () => {
     const timer = window.setInterval(() => {
       setCountdown((prev) => {
         if (prev <= 1) {
-          // Escalate to SOS
-          setActiveIncident((curr) => curr ? { ...curr, state: 'ESCALATED_SOS' } : null);
+          setActiveIncident((curr) => (curr ? { ...curr, state: 'ESCALATED_SOS' } : null));
           return 0;
         }
         return prev - 1;
@@ -210,7 +264,7 @@ export const EmergencyFallModal: React.FC = () => {
   const handleAcknowledge = async () => {
     if (activeIncident) {
       await fallDetectionService.acknowledgeIncident(activeIncident.id);
-      setActiveIncident((prev) => prev ? { ...prev, state: 'ACKNOWLEDGED' } : null);
+      setActiveIncident((prev) => (prev ? { ...prev, state: 'ACKNOWLEDGED' } : null));
     }
   };
 
@@ -230,6 +284,8 @@ export const EmergencyFallModal: React.FC = () => {
     switch (type) {
       case 'HEAD_SLUMP_SUSPECTED':
         return 'NGHI NGỜ ĐỘT QUỴ / GỤC ĐẦU BẤT TỈNH';
+      case 'SAFE_ZONE_IMPACT_FALL':
+        return 'VA ĐẬP NGUY HIỂM TẠI VÙNG NỘI THẤT';
       case 'ACCIDENTAL_FALL':
       default:
         return 'PHÁT HIỆN TÉ NGÃ KHẨN CẤP TRONG TẦM MẮT CAMERA';
@@ -238,7 +294,7 @@ export const EmergencyFallModal: React.FC = () => {
 
   return (
     <>
-      {/* Floating Demo Trigger Button (For Client Presentation) */}
+      {/* Floating Demo & Connection Trigger Bar */}
       <div className="fixed bottom-4 right-4 z-40 flex items-center gap-2">
         <button
           onClick={handleTriggerDemo}
@@ -250,10 +306,27 @@ export const EmergencyFallModal: React.FC = () => {
           {isDemoTriggering ? 'Đang kích hoạt...' : 'Demo Té Ngã 1-Chạm'}
         </button>
 
+        {cameraOnline !== null && (
+          <span
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[11px] font-medium backdrop-blur-sm border ${
+              cameraOnline
+                ? 'bg-emerald-950/80 text-emerald-400 border-emerald-500/30'
+                : 'bg-red-950/80 text-red-400 border-red-500/30 animate-pulse'
+            }`}
+          >
+            <span
+              className={`w-2 h-2 rounded-full ${
+                cameraOnline ? 'bg-emerald-400 animate-pulse' : 'bg-red-500'
+              }`}
+            />
+            {cameraOnline ? 'Cam IP Online' : 'Cam Mất Tín Hiệu'}
+          </span>
+        )}
+
         {aiConnected && (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[11px] font-medium bg-emerald-950/80 text-emerald-400 border border-emerald-500/30 backdrop-blur-sm">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            AI Edge Online
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[11px] font-medium bg-slate-900/80 text-cyan-400 border border-cyan-500/30 backdrop-blur-sm">
+            <Radio className="w-3 h-3 text-cyan-400 animate-pulse" />
+            AI Edge v4.0
           </span>
         )}
       </div>
@@ -329,7 +402,7 @@ export const EmergencyFallModal: React.FC = () => {
                   ) : (
                     <div className="flex flex-col items-center justify-center p-6 text-center text-gray-400">
                       <Eye className="w-12 h-12 text-red-500 mb-2 opacity-50" />
-                      <p className="text-sm font-medium">Đang tải luồng hình ảnh AI từ camera...</p>
+                      <p className="text-sm font-medium">Đang kết nối lại luồng hình ảnh AI từ camera...</p>
                       <button
                         onClick={() => setShowLiveStream(true)}
                         className="mt-3 px-3 py-1 bg-red-900/60 hover:bg-red-800 text-xs text-white rounded border border-red-600/50"
@@ -404,7 +477,7 @@ export const EmergencyFallModal: React.FC = () => {
                   <div className="p-2.5 bg-slate-800/50 rounded-lg border border-slate-700/60 text-xs">
                     <span className="text-gray-400 block text-[11px]">Phạm vi theo dõi:</span>
                     <span className="text-emerald-400 font-semibold">
-                      Toàn cảnh không gian Camera (Tracking 100% mọi vị trí)
+                      Toàn cảnh không gian Camera (Lọc EMA + SafeZone)
                     </span>
                   </div>
                 </div>
