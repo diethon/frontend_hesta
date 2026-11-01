@@ -1,5 +1,5 @@
 import type { DeviceSummary } from '../types/automation';
-import { isAcDevice, normalizeDeviceCapabilities } from './device/deviceHelpers';
+import { isAcDevice, normalizeDeviceCapabilities } from './device/deviceHelpers.ts';
 
 export type ActionValueKind = 'none' | 'percentage' | 'number' | 'text' | 'color' | 'json';
 export type ActionOption = { code: string; label: string; valueLabel?: string; defaultValue: string } & (

@@ -293,6 +293,15 @@ export function AutomationRulePage() {
 
             <button
               type="button"
+              className="scene-ghost"
+              onClick={() => navigate(homeId ? `/homes/${homeId}/guardian` : '/home')}
+            >
+              <Icon name="shield" size={17} />
+              Giám hộ con trẻ
+            </button>
+
+            <button
+              type="button"
               className="add-device"
               onClick={() => setEditorRule(null)}
             >
