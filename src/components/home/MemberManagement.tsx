@@ -4,6 +4,12 @@ import type { HomeMember, InvitationResponse } from '../../services/homeApi';
 import { getErrorMessage } from '../../utils/errors';
 import { notify } from '../ui/notify';
 import { UserAvatar } from '../ui/UserAvatar';
+import { useAppSelector } from '../../store/hooks';
+
+export function sanitizeMemberName(name: string): string {
+  if (!name) return '';
+  return name.replace(/\s*\(Owner\)\s*$/i, '').trim();
+}
 
 interface MemberManagementProps {
   homeId: string;
@@ -11,6 +17,7 @@ interface MemberManagementProps {
 }
 
 export const MemberManagement: React.FC<MemberManagementProps> = ({ homeId, currentUserRole }) => {
+  const currentUserId = useAppSelector((state) => state.auth.user?.id);
   const [members, setMembers] = useState<HomeMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [inviteEmail, setInviteEmail] = useState('');
@@ -137,54 +144,76 @@ export const MemberManagement: React.FC<MemberManagementProps> = ({ homeId, curr
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800/50">
-            {members.map((member) => (
-              <tr key={member.id} className="text-slate-300">
-                <td className="py-4 flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-slate-800 overflow-hidden flex items-center justify-center shrink-0 border border-slate-700">
-                    <UserAvatar
-                      src={member.avatarUrl}
-                      name={member.fullName}
-                      size={40}
-                      loading="lazy"
-                      fallbackClassName="text-sm font-bold text-slate-400"
-                    />
-                  </div>
-                  <div>
-                    <div className="font-medium text-slate-200">{member.fullName}</div>
-                    <div className="text-xs text-slate-500">{member.email}</div>
-                  </div>
-                </td>
-                <td className="py-4">
-                  <span className={`px-2 py-1 rounded text-xs font-medium ${
-                    member.role === 'OWNER' ? 'bg-amber-900/40 text-amber-400 border border-amber-800/50' : 'bg-slate-800 text-slate-300'
-                  }`}>
-                    {member.role === 'OWNER' ? 'Chủ nhà' : 'Thành viên'}
-                  </span>
-                </td>
-                <td className="py-4 text-sm text-slate-400">
-                  {new Date(member.joinedAt).toLocaleDateString('vi-VN')}
-                </td>
-                {currentUserRole === 'OWNER' && (
-                  <td className="py-4 text-right space-x-2">
-                    <select
-                      aria-label={`Vai trò của ${member.fullName}`}
-                      value={member.role}
-                      onChange={(e) => handleRoleChange(member.id, e.target.value as 'OWNER' | 'MEMBER')}
-                      className="bg-slate-800 border border-slate-700 text-slate-300 text-xs rounded px-2 py-1 outline-none"
-                    >
-                      <option value="MEMBER">Thành viên</option>
-                      <option value="OWNER">Chủ nhà</option>
-                    </select>
-                    <button
-                      onClick={() => handleRemove(member.id)}
-                      className="text-rose-400 hover:text-rose-300 text-xs px-2 py-1 bg-rose-500/10 hover:bg-rose-500/20 rounded transition-colors"
-                    >
-                      Xóa
-                    </button>
+            {members.map((member) => {
+              const displayName = sanitizeMemberName(member.fullName);
+              const isOwner = member.role === 'OWNER';
+              const isSelf = member.id === currentUserId;
+              const canManage = currentUserRole === 'OWNER' && !isOwner && !isSelf;
+
+              return (
+                <tr key={member.id} className="text-slate-300">
+                  <td className="py-4 flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-slate-800 overflow-hidden flex items-center justify-center shrink-0 border border-slate-700">
+                      <UserAvatar
+                        src={member.avatarUrl}
+                        name={displayName}
+                        size={40}
+                        loading="lazy"
+                        fallbackClassName="text-sm font-bold text-slate-400"
+                      />
+                    </div>
+                    <div>
+                      <div className="font-medium text-slate-200 flex items-center gap-2">
+                        <span>{displayName}</span>
+                        {isSelf && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
+                            Bạn
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs text-slate-500">{member.email}</div>
+                    </div>
                   </td>
-                )}
-              </tr>
-            ))}
+                  <td className="py-4">
+                    <span className={`px-2 py-1 rounded text-xs font-medium ${
+                      isOwner ? 'bg-amber-900/40 text-amber-400 border border-amber-800/50' : 'bg-slate-800 text-slate-300'
+                    }`}>
+                      {isOwner ? 'Chủ nhà' : 'Thành viên'}
+                    </span>
+                  </td>
+                  <td className="py-4 text-sm text-slate-400">
+                    {new Date(member.joinedAt).toLocaleDateString('vi-VN')}
+                  </td>
+                  {currentUserRole === 'OWNER' && (
+                    <td className="py-4 text-right space-x-2">
+                      {canManage ? (
+                        <>
+                          <select
+                            aria-label={`Vai trò của ${displayName}`}
+                            value={member.role}
+                            onChange={(e) => handleRoleChange(member.id, e.target.value as 'OWNER' | 'MEMBER')}
+                            className="bg-slate-800 border border-slate-700 text-slate-300 text-xs rounded px-2 py-1 outline-none"
+                          >
+                            <option value="MEMBER">Thành viên</option>
+                            <option value="OWNER">Chủ nhà</option>
+                          </select>
+                          <button
+                            onClick={() => handleRemove(member.id)}
+                            className="text-rose-400 hover:text-rose-300 text-xs px-2 py-1 bg-rose-500/10 hover:bg-rose-500/20 rounded transition-colors"
+                          >
+                            Xóa
+                          </button>
+                        </>
+                      ) : (
+                        <span className="text-xs text-slate-500 italic">
+                          {isOwner ? 'Chủ nhà' : 'Tài khoản của bạn'}
+                        </span>
+                      )}
+                    </td>
+                  )}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
