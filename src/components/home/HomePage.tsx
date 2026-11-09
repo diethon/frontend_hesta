@@ -158,7 +158,7 @@ export const HomePage: React.FC<HomePageProps> = ({
     if (location.hash === "#scenes-section") {
       navigate(`/homes/${encodeURIComponent(userHome.homeId)}/scenes`);
     } else if (location.hash === "#members-section") {
-      setActiveTabSection('members');
+      navigate(`/homes/${encodeURIComponent(userHome.homeId)}/members`);
     }
   }, [location.hash, location.key, userHome, navigate]);
 
@@ -310,10 +310,11 @@ export const HomePage: React.FC<HomePageProps> = ({
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
         onSelectMembers={() => {
-          setActiveTabSection('members');
-          setTimeout(() => {
-            document.getElementById('members-section')?.scrollIntoView({ behavior: 'smooth' });
-          }, 50);
+          if (userHome?.homeId) {
+            navigate(`/homes/${encodeURIComponent(userHome.homeId)}/members`);
+          } else {
+            notify.info('Hãy chọn hoặc tạo một ngôi nhà trước.');
+          }
         }}
         onOpenProfile={() => setIsProfileModalOpen(true)}
       />

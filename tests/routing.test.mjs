@@ -120,7 +120,7 @@ test('session restoration happens before protected routes render', () => {
 
 test('home navigation keeps all menu entries and the same order on feature pages', () => {
   const labels = ['Tổng quan', 'Thiết bị', 'Digital Twin', 'Tiêu thụ điện', 'Kịch bản', 'Tự động hóa', 'Thành viên'];
-  for (const path of ['/home', '/home/home-1/devices', '/home/home-1/energy', '/homes/home-1/scenes', '/homes/home-1/automation-rules', '/homes/home-1/recommendations']) {
+  for (const path of ['/home', '/home/home-1/devices', '/home/home-1/energy', '/homes/home-1/scenes', '/homes/home-1/automation-rules', '/homes/home-1/recommendations', '/homes/home-1/members']) {
     const html = renderRoute(path, user);
     assert.equal((html.match(/<nav aria-label="Điều hướng chính"/g) ?? []).length, 1, `Expected one sidebar on ${path}`);
     const navigation = html.match(/<nav aria-label="Điều hướng chính"[^>]*>([\s\S]*?)<\/nav>/)?.[1];
@@ -135,6 +135,18 @@ test('home navigation keeps all menu entries and the same order on feature pages
     renderRoute(path, admin);
     assert.equal(redirects[0]?.to, '/admin');
   }
+});
+
+test('Members page renders a single header and a single mic/bell/avatar cluster', () => {
+  const html = renderRoute('/homes/home-1/members', user);
+  const headers = html.match(/<header class="[^"]*topbar[^"]*"/g) || [];
+  assert.equal(headers.length, 1, 'Expected exactly one topbar on Members page');
+
+  const topActions = html.match(/class="[^"]*top-actions[^"]*"/g) || [];
+  assert.equal(topActions.length, 1, 'Expected exactly one top-actions cluster on Members page');
+
+  assert.equal(html.includes('Quay lại Màn hình tổng quan'), false, 'Should not render back-to-dashboard bar');
+  assert.equal(html.includes('Chào buổi'), false, 'Should not render dashboard greeting header');
 });
 
 test('login exposes an accessible password visibility control', () => {

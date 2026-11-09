@@ -11,8 +11,6 @@ export interface MemberManagementProps {
 
 export const MemberManagement: React.FC<MemberManagementProps> = ({ homeId, currentUserRole }) => {
   return (
-    <div className="surface-card p-4 sm:p-6">
-      <MemberPage embeddedHomeId={homeId} embeddedUserRole={currentUserRole} />
-    </div>
+    <MemberPage embeddedHomeId={homeId} embeddedUserRole={currentUserRole} />
   );
 };

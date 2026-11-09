@@ -163,11 +163,13 @@ export function MemberPage({ embeddedHomeId, embeddedUserRole }: MemberPageProps
   const content = (
     <main className={`flex-1 min-w-0 ${isEmbedded ? '' : 'pb-20 md:pb-8'}`}>
       {/* TopBar */}
-      <MemberTopBar
-        totalCount={totalCount}
-        ownerCount={ownerCount}
-        userInitial={userInitial}
-      />
+      {!isEmbedded && (
+        <MemberTopBar
+          totalCount={totalCount}
+          ownerCount={ownerCount}
+          userInitial={userInitial}
+        />
+      )}
 
       {/* ── Action Row (One Line) ── */}
       <div className="scenes-actions flex items-center justify-between gap-3 mt-4 mb-3">
