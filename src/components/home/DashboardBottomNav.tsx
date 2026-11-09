@@ -5,7 +5,7 @@ import { notify } from '../ui/notify';
 
 interface DashboardBottomNavProps {
   homeId?: string;
-  activeItem?: 'overview' | 'devices' | 'scenes' | 'energy' | 'more';
+  activeItem?: 'overview' | 'devices' | 'scenes' | 'energy' | 'more' | 'members';
   onSelectOverview?: () => void;
   onOpenMore?: () => void;
 }

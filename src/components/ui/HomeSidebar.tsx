@@ -4,7 +4,7 @@ import { notify } from './notify';
 import { AdminIcon, AppSidebar, AutomationIcon, DeviceIcon, EnergyIcon, HomeIcon, PeopleIcon, SceneIcon, TwinIcon } from './AppSidebar';
 
 interface HomeSidebarProps {
-  activeItem: 'overview' | 'devices' | 'twin' | 'energy' | 'scenes' | 'automations';
+  activeItem: 'overview' | 'devices' | 'twin' | 'energy' | 'scenes' | 'automations' | 'members';
   homeId?: string;
   showSystemSummary?: boolean;
 }
@@ -30,7 +30,7 @@ export function HomeSidebar({ activeItem, homeId, showSystemSummary }: HomeSideb
     { id: 'energy', label: 'Tiêu thụ điện', icon: <EnergyIcon />, onClick: () => openPage('energy') },
     { id: 'scenes', label: 'Kịch bản', icon: <SceneIcon />, onClick: () => openPage('scenes', 'homes') },
     { id: 'automations', label: 'Tự động hóa', icon: <AutomationIcon />, onClick: () => openPage('automation-rules', 'homes') },
-    { id: 'members', label: 'Thành viên', icon: <PeopleIcon />, onClick: () => openOverview('members-section') },
+    { id: 'members', label: 'Thành viên', icon: <PeopleIcon />, onClick: () => openPage('members', 'homes') },
     ...(isAdmin ? [{ id: 'admin', label: 'Quản trị hệ thống', icon: <AdminIcon />, onClick: () => navigate('/admin') }] : []),
   ]} />;
 }

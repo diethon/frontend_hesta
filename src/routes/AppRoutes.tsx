@@ -23,6 +23,7 @@ import { AutomationRulePage } from '../components/automation/AutomationRulePage'
 import { RecommendationsPage } from '../components/automation/RecommendationsPage';
 import { ParentalGuardianRouteWrapper } from '../components/guardian/ParentalGuardianRouteWrapper';
 import { EnergyDashboardPage } from '../components/energy/EnergyDashboardPage';
+import { MemberPage } from '../components/member/MemberPage';
 
 export function AppRoutes() {
   const { initialized, user, login, logout, updateUser } = useRouteSession();
@@ -91,6 +92,8 @@ export function AppRoutes() {
         <Route path="/homes/:homeId/automation-rules" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <AutomationRulePage />} />
         <Route path="/homes/:homeId/recommendations" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <RecommendationsPage />} />
         <Route path="/homes/:homeId/guardian" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <ParentalGuardianRouteWrapper />} />
+        <Route path="/homes/:homeId/members" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <MemberPage />} />
+        <Route path="/home/:homeId/members" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <MemberPage />} />
         <Route path="/home/:homeId/devices" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <DevicePage />} />
         <Route path="/home/:homeId/energy" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <EnergyDashboardPage />} />
         <Route path="/home/:homeId/digital-twin" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <Suspense fallback={<p role="status" className="p-8 text-muted">Đang tải Digital Twin…</p>}><DigitalTwinPage /></Suspense>} />
