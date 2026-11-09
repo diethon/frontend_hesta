@@ -283,7 +283,7 @@ export const MemberPanel: React.FC<MemberPanelProps> = ({
       <ConfirmModal
         isOpen={showPromoteConfirm}
         title={`Cấp quyền Chủ nhà cho ${displayName}?`}
-        description="Họ sẽ có toàn quyền như bạn, bao gồm quản lý thiết bị, kịch bản và xóa thành viên."
+        description="Họ sẽ có toàn quyền như bạn, bao gồm quản lý thiết bị, kịch bản và xóa thành viên. Thao tác này không thể hoàn tác: chủ nhà không thể bị xóa hoặc hạ quyền."
         confirmText="Cấp quyền Chủ nhà"
         cancelText="Hủy bỏ"
         variant="warning"

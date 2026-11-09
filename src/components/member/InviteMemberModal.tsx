@@ -49,6 +49,7 @@ export const InviteMemberModal: React.FC<InviteMemberModalProps> = ({
   const [emailLoading, setEmailLoading] = useState(false);
   const [emailError, setEmailError] = useState<string | null>(null);
   const [emailSuccessMsg, setEmailSuccessMsg] = useState<string | null>(null);
+  const [emailSentStatus, setEmailSentStatus] = useState<boolean | null>(null);
 
   const linkInputRef = useRef<HTMLInputElement>(null);
   const emailInputRef = useRef<HTMLInputElement>(null);
@@ -186,14 +187,17 @@ export const InviteMemberModal: React.FC<InviteMemberModalProps> = ({
     setEmailLoading(true);
     try {
       const data = await generateInvitation(homeId, email);
+      setInvitation(data);
       if (data.emailSent) {
+        setEmailSentStatus(true);
         setEmailSuccessMsg(`Đã gửi lời mời tới ${email}`);
         setEmailInput('');
         notify.success('Đã gửi lời mời', email);
       } else {
-        setEmailSuccessMsg(`Đã tạo lời mời cho ${email}. Bạn có thể gửi liên kết thủ công.`);
+        setEmailSentStatus(false);
+        setEmailSuccessMsg('Đã tạo lời mời nhưng chưa gửi được email. Hãy sao chép liên kết.');
         setEmailInput('');
-        notify.info('Đã tạo lời mời thành công');
+        notify.warning('Đã tạo lời mời nhưng chưa gửi được email');
       }
     } catch (err: unknown) {
       const msg = getErrorMessage(err, 'Không thể gửi · Thử lại');
@@ -372,9 +376,30 @@ export const InviteMemberModal: React.FC<InviteMemberModalProps> = ({
             </div>
 
             {emailSuccessMsg && (
-              <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-600 flex items-center gap-2">
-                <Icon name="check" size={14} className="text-emerald-600 shrink-0" />
-                <span>{emailSuccessMsg}</span>
+              <div
+                className={`p-3.5 rounded-xl border text-xs flex flex-col gap-2 ${
+                  emailSentStatus
+                    ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600'
+                    : 'bg-amber-500/10 border-amber-500/20 text-amber-600'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <Icon
+                    name={emailSentStatus ? 'check' : 'alert'}
+                    size={14}
+                    className={emailSentStatus ? 'text-emerald-600' : 'text-amber-600'}
+                  />
+                  <span>{emailSuccessMsg}</span>
+                </div>
+                {!emailSentStatus && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('link')}
+                    className="self-start text-[11px] font-semibold underline hover:opacity-80 cursor-pointer"
+                  >
+                    Chuyển sang tab Liên kết để sao chép →
+                  </button>
+                )}
               </div>
             )}
 
