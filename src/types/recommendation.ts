@@ -3,6 +3,7 @@ export interface Recommendation {
   homeId: string;
   deviceId: string | null;
   deviceName: string | null;
+  roomName?: string | null;
   triggerCondition: {
     type: string;
     time: string;

@@ -6,6 +6,9 @@ const path = (homeId: string) => `/homes/${homeId}/recommendations`;
 export const getRecommendations = (homeId: string) =>
   featureRequest<Recommendation[]>(path(homeId));
 
+export const getTopRecommendation = (homeId: string) =>
+  featureRequest<Recommendation | null>(`${path(homeId)}/top`);
+
 export const generateRecommendations = (homeId: string, from: string, to: string) =>
   featureRequest<Recommendation[]>(`${path(homeId)}/generate?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`, { method: 'POST' });
 
