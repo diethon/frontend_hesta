@@ -80,35 +80,31 @@ export const MemberPanel: React.FC<MemberPanelProps> = ({
       <div className="scene-panel-backdrop active" onClick={onClose} />
 
       <aside
-        className="scene-panel glass-g2 flex flex-col"
+        className="scene-panel glass-g2 flex flex-col w-full sm:w-[480px]"
         role="dialog"
         aria-modal="true"
         aria-labelledby="member-panel-title"
-        style={{ width: '480px' }}
       >
         <div className="sheet-handle" />
 
         {/* ── Sticky Header ── */}
-        <header
-          className="scene-panel-header shrink-0 p-4 border-b border-[var(--border)]"
-          style={{ display: 'flex', alignItems: 'center', gap: '12px', minHeight: '72px' }}
-        >
+        <header className="scene-panel-header">
           <button
             type="button"
             onClick={onClose}
-            className="icon-button w-10 h-10 rounded-full hover:bg-[var(--border)] flex items-center justify-center text-[var(--secondary)] hover:text-[var(--text)] transition-colors cursor-pointer shrink-0"
+            className="detail-icon-button cursor-pointer"
             aria-label="Đóng bảng thông tin"
           >
             <Icon name="x" size={18} />
           </button>
 
-          <div className="min-w-0 flex-1">
-            <h3 id="member-panel-title" className="text-base font-bold text-[var(--text)] truncate">
+          <div>
+            <strong id="member-panel-title" className="text-base font-bold text-[var(--text)] truncate block">
               Chi tiết thành viên
-            </h3>
-            <p className="text-xs text-[var(--secondary)] mt-0.5">
+            </strong>
+            <small className="text-xs text-[var(--secondary)]">
               {isTargetOwner ? 'Chủ nhà' : 'Thành viên gia đình'}
-            </p>
+            </small>
           </div>
         </header>
 
@@ -271,9 +267,9 @@ export const MemberPanel: React.FC<MemberPanelProps> = ({
             <button
               type="button"
               onClick={() => onRemoveMember(member)}
-              className="text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-500/10 h-10 px-4 rounded-xl transition-colors cursor-pointer flex items-center gap-1.5"
+              className="text-xs font-semibold text-[var(--secondary)] hover:text-rose-500 hover:bg-rose-500/10 h-10 px-4 rounded-xl transition-colors cursor-pointer flex items-center gap-1.5"
             >
-              <Icon name="trash" size={14} className="text-rose-600" />
+              <Icon name="trash" size={14} className="text-current" />
               <span>Xóa khỏi nhà</span>
             </button>
           </footer>
