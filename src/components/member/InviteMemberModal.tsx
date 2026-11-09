@@ -227,34 +227,34 @@ export const InviteMemberModal: React.FC<InviteMemberModalProps> = ({
         <div className="w-10 h-1 rounded-full bg-[var(--border)] mx-auto -mt-2 mb-2 sm:hidden" />
 
         {/* ── Header ── */}
-        <div className="flex items-start justify-between gap-3 pb-2 border-b border-[var(--border)]">
+        <div className="flex items-start justify-between gap-3 pb-3 border-b border-[var(--border)]">
           <div>
             <h3 id="invite-modal-title" className="text-base font-bold text-[var(--text)]">
               Mời thành viên
             </h3>
-            <p className="text-xs text-[var(--tertiary)] mt-0.5">
+            <p className="text-xs text-[var(--secondary)] mt-0.5">
               Người được mời sẽ có quyền theo vai trò Thành viên
             </p>
           </div>
           <button
             type="button"
             onClick={handleClose}
-            className="icon-button w-8 h-8 rounded-full flex items-center justify-center text-[var(--secondary)] hover:text-[var(--text)] hover:bg-[var(--border)]/60 transition-colors cursor-pointer shrink-0"
+            className="icon-button w-10 h-10 rounded-full flex items-center justify-center text-[var(--secondary)] hover:text-[var(--text)] hover:bg-[var(--muted)] transition-colors cursor-pointer shrink-0 -mr-2 -mt-1"
             aria-label="Đóng"
           >
-            <Icon name="x" size={16} />
+            <Icon name="x" size={18} />
           </button>
         </div>
 
         {/* ── Segmented Control: [Liên kết | Email] ── */}
-        <div className="p-1 rounded-xl bg-[var(--muted)] flex gap-1">
+        <div className="p-1 rounded-xl bg-[var(--muted)] border border-[var(--border)]/40 flex gap-1">
           <button
             type="button"
             onClick={() => setActiveTab('link')}
-            className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+            className={`flex-1 py-2 px-3 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
               activeTab === 'link'
-                ? 'bg-[var(--solid)] text-[var(--text)] shadow-sm'
-                : 'text-[var(--tertiary)] hover:text-[var(--text)]'
+                ? 'bg-[var(--solid)] text-[var(--text)] shadow-xs'
+                : 'text-[var(--secondary)] hover:text-[var(--text)]'
             }`}
           >
             Liên kết
@@ -262,10 +262,10 @@ export const InviteMemberModal: React.FC<InviteMemberModalProps> = ({
           <button
             type="button"
             onClick={() => setActiveTab('email')}
-            className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+            className={`flex-1 py-2 px-3 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
               activeTab === 'email'
-                ? 'bg-[var(--solid)] text-[var(--text)] shadow-sm'
-                : 'text-[var(--tertiary)] hover:text-[var(--text)]'
+                ? 'bg-[var(--solid)] text-[var(--text)] shadow-xs'
+                : 'text-[var(--secondary)] hover:text-[var(--text)]'
             }`}
           >
             Email
@@ -296,28 +296,30 @@ export const InviteMemberModal: React.FC<InviteMemberModalProps> = ({
                 >
                   Liên kết tham gia
                 </label>
-                <div className="relative flex items-center">
+                <div className="flex items-center gap-2">
                   <input
                     id="invite-link-input"
                     ref={linkInputRef}
                     type="text"
                     readOnly
                     value={inviteUrl}
-                    className="w-full h-11 pr-24 pl-3.5 rounded-xl border border-[var(--border)] bg-[var(--solid)] text-xs text-[var(--text)] font-mono outline-none focus:ring-1 focus:ring-[var(--accent)]"
+                    onClick={handleCopyLink}
+                    className="flex-1 min-w-0 h-11 px-3.5 rounded-xl border border-[var(--border)] bg-[var(--solid)] text-xs text-[var(--text)] font-mono outline-none focus:ring-1 focus:ring-[var(--accent)] select-all cursor-pointer"
+                    title={inviteUrl}
                   />
                   <button
                     type="button"
                     onClick={handleCopyLink}
-                    className="absolute right-1.5 h-8 px-3 rounded-lg bg-[var(--accent)] text-white text-xs font-medium hover:opacity-90 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+                    className="h-11 px-4 rounded-xl bg-[var(--accent)] text-white text-xs font-semibold hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-1.5 shrink-0 shadow-xs cursor-pointer min-w-[104px]"
                   >
                     {copied ? (
                       <>
-                        <Icon name="check" size={13} />
+                        <Icon name="check" size={14} />
                         <span>Đã chép</span>
                       </>
                     ) : (
                       <>
-                        <Icon name="copy" size={13} />
+                        <Icon name="copy" size={14} />
                         <span>Sao chép</span>
                       </>
                     )}
@@ -330,7 +332,7 @@ export const InviteMemberModal: React.FC<InviteMemberModalProps> = ({
                   </p>
                 )}
 
-                <div className="mt-2.5 flex items-center justify-between text-[11px] text-[var(--tertiary)]">
+                <div className="mt-2.5 flex items-center justify-between text-[11px] text-[var(--secondary)]">
                   <span>Có hiệu lực đến {formatExpiry(invitation?.expiresAt)}</span>
                   <span>Liên kết dùng được 1 lần</span>
                 </div>
