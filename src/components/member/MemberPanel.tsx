@@ -89,25 +89,26 @@ export const MemberPanel: React.FC<MemberPanelProps> = ({
         <div className="sheet-handle" />
 
         {/* ── Sticky Header ── */}
-        <header className="scene-panel-header shrink-0 flex items-center justify-between p-4 border-b border-[var(--border)]">
-          <div className="flex items-center gap-3 min-w-0 pr-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="icon-button w-8 h-8 rounded-full hover:bg-[var(--border)] flex items-center justify-center text-[var(--secondary)] cursor-pointer"
-              aria-label="Đóng bảng thông tin"
-            >
-              <Icon name="x" size={16} />
-            </button>
+        <header
+          className="scene-panel-header shrink-0 p-4 border-b border-[var(--border)]"
+          style={{ display: 'flex', alignItems: 'center', gap: '12px', minHeight: '72px' }}
+        >
+          <button
+            type="button"
+            onClick={onClose}
+            className="icon-button w-10 h-10 rounded-full hover:bg-[var(--border)] flex items-center justify-center text-[var(--secondary)] hover:text-[var(--text)] transition-colors cursor-pointer shrink-0"
+            aria-label="Đóng bảng thông tin"
+          >
+            <Icon name="x" size={18} />
+          </button>
 
-            <div className="min-w-0">
-              <h3 id="member-panel-title" className="text-sm font-bold text-[var(--text)] truncate">
-                Chi tiết thành viên
-              </h3>
-              <p className="text-[11px] text-[var(--tertiary)]">
-                {isTargetOwner ? 'Chủ nhà' : 'Thành viên gia đình'}
-              </p>
-            </div>
+          <div className="min-w-0 flex-1">
+            <h3 id="member-panel-title" className="text-base font-bold text-[var(--text)] truncate">
+              Chi tiết thành viên
+            </h3>
+            <p className="text-xs text-[var(--secondary)] mt-0.5">
+              {isTargetOwner ? 'Chủ nhà' : 'Thành viên gia đình'}
+            </p>
           </div>
         </header>
 
@@ -135,7 +136,7 @@ export const MemberPanel: React.FC<MemberPanelProps> = ({
                   </span>
                 )}
               </div>
-              <p className="text-xs text-[var(--tertiary)] truncate mt-0.5">
+              <p className="text-xs text-[var(--secondary)] truncate mt-0.5">
                 {member.email}
               </p>
               <div className="mt-2">
@@ -181,7 +182,7 @@ export const MemberPanel: React.FC<MemberPanelProps> = ({
                     <strong className="text-xs font-semibold text-[var(--text)] block">
                       Chủ nhà
                     </strong>
-                    <p className="text-[11px] text-[var(--tertiary)] leading-relaxed mt-0.5">
+                    <p className="text-[11px] text-[var(--secondary)] leading-relaxed mt-0.5">
                       Toàn quyền quản trị ngôi nhà, thiết bị, kịch bản, tự động hóa và quản lý thành viên.
                     </p>
                   </div>
@@ -207,7 +208,7 @@ export const MemberPanel: React.FC<MemberPanelProps> = ({
                     <strong className="text-xs font-semibold text-[var(--text)] block">
                       Thành viên
                     </strong>
-                    <p className="text-[11px] text-[var(--tertiary)] leading-relaxed mt-0.5">
+                    <p className="text-[11px] text-[var(--secondary)] leading-relaxed mt-0.5">
                       Điều khiển thiết bị, kích hoạt kịch bản và xem thông tin không gian sống.
                     </p>
                   </div>
@@ -218,7 +219,7 @@ export const MemberPanel: React.FC<MemberPanelProps> = ({
                     type="button"
                     disabled={!hasRoleChanged || savingRole}
                     onClick={handleSaveRoleClick}
-                    className="w-full py-2.5 px-4 rounded-xl text-xs font-semibold bg-[var(--accent)] text-white hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center justify-center gap-2"
+                    className="w-full h-11 px-4 rounded-xl text-xs font-semibold bg-[var(--accent)] text-white hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center justify-center gap-2"
                   >
                     {savingRole ? 'Đang lưu…' : 'Lưu vai trò'}
                   </button>
@@ -231,7 +232,7 @@ export const MemberPanel: React.FC<MemberPanelProps> = ({
                     {isTargetOwner ? 'Chủ nhà' : 'Thành viên'}
                   </strong>
                 </div>
-                <p className="text-[11px] text-[var(--tertiary)]">
+                <p className="text-[11px] text-[var(--secondary)]">
                   {isTargetOwner
                     ? 'Không thể thay đổi vai trò của chủ nhà'
                     : !isOwnerViewer
@@ -249,13 +250,13 @@ export const MemberPanel: React.FC<MemberPanelProps> = ({
             </h4>
             <div className="rounded-2xl glass-g1 border border-[var(--border)] divide-y divide-[var(--border)]/60 text-xs">
               <div className="flex justify-between items-center p-3.5">
-                <span className="text-[var(--tertiary)]">Email</span>
+                <span className="text-[var(--secondary)]">Email</span>
                 <span className="font-medium text-[var(--text)] truncate max-w-[240px]">
                   {member.email || '—'}
                 </span>
               </div>
               <div className="flex justify-between items-center p-3.5">
-                <span className="text-[var(--tertiary)]">Ngày gia nhập</span>
+                <span className="text-[var(--secondary)]">Ngày gia nhập</span>
                 <span className="font-medium text-[var(--text)]">
                   {formatJoinDate(member.joinedAt)}
                 </span>
@@ -270,7 +271,7 @@ export const MemberPanel: React.FC<MemberPanelProps> = ({
             <button
               type="button"
               onClick={() => onRemoveMember(member)}
-              className="text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-500/10 py-2 px-3.5 rounded-xl transition-colors cursor-pointer flex items-center gap-1.5"
+              className="text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-500/10 h-10 px-4 rounded-xl transition-colors cursor-pointer flex items-center gap-1.5"
             >
               <Icon name="trash" size={14} className="text-rose-600" />
               <span>Xóa khỏi nhà</span>
