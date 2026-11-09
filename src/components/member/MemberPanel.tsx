@@ -88,23 +88,23 @@ export const MemberPanel: React.FC<MemberPanelProps> = ({
         <div className="sheet-handle" />
 
         {/* ── Sticky Header ── */}
-        <header className="scene-panel-header">
+        <header className="shrink-0 flex items-center gap-3 px-5 py-4 border-b border-[var(--border)] bg-[var(--solid)]/80 backdrop-blur-md">
           <button
             type="button"
             onClick={onClose}
-            className="detail-icon-button cursor-pointer"
+            className="w-10 h-10 rounded-full flex items-center justify-center text-[var(--secondary)] hover:text-[var(--text)] hover:bg-[var(--muted)] transition-colors cursor-pointer shrink-0"
             aria-label="Đóng bảng thông tin"
           >
             <Icon name="x" size={18} />
           </button>
 
-          <div>
-            <strong id="member-panel-title" className="text-base font-bold text-[var(--text)] truncate block">
+          <div className="min-w-0 flex-1">
+            <h3 id="member-panel-title" className="text-base font-bold text-[var(--text)] truncate leading-tight">
               Chi tiết thành viên
-            </strong>
-            <small className="text-xs text-[var(--secondary)]">
+            </h3>
+            <p className="text-xs text-[var(--secondary)] mt-0.5 truncate">
               {isTargetOwner ? 'Chủ nhà' : 'Thành viên gia đình'}
-            </small>
+            </p>
           </div>
         </header>
 
@@ -152,7 +152,7 @@ export const MemberPanel: React.FC<MemberPanelProps> = ({
 
           {/* Section: Vai trò */}
           <section className="space-y-3">
-            <h4 className="text-xs font-bold text-[var(--secondary)] uppercase tracking-wider">
+            <h4 className="text-xs font-semibold text-[var(--secondary)]">
               Vai trò
             </h4>
 
@@ -241,7 +241,7 @@ export const MemberPanel: React.FC<MemberPanelProps> = ({
 
           {/* Section: Thông tin */}
           <section className="space-y-3">
-            <h4 className="text-xs font-bold text-[var(--secondary)] uppercase tracking-wider">
+            <h4 className="text-xs font-semibold text-[var(--secondary)]">
               Thông tin
             </h4>
             <div className="rounded-2xl glass-g1 border border-[var(--border)] divide-y divide-[var(--border)]/60 text-xs">

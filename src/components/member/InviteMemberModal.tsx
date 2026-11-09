@@ -190,14 +190,14 @@ export const InviteMemberModal: React.FC<InviteMemberModalProps> = ({
       setInvitation(data);
       if (data.emailSent) {
         setEmailSentStatus(true);
-        setEmailSuccessMsg(`Đã gửi lời mời tới ${email}`);
+        setEmailSuccessMsg(`Đã gửi email mời thành công tới ${email}`);
         setEmailInput('');
         notify.success('Đã gửi lời mời', email);
       } else {
         setEmailSentStatus(false);
-        setEmailSuccessMsg('Đã tạo lời mời nhưng chưa gửi được email. Hãy sao chép liên kết.');
+        setEmailSuccessMsg(`Đã tạo lời mời cho ${email}`);
         setEmailInput('');
-        notify.warning('Đã tạo lời mời nhưng chưa gửi được email');
+        notify.warning('Đã tạo lời mời', 'Dịch vụ gửi email gián đoạn');
       }
     } catch (err: unknown) {
       const msg = getErrorMessage(err, 'Không thể gửi · Thử lại');
@@ -220,7 +220,7 @@ export const InviteMemberModal: React.FC<InviteMemberModalProps> = ({
     >
       <div
         ref={modalRef}
-        className="glass-g2 w-full sm:max-w-[440px] rounded-t-[28px] sm:rounded-3xl border border-[var(--border)] shadow-2xl p-6 space-y-5 animate-in slide-in-from-bottom sm:zoom-in-95 duration-200 bg-[var(--surface)] text-[var(--text)] relative"
+        className="glass-g2 w-full sm:max-w-[480px] rounded-t-[28px] sm:rounded-3xl border border-[var(--border)] shadow-2xl p-6 space-y-5 animate-in slide-in-from-bottom sm:zoom-in-95 duration-200 bg-[var(--surface)] text-[var(--text)] relative"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Mobile handle */}
@@ -379,28 +379,55 @@ export const InviteMemberModal: React.FC<InviteMemberModalProps> = ({
 
             {emailSuccessMsg && (
               <div
-                className={`p-3.5 rounded-xl border text-xs flex flex-col gap-2 ${
+                className={`p-3.5 rounded-xl border text-xs flex flex-col gap-2.5 ${
                   emailSentStatus
-                    ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600'
-                    : 'bg-amber-500/10 border-amber-500/20 text-amber-600'
+                    ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-700 dark:text-emerald-400'
+                    : 'bg-amber-500/10 border-amber-500/20 text-amber-700 dark:text-amber-400'
                 }`}
               >
-                <div className="flex items-center gap-2">
+                <div className="flex items-start gap-2">
                   <Icon
                     name={emailSentStatus ? 'check' : 'alert'}
-                    size={14}
-                    className={emailSentStatus ? 'text-emerald-600' : 'text-amber-600'}
+                    size={15}
+                    className={`shrink-0 mt-0.5 ${emailSentStatus ? 'text-emerald-600' : 'text-amber-600'}`}
                   />
-                  <span>{emailSuccessMsg}</span>
+                  <div className="leading-relaxed">
+                    <p className="font-semibold">{emailSuccessMsg}</p>
+                    {!emailSentStatus && (
+                      <p className="text-[11px] opacity-90 mt-1 text-[var(--secondary)]">
+                        Dịch vụ gửi email đang gián đoạn. Bạn có thể sao chép liên kết dưới đây để gửi trực tiếp cho thành viên:
+                      </p>
+                    )}
+                  </div>
                 </div>
-                {!emailSentStatus && (
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab('link')}
-                    className="self-start text-[11px] font-semibold underline hover:opacity-80 cursor-pointer"
-                  >
-                    Chuyển sang tab Liên kết để sao chép →
-                  </button>
+
+                {!emailSentStatus && inviteUrl && (
+                  <div className="flex items-center gap-2 pt-1">
+                    <input
+                      type="text"
+                      readOnly
+                      value={inviteUrl}
+                      onClick={handleCopyLink}
+                      className="flex-1 min-w-0 h-10 px-3 rounded-lg border border-[var(--border)] bg-[var(--solid)] text-xs text-[var(--text)] font-mono outline-none select-all cursor-pointer"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleCopyLink}
+                      className="h-10 px-3.5 rounded-lg bg-[var(--accent)] text-white text-xs font-semibold hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-1.5 shrink-0 shadow-xs cursor-pointer min-w-[96px]"
+                    >
+                      {copied ? (
+                        <>
+                          <Icon name="check" size={13} />
+                          <span>Đã chép</span>
+                        </>
+                      ) : (
+                        <>
+                          <Icon name="copy" size={13} />
+                          <span>Sao chép</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
                 )}
               </div>
             )}
