@@ -7,7 +7,8 @@ import { notify } from '../ui/notify';
 import { DashboardNavRail } from '../home/DashboardNavRail';
 import { DashboardBottomNav } from '../home/DashboardBottomNav';
 import { MemberTopBar } from './MemberTopBar';
-import { MemberCard, sanitizeMemberName } from './MemberCard';
+import { MemberRow } from './MemberRow';
+import { sanitizeMemberName } from './MemberCard';
 import { MemberPanel } from './MemberPanel';
 import { InviteMemberModal } from './InviteMemberModal';
 import { ConfirmModal } from '../ui/ConfirmModal';
@@ -89,6 +90,7 @@ export function MemberPage({ embeddedHomeId, embeddedUserRole }: MemberPageProps
   // Derived counts
   const totalCount = members.length;
   const ownerCount = useMemo(() => members.filter((m) => m.role === 'OWNER').length, [members]);
+  const memberCount = totalCount - ownerCount;
   const isOwnerViewer = currentUserRole === 'OWNER';
 
   // Sort: OWNER first, then by join date
@@ -172,47 +174,47 @@ export function MemberPage({ embeddedHomeId, embeddedUserRole }: MemberPageProps
       )}
 
       {/* ── Action Row (One Line) ── */}
-      <div className="scenes-actions flex items-center justify-between gap-3 mt-4 mb-3">
-        {/* Left: Segmented control [Tất cả | Chủ nhà | Thành viên] */}
+      <div className="scenes-actions flex items-center justify-between gap-3 mt-4 mb-4">
+        {/* Left: Segmented control [Tất cả X | Chủ nhà Y | Thành viên Z] */}
         <div className="scene-filter p-1 rounded-2xl bg-[var(--muted)] flex items-center gap-1">
           <button
             type="button"
             className={`py-1.5 px-3 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
               roleFilter === 'ALL'
                 ? 'bg-[var(--solid)] text-[var(--text)] shadow-xs'
-                : 'text-[var(--tertiary)] hover:text-[var(--text)]'
+                : 'text-[var(--secondary)] hover:text-[var(--text)]'
             }`}
             onClick={() => setRoleFilter('ALL')}
           >
-            Tất cả
+            Tất cả {totalCount}
           </button>
           <button
             type="button"
             className={`py-1.5 px-3 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
               roleFilter === 'OWNER'
                 ? 'bg-[var(--solid)] text-[var(--text)] shadow-xs'
-                : 'text-[var(--tertiary)] hover:text-[var(--text)]'
+                : 'text-[var(--secondary)] hover:text-[var(--text)]'
             }`}
             onClick={() => setRoleFilter('OWNER')}
           >
-            Chủ nhà
+            Chủ nhà {ownerCount}
           </button>
           <button
             type="button"
             className={`py-1.5 px-3 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
               roleFilter === 'MEMBER'
                 ? 'bg-[var(--solid)] text-[var(--text)] shadow-xs'
-                : 'text-[var(--tertiary)] hover:text-[var(--text)]'
+                : 'text-[var(--secondary)] hover:text-[var(--text)]'
             }`}
             onClick={() => setRoleFilter('MEMBER')}
           >
-            Thành viên
+            Thành viên {memberCount}
           </button>
         </div>
 
         {/* Right: Inline Search (if > 8 members) + Primary Pill "+ Mời thành viên" (owners only) */}
         <div className="flex items-center gap-2">
-          {members.length > 8 && (
+          {totalCount > 8 && (
             <div className="flex items-center gap-1.5">
               {searchOpen && (
                 <input
@@ -246,42 +248,32 @@ export function MemberPage({ embeddedHomeId, embeddedUserRole }: MemberPageProps
         </div>
       </div>
 
-      {/* ── Summary Chips (Neutral StatChips) ── */}
-      <div className="flex items-center gap-2 mb-5">
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-[var(--muted)] text-[var(--secondary)] border border-[var(--border)]">
-          <Icon name="users" size={13} className="text-[var(--tertiary)]" />
-          <span>{totalCount} thành viên</span>
-        </div>
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-[var(--muted)] text-[var(--secondary)] border border-[var(--border)]">
-          <Icon name="shield" size={13} className="text-[var(--tertiary)]" />
-          <span>{ownerCount} chủ nhà</span>
-        </div>
-      </div>
-
-      {/* ── Main Content Grid / States ── */}
+      {/* ── Main Content: Single G1 List Container / States ── */}
       {loading ? (
-        /* Loading Skeletons */
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        /* Loading Skeleton List */
+        <div className="glass-g1 rounded-[24px] border border-[var(--border)] overflow-hidden shadow-card divide-y divide-[var(--border)]">
           {[1, 2, 3].map((n) => (
             <div
               key={n}
-              className="glass-g1 rounded-[20px] p-4 border border-[var(--border)] h-44 animate-pulse flex flex-col justify-between"
+              className="flex items-center justify-between gap-4 px-4 sm:px-5 py-3.5 min-h-[72px] animate-pulse"
             >
-              <div className="flex items-start justify-between">
-                <div className="w-12 h-12 rounded-full bg-[var(--muted)]" />
-                <div className="w-8 h-8 rounded-full bg-[var(--muted)]" />
+              <div className="flex items-center gap-3.5 min-w-0">
+                <div className="w-11 h-11 rounded-full bg-[var(--muted)] shrink-0" />
+                <div className="space-y-2">
+                  <div className="w-32 h-3.5 rounded bg-[var(--muted)]" />
+                  <div className="w-48 h-3 rounded bg-[var(--muted)]" />
+                </div>
               </div>
-              <div className="space-y-2">
-                <div className="w-2/3 h-4 rounded bg-[var(--muted)]" />
-                <div className="w-1/2 h-3 rounded bg-[var(--muted)]" />
+              <div className="flex items-center gap-3">
+                <div className="w-20 h-5 rounded-full bg-[var(--muted)]" />
+                <div className="w-11 h-11 rounded-full bg-[var(--muted)]" />
               </div>
-              <div className="w-1/3 h-5 rounded-full bg-[var(--muted)]" />
             </div>
           ))}
         </div>
       ) : error ? (
         /* Error State */
-        <div className="p-8 rounded-3xl glass-g1 border border-rose-500/20 text-center space-y-3">
+        <div className="glass-g1 rounded-[24px] border border-rose-500/20 p-8 text-center space-y-3 shadow-card">
           <p className="text-sm text-rose-600 font-medium">{error}</p>
           <button
             type="button"
@@ -294,20 +286,20 @@ export function MemberPage({ embeddedHomeId, embeddedUserRole }: MemberPageProps
         </div>
       ) : filteredMembers.length === 0 ? (
         /* No Search Results */
-        <div className="p-12 rounded-3xl glass-g1 border border-[var(--border)] text-center space-y-2">
-          <p className="text-sm font-medium text-[var(--text)]">Không tìm thấy thành viên nào phù hợp</p>
-          <p className="text-xs text-[var(--tertiary)]">Thử thay đổi từ khóa tìm kiếm hoặc bộ lọc vai trò</p>
+        <div className="glass-g1 rounded-[24px] border border-[var(--border)] p-12 text-center space-y-2 shadow-card">
+          <p className="text-sm font-semibold text-[var(--text)]">Không tìm thấy thành viên nào phù hợp</p>
+          <p className="text-xs text-[var(--secondary)]">Thử thay đổi từ khóa tìm kiếm hoặc bộ lọc vai trò</p>
         </div>
       ) : (
-        /* MemberCard Grid */
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        /* Single G1 List Container */
+        <div className="glass-g1 rounded-[24px] border border-[var(--border)] overflow-hidden shadow-card divide-y divide-[var(--border)]">
           {filteredMembers.map((member) => {
             const isCurrentUser = member.id === authUser?.id;
             const isOwner = member.role === 'OWNER';
             const canManage = isOwnerViewer && !isOwner && !isCurrentUser;
 
             return (
-              <MemberCard
+              <MemberRow
                 key={member.id}
                 member={member}
                 isCurrentUser={isCurrentUser}
@@ -327,28 +319,30 @@ export function MemberPage({ embeddedHomeId, embeddedUserRole }: MemberPageProps
             );
           })}
 
-          {/* Empty Hint Card when only 1 owner exists and viewer is owner */}
+          {/* Empty Hint Row when only 1 owner exists and viewer is owner */}
           {isSoloOwner && isOwnerViewer && (
             <div
-              className="glass-g1 rounded-[20px] p-5 border border-dashed border-[var(--border)] flex flex-col justify-between text-center items-center gap-4 hover:border-[var(--accent)]/50 transition-colors"
+              className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 sm:p-5 border-t border-dashed border-[var(--border)] bg-[var(--muted)]/20 hover:bg-[var(--muted)]/40 transition-colors"
               role="region"
               aria-label="Gợi ý mời thành viên"
             >
-              <div className="w-12 h-12 rounded-full bg-[var(--muted)] flex items-center justify-center text-[var(--accent)] shrink-0">
-                <Icon name="plus" size={20} />
-              </div>
-              <div>
-                <strong className="text-xs font-semibold text-[var(--text)] block">
-                  Mời người thân để cùng điều khiển ngôi nhà
-                </strong>
-                <p className="text-[11px] text-[var(--tertiary)] mt-1">
-                  Gửi liên kết hoặc email để các thành viên gia đình cùng tham gia
-                </p>
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-full bg-[var(--muted)] border border-[var(--border)] flex items-center justify-center text-[var(--accent)] shrink-0">
+                  <Icon name="plus" size={18} />
+                </div>
+                <div>
+                  <strong className="text-xs font-semibold text-[var(--text)] block">
+                    Mời người thân để cùng điều khiển ngôi nhà
+                  </strong>
+                  <p className="text-[11px] text-[var(--secondary)] mt-0.5">
+                    Gửi liên kết hoặc email để các thành viên gia đình cùng tham gia
+                  </p>
+                </div>
               </div>
               <button
                 type="button"
                 onClick={() => setInviteModalOpen(true)}
-                className="py-2 px-4 rounded-xl text-xs font-semibold bg-[var(--accent)] text-white hover:opacity-90 transition-all cursor-pointer"
+                className="h-9 px-4 rounded-xl text-xs font-semibold bg-[var(--accent)] text-white hover:opacity-90 transition-all cursor-pointer shrink-0"
               >
                 Mời thành viên
               </button>
