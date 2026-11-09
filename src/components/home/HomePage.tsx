@@ -15,6 +15,7 @@ import { HomeQuickScenes } from "./HomeQuickScenes";
 import { HomeFavoriteDevices } from "./HomeFavoriteDevices";
 import { HomeEnergyWidget } from "./HomeEnergyWidget";
 import { HomeActivityWidget } from "./HomeActivityWidget";
+import { SpotlightRecommendationBanner } from "./SpotlightRecommendationBanner";
 import { DashboardNavRail } from "./DashboardNavRail";
 import { DashboardTopBar, type HomeOption } from "./DashboardTopBar";
 import { DashboardBottomNav } from "./DashboardBottomNav";
@@ -350,6 +351,13 @@ export const HomePage: React.FC<HomePageProps> = ({
         {/* ── Main Dashboard: Pixel-perfect Figma Layout ── */}
         {activeTabSection === 'dashboard' && (
           <div className="dashboard">
+            <SpotlightRecommendationBanner
+              homeId={userHome?.homeId}
+              onApplied={() => {
+                if (userHome?.homeId) loadHomeDashboardData(userHome.homeId);
+              }}
+            />
+
             <HomeHeroLiveCamera
               homeId={userHome?.homeId}
               totalDevices={devices.length || 8}
