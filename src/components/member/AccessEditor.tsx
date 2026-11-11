@@ -410,7 +410,7 @@ export const AccessEditor: React.FC<AccessEditorProps> = ({
           </div>
 
           {/* Rooms List */}
-          <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
+          <div className="space-y-3">
             {filteredRooms.map((room) => {
               const currentRoomLevel = roomLevels[room.id] || 'NONE';
               const isExpanded = !!expandedRooms[room.id] || !!searchQuery;
@@ -419,32 +419,52 @@ export const AccessEditor: React.FC<AccessEditorProps> = ({
               return (
                 <div
                   key={room.id}
-                  className="rounded-2xl border border-[var(--border)] bg-[var(--solid)]/60 overflow-hidden transition-all"
+                  className="rounded-2xl border border-[var(--border)] bg-[var(--solid)] shadow-xs overflow-hidden transition-all"
                 >
-                  {/* Room Row */}
-                  <div className="p-3.5 flex items-center justify-between gap-3">
-                    <button
-                      type="button"
-                      onClick={() => toggleRoomExpand(room.id)}
-                      className="flex items-center gap-2 min-w-0 flex-1 text-left cursor-pointer group"
-                    >
+                  {/* Room Header & Controls */}
+                  <div className="p-3.5 space-y-2.5">
+                    {/* Line 1: Chevron + Full Room Name + Count Badge + Quick Status */}
+                    <div className="flex items-center justify-between gap-2">
+                      <button
+                        type="button"
+                        onClick={() => toggleRoomExpand(room.id)}
+                        className="flex items-center gap-2.5 min-w-0 flex-1 text-left cursor-pointer group"
+                      >
+                        <span
+                          className={`w-6 h-6 rounded-lg bg-[var(--muted)] flex items-center justify-center text-[var(--secondary)] transition-transform duration-200 shrink-0 group-hover:text-[var(--accent)] ${
+                            isExpanded ? 'rotate-90' : ''
+                          }`}
+                        >
+                          <ChevronRight className="w-3.5 h-3.5" />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <strong className="text-sm font-semibold text-[var(--text)] group-hover:text-[var(--accent)] transition-colors break-words">
+                              {room.name}
+                            </strong>
+                            <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-[var(--muted)] text-[var(--secondary)] border border-[var(--border)] shrink-0">
+                              {roomDevices.length} thiết bị
+                            </span>
+                          </div>
+                        </div>
+                      </button>
+
+                      {/* Current Room Access Level Badge */}
                       <span
-                        className={`text-[var(--secondary)] transition-transform duration-200 shrink-0 ${
-                          isExpanded ? 'rotate-90' : ''
+                        className={`text-[10px] font-semibold px-2 py-0.5 rounded-md shrink-0 border ${
+                          currentRoomLevel === 'CONTROL'
+                            ? 'bg-blue-500/10 text-blue-600 border-blue-500/20'
+                            : currentRoomLevel === 'VIEW'
+                            ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+                            : 'bg-slate-500/10 text-slate-500 border-slate-500/20'
                         }`}
                       >
-                        <ChevronRight className="w-3.5 h-3.5" />
+                        {currentRoomLevel === 'CONTROL' ? 'Điều khiển' : currentRoomLevel === 'VIEW' ? 'Xem' : 'Không'}
                       </span>
-                      <strong className="text-xs font-semibold text-[var(--text)] truncate group-hover:text-[var(--accent)] transition-colors">
-                        {room.name}
-                      </strong>
-                      <span className="text-[11px] text-[var(--secondary)] shrink-0">
-                        ({roomDevices.length} thiết bị)
-                      </span>
-                    </button>
+                    </div>
 
-                    {/* Room Level Segmented Control: [Không | Xem | Điều khiển] */}
-                    <div className="inline-flex rounded-lg p-0.5 bg-[var(--muted)] border border-[var(--border)] shrink-0">
+                    {/* Line 2: Full-Width 3-Column Segmented Control */}
+                    <div className="grid grid-cols-3 gap-1.5 p-1 rounded-xl bg-[var(--muted)] border border-[var(--border)]">
                       {(['NONE', 'VIEW', 'CONTROL'] as AccessLevel[]).map((lvl) => {
                         const isSelected = currentRoomLevel === lvl;
                         const label = lvl === 'NONE' ? 'Không' : lvl === 'VIEW' ? 'Xem' : 'Điều khiển';
@@ -453,13 +473,13 @@ export const AccessEditor: React.FC<AccessEditorProps> = ({
                             key={lvl}
                             type="button"
                             onClick={() => handleRoomLevelChange(room.id, lvl)}
-                            className={`px-2 py-1 rounded-md text-[11px] font-medium transition-all cursor-pointer ${
+                            className={`h-8 rounded-lg text-xs font-medium transition-all cursor-pointer flex items-center justify-center ${
                               isSelected
-                                ? 'bg-[var(--solid)] text-[var(--accent)] font-semibold shadow-xs'
-                                : 'text-[var(--secondary)] hover:text-[var(--text)]'
+                                ? 'bg-[var(--solid)] text-[var(--accent)] font-semibold shadow-xs border border-[var(--border)]'
+                                : 'text-[var(--secondary)] hover:text-[var(--text)] hover:bg-[var(--solid)]/40'
                             }`}
                           >
-                            {label}
+                            <span>{label}</span>
                           </button>
                         );
                       })}
@@ -468,7 +488,11 @@ export const AccessEditor: React.FC<AccessEditorProps> = ({
 
                   {/* Devices in Room */}
                   {isExpanded && roomDevices.length > 0 && (
-                    <div className="border-t border-[var(--border)]/60 bg-[var(--muted)]/40 p-3 space-y-2.5">
+                    <div className="border-t border-[var(--border)] bg-[var(--muted)]/30 p-3 space-y-2.5">
+                      <div className="text-[11px] font-medium text-[var(--secondary)] flex items-center justify-between px-1">
+                        <span>Thiết bị trong phòng</span>
+                        <span>{roomDevices.length} thiết bị</span>
+                      </div>
                       {roomDevices.map((dev) => {
                         const override = deviceOverrides[dev.deviceId] || 'INHERIT';
                         const effective = getEffectiveDeviceLevel(dev);
@@ -478,34 +502,48 @@ export const AccessEditor: React.FC<AccessEditorProps> = ({
                         return (
                           <div
                             key={dev.deviceId}
-                            className="flex items-center justify-between gap-3 p-2 rounded-xl bg-[var(--solid)]/80 border border-[var(--border)]/60 text-xs"
+                            className="p-3 rounded-xl bg-[var(--solid)] border border-[var(--border)] shadow-xs space-y-2"
                           >
-                            <div className="min-w-0 flex-1">
-                              <span className="font-medium text-[var(--text)] truncate block">
-                                {dev.deviceName || 'Thiết bị'}
-                              </span>
-                              <span className="text-[10px] text-[var(--secondary)] block mt-0.5">
-                                {override === 'INHERIT'
-                                  ? `Theo phòng (Hiện tại: ${effectiveLabel})`
-                                  : `Ghi đè: ${effectiveLabel}`}
+                            {/* Device Header: Name + Badge */}
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0 flex-1">
+                                <span className="text-xs font-semibold text-[var(--text)] block break-words">
+                                  {dev.deviceName || 'Thiết bị'}
+                                </span>
+                                <span className="text-[11px] text-[var(--secondary)] block mt-0.5">
+                                  {override === 'INHERIT'
+                                    ? `Theo phòng (Hiện tại: ${effectiveLabel})`
+                                    : `Ghi đè riêng: ${effectiveLabel}`}
+                                </span>
+                              </div>
+                              <span
+                                className={`text-[10px] font-semibold px-2 py-0.5 rounded shrink-0 border ${
+                                  effective === 'CONTROL'
+                                    ? 'bg-blue-500/10 text-blue-600 border-blue-500/20'
+                                    : effective === 'VIEW'
+                                    ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+                                    : 'bg-slate-500/10 text-slate-500 border-slate-500/20'
+                                }`}
+                              >
+                                {effectiveLabel}
                               </span>
                             </div>
 
-                            {/* Device Segmented Control: [Theo phòng | Không | Xem | ĐK] */}
-                            <div className="inline-flex rounded-lg p-0.5 bg-[var(--muted)] border border-[var(--border)] shrink-0">
+                            {/* Device Controls: 4 Full-Width Columns */}
+                            <div className="grid grid-cols-4 gap-1 p-0.5 rounded-lg bg-[var(--muted)] border border-[var(--border)]">
                               {(['INHERIT', 'NONE', 'VIEW', 'CONTROL'] as const).map((opt) => {
                                 const isSelected = override === opt;
                                 const label =
-                                  opt === 'INHERIT' ? 'Theo phòng' : opt === 'NONE' ? 'Không' : opt === 'VIEW' ? 'Xem' : 'ĐK';
+                                  opt === 'INHERIT' ? 'Theo phòng' : opt === 'NONE' ? 'Không' : opt === 'VIEW' ? 'Xem' : 'Điều khiển';
                                 return (
                                   <button
                                     key={opt}
                                     type="button"
                                     onClick={() => handleDeviceLevelChange(dev.deviceId, opt)}
-                                    className={`px-2 py-0.5 rounded-md text-[10px] font-medium transition-all cursor-pointer ${
+                                    className={`h-7 rounded-md text-[11px] font-medium transition-all cursor-pointer flex items-center justify-center text-center ${
                                       isSelected
-                                        ? 'bg-[var(--solid)] text-[var(--accent)] font-semibold shadow-xs'
-                                        : 'text-[var(--secondary)] hover:text-[var(--text)]'
+                                        ? 'bg-[var(--solid)] text-[var(--accent)] font-semibold shadow-xs border border-[var(--border)]'
+                                        : 'text-[var(--secondary)] hover:text-[var(--text)] hover:bg-[var(--solid)]/40'
                                     }`}
                                   >
                                     {label}
@@ -524,42 +562,55 @@ export const AccessEditor: React.FC<AccessEditorProps> = ({
 
             {/* Unassigned Devices */}
             {filteredUnassignedDevices.length > 0 && (
-              <div className="rounded-2xl border border-[var(--border)] bg-[var(--solid)]/60 overflow-hidden">
-                <div className="p-3.5 flex items-center justify-between">
-                  <div>
-                    <strong className="text-xs font-semibold text-[var(--text)] block">
-                      Thiết bị chưa phân phòng
-                    </strong>
-                    <span className="text-[11px] text-[var(--secondary)]">
-                      Mặc định: Không truy cập
-                    </span>
-                  </div>
+              <div className="rounded-2xl border border-[var(--border)] bg-[var(--solid)] shadow-xs overflow-hidden">
+                <div className="p-3.5 border-b border-[var(--border)] bg-[var(--muted)]/20">
+                  <strong className="text-sm font-semibold text-[var(--text)] block">
+                    Thiết bị chưa phân phòng
+                  </strong>
+                  <span className="text-xs text-[var(--secondary)] mt-0.5 block">
+                    Mặc định: Không có quyền truy cập
+                  </span>
                 </div>
 
-                <div className="border-t border-[var(--border)]/60 bg-[var(--muted)]/40 p-3 space-y-2.5">
+                <div className="p-3 space-y-2.5 bg-[var(--muted)]/30">
                   {filteredUnassignedDevices.map((dev) => {
                     const override = deviceOverrides[dev.deviceId] || 'NONE';
+                    const effectiveLabel =
+                      override === 'NONE' ? 'Không' : override === 'VIEW' ? 'Xem' : 'Điều khiển';
                     return (
                       <div
                         key={dev.deviceId}
-                        className="flex items-center justify-between gap-3 p-2 rounded-xl bg-[var(--solid)]/80 border border-[var(--border)]/60 text-xs"
+                        className="p-3 rounded-xl bg-[var(--solid)] border border-[var(--border)] shadow-xs space-y-2"
                       >
-                        <span className="font-medium text-[var(--text)] truncate">
-                          {dev.deviceName || 'Thiết bị'}
-                        </span>
-                        <div className="inline-flex rounded-lg p-0.5 bg-[var(--muted)] border border-[var(--border)] shrink-0">
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="text-xs font-semibold text-[var(--text)] block break-words min-w-0 flex-1">
+                            {dev.deviceName || 'Thiết bị'}
+                          </span>
+                          <span
+                            className={`text-[10px] font-semibold px-2 py-0.5 rounded shrink-0 border ${
+                              override === 'CONTROL'
+                                ? 'bg-blue-500/10 text-blue-600 border-blue-500/20'
+                                : override === 'VIEW'
+                                ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+                                : 'bg-slate-500/10 text-slate-500 border-slate-500/20'
+                            }`}
+                          >
+                            {effectiveLabel}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-1 p-0.5 rounded-lg bg-[var(--muted)] border border-[var(--border)]">
                           {(['NONE', 'VIEW', 'CONTROL'] as AccessLevel[]).map((lvl) => {
                             const isSelected = override === lvl;
-                            const label = lvl === 'NONE' ? 'Không' : lvl === 'VIEW' ? 'Xem' : 'ĐK';
+                            const label = lvl === 'NONE' ? 'Không' : lvl === 'VIEW' ? 'Xem' : 'Điều khiển';
                             return (
                               <button
                                 key={lvl}
                                 type="button"
                                 onClick={() => handleDeviceLevelChange(dev.deviceId, lvl)}
-                                className={`px-2 py-0.5 rounded-md text-[10px] font-medium transition-all cursor-pointer ${
+                                className={`h-7 rounded-md text-[11px] font-medium transition-all cursor-pointer flex items-center justify-center ${
                                   isSelected
-                                    ? 'bg-[var(--solid)] text-[var(--accent)] font-semibold shadow-xs'
-                                    : 'text-[var(--secondary)] hover:text-[var(--text)]'
+                                    ? 'bg-[var(--solid)] text-[var(--accent)] font-semibold shadow-xs border border-[var(--border)]'
+                                    : 'text-[var(--secondary)] hover:text-[var(--text)] hover:bg-[var(--solid)]/40'
                                 }`}
                               >
                                 {label}
