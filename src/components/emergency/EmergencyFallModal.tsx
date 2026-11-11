@@ -7,8 +7,7 @@ import {
   VolumeX,
   Eye,
   Activity,
-  Flame,
-  Radio,
+  ShieldCheck,
 } from 'lucide-react';
 import {
   fallDetectionService,
@@ -23,9 +22,6 @@ export const EmergencyFallModal: React.FC = () => {
   const [countdown, setCountdown] = useState<number>(30);
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [showLiveStream, setShowLiveStream] = useState<boolean>(true);
-  const [aiConnected, setAiConnected] = useState<boolean>(false);
-  const [cameraOnline, setCameraOnline] = useState<boolean | null>(null);
-  const [isDemoTriggering, setIsDemoTriggering] = useState<boolean>(false);
 
   // Audio Context for synthesized siren
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -35,7 +31,6 @@ export const EmergencyFallModal: React.FC = () => {
   const stompClientRef = useRef<Client | null>(null);
 
   // --- Global Browser Autoplay Policy Unlocker ---
-  // Resumes AudioContext on the first click/touch/keypress anywhere on the screen
   useEffect(() => {
     const unlockAudio = () => {
       try {
@@ -181,15 +176,6 @@ export const EmergencyFallModal: React.FC = () => {
     const pollInterval = window.setInterval(async () => {
       const status = await fallDetectionService.checkAiStatus();
       if (status) {
-        setAiConnected(true);
-        if (typeof status.is_camera_online === 'boolean') {
-          setCameraOnline(status.is_camera_online);
-        } else if (status.camera_health) {
-          setCameraOnline(status.camera_health.is_online);
-        } else {
-          setCameraOnline(true);
-        }
-
         if (status.alert && status.state === 'CONFIRMED_FALL') {
           const resolvedType = (
             status.incident_type && status.incident_type !== 'NONE'
@@ -203,7 +189,7 @@ export const EmergencyFallModal: React.FC = () => {
               return {
                 id: `local-fall-${Date.now()}`,
                 deviceId: 'cam_livingroom_01',
-                roomName: status.safe_zone || 'Khu vực Camera quan sát',
+                roomName: status.safe_zone || 'Toàn Cảnh Camera Quan Sát',
                 incidentType: resolvedType,
                 state: 'DETECTED',
                 confidenceScore: 0.96,
@@ -226,9 +212,6 @@ export const EmergencyFallModal: React.FC = () => {
             return prev;
           });
         }
-      } else {
-        setAiConnected(false);
-        setCameraOnline(false);
       }
     }, 1500);
 
@@ -255,6 +238,7 @@ export const EmergencyFallModal: React.FC = () => {
   // --- Action Handlers ---
   const handleDismiss = async () => {
     stopSiren();
+    await fallDetectionService.dismissAiLocal();
     if (activeIncident) {
       await fallDetectionService.dismissIncident(activeIncident.id, 'Người dùng bấm xác nhận an toàn (Tôi ổn)');
     }
@@ -272,104 +256,76 @@ export const EmergencyFallModal: React.FC = () => {
     window.open('tel:115', '_self');
   };
 
-  const handleTriggerDemo = async () => {
-    setIsDemoTriggering(true);
-    await fallDetectionService.triggerDemoFall();
-    setTimeout(() => {
-      setIsDemoTriggering(false);
-    }, 1000);
-  };
-
   const formatClassification = (type: string) => {
     switch (type) {
       case 'HEAD_SLUMP_SUSPECTED':
         return 'NGHI NGỜ ĐỘT QUỴ / GỤC ĐẦU BẤT TỈNH';
       case 'SAFE_ZONE_IMPACT_FALL':
-        return 'VA ĐẬP NGUY HIỂM TẠI VÙNG NỘI THẤT';
+        return 'VA ĐẬP NGUY HIỂM TRONG TẦM MẮT CAMERA';
       case 'ACCIDENTAL_FALL':
       default:
         return 'PHÁT HIỆN TÉ NGÃ KHẨN CẤP TRONG TẦM MẮT CAMERA';
     }
   };
 
+  if (!activeIncident) {
+    return null;
+  }
+
   return (
     <>
-      {/* Floating Demo & Connection Trigger Bar */}
-      <div className="fixed bottom-4 right-4 z-40 flex items-center gap-2">
-        <button
-          onClick={handleTriggerDemo}
-          disabled={isDemoTriggering}
-          className="flex items-center gap-2 px-3 py-2 bg-red-600/90 hover:bg-red-700 text-white text-xs font-semibold rounded-full shadow-lg backdrop-blur-md border border-red-400/40 transition-all transform hover:scale-105 active:scale-95"
-          title="Kích hoạt demo té ngã tức thì cho khách hàng"
-        >
-          <Flame className={`w-4 h-4 ${isDemoTriggering ? 'animate-spin' : 'animate-bounce text-yellow-300'}`} />
-          {isDemoTriggering ? 'Đang kích hoạt...' : 'Demo Té Ngã 1-Chạm'}
-        </button>
-
-        {cameraOnline !== null && (
-          <span
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[11px] font-medium backdrop-blur-sm border ${
-              cameraOnline
-                ? 'bg-emerald-950/80 text-emerald-400 border-emerald-500/30'
-                : 'bg-red-950/80 text-red-400 border-red-500/30 animate-pulse'
-            }`}
-          >
-            <span
-              className={`w-2 h-2 rounded-full ${
-                cameraOnline ? 'bg-emerald-400 animate-pulse' : 'bg-red-500'
-              }`}
-            />
-            {cameraOnline ? 'Cam IP Online' : 'Cam Mất Tín Hiệu'}
-          </span>
-        )}
-
-        {aiConnected && (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[11px] font-medium bg-slate-900/80 text-cyan-400 border border-cyan-500/30 backdrop-blur-sm">
-            <Radio className="w-3 h-3 text-cyan-400 animate-pulse" />
-            AI Edge v4.0
-          </span>
-        )}
-      </div>
-
       {/* Emergency Full-Screen Modal */}
       {activeIncident && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-lg animate-in fade-in duration-200">
-          <div className="relative w-full max-w-4xl bg-slate-900/95 border-2 border-red-500/80 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
-            
-            {/* Header: Pulsing Emergency Alert Banner */}
-            <div className="bg-gradient-to-r from-red-700 via-rose-600 to-red-800 text-white px-6 py-4 flex items-center justify-between shadow-md">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Cảnh báo té ngã khẩn cấp"
+          className="fixed inset-0 z-[90] flex items-center justify-center p-4 bg-[#090d16]/80 backdrop-blur-md animate-in fade-in duration-200"
+        >
+          <div className="relative w-full max-w-4xl bg-[var(--solid)] border-2 border-rose-500 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+            {/* Header: Emergency Alert Banner */}
+            <div className="bg-gradient-to-r from-rose-700 via-rose-600 to-red-700 text-white px-6 py-4 flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-white/20 rounded-full animate-ping">
-                  <AlertTriangle className="w-7 h-7 text-yellow-300" />
+                <div className="p-2.5 bg-white/15 rounded-2xl border border-white/25">
+                  <AlertTriangle className="w-6 h-6 text-amber-200 animate-pulse" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-black tracking-wide flex items-center gap-2">
+                  <div
+                    role="heading"
+                    aria-level={2}
+                    className="text-base sm:text-lg font-black tracking-wide text-white"
+                  >
                     CẢNH BÁO TÉ NGÃ KHẨN CẤP (EMERGENCY SOS)
-                  </h2>
-                  <p className="text-xs text-red-100 font-medium">
-                    Phát hiện tại: <span className="font-bold underline">{activeIncident.roomName || 'Khu vực camera'}</span> • Mã thiết bị: {activeIncident.deviceId}
+                  </div>
+                  <p className="text-xs text-rose-100 font-medium mt-0.5">
+                    Khu vực: <strong className="text-white underline">{activeIncident.roomName || 'Toàn Cảnh Camera Quan Sát'}</strong> · Thiết bị: <span className="font-mono">{activeIncident.deviceId}</span>
                   </p>
                 </div>
               </div>
 
               {/* Siren Audio Controls */}
               <button
+                type="button"
                 onClick={() => setIsMuted(!isMuted)}
-                className="p-2 rounded-lg bg-black/30 hover:bg-black/50 text-white transition-colors flex items-center gap-1.5 text-xs font-semibold"
+                className="px-3 py-1.5 rounded-xl bg-black/25 hover:bg-black/40 border border-white/20 text-white transition-colors flex items-center gap-1.5 text-xs font-bold cursor-pointer"
                 title={isMuted ? 'Bật còi' : 'Tắt còi tạm thời'}
               >
-                {isMuted ? <VolumeX className="w-5 h-5 text-gray-300" /> : <Volume2 className="w-5 h-5 text-yellow-300 animate-pulse" />}
-                {isMuted ? 'Đã tắt còi' : 'Còi đang hú'}
+                {isMuted ? (
+                  <VolumeX className="w-4 h-4 text-white/80" />
+                ) : (
+                  <Volume2 className="w-4 h-4 text-amber-200 animate-pulse" />
+                )}
+                <span>{isMuted ? 'Đã tắt còi' : 'Còi đang hú'}</span>
               </button>
             </div>
 
             {/* Countdown Progress Bar */}
-            <div className="bg-slate-950 px-6 py-3 border-b border-red-900/40 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <span className="text-3xl font-extrabold text-red-400 font-mono">
+            <div className="bg-rose-500/10 px-6 py-3.5 border-b border-rose-500/20 flex flex-wrap items-center justify-between gap-4 tabular-nums">
+              <div className="flex items-center gap-3.5">
+                <span className="text-3xl font-black text-rose-600 font-mono">
                   {countdown < 10 ? `0${countdown}` : countdown}s
                 </span>
-                <span className="text-xs text-gray-300 max-w-xs">
+                <span className="text-xs font-medium text-[var(--text)] max-w-md leading-relaxed">
                   {activeIncident.state === 'ESCALATED_SOS'
                     ? 'Hết thời gian chờ! Đã tự động kích hoạt cuộc gọi khẩn cấp SOS và còi hú tối đa.'
                     : activeIncident.state === 'ACKNOWLEDGED'
@@ -378,9 +334,9 @@ export const EmergencyFallModal: React.FC = () => {
                 </span>
               </div>
 
-              <div className="w-48 h-3 bg-gray-800 rounded-full overflow-hidden border border-gray-700">
+              <div className="w-full sm:w-48 h-2.5 bg-[var(--muted)] rounded-full overflow-hidden border border-[var(--border)]">
                 <div
-                  className="h-full bg-gradient-to-r from-yellow-500 to-red-600 transition-all duration-1000 ease-linear"
+                  className="h-full bg-gradient-to-r from-amber-500 to-rose-600 transition-all duration-1000 ease-linear"
                   style={{ width: `${(countdown / 30) * 100}%` }}
                 />
               </div>
@@ -388,131 +344,166 @@ export const EmergencyFallModal: React.FC = () => {
 
             {/* Modal Body */}
             <div className="p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 overflow-y-auto">
-              
               {/* Left Column: Live AI Video Feed / Snapshot */}
-              <div className="lg:col-span-7 flex flex-col gap-3">
-                <div className="relative rounded-xl overflow-hidden bg-black aspect-video border border-red-500/40 shadow-inner flex items-center justify-center">
+              <div className="lg:col-span-7 flex flex-col gap-3.5">
+                <div className="relative rounded-2xl overflow-hidden bg-[#090d16] aspect-video border border-[#1e293b] shadow-inner flex items-center justify-center">
                   {showLiveStream ? (
                     <img
                       src="http://localhost:5000/video_feed"
-                      alt="AI Live Vision Stream"
+                      alt="Luồng hình ảnh AI trực tiếp"
                       className="w-full h-full object-contain"
                       onError={() => setShowLiveStream(false)}
                     />
                   ) : (
-                    <div className="flex flex-col items-center justify-center p-6 text-center text-gray-400">
-                      <Eye className="w-12 h-12 text-red-500 mb-2 opacity-50" />
-                      <p className="text-sm font-medium">Đang kết nối lại luồng hình ảnh AI từ camera...</p>
-                      <button
-                        onClick={() => setShowLiveStream(true)}
-                        className="mt-3 px-3 py-1 bg-red-900/60 hover:bg-red-800 text-xs text-white rounded border border-red-600/50"
-                      >
-                        Thử kết nối lại
-                      </button>
+                    <div className="relative w-full h-full flex flex-col items-center justify-center p-6 text-center">
+                      <img
+                        src="/camera_living_room.jpg"
+                        alt="Ảnh hiện trường camera"
+                        className="absolute inset-0 w-full h-full object-cover opacity-30 pointer-events-none"
+                      />
+                      <div className="relative z-10 p-4 rounded-2xl bg-[#0b111e]/90 border border-white/15 backdrop-blur-md">
+                        <Eye className="w-8 h-8 text-rose-400 mx-auto mb-2" />
+                        <p className="text-xs font-semibold text-white">
+                          Đang kết nối lại luồng hình ảnh trực tiếp từ camera...
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setShowLiveStream(true)}
+                          className="mt-2.5 px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-xs font-bold text-white rounded-xl transition-colors cursor-pointer"
+                        >
+                          Thử kết nối lại
+                        </button>
+                      </div>
                     </div>
                   )}
 
                   {/* Top Overlay Badge */}
-                  <div className="absolute top-2 left-2 px-2.5 py-1 bg-red-600/90 text-white text-[11px] font-bold rounded flex items-center gap-1.5 shadow">
+                  <div className="absolute top-3 left-3 px-2.5 py-1 bg-rose-600 text-white text-[11px] font-bold rounded-full flex items-center gap-1.5 shadow">
                     <span className="w-2 h-2 rounded-full bg-white animate-ping" />
-                    LIVE YOLOv8 HUD
+                    <span>LIVE YOLOv8-POSE HUD</span>
                   </div>
                 </div>
 
                 {/* Classification info */}
-                <div className="p-3 bg-red-950/40 rounded-xl border border-red-800/40">
-                  <span className="text-[11px] text-red-300 font-bold uppercase tracking-wider block">Phân loại sự cố:</span>
-                  <p className="text-sm font-extrabold text-white mt-0.5">
-                    {formatClassification(activeIncident.incidentType)}
-                  </p>
-                  <p className="text-xs text-gray-300 mt-1">
-                    Độ tin cậy AI: <span className="text-emerald-400 font-semibold">{Math.round(activeIncident.confidenceScore * 100)}%</span>
-                  </p>
+                <div className="p-4 bg-rose-500/10 rounded-2xl border border-rose-500/25 flex flex-wrap items-center justify-between gap-2 tabular-nums">
+                  <div>
+                    <span className="text-[11px] text-rose-700 font-bold uppercase tracking-wider block">
+                      Phân loại sự cố AI:
+                    </span>
+                    <p className="text-sm font-extrabold text-[var(--text)] mt-0.5">
+                      {formatClassification(activeIncident.incidentType)}
+                    </p>
+                  </div>
+                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-800 border border-emerald-500/30">
+                    Độ tin cậy: {Math.round(activeIncident.confidenceScore * 100)}%
+                  </span>
                 </div>
               </div>
 
-              {/* Right Column: Kinematic Telemetry & Decision Tree */}
+              {/* Right Column: Kinematic Telemetry & Actions */}
               <div className="lg:col-span-5 flex flex-col justify-between gap-4">
                 <div className="space-y-3">
-                  <h3 className="text-sm font-bold text-gray-200 flex items-center gap-2 border-b border-gray-700/60 pb-2">
-                    <Activity className="w-4 h-4 text-rose-400" />
-                    Chỉ số động học khi ngã (Kinematics)
-                  </h3>
+                  <div className="flex items-center gap-2 border-b border-[var(--border)] pb-2.5">
+                    <Activity className="w-4 h-4 text-rose-600" />
+                    <span className="text-sm font-bold text-[var(--text)]">
+                      Chỉ số động học khi ngã (Kinematics)
+                    </span>
+                  </div>
 
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div className="p-2.5 bg-slate-800/70 rounded-lg border border-slate-700">
-                      <span className="text-gray-400 block text-[11px]">Góc cột sống (Spine)</span>
-                      <span className="text-lg font-bold text-amber-400">
-                        {activeIncident.metrics?.spine_angle ?? 18.5}°
+                  <div className="grid grid-cols-2 gap-2.5 text-xs tabular-nums">
+                    <div className="p-3 bg-[var(--g1)] rounded-2xl border border-[var(--border)]">
+                      <span className="text-[var(--secondary)] font-semibold block text-[11px]">
+                        Góc cột sống (θ)
                       </span>
-                      <span className="text-[10px] text-gray-400 block">&lt; 30°: Mặt phẳng nằm</span>
+                      <span className="text-lg font-extrabold font-mono text-[var(--text)]">
+                        {(activeIncident.metrics?.spine_angle ?? 18.5).toFixed(1)}°
+                      </span>
+                      <span className="text-[10px] text-[var(--secondary)] block mt-0.5">
+                        &lt; 35°: Tư thế nằm sàn
+                      </span>
                     </div>
 
-                    <div className="p-2.5 bg-slate-800/70 rounded-lg border border-slate-700">
-                      <span className="text-gray-400 block text-[11px]">Gia tốc va chạm</span>
-                      <span className="text-lg font-bold text-rose-400">
-                        {activeIncident.metrics?.accel_g ?? 2.8}g
+                    <div className="p-3 bg-[var(--g1)] rounded-2xl border border-[var(--border)]">
+                      <span className="text-[var(--secondary)] font-semibold block text-[11px]">
+                        Gia tốc va chạm
                       </span>
-                      <span className="text-[10px] text-gray-400 block">&gt; 2.2g: Va đập mạnh</span>
+                      <span className="text-lg font-extrabold font-mono text-rose-600">
+                        {(activeIncident.metrics?.accel_g ?? 2.8).toFixed(2)} g
+                      </span>
+                      <span className="text-[10px] text-[var(--secondary)] block mt-0.5">
+                        &gt; 2.20g: Va đập mạnh
+                      </span>
                     </div>
 
-                    <div className="p-2.5 bg-slate-800/70 rounded-lg border border-slate-700">
-                      <span className="text-gray-400 block text-[11px]">Xung lực giật (Jerk)</span>
-                      <span className="text-lg font-bold text-yellow-400">
-                        {activeIncident.metrics?.jerk_g_per_sec ?? 12.4} g/s
+                    <div className="p-3 bg-[var(--g1)] rounded-2xl border border-[var(--border)]">
+                      <span className="text-[var(--secondary)] font-semibold block text-[11px]">
+                        Xung lực giật (Jerk)
                       </span>
-                      <span className="text-[10px] text-gray-400 block">Độ đột ngột của chuyển động</span>
+                      <span className="text-lg font-extrabold font-mono text-amber-700">
+                        {(activeIncident.metrics?.jerk_g_per_sec ?? 12.4).toFixed(1)} g/s
+                      </span>
+                      <span className="text-[10px] text-[var(--secondary)] block mt-0.5">
+                        Độ đột ngột chuyển động
+                      </span>
                     </div>
 
-                    <div className="p-2.5 bg-slate-800/70 rounded-lg border border-slate-700">
-                      <span className="text-gray-400 block text-[11px]">Thời gian tư thế (PTT)</span>
-                      <span className="text-lg font-bold text-cyan-400">
-                        {activeIncident.metrics?.ptt_sec ?? 0.6}s
+                    <div className="p-3 bg-[var(--g1)] rounded-2xl border border-[var(--border)]">
+                      <span className="text-[var(--secondary)] font-semibold block text-[11px]">
+                        Thời gian rơi (PTT)
                       </span>
-                      <span className="text-[10px] text-gray-400 block">&lt; 1.0s: Rơi mất kiểm soát</span>
+                      <span className="text-lg font-extrabold font-mono text-[var(--accent)]">
+                        {(activeIncident.metrics?.ptt_sec ?? 0.6).toFixed(2)} s
+                      </span>
+                      <span className="text-[10px] text-[var(--secondary)] block mt-0.5">
+                        &lt; 1.0s: Rơi mất kiểm soát
+                      </span>
                     </div>
                   </div>
 
                   {/* Omnipresent Tracking Status */}
-                  <div className="p-2.5 bg-slate-800/50 rounded-lg border border-slate-700/60 text-xs">
-                    <span className="text-gray-400 block text-[11px]">Phạm vi theo dõi:</span>
-                    <span className="text-emerald-400 font-semibold">
-                      Toàn cảnh không gian Camera (Lọc EMA + SafeZone)
-                    </span>
+                  <div className="p-3 bg-emerald-500/10 rounded-2xl border border-emerald-500/25 text-xs flex items-center gap-2.5">
+                    <ShieldCheck className="w-4 h-4 text-emerald-700 shrink-0" />
+                    <div>
+                      <span className="text-[var(--secondary)] block text-[11px]">Phạm vi theo dõi:</span>
+                      <span className="text-emerald-800 font-bold">
+                        Toàn cảnh 100% tầm nhìn Camera (Omnipresent Tracking)
+                      </span>
+                    </div>
                   </div>
                 </div>
 
                 {/* Action Buttons */}
-                <div className="space-y-2 pt-2 border-t border-gray-800">
+                <div className="space-y-2.5 pt-3 border-t border-[var(--border)]">
                   <button
+                    type="button"
                     onClick={handleDismiss}
-                    className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 transform active:scale-98"
+                    className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-bold rounded-2xl shadow-sm transition-all flex items-center justify-center gap-2 active:scale-98 cursor-pointer"
                   >
-                    <CheckCircle2 className="w-5 h-5 text-white" />
-                    TÔI ỔN / BÁO ĐỘNG GIẢ (HỦY BÁO ĐỘNG)
+                    <CheckCircle2 className="w-5 h-5 text-white shrink-0" />
+                    <span>TÔI ỔN / BÁO ĐỘNG GIẢ (HỦY BÁO ĐỘNG)</span>
                   </button>
 
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-2 gap-2.5">
                     <button
+                      type="button"
                       onClick={handleAcknowledge}
-                      className="py-2.5 bg-slate-700 hover:bg-slate-600 text-gray-200 text-xs font-semibold rounded-xl border border-slate-600 transition-colors flex items-center justify-center gap-1.5"
+                      className="py-2.5 px-3 bg-[var(--g1)] hover:bg-[var(--muted)] text-[var(--text)] text-xs font-bold rounded-2xl border border-[var(--border)] transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                     >
-                      Tôi đang kiểm tra
+                      <span>Tôi đang kiểm tra</span>
                     </button>
 
                     <button
+                      type="button"
                       onClick={handleCallEmergency}
-                      className="py-2.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl shadow transition-colors flex items-center justify-center gap-1.5"
+                      className="py-2.5 px-3 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-2xl shadow-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                     >
-                      <PhoneCall className="w-4 h-4 text-white" />
-                      GỌI CỨU HỘ 115
+                      <PhoneCall className="w-4 h-4 text-white shrink-0" />
+                      <span>GỌI CỨU HỘ 115</span>
                     </button>
                   </div>
                 </div>
-
               </div>
             </div>
-
           </div>
         </div>
       )}

@@ -52,6 +52,7 @@ export function AppRoutes() {
     <Routes>
       <Route path="/fall-detection" element={<FallDetectionPage />} />
       <Route path="/camera-ai" element={<FallDetectionPage />} />
+      <Route path="/home/:homeId/fall-detection" element={<FallDetectionPage />} />
       <Route path="/twin-demo" element={<Suspense fallback={<p role="status" className="p-8 text-muted">Đang mở căn hộ mẫu…</p>}><TwinDemoPage /></Suspense>} />
       <Route path="/login" element={
         <LoginForm

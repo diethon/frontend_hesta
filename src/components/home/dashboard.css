@@ -245,145 +245,401 @@ main {
 
 .hero {
   grid-column: span 8;
-  min-height: 270px;
+  aspect-ratio: 16 / 9;
+  min-height: 360px;
   border-radius: 32px;
   position: relative;
   overflow: hidden;
-  box-shadow: var(--glass-shadow);
+  box-shadow: 0 16px 36px -8px rgba(0, 0, 0, 0.35);
   border: 1px solid var(--border);
+  isolation: isolate;
+  -webkit-mask-image: -webkit-radial-gradient(white, black);
 }
 
 .camera-card {
   padding: 0;
-  background: #71808a;
+  background: #090d16;
+  position: relative;
+  border-radius: 32px;
+  overflow: hidden;
+  box-shadow: 0 16px 36px -8px rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  isolation: isolate;
+  -webkit-mask-image: -webkit-radial-gradient(white, black);
 }
 
 .camera-viewport {
   position: absolute;
   inset: 0;
   overflow: hidden;
+  border-radius: 32px;
+  background: #020617;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  isolation: isolate;
+  -webkit-mask-image: -webkit-radial-gradient(white, black);
+}
+
+.camera-ambient-blur {
+  position: absolute;
+  inset: -12%;
+  width: 124%;
+  height: 124%;
+  object-fit: cover;
+  filter: blur(28px) brightness(0.6) saturate(1.25);
+  opacity: 0.65;
+  pointer-events: none;
+  z-index: 1;
+  border-radius: 32px;
 }
 
 .camera-image {
+  position: relative;
+  z-index: 2;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+  object-position: center;
+  display: block;
+  border-radius: 24px;
 }
 
-.camera-top-left {
+/* Flash snapshot effect */
+.camera-snap-flash {
   position: absolute;
-  left: 18px;
-  top: 18px;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.7);
+  pointer-events: none;
+  animation: cameraFlash 0.35s ease-out forwards;
+  z-index: 30;
+}
+
+@keyframes cameraFlash {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* ── Unified Top HUD Header Bar ── */
+.camera-hud-header {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  right: 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  z-index: 20;
+  pointer-events: none;
+}
+
+.camera-hud-left,
+.camera-hud-right {
   display: flex;
   align-items: center;
   gap: 8px;
-  z-index: 2;
+  pointer-events: auto;
 }
 
-.live-badge,
-.camera-name,
-.camera-chip {
-  height: 36px;
-  border: 1px solid rgba(255, 255, 255, 0.85);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.88);
+/* Live Badge */
+.camera-live-badge {
+  height: 34px;
+  padding: 0 11px;
+  border-radius: 9999px;
+  background: rgba(15, 23, 42, 0.75);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
-  color: #0f172a;
-  display: flex;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #f8fafc;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  display: inline-flex;
   align-items: center;
-  gap: 7px;
-  padding: 0 12px;
-  font-size: 12px;
-  font-weight: 600;
-  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.12);
+  gap: 6px;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.15);
+  user-select: none;
 }
 
-.live-badge {
-  padding: 0 11px;
-}
-
-.live-dot {
+.camera-live-dot {
   width: 7px;
   height: 7px;
   border-radius: 50%;
   background: #ef4444;
-  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2);
+  box-shadow: 0 0 10px #ef4444;
+  animation: livePulse 1.8s infinite;
 }
 
-.camera-name {
+@keyframes livePulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.85); }
+}
+
+/* Camera Selector Pill */
+.camera-name-pill {
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 9999px;
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #f8fafc;
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
 }
 
-.camera-sensors {
+.camera-name-pill:hover {
+  background: rgba(30, 41, 59, 0.9);
+  border-color: rgba(255, 255, 255, 0.3);
+  transform: translateY(-1px);
+}
+
+/* Camera Dropdown Menu */
+.camera-dropdown-menu {
   position: absolute;
-  right: 18px;
-  top: 18px;
+  top: calc(100% + 8px);
+  left: 0;
+  width: 210px;
+  border-radius: 18px;
+  background: rgba(15, 23, 42, 0.92);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 14px 35px -5px rgba(0, 0, 0, 0.6);
+  padding: 6px;
+  z-index: 50;
   display: flex;
-  gap: 8px;
-  z-index: 2;
+  flex-direction: column;
+  gap: 2px;
+  animation: dropdownIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.camera-chip.success {
-  color: #15803d;
+@keyframes dropdownIn {
+  from { opacity: 0; transform: translateY(-6px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
+.camera-dropdown-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #cbd5e1;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.camera-dropdown-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+.camera-dropdown-item.active {
+  background: rgba(59, 130, 246, 0.25);
+  border: 1px solid rgba(59, 130, 246, 0.4);
+  color: #60a5fa;
+  font-weight: 600;
+}
+
+/* AI Fall Detection Pill */
+.camera-ai-pill {
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 9999px;
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  color: #f8fafc;
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.15);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+}
+
+.camera-ai-pill:hover {
+  background: rgba(16, 185, 129, 0.2);
+  border-color: rgba(16, 185, 129, 0.6);
+  transform: translateY(-1px);
+}
+
+.camera-ai-pill.alert {
+  background: rgba(220, 38, 38, 0.9);
+  border-color: #f87171;
+  box-shadow: 0 0 18px rgba(239, 68, 68, 0.7);
+  animation: alertPulse 1.2s infinite;
+}
+
+.camera-ai-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 8px #10b981;
+  animation: livePulse 2s infinite;
+}
+
+.camera-ai-dot.alert {
+  background: #ffffff;
+  box-shadow: 0 0 8px #ffffff;
+}
+
+@keyframes alertPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+/* Compact Environment Chip */
+.camera-env-pill {
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 9999px;
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #f1f5f9;
+  font-size: 12px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  user-select: none;
+}
+
+/* ── Bottom HUD Footer Bar ── */
 .camera-bottom {
   position: absolute;
   left: 0;
   right: 0;
   bottom: 0;
-  min-height: 38%;
-  padding: 40px 18px 18px;
+  min-height: 40%;
+  padding: 40px 16px 14px;
   display: flex;
   justify-content: space-between;
   align-items: flex-end;
-  background: linear-gradient(to top, rgba(4, 10, 20, 0.72), transparent);
-  z-index: 1;
+  background: linear-gradient(to top, rgba(8, 14, 26, 0.9) 0%, rgba(8, 14, 26, 0.45) 60%, transparent 100%);
+  z-index: 10;
+  pointer-events: none;
 }
 
-.camera-bottom p {
+.camera-bottom-status {
   display: flex;
   align-items: center;
   gap: 7px;
-  color: white;
+  color: #f8fafc;
   font-size: 12px;
   font-weight: 500;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  pointer-events: auto;
+}
+
+.camera-safe-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 8px #10b981;
+  flex-shrink: 0;
 }
 
 .camera-controls {
   display: flex;
   align-items: center;
   gap: 8px;
+  pointer-events: auto;
 }
 
-.camera-control {
-  width: 40px;
-  height: 40px;
-  border: 1px solid rgba(255, 255, 255, 0.45);
+.camera-control-btn {
+  width: 38px;
+  height: 38px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 50%;
-  background: rgba(10, 18, 30, 0.4);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  color: white;
+  background: rgba(15, 23, 42, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: #f8fafc;
   display: grid;
   place-items: center;
   cursor: pointer;
-  transition: 0.2s var(--ease);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
-.camera-control:hover {
-  background: rgba(10, 18, 30, 0.65);
+.camera-control-btn:hover {
+  background: rgba(30, 41, 59, 0.9);
+  border-color: rgba(255, 255, 255, 0.35);
+  transform: translateY(-1px) scale(1.05);
 }
 
-.camera-bottom .secondary-button {
-  background: rgba(255, 255, 255, 0.88);
-  border-color: rgba(255, 255, 255, 0.7);
+.camera-control-btn:active {
+  transform: scale(0.95);
+}
+
+.camera-light-btn {
+  height: 38px;
+  padding: 0 14px;
+  border-radius: 9999px;
+  background: rgba(15, 23, 42, 0.7);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  color: #0f172a;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #f8fafc;
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
+
+.camera-light-btn:hover {
+  background: rgba(30, 41, 59, 0.9);
+  border-color: rgba(255, 255, 255, 0.35);
+  transform: translateY(-1px);
+}
+
+.camera-light-btn.active {
+  background: rgba(245, 158, 11, 0.22);
+  border-color: rgba(245, 158, 11, 0.5);
+  color: #fbbf24;
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.2);
+}
+
+.camera-light-btn.active:hover {
+  background: rgba(245, 158, 11, 0.35);
+  border-color: rgba(245, 158, 11, 0.7);
+}
+
+/* Fallback legacy class references */
+.live-badge { display: none; }
+.camera-name { display: none; }
+.camera-sensors { display: none; }
+.camera-chip { display: none; }
+.camera-control { display: none; }
 
 .camera-state {
   position: absolute;
@@ -540,9 +796,11 @@ main {
 
 .rooms {
   grid-column: span 4;
-  min-height: 270px;
+  height: 100%;
   border-radius: 28px;
-  padding: 22px 20px;
+  padding: 20px 18px;
+  display: flex;
+  flex-direction: column;
   background: var(--g2) !important;
   border: 1px solid var(--border) !important;
   box-shadow: var(--glass-shadow) !important;
@@ -554,7 +812,7 @@ main {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 14px;
+  margin-bottom: 10px;
 }
 
 .section-head h2 {
@@ -566,7 +824,7 @@ main {
 }
 
 .text-button {
-  min-height: 40px;
+  min-height: 36px;
   border: 0;
   background: transparent;
   color: var(--accent);
@@ -584,16 +842,17 @@ main {
 }
 
 .room-list {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 6px;
-  max-height: 190px;
-  overflow: auto;
+  flex: 1;
+  overflow-y: auto;
   padding-right: 2px;
 }
 
 .room-item {
   width: 100%;
-  min-height: 50px;
+  min-height: 46px;
   border: 1px solid transparent;
   background: transparent;
   border-radius: 15px;
@@ -900,6 +1159,8 @@ main {
   border-radius: 24px;
   padding: 20px;
   min-height: 410px;
+  display: flex;
+  flex-direction: column;
   background: var(--g1) !important;
   border: 1px solid var(--border) !important;
   box-shadow: var(--card-shadow) !important;
@@ -979,30 +1240,43 @@ main {
 }
 
 .segments {
-  height: 36px;
+  height: 38px;
   margin-top: 14px;
   padding: 3px;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   background: var(--muted);
-  border-radius: 12px;
+  border-radius: 9999px;
+  border: 1px solid var(--border);
 }
 
 .segments button {
   border: 0;
   background: transparent;
-  border-radius: 9px;
+  border-radius: 9999px;
   font-size: 11px;
+  font-weight: 600;
   color: var(--secondary);
   cursor: pointer;
   transition: 0.2s var(--ease);
 }
 
+.segments button:hover {
+  color: var(--text);
+}
+
 .segments button.active {
   background: white;
-  color: var(--text);
-  box-shadow: var(--card-shadow);
-  font-weight: 600;
+  color: var(--accent);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+  font-weight: 700;
+}
+
+html.dark .segments button.active,
+[data-theme="dark"] .segments button.active {
+  background: var(--solid);
+  color: var(--accent);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
 .activity-card {
@@ -1153,72 +1427,59 @@ main {
     border: 1px solid var(--border);
     box-shadow: var(--glass-shadow);
   }
-  .camera-top-left {
-    left: 12px;
-    top: 12px;
+  .camera-hud-header {
+    top: 10px;
+    left: 10px;
+    right: 10px;
+    gap: 6px;
   }
-  .camera-name {
-    max-width: 158px;
+  .camera-live-badge {
+    height: 30px;
+    padding: 0 9px;
+    font-size: 10px;
+  }
+  .camera-name-pill {
+    height: 30px;
+    padding: 0 10px;
+    font-size: 11px;
+    max-width: 140px;
+  }
+  .camera-name-pill span {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .camera-sensors {
-    position: relative;
-    right: auto;
-    top: auto;
-    display: flex;
-    overflow-x: auto;
-    gap: 8px;
-    margin-top: 10px;
-    padding: 2px 1px 4px;
+  .camera-ai-pill {
+    height: 30px;
+    padding: 0 10px;
+    font-size: 11px;
   }
-  .camera-viewport > .camera-sensors {
+  .camera-env-pill {
     display: none;
-  }
-  .camera-chip {
-    flex: 0 0 auto;
-    background: var(--g1);
-    color: var(--text);
-    border-color: var(--border);
-  }
-  .camera-chip.success {
-    color: var(--success);
   }
   .camera-bottom {
     min-height: 45%;
-    padding: 30px 12px 12px;
+    padding: 30px 10px 10px;
   }
-  .camera-bottom p {
-    max-width: 48%;
+  .camera-bottom-status {
+    max-width: 52%;
     font-size: 10px;
-    line-height: 15px;
+    line-height: 14px;
   }
   .camera-controls {
-    gap: 5px;
+    gap: 6px;
   }
-  .camera-control {
-    width: 38px;
-    height: 38px;
+  .camera-control-btn {
+    width: 34px;
+    height: 34px;
   }
-  .camera-controls .secondary-button {
-    width: 40px;
-    padding: 0;
-    justify-content: center;
-    font-size: 0;
+  .camera-light-btn {
+    height: 34px;
+    padding: 0 10px;
+    font-size: 11px;
   }
-  .camera-controls .secondary-button .icon {
-    width: 18px;
-  }
-  .camera-card:after {
-    content: "";
-    display: block;
-  }
-  .camera-card > .camera-sensors {
-    display: flex;
-  }
-  .camera-empty > .camera-sensors {
-    display: flex;
+  .camera-light-btn span {
+    display: none;
   }
   .rooms {
     order: 1;
@@ -4985,3 +5246,67 @@ main {
   height: auto;
 }
 
+
+/* Home Energy Widget Weekly Chart Polish */
+.energy-card .chart {
+  flex: 1;
+  min-height: 220px;
+  height: auto;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  border-radius: 20px;
+  margin-top: 14px;
+  padding: 16px 14px 12px;
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  box-shadow: inset 0 2px 6px rgba(15, 23, 42, 0.03);
+}
+
+html.dark .energy-card .chart,
+[data-theme="dark"] .energy-card .chart {
+  background: rgba(30, 41, 59, 0.45);
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.energy-card .bar-wrap {
+  height: 100%;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.energy-card .bar-wrap:hover {
+  transform: translateY(-2px);
+}
+
+.energy-card .bar {
+  width: 100%;
+  max-width: 26px;
+  min-height: 8px;
+  border-radius: 8px 8px 4px 4px;
+  background: linear-gradient(180deg, rgba(59, 130, 246, 0.38) 0%, rgba(59, 130, 246, 0.16) 100%);
+  cursor: pointer;
+  transition: 0.2s var(--ease);
+}
+
+.energy-card .bar-wrap:hover .bar {
+  background: linear-gradient(180deg, rgba(59, 130, 246, 0.65) 0%, rgba(59, 130, 246, 0.35) 100%);
+}
+
+.energy-card .bar.selected {
+  background: linear-gradient(180deg, #3b82f6 0%, #1d4ed8 100%) !important;
+  box-shadow: 0 4px 14px rgba(59, 130, 246, 0.42);
+}
+
+.energy-card .bar-wrap small {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--secondary);
+}

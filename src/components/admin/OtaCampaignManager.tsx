@@ -50,6 +50,7 @@ export const OtaCampaignManager: React.FC = () => {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchData();
     const timer = setInterval(fetchData, 4000);
     return () => clearInterval(timer);
@@ -74,8 +75,17 @@ export const OtaCampaignManager: React.FC = () => {
       setIsModalOpen(false);
       setName('');
       await fetchData();
-    } catch (err: any) {
-      notify.error(err?.response?.data?.message || 'Lỗi khi khởi tạo đợt cập nhật');
+    } catch (err: unknown) {
+      const respMsg =
+        typeof err === 'object' &&
+        err !== null &&
+        'response' in err &&
+        typeof (err as { response?: { data?: { message?: string } } }).response?.data?.message === 'string'
+          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+          : err instanceof Error
+          ? err.message
+          : 'Lỗi khi khởi tạo đợt cập nhật';
+      notify.error(respMsg || 'Lỗi khi khởi tạo đợt cập nhật');
     } finally {
       setIsSubmitting(false);
     }
@@ -138,12 +148,12 @@ export const OtaCampaignManager: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 tabular-nums">
       {/* Banner Giới Thiệu Chức Năng Dễ Hiểu */}
-      <div className="p-6 rounded-3xl bg-gradient-to-r from-primary/10 via-surface to-surface border border-line flex flex-wrap items-center justify-between gap-4">
+      <div className="glass-card glass-g2 p-6 rounded-3xl border border-[var(--border)] flex flex-wrap items-center justify-between gap-4">
         <div className="space-y-1.5">
           <div className="flex items-center gap-2">
-            <span className="p-2 rounded-2xl bg-primary/20 text-primary">
+            <span className="p-2 rounded-2xl bg-primary/15 text-primary">
               <UploadCloud className="w-5 h-5" />
             </span>
             <h3 className="text-lg font-bold text-text">
@@ -152,7 +162,7 @@ export const OtaCampaignManager: React.FC = () => {
           </div>
           <p className="text-xs text-muted max-w-2xl leading-relaxed">
             Tự động nâng cấp tính năng mới và sửa lỗi cho công tắc, cảm biến trong nhà qua Wi-Fi mà không cần tháo gỡ.
-            Chế độ <strong>Nâng cấp an toàn 3 đợt</strong> (Thử 10% $\rightarrow$ Mở rộng 50% $\rightarrow$ Hoàn tất 100%) kèm cơ chế
+            Chế độ <strong>Nâng cấp an toàn 3 đợt</strong> (Thử 10% &rarr; Mở rộng 50% &rarr; Hoàn tất 100%) kèm cơ chế
             <strong> tự ngắt khẩn cấp</strong> nếu tỷ lệ lỗi phần cứng vượt mức an toàn, đảm bảo sinh hoạt gia đình không bị gián đoạn.
           </p>
         </div>
@@ -195,7 +205,7 @@ export const OtaCampaignManager: React.FC = () => {
         </h4>
 
         {campaigns.length === 0 ? (
-          <div className="p-12 text-center rounded-2xl border border-line bg-surface">
+          <div className="glass-card glass-g2 p-12 text-center rounded-3xl border border-[var(--border)]">
             <Layers className="w-12 h-12 text-muted mx-auto mb-3 opacity-40" />
             <p className="text-sm font-semibold text-text">Chưa có đợt cập nhật nào đang diễn ra</p>
             <p className="text-xs text-muted mt-1 max-w-md mx-auto">
@@ -223,7 +233,7 @@ export const OtaCampaignManager: React.FC = () => {
             return (
               <div
                 key={camp.id}
-                className="p-5 rounded-2xl border border-line bg-surface hover:shadow-md transition-shadow"
+                className="glass-card glass-g2 p-5 rounded-3xl border border-[var(--border)] hover:shadow-md transition-shadow"
               >
                 <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
                   <div>
@@ -322,8 +332,8 @@ export const OtaCampaignManager: React.FC = () => {
 
       {/* Modal Khởi Tạo Đợt Cập Nhật */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="w-full max-w-lg rounded-3xl bg-surface border border-line p-6 shadow-2xl relative">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0f172a]/55 backdrop-blur-md">
+          <div className="w-full max-w-lg rounded-3xl bg-[var(--solid)] border border-[var(--border)] p-6 shadow-2xl relative">
             <button
               onClick={() => setIsModalOpen(false)}
               className="absolute top-4 right-4 p-1.5 rounded-xl text-muted hover:text-text hover:bg-sidebar transition-colors"
@@ -358,7 +368,7 @@ export const OtaCampaignManager: React.FC = () => {
                   Chọn Bản Vá Phần Mềm
                 </label>
                 {packages.length === 0 ? (
-                  <p className="text-xs text-amber-500">
+                  <p className="text-xs text-amber-600">
                     Chưa có bản cập nhật nào. Hãy bấm nút &quot;Thêm Bản Vá Mẫu&quot; bên ngoài trước.
                   </p>
                 ) : (
@@ -402,7 +412,7 @@ export const OtaCampaignManager: React.FC = () => {
               <div className="space-y-1.5 p-3.5 rounded-2xl bg-sidebar/50 border border-line">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-semibold text-text flex items-center gap-1.5">
-                    <ShieldAlert className="w-4 h-4 text-amber-500" />
+                    <ShieldAlert className="w-4 h-4 text-amber-600" />
                     Ngưỡng tự động dừng an toàn: <span className="text-primary font-bold">{threshold}% lỗi</span>
                   </label>
                   <span className="text-[11px] text-muted">Mặc định: 20%</span>
