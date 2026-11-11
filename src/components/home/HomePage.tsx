@@ -253,6 +253,7 @@ export const HomePage: React.FC<HomePageProps> = ({
   // Turn off all lights quick handler
   const handleTurnOffAllLights = async () => {
     const activeLights = devices.filter((d) => {
+      if (d.accessLevel === 'VIEW' || d.accessLevel === 'NONE') return false;
       const isLight = d.deviceType === 'LIGHT' || d.deviceType === 'LED_RGB';
       const isPowerOn = d.currentState?.power === 'ON' || d.currentState?.power === true;
       return isLight && isPowerOn;

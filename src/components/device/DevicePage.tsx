@@ -45,6 +45,7 @@ export interface UIMappedDevice {
   manualOverrideUntil?: string | null;
   manualOverrideActive?: boolean;
   raw?: DeviceResponse;
+  accessLevel?: 'NONE' | 'VIEW' | 'CONTROL';
 }
 
 export function mapDeviceToUI(d: DeviceResponse, localPower: Record<string, boolean>, localBrightness: Record<string, number>): UIMappedDevice {
@@ -157,6 +158,7 @@ export function mapDeviceToUI(d: DeviceResponse, localPower: Record<string, bool
     manualOverrideUntil: d.manualOverrideUntil,
     manualOverrideActive: d.manualOverrideActive ?? (d.manualOverrideUntil ? new Date(d.manualOverrideUntil).getTime() > Date.now() : false),
     raw: d,
+    accessLevel: d.accessLevel,
   };
 }
 
@@ -318,6 +320,7 @@ function DevicesDeviceCard({
 }) {
   const [gate, setGate] = useState('Dừng');
   const { isOverrideActive, formattedTime } = useOverrideCountdown(device.manualOverrideUntil);
+  const isViewOnly = device.accessLevel === 'VIEW' || device.raw?.accessLevel === 'VIEW';
 
   return (
     <article
@@ -333,6 +336,11 @@ function DevicesDeviceCard({
           <Icon name={device.icon} />
         </span>
         <div className="flex items-center gap-1.5">
+          {isViewOnly && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
+              Chỉ xem
+            </span>
+          )}
           {isOverrideActive && (
             <span
               className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 animate-pulse cursor-pointer shrink-0"
@@ -345,7 +353,21 @@ function DevicesDeviceCard({
               🔒 {formattedTime}
             </span>
           )}
-          {!device.offline && !device.sensor && device.type !== 'Cổng' ? (
+          {isViewOnly ? (
+            <button
+              type="button"
+              disabled
+              className={`toggle ${device.on ? 'active' : ''} opacity-40 cursor-not-allowed`}
+              title="Thiết bị ở chế độ chỉ xem"
+              onClick={(event) => {
+                event.stopPropagation();
+              }}
+              aria-disabled="true"
+              aria-label={`${device.name} (Chỉ xem)`}
+            >
+              <span />
+            </button>
+          ) : !device.offline && !device.sensor && device.type !== 'Cổng' ? (
             <button
               type="button"
               className={`toggle ${device.on ? 'active' : ''}`}
@@ -406,9 +428,11 @@ function DevicesDeviceCard({
             <button
               type="button"
               key={item}
-              className={gate === item ? 'active' : ''}
+              disabled={isViewOnly}
+              className={`${gate === item ? 'active' : ''} ${isViewOnly ? 'opacity-40 cursor-not-allowed' : ''}`}
               onClick={(event) => {
                 event.stopPropagation();
+                if (isViewOnly) return;
                 setGate(item);
                 onGateCommand(item);
               }}
@@ -616,6 +640,11 @@ export const DevicePage: React.FC = () => {
       return;
     }
 
+    if (dev.accessLevel === 'VIEW') {
+      notify.warning('Bạn chỉ có quyền xem thiết bị này');
+      return;
+    }
+
     const currentOn =
       localPower[deviceId] !== undefined
         ? localPower[deviceId]
@@ -645,9 +674,8 @@ export const DevicePage: React.FC = () => {
 
   // Turn off all lights
   const handleTurnOffAllLights = async () => {
-
-
     const onLights = devices.filter((d) => {
+      if (d.accessLevel === 'VIEW' || d.accessLevel === 'NONE') return false;
       const isLight = (d.deviceType || '').toUpperCase().includes('LIGHT') || (d.deviceType || '').toUpperCase().includes('LED');
       if (!isLight) return false;
       const isPowerOn =
@@ -658,7 +686,7 @@ export const DevicePage: React.FC = () => {
     });
 
     if (onLights.length === 0) {
-      notify.info('Không có đèn nào đang bật');
+      notify.info('Không có đèn nào đang bật hoặc bạn không có quyền điều khiển');
       return;
     }
 
@@ -680,6 +708,10 @@ export const DevicePage: React.FC = () => {
   const handleGateCommand = async (deviceId: string, cmd: 'Mở' | 'Dừng' | 'Đóng') => {
     const dev = devices.find((d) => d.id === deviceId);
     if (!dev) return;
+    if (dev.accessLevel === 'VIEW') {
+      notify.warning('Bạn chỉ có quyền xem thiết bị này');
+      return;
+    }
     const action = cmd === 'Mở' ? 'OPEN' : cmd === 'Đóng' ? 'CLOSE' : 'STOP';
     try {
       await sendDeviceCommand(deviceId, action);
@@ -691,9 +723,10 @@ export const DevicePage: React.FC = () => {
 
   // Brightness change
   const handleBrightnessChange = async (deviceId: string, brightness: number) => {
-    setLocalBrightness((prev) => ({ ...prev, [deviceId]: brightness }));
     const dev = devices.find((d) => d.id === deviceId);
     if (!dev) return;
+    if (dev.accessLevel === 'VIEW') return;
+    setLocalBrightness((prev) => ({ ...prev, [deviceId]: brightness }));
     try {
       await sendDeviceCommand(deviceId, 'SET_BRIGHTNESS', { brightness });
     } catch (e) {
@@ -703,9 +736,10 @@ export const DevicePage: React.FC = () => {
 
   // Color change
   const handleColorChange = async (deviceId: string, r: number, g: number, b: number) => {
-    const brightness = localBrightness[deviceId] || 80;
     const dev = devices.find((d) => d.id === deviceId);
     if (!dev) return;
+    if (dev.accessLevel === 'VIEW') return;
+    const brightness = localBrightness[deviceId] || 80;
     try {
       await sendDeviceCommand(deviceId, 'SET_RGB', { r, g, b, brightness });
     } catch (e) {
@@ -760,6 +794,7 @@ export const DevicePage: React.FC = () => {
   // Filtered devices
   const visibleDevices = useMemo(() => {
     return uiDevices.filter((device) => {
+      if (device.accessLevel === 'NONE' || device.raw?.accessLevel === 'NONE') return false;
       // Room filter
       if (selectedRoomId !== 'ALL') {
         const matchId = device.roomId === selectedRoomId;

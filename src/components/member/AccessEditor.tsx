@@ -459,7 +459,7 @@ export const AccessEditor: React.FC<AccessEditorProps> = ({
                             : 'bg-slate-500/10 text-slate-500 border-slate-500/20'
                         }`}
                       >
-                        {currentRoomLevel === 'CONTROL' ? 'Điều khiển' : currentRoomLevel === 'VIEW' ? 'Xem' : 'Không'}
+                        {currentRoomLevel === 'CONTROL' ? 'Điều khiển' : currentRoomLevel === 'VIEW' ? 'Chỉ xem' : 'Không'}
                       </span>
                     </div>
 
@@ -467,7 +467,7 @@ export const AccessEditor: React.FC<AccessEditorProps> = ({
                     <div className="grid grid-cols-3 gap-1.5 p-1 rounded-xl bg-[var(--muted)] border border-[var(--border)]">
                       {(['NONE', 'VIEW', 'CONTROL'] as AccessLevel[]).map((lvl) => {
                         const isSelected = currentRoomLevel === lvl;
-                        const label = lvl === 'NONE' ? 'Không' : lvl === 'VIEW' ? 'Xem' : 'Điều khiển';
+                        const label = lvl === 'NONE' ? 'Không' : lvl === 'VIEW' ? 'Chỉ xem' : 'Điều khiển';
                         return (
                           <button
                             key={lvl}
@@ -497,7 +497,7 @@ export const AccessEditor: React.FC<AccessEditorProps> = ({
                         const override = deviceOverrides[dev.deviceId] || 'INHERIT';
                         const effective = getEffectiveDeviceLevel(dev);
                         const effectiveLabel =
-                          effective === 'NONE' ? 'Không' : effective === 'VIEW' ? 'Xem' : 'Điều khiển';
+                          effective === 'NONE' ? 'Không' : effective === 'VIEW' ? 'Chỉ xem' : 'Điều khiển';
 
                         return (
                           <div
@@ -512,7 +512,7 @@ export const AccessEditor: React.FC<AccessEditorProps> = ({
                                 </span>
                                 <span className="text-[11px] text-[var(--secondary)] block mt-0.5">
                                   {override === 'INHERIT'
-                                    ? `Theo phòng (Hiện tại: ${effectiveLabel})`
+                                    ? `Mặc định (Hiện tại: ${effectiveLabel})`
                                     : `Ghi đè riêng: ${effectiveLabel}`}
                                 </span>
                               </div>
@@ -534,13 +534,13 @@ export const AccessEditor: React.FC<AccessEditorProps> = ({
                               {(['INHERIT', 'NONE', 'VIEW', 'CONTROL'] as const).map((opt) => {
                                 const isSelected = override === opt;
                                 const label =
-                                  opt === 'INHERIT' ? 'Theo phòng' : opt === 'NONE' ? 'Không' : opt === 'VIEW' ? 'Xem' : 'Đ.khiển';
+                                  opt === 'INHERIT' ? 'Mặc định' : opt === 'NONE' ? 'Không' : opt === 'VIEW' ? 'Chỉ xem' : 'Điều khiển';
                                 return (
                                   <button
                                     key={opt}
                                     type="button"
                                     onClick={() => handleDeviceLevelChange(dev.deviceId, opt)}
-                                    className={`min-h-[32px] py-1 px-0.5 rounded-md text-[10.5px] sm:text-[11px] font-medium transition-all cursor-pointer flex items-center justify-center text-center whitespace-nowrap ${
+                                    className={`min-h-[32px] py-1 px-0.5 rounded-md text-[10px] sm:text-[11px] tracking-tight font-medium transition-all cursor-pointer flex items-center justify-center text-center whitespace-nowrap ${
                                       isSelected
                                         ? 'bg-[var(--solid)] text-[var(--accent)] font-semibold shadow-xs border border-[var(--border)]'
                                         : 'text-[var(--secondary)] hover:text-[var(--text)] hover:bg-[var(--solid)]/40'
@@ -576,7 +576,7 @@ export const AccessEditor: React.FC<AccessEditorProps> = ({
                   {filteredUnassignedDevices.map((dev) => {
                     const override = deviceOverrides[dev.deviceId] || 'NONE';
                     const effectiveLabel =
-                      override === 'NONE' ? 'Không' : override === 'VIEW' ? 'Xem' : 'Điều khiển';
+                      override === 'NONE' ? 'Không' : override === 'VIEW' ? 'Chỉ xem' : 'Điều khiển';
                     return (
                       <div
                         key={dev.deviceId}
@@ -601,7 +601,7 @@ export const AccessEditor: React.FC<AccessEditorProps> = ({
                         <div className="grid grid-cols-3 gap-1 p-0.5 rounded-lg bg-[var(--muted)] border border-[var(--border)]">
                           {(['NONE', 'VIEW', 'CONTROL'] as AccessLevel[]).map((lvl) => {
                             const isSelected = override === lvl;
-                            const label = lvl === 'NONE' ? 'Không' : lvl === 'VIEW' ? 'Xem' : 'Điều khiển';
+                            const label = lvl === 'NONE' ? 'Không' : lvl === 'VIEW' ? 'Chỉ xem' : 'Điều khiển';
                             return (
                               <button
                                 key={lvl}

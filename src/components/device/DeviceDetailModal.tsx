@@ -2282,6 +2282,7 @@ export const DeviceDetailModal: React.FC<DeviceDetailModalProps> = ({
 }) => {
   if (!device || !isOpen) return null;
 
+  const isReadOnly = device.accessLevel === 'VIEW' || device.raw?.accessLevel === 'VIEW';
   const [name, setName] = useState(device.name || '');
   const [rename, setRename] = useState(false);
   const [menu, setMenu] = useState(false);
@@ -2415,7 +2416,7 @@ export const DeviceDetailModal: React.FC<DeviceDetailModalProps> = ({
   const deltaKeys = shadow ? Object.keys(shadow.deltaState || {}) : [];
   const isOutOfSync = shadow ? (!shadow.inSync || deltaKeys.length > 0) : false;
 
-  const disabled = device.offline || device.status === 'OFFLINE';
+  const disabled = device.offline || device.status === 'OFFLINE' || isReadOnly;
 
   const devName = (device.name || '').toLowerCase();
   const devTypeStr = (device.type || device.raw?.deviceType || device.deviceType || '').toUpperCase();
@@ -2517,14 +2518,20 @@ export const DeviceDetailModal: React.FC<DeviceDetailModalProps> = ({
   };
 
   const handleToggleCurrent = () => {
+    if (isReadOnly) {
+      notify.warning('Bạn chỉ có quyền xem thiết bị này');
+      return;
+    }
     onTogglePower?.();
   };
 
   const handleBrightnessCurrent = (brightness: number) => {
+    if (isReadOnly) return;
     onBrightnessChange?.(brightness);
   };
 
   const handleColorCurrent = (r: number, g: number, b: number) => {
+    if (isReadOnly) return;
     onColorChange?.(r, g, b);
   };
 
@@ -2548,7 +2555,7 @@ export const DeviceDetailModal: React.FC<DeviceDetailModalProps> = ({
             ×
           </button>
           <div>
-            {rename ? (
+            {rename && !isReadOnly ? (
               <input
                 autoFocus
                 value={name}
@@ -2557,24 +2564,26 @@ export const DeviceDetailModal: React.FC<DeviceDetailModalProps> = ({
                 onKeyDown={(event) => event.key === 'Enter' && handleSaveName()}
               />
             ) : (
-              <strong onClick={() => setRename(true)} title="Nhấp để sửa tên">
-                {name} <small>Sửa</small>
+              <strong onClick={() => !isReadOnly && setRename(true)} title={isReadOnly ? name : 'Nhấp để sửa tên'}>
+                {name} {!isReadOnly && <small>Sửa</small>}
               </strong>
             )}
-            <span className={disabled ? 'offline' : ''}>
+            <span className={device.offline || device.status === 'OFFLINE' ? 'offline' : ''}>
               <i />
-              {disabled ? 'Ngoại tuyến' : 'Trực tuyến'} · {device.room || device.roomName || 'Nhà'}
+              {device.offline || device.status === 'OFFLINE' ? 'Ngoại tuyến' : 'Trực tuyến'} · {device.room || device.roomName || 'Nhà'}
             </span>
           </div>
-          <button
-            type="button"
-            className="detail-icon-button"
-            onClick={() => setMenu(!menu)}
-            aria-label="Tùy chọn"
-          >
-            ⋯
-          </button>
-          {menu && (
+          {!isReadOnly && (
+            <button
+              type="button"
+              className="detail-icon-button"
+              onClick={() => setMenu(!menu)}
+              aria-label="Tùy chọn"
+            >
+              ⋯
+            </button>
+          )}
+          {menu && !isReadOnly && (
             <div className="detail-menu glass-g2">
               <button
                 type="button"
@@ -2621,6 +2630,13 @@ export const DeviceDetailModal: React.FC<DeviceDetailModalProps> = ({
             </div>
           )}
         </header>
+
+        {isReadOnly && (
+          <div className="mx-4 my-2 px-3 py-2 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400 text-xs flex items-center gap-2">
+            <span className="font-semibold px-1.5 py-0.5 rounded bg-blue-500/20 text-[10px] shrink-0">Chỉ xem</span>
+            <span>Bạn có quyền theo dõi trạng thái thiết bị nhưng không thể điều khiển hoặc thay đổi cấu hình.</span>
+          </div>
+        )}
 
         {isOverrideActive && (
           <div className="mx-4 my-2 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-3 text-xs text-amber-700 dark:text-amber-300 animate-in fade-in slide-in-from-top-1">

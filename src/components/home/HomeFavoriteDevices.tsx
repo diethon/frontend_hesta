@@ -27,6 +27,7 @@ interface DashboardDeviceItem {
   brightness?: number;
   realDeviceId?: string;
   raw?: DeviceResponse;
+  accessLevel?: 'NONE' | 'VIEW' | 'CONTROL';
 }
 
 export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
@@ -211,8 +212,9 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
       brightness: brightnessVal,
       realDeviceId: d.id,
       raw: d,
+      accessLevel: d.accessLevel,
     };
-  });
+  }).filter((d) => d.accessLevel !== 'NONE');
 
   // Filter devices by selected room
   let displayList: DashboardDeviceItem[];
@@ -225,6 +227,11 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
   }
 
   const handleToggle = async (device: DashboardDeviceItem) => {
+    if (device.accessLevel === 'VIEW' || device.raw?.accessLevel === 'VIEW') {
+      notify.warning('Bạn chỉ có quyền xem thiết bị này');
+      return;
+    }
+
     const nextOn = !device.on;
     setLocalPower((prev) => ({ ...prev, [device.id]: nextOn }));
 
@@ -239,7 +246,8 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
         notify.success(`${nextOn ? 'Đã bật' : 'Đã tắt'} ${device.name}`);
       } catch (err: unknown) {
         console.warn('Toggle device error:', err);
-        notify.info(`Đã gửi lệnh ${nextOn ? 'bật' : 'tắt'} ${device.name}`);
+        setLocalPower((prev) => ({ ...prev, [device.id]: Boolean(device.on) }));
+        notify.error('Không thể điều khiển thiết bị');
       }
     } else {
       notify.success(`${nextOn ? 'Đã bật' : 'Đã tắt'} ${device.name}`);
@@ -248,6 +256,7 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
 
   const handleBrightnessChange = async (device: DashboardDeviceItem, e: React.MouseEvent<HTMLDivElement>) => {
     e.stopPropagation();
+    if (device.accessLevel === 'VIEW' || device.raw?.accessLevel === 'VIEW') return;
     const rect = e.currentTarget.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
     const newPercent = Math.min(100, Math.max(10, Math.round((clickX / rect.width) * 100)));
@@ -304,6 +313,8 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
             setSelectedDetail(realDev ? { ...realDev, ...device } : device);
           };
 
+          const isViewOnly = device.accessLevel === 'VIEW' || device.raw?.accessLevel === 'VIEW';
+
           return (
             <article
               key={device.id}
@@ -320,30 +331,49 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
                   <Icon name={device.icon} />
                 </span>
 
-                {device.offline ? (
-                  <span className="offline-dot" title="Ngoại tuyến" />
-                ) : device.sensor ? (
-                  <IconButton
-                    icon="more"
-                    label={`Tùy chọn ${device.name}`}
-                    onClick={() => {
-                      handleCardClick();
-                    }}
-                  />
-                ) : (
-                  <button
-                    type="button"
-                    className={`toggle ${isOn ? 'active' : ''}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleToggle(device);
-                    }}
-                    aria-label={`${isOn ? 'Tắt' : 'Bật'} ${device.name}`}
-                    aria-pressed={isOn}
-                  >
-                    <span />
-                  </button>
-                )}
+                <div className="flex items-center gap-1.5">
+                  {isViewOnly && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
+                      Chỉ xem
+                    </span>
+                  )}
+                  {device.offline ? (
+                    <span className="offline-dot" title="Ngoại tuyến" />
+                  ) : device.sensor ? (
+                    <IconButton
+                      icon="more"
+                      label={`Tùy chọn ${device.name}`}
+                      onClick={() => {
+                        handleCardClick();
+                      }}
+                    />
+                  ) : isViewOnly ? (
+                    <button
+                      type="button"
+                      disabled
+                      className={`toggle ${isOn ? 'active' : ''} opacity-40 cursor-not-allowed`}
+                      title="Thiết bị ở chế độ chỉ xem"
+                      onClick={(e) => e.stopPropagation()}
+                      aria-disabled="true"
+                      aria-label={`${device.name} (Chỉ xem)`}
+                    >
+                      <span />
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className={`toggle ${isOn ? 'active' : ''}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleToggle(device);
+                      }}
+                      aria-label={`${isOn ? 'Tắt' : 'Bật'} ${device.name}`}
+                      aria-pressed={isOn}
+                    >
+                      <span />
+                    </button>
+                  )}
+                </div>
               </div>
 
               {device.sensor && (
@@ -361,10 +391,16 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
 
               {device.slider ? (
                 <div
-                  className="brightness"
+                  className={`brightness ${isViewOnly ? 'opacity-60 cursor-default' : ''}`}
                   aria-label={`Độ sáng ${currentBrightness}%`}
-                  title="Nhấp để chỉnh độ sáng"
-                  onClick={(e) => handleBrightnessChange(device, e)}
+                  title={isViewOnly ? 'Chế độ chỉ xem' : 'Nhấp để chỉnh độ sáng'}
+                  onClick={(e) => {
+                    if (isViewOnly) {
+                      e.stopPropagation();
+                      return;
+                    }
+                    handleBrightnessChange(device, e);
+                  }}
                 >
                   <span style={{ width: `${currentBrightness}%` }} />
                   <b>{currentBrightness}%</b>
