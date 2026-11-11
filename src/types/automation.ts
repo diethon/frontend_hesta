@@ -3,6 +3,8 @@ export interface DeviceSummary {
   homeId: string;
   roomId?: string;
   roomName?: string;
+  room?: string;
+  online?: boolean;
   name: string;
   deviceType: string;
   status: string;
@@ -111,10 +113,13 @@ export interface AutomationRuleInput {
 export interface AutomationExecution {
   id: string;
   ruleId: string;
+  ruleName?: string;
   triggerSource: string;
   status: string;
   test: boolean;
   matchedAt: string;
+  startedAt?: string;
+  completedAt?: string;
   resultDetail: Array<{ deviceId?: string; sceneId?: string; action: string; success: boolean; status: string }>;
 }
 

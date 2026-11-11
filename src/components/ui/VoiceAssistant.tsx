@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useAppSelector } from '../../store/hooks';
 import { selectCurrentHomeId, selectCurrentUser } from '../../store/selectors';
-import { processVoiceCommand, checkVoiceServiceHealth } from '../../services/voiceApi';
+import { processVoiceCommand, checkVoiceServiceHealth, getTtsAudioUrl, VOICE_SERVICE_URL } from '../../services/voiceApi';
 import type { VoiceCommandResponse } from '../../services/voiceApi';
 
 /* ── Trạng thái voice ── */
@@ -76,6 +76,24 @@ const StatusIcon: React.FC<{ state: VoiceState }> = ({ state }) => {
   return null;
 };
 
+/* ── VolumeIcon (Speaker) ── */
+const VolumeIcon: React.FC<{ className?: string }> = ({ className = 'h-4 w-4' }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M11 5L6 9H2v6h4l5 4V5z" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+  </svg>
+);
+
+/* ── VolumeMuteIcon (Speaker Muted) ── */
+const VolumeMuteIcon: React.FC<{ className?: string }> = ({ className = 'h-4 w-4' }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M11 5L6 9H2v6h4l5 4V5z" />
+    <line x1="23" y1="9" x2="17" y2="15" strokeLinecap="round" />
+    <line x1="17" y1="9" x2="23" y2="15" strokeLinecap="round" />
+  </svg>
+);
+
 const QUICK_COMMANDS = [
   'Bật đèn phòng ngủ',
   'Bật quạt phòng khách',
@@ -98,10 +116,161 @@ export const VoiceAssistantButton: React.FC = () => {
   const [result, setResult] = useState<VoiceResult | null>(null);
   const [serviceOnline, setServiceOnline] = useState<boolean | null>(null);
   const [history, setHistory] = useState<VoiceResult[]>([]);
+  const [ttsEnabled, setTtsEnabled] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('hesta_voice_tts') !== 'false';
+    } catch {
+      return true;
+    }
+  });
+  const [isSpeaking, setIsSpeaking] = useState<boolean>(false);
 
   const recognitionRef = useRef<any>(null);
   const modalRef = useRef<HTMLDivElement>(null);
   const autoCloseTimerRef = useRef<any>(null);
+  const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
+  const watchdogTimerRef = useRef<any>(null);
+
+  /* ── Kích hoạt / Unlock AudioContext & Audio Player trên tương tác người dùng ── */
+  const unlockAudioPlayer = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      if (!audioPlayerRef.current) {
+        audioPlayerRef.current = new Audio();
+      }
+      // Đảm bảo volume = 1.0 và trình duyệt ghi nhận gesture unlock
+      audioPlayerRef.current.volume = 1.0;
+    } catch {}
+  }, []);
+
+  /* ── Dừng toàn bộ âm thanh (cả Audio stream và Web Speech) ── */
+  const stopAllAudio = useCallback(() => {
+    if (watchdogTimerRef.current) {
+      clearTimeout(watchdogTimerRef.current);
+      watchdogTimerRef.current = null;
+    }
+    if (audioPlayerRef.current) {
+      try {
+        audioPlayerRef.current.pause();
+        audioPlayerRef.current.currentTime = 0;
+      } catch {}
+    }
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      try {
+        window.speechSynthesis.cancel();
+      } catch {}
+    }
+    setIsSpeaking(false);
+  }, []);
+
+  /* ── Bật/tắt giọng đọc phản hồi ── */
+  const toggleTts = useCallback(() => {
+    unlockAudioPlayer();
+    setTtsEnabled((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('hesta_voice_tts', String(next));
+      } catch {}
+      if (!next) {
+        stopAllAudio();
+      }
+      return next;
+    });
+  }, [stopAllAudio, unlockAudioPlayer]);
+
+  /* ── Fallback chỉ dùng Web Speech API NẾU máy có giọng tiếng Việt thực thụ ── */
+  const fallbackLocalSpeech = useCallback((cleanMessage: string) => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    try {
+      const voices = window.speechSynthesis.getVoices();
+      const viVoice =
+        voices.find((v) => v.lang && v.lang.toLowerCase().replace('_', '-').startsWith('vi')) ||
+        voices.find(
+          (v) =>
+            (v.name && v.name.toLowerCase().includes('vietnam')) ||
+            (v.name && v.name.toLowerCase().includes('tiếng việt')),
+        );
+
+      // QUAN TRỌNG: Nếu Windows KHÔNG có gói giọng tiếng Việt cài sẵn, tuyệt đối KHÔNG cho đọc
+      // để tránh việc Chrome lấy giọng tiếng Anh (Microsoft David) đọc tiếng Việt như "người Anh cố đọc"!
+      if (!viVoice) {
+        console.info('Hệ điều hành chưa cài giọng tiếng Việt cục bộ. Đã bỏ qua fallback tiếng Anh.');
+        setIsSpeaking(false);
+        return;
+      }
+
+      const utterance = new SpeechSynthesisUtterance(cleanMessage);
+      utterance.voice = viVoice;
+      utterance.lang = viVoice.lang;
+      utterance.rate = 1.05;
+      utterance.onstart = () => setIsSpeaking(true);
+      utterance.onend = () => setIsSpeaking(false);
+      utterance.onerror = () => setIsSpeaking(false);
+
+      window.speechSynthesis.speak(utterance);
+    } catch {
+      setIsSpeaking(false);
+    }
+  }, []);
+
+  /* ── Phát âm thanh giọng đọc phản hồi tiếng Việt ── */
+  const speakResponse = useCallback(
+    (text: string, customAudioPayload?: string | null) => {
+      if (!ttsEnabled) return;
+      stopAllAudio();
+
+      const cleanMessage = text.replace(/[✅⚠️❌⚡📝🔒🔓💡🔌🌀❄️☀️🌡️🔊🔇\*_`~#]/g, '').trim();
+      if (!cleanMessage) return;
+
+      // 1. Ưu tiên cao nhất: Dùng Neural Audio (Base64 data URL tức thì < 10ms hoặc Stream URL từ server)
+      const audioSrc = customAudioPayload || getTtsAudioUrl(cleanMessage);
+      try {
+        if (!audioPlayerRef.current) {
+          audioPlayerRef.current = new Audio();
+        }
+        const audio = audioPlayerRef.current;
+        audio.pause();
+        audio.src = audioSrc;
+
+        let finished = false;
+        const finishSpeech = () => {
+          if (finished) return;
+          finished = true;
+          setIsSpeaking(false);
+          if (watchdogTimerRef.current) {
+            clearTimeout(watchdogTimerRef.current);
+            watchdogTimerRef.current = null;
+          }
+        };
+
+        audio.onplay = () => setIsSpeaking(true);
+        audio.onended = finishSpeech;
+        audio.onerror = () => {
+          console.warn('Audio playback error, falling back...');
+          finishSpeech();
+          fallbackLocalSpeech(cleanMessage);
+        };
+
+        // Watchdog: Tự động giải phóng trạng thái isSpeaking sau 8s để không bao giờ bị đơ UI
+        if (watchdogTimerRef.current) clearTimeout(watchdogTimerRef.current);
+        watchdogTimerRef.current = setTimeout(finishSpeech, 8000);
+
+        const playPromise = audio.play();
+        if (playPromise !== undefined) {
+          playPromise.catch((err) => {
+            console.warn('Audio play() rejected:', err);
+            finishSpeech();
+            fallbackLocalSpeech(cleanMessage);
+          });
+        }
+      } catch (e) {
+        console.warn('Could not initialize Audio player:', e);
+        setIsSpeaking(false);
+        fallbackLocalSpeech(cleanMessage);
+      }
+    },
+    [ttsEnabled, stopAllAudio, fallbackLocalSpeech],
+  );
 
   /* ── Kiểm tra voice service khi mở modal ── */
   useEffect(() => {
@@ -122,7 +291,7 @@ export const VoiceAssistantButton: React.FC = () => {
     };
   }, [isOpen]);
 
-  /* ── Cleanup recognition khi unmount ── */
+  /* ── Cleanup recognition & speech khi unmount ── */
   useEffect(() => {
     return () => {
       if (recognitionRef.current) {
@@ -134,8 +303,9 @@ export const VoiceAssistantButton: React.FC = () => {
       if (autoCloseTimerRef.current) {
         clearTimeout(autoCloseTimerRef.current);
       }
+      stopAllAudio();
     };
-  }, []);
+  }, [stopAllAudio]);
 
   /* ── Dọn dẹp khi đóng ── */
   const handleClose = useCallback(() => {
@@ -149,11 +319,12 @@ export const VoiceAssistantButton: React.FC = () => {
       clearTimeout(autoCloseTimerRef.current);
       autoCloseTimerRef.current = null;
     }
+    stopAllAudio();
     setIsOpen(false);
     setVoiceState('idle');
     setTranscript('');
     setResult(null);
-  }, []);
+  }, [stopAllAudio]);
 
   /* ── Gửi text command → voice service ── */
   const sendCommand = useCallback(
@@ -185,10 +356,17 @@ export const VoiceAssistantButton: React.FC = () => {
         setVoiceState(resp.success ? 'success' : 'error');
         setHistory((prev) => [voiceResult, ...prev.filter((h) => h.transcript !== cleanText)].slice(0, 8));
 
-        // Tự động chuyển về idle sau 4s
+        // Phát giọng nói tiếng Việt chuẩn tự nhiên (ưu tiên Base64 phát tức thì < 10ms)
+        if (resp.message) {
+          const directUrl = resp.audioUrl ? `${VOICE_SERVICE_URL}${resp.audioUrl}` : undefined;
+          const audioPayload = resp.audioData || directUrl;
+          speakResponse(resp.message, audioPayload);
+        }
+
+        // Tự động chuyển về idle sau 5s (đủ nghe trọn vẹn câu phản hồi)
         autoCloseTimerRef.current = setTimeout(() => {
           setVoiceState('idle');
-        }, 4000);
+        }, 5000);
       } catch (err: any) {
         const voiceResult: VoiceResult = {
           success: false,
@@ -199,13 +377,23 @@ export const VoiceAssistantButton: React.FC = () => {
         setResult(voiceResult);
         setVoiceState('error');
         setHistory((prev) => [voiceResult, ...prev.filter((h) => h.transcript !== cleanText)].slice(0, 8));
+
+        if (voiceResult.message) {
+          speakResponse(voiceResult.message);
+        }
       }
     },
-    [currentHomeId],
+    [currentHomeId, speakResponse],
   );
 
   /* ── Bắt đầu nghe giọng nói ── */
   const startListening = useCallback(() => {
+    // Mở khóa âm thanh trước cho trình duyệt để tránh bị chặn phát giọng đọc
+    unlockAudioPlayer();
+
+    // Dừng giọng đọc nếu đang nói dở để lắng nghe người dùng
+    stopAllAudio();
+
     if (!SpeechRecognition) {
       setResult({
         success: false,
@@ -290,7 +478,7 @@ export const VoiceAssistantButton: React.FC = () => {
     } catch (e) {
       console.warn('Recognition start warning:', e);
     }
-  }, [sendCommand]);
+  }, [sendCommand, stopAllAudio, unlockAudioPlayer]);
 
   /* ── Dừng nghe ── */
   const stopListening = useCallback(() => {
@@ -303,6 +491,7 @@ export const VoiceAssistantButton: React.FC = () => {
 
   /* ── Mở modal & tự động kích hoạt mic ── */
   const handleOpen = () => {
+    unlockAudioPlayer();
     setIsOpen(true);
     setVoiceState('idle');
     setTranscript('');
@@ -374,6 +563,34 @@ export const VoiceAssistantButton: React.FC = () => {
                       {serviceOnline ? 'Online' : 'Offline'}
                     </span>
                   )}
+                  {/* TTS Voice Feedback Toggle Button */}
+                  <button
+                    type="button"
+                    onClick={toggleTts}
+                    className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border transition-all ${
+                      ttsEnabled
+                        ? 'bg-primary/10 text-primary border-primary/20 hover:bg-primary/20'
+                        : 'bg-surface text-muted border-line hover:bg-line'
+                    }`}
+                    title={
+                      ttsEnabled
+                        ? 'Giọng phản hồi: Đang BẬT (Click để tắt)'
+                        : 'Giọng phản hồi: Đang TẮT (Click để bật)'
+                    }
+                    aria-label="Bật hoặc tắt giọng phản hồi"
+                  >
+                    {ttsEnabled ? (
+                      <>
+                        <VolumeIcon className={`h-3.5 w-3.5 ${isSpeaking ? 'animate-bounce text-primary' : ''}`} />
+                        <span>{isSpeaking ? 'Đang đọc...' : 'Voice'}</span>
+                      </>
+                    ) : (
+                      <>
+                        <VolumeMuteIcon className="h-3.5 w-3.5 text-muted" />
+                        <span>Mute</span>
+                      </>
+                    )}
+                  </button>
                   <button
                     type="button"
                     onClick={handleClose}
@@ -463,16 +680,32 @@ export const VoiceAssistantButton: React.FC = () => {
                         : 'bg-rose-50 border-rose-200 text-rose-700'
                     }`}
                   >
-                    <div className="flex items-start gap-2.5">
-                      <span className="mt-0.5 text-base">{result.success ? '✅' : '⚠️'}</span>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium leading-relaxed">{result.message}</p>
-                        {result.durationMs > 0 && (
-                          <p className="mt-1 text-xs opacity-75 font-mono">
-                            ⚡ Phản hồi: {Math.round(result.durationMs)}ms
-                          </p>
-                        )}
+                    <div className="flex items-start gap-2.5 justify-between">
+                      <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                        <span className="mt-0.5 text-base shrink-0">{result.success ? '✅' : '⚠️'}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium leading-relaxed">{result.message}</p>
+                          {result.durationMs > 0 && (
+                            <p className="mt-1 text-xs opacity-75 font-mono">
+                              ⚡ Phản hồi: {Math.round(result.durationMs)}ms
+                            </p>
+                          )}
+                        </div>
                       </div>
+                      {/* Replay TTS button */}
+                      <button
+                        type="button"
+                        onClick={() => speakResponse(result.message)}
+                        className={`p-1.5 rounded-xl border transition-all shrink-0 ${
+                          isSpeaking
+                            ? 'bg-primary text-white border-primary shadow-sm animate-pulse'
+                            : 'bg-surface border-line text-muted hover:text-text hover:bg-line'
+                        }`}
+                        title="Nghe lại câu phản hồi"
+                        aria-label="Nghe lại câu phản hồi"
+                      >
+                        <VolumeIcon className="h-4 w-4" />
+                      </button>
                     </div>
                   </div>
                 )}

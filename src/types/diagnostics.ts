@@ -43,3 +43,43 @@ export interface MqttPacket {
   qos: number;
   payloadSummary: string;
 }
+
+export interface MqttDeadLetter {
+  id: string;
+  nodeId: string;
+  topic: string;
+  payload: string;
+  failureReason: string;
+  receivedAt: string;
+  replayed: boolean;
+  replayedAt?: string;
+}
+
+export interface FirmwarePackage {
+  id: string;
+  deviceType: string;
+  version: string;
+  fileUrl: string;
+  checksumSha256: string;
+  fileSizeBytes?: number;
+  releaseNotes?: string;
+  createdAt?: string;
+}
+
+export interface OtaCampaign {
+  id: string;
+  name: string;
+  firmwarePackageId: string;
+  deviceType: string;
+  version: string;
+  status: string;
+  rolloutStrategy: string;
+  failureThresholdPercent: number;
+  totalNodes: number;
+  attemptedNodes: number;
+  successNodes: number;
+  failedNodes: number;
+  abortReason?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}

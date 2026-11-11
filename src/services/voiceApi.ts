@@ -3,11 +3,19 @@
  * để xử lý lệnh voice dạng text.
  */
 
-const VOICE_SERVICE_URL = import.meta.env.VITE_VOICE_SERVICE_URL?.trim() || 'http://localhost:8001';
+export const VOICE_SERVICE_URL = import.meta.env.VITE_VOICE_SERVICE_URL?.trim() || 'http://localhost:8001';
 
 export interface VoiceCommandRequest {
   text: string;
   homeId: string;
+}
+
+export interface SubCommandResult {
+  message: string;
+  success: boolean;
+  action: string | null;
+  room: string | null;
+  deviceType: string | null;
 }
 
 export interface VoiceCommandResponse {
@@ -19,6 +27,16 @@ export interface VoiceCommandResponse {
   deviceType: string | null;
   totalDurationMs: number;
   stepDurations: Record<string, number>;
+  audioUrl?: string | null;
+  audioData?: string | null;
+  subCommands?: SubCommandResult[];
+}
+
+/**
+ * Trả về URL audio phát giọng nói tiếng Việt từ Server Neural TTS (Hoài My).
+ */
+export function getTtsAudioUrl(text: string): string {
+  return `${VOICE_SERVICE_URL}/api/voice/tts?text=${encodeURIComponent(text.trim())}`;
 }
 
 /**

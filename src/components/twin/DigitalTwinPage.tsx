@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router';
+import { useNavigate, useParams } from 'react-router';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { currentHomeChanged, currentHomeCleared } from '../../store/homeSlice';
 import { loadTwinSnapshot, twinClosed, twinOpened } from '../../store/twinSlice';
 import { TwinDashboardHeader } from './dashboard/TwinDashboardHeader';
-import { HomeSidebar } from '../ui/HomeSidebar';
+import { DashboardNavRail } from '../home/DashboardNavRail';
+import { DashboardBottomNav } from '../home/DashboardBottomNav';
 import type { TwinRendererTheme } from './scene/rendererTheme';
 import { TwinLayoutEditor } from './TwinLayoutEditor';
 import { loadLayoutRole, loadTwinLayout } from '../../store/twinLayoutSlice';
@@ -39,8 +40,8 @@ export function DigitalTwinView({ homeId, initialMode, navigationOpen, onToggleN
     {matchesHome && error ? <div role="alert" className="rounded-2xl border border-error bg-error-soft p-5 text-text">
       <p>{error}</p><button type="button" disabled={loading} onClick={() => void dispatch(loadTwinSnapshot(homeId))} className="mt-3 rounded-xl bg-surface px-4 py-3 text-sm font-semibold disabled:opacity-50">Thử lại</button>
     </div> : null}
-    {!matchesHome || (!initialized && !error) ? <div role="status" aria-label="Đang tải Digital Twin" className="surface-card p-6">
-      <p className="text-sm text-muted">Đang tải Digital Twin…</p><div className="mt-4 h-32 animate-pulse rounded-2xl bg-off-soft" />
+    {!matchesHome || (!initialized && !error) ? <div role="status" aria-label="Đang tải Mô hình 3D" className="surface-card p-6">
+      <p className="text-sm text-muted">Đang tải Mô hình 3D…</p><div className="mt-4 h-32 animate-pulse rounded-2xl bg-off-soft" />
     </div> : initialized ? <>
       <TwinLayoutEditor key={homeId} homeId={homeId} initialMode={initialMode} rendererTheme={theme} onRendererThemeChange={setTheme} />
     </> : null}
@@ -51,8 +52,11 @@ export function DigitalTwinView({ homeId, initialMode, navigationOpen, onToggleN
 export function DigitalTwinPage() {
   useLayoutNavigationGuard();
   const { homeId = '' } = useParams<{ homeId: string }>();
+  const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const [navigationOpen, setNavigationOpen] = useState(false);
+  const currentUser = useAppSelector((state) => state.auth.user);
+
   useEffect(() => {
     dispatch(currentHomeChanged(homeId));
     dispatch(twinOpened(homeId));

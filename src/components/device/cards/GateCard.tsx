@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { motion } from 'motion/react';
 import type { DeviceResponse } from '../../../types/device';
 import {
   DoorOpen,
@@ -18,7 +19,7 @@ interface GateCardProps {
   onStateChange?: (updatedDevice: DeviceResponse) => void;
 }
 
-export const GateCard: React.FC<GateCardProps> = ({
+const GateCardComponent: React.FC<GateCardProps> = ({
   device,
   onClick,
   onStateChange,
@@ -70,9 +71,12 @@ export const GateCard: React.FC<GateCardProps> = ({
   const isStopped = state === 'STOPPED';
 
   return (
-    <article
+    <motion.article
       role="button"
       tabIndex={0}
+      whileHover={{ translateY: -3 }}
+      whileTap={{ scale: 0.985 }}
+      transition={{ type: 'spring', stiffness: 450, damping: 25 }}
       onClick={() => onClick?.(device.id)}
       onKeyDown={(e) => e.key === 'Enter' && onClick?.(device.id)}
       className={`relative flex flex-col justify-between p-4 sm:p-5 rounded-2xl border transition-all duration-200 select-none cursor-pointer ${
@@ -210,6 +214,15 @@ export const GateCard: React.FC<GateCardProps> = ({
           <span>Đóng</span>
         </button>
       </div>
-    </article>
+    </motion.article>
   );
 };
+
+export const GateCard = React.memo(GateCardComponent, (prev, next) => {
+  return (
+    prev.device.id === next.device.id &&
+    prev.device.status === next.device.status &&
+    prev.device.name === next.device.name &&
+    JSON.stringify(prev.device.currentState) === JSON.stringify(next.device.currentState)
+  );
+});

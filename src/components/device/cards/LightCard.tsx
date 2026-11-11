@@ -1,35 +1,29 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { DeviceResponse } from '../../../types/device';
-import { Lightbulb, Plug2, SunMedium, SlidersHorizontal, Power } from 'lucide-react';
+import { Lightbulb, Plug2, SunMedium, SlidersHorizontal, Power, Loader2 } from 'lucide-react';
+import { motion } from 'motion/react';
 import { sendDeviceCommand } from '../../../services/deviceApi';
 import { notify } from '../../ui/notify';
 import { getErrorMessage, isDuplicateCommandError } from '../../../utils/errors';
 import { useOverrideCountdown } from '../useOverrideCountdown';
 import { OverrideActionModal } from '../OverrideActionModal';
+import { type CustomColorOption, DEFAULT_SEED } from '../controls/RgbLightControl';
+import { resolveDeviceRgb } from '../deviceHelpers';
 
 interface LightCardProps {
   device: DeviceResponse;
   powerPending?: boolean;
   onTogglePower?: (deviceId: string, currentPower: string) => void;
   onClick?: (deviceId: string) => void;
+  onStateChange?: (updatedDevice: DeviceResponse) => void;
 }
 
-const COLOR_PRESETS = [
-  { label: 'Trắng ấm', r: 255, g: 244, b: 229, hex: '#fff4e5' },
-  { label: 'Vàng nắng', r: 255, g: 193, b: 7, hex: '#ffc107' },
-  { label: 'Cam hoàng hôn', r: 255, g: 112, b: 67, hex: '#ff7043' },
-  { label: 'Đỏ', r: 244, g: 67, b: 54, hex: '#f44336' },
-  { label: 'Xanh lá', r: 76, g: 175, b: 80, hex: '#4caf50' },
-  { label: 'Xanh băng', r: 0, g: 188, b: 212, hex: '#00bcd4' },
-  { label: 'Xanh dương', r: 33, g: 150, b: 243, hex: '#2196f3' },
-  { label: 'Tím', r: 156, g: 39, b: 176, hex: '#9c27b0' },
-];
-
-export const LightCard: React.FC<LightCardProps> = ({
+const LightCardComponent: React.FC<LightCardProps> = ({
   device,
   powerPending = false,
   onTogglePower,
   onClick,
+  onStateChange,
 }) => {
   const isOffline = device.status === 'OFFLINE';
   const isRgb = device.deviceType === 'LED_RGB';
@@ -38,7 +32,13 @@ export const LightCard: React.FC<LightCardProps> = ({
   const rawPower = device.currentState?.power;
   const isOn = rawPower === 'ON' || rawPower === true || rawPower === 'true';
 
-  const { isOverrideActive, formattedTime } = useOverrideCountdown(device.manualOverrideUntil);
+  const [overrideUntil, setOverrideUntil] = useState<string | null | undefined>(device.manualOverrideUntil);
+
+  useEffect(() => {
+    setOverrideUntil(device.manualOverrideUntil);
+  }, [device.manualOverrideUntil]);
+
+  const { isOverrideActive, formattedTime } = useOverrideCountdown(overrideUntil);
   const [isOverrideModalOpen, setIsOverrideModalOpen] = useState(false);
 
   const [brightness, setBrightness] = useState<number>(
@@ -46,13 +46,68 @@ export const LightCard: React.FC<LightCardProps> = ({
       ? Number(device.currentState.brightness)
       : 80
   );
+  const isDraggingRef = useRef(false);
+  const pendingBrightnessRef = useRef<number | null>(null);
 
-  const rgbColor = device.currentState?.color as
-    | { r: number; g: number; b: number }
-    | undefined;
+  const rgbColor = resolveDeviceRgb(device.currentState);
+
+  const [customColors, setCustomColors] = useState<CustomColorOption[]>(() => {
+    if (Array.isArray(device.settings?.customColors) && device.settings.customColors.length > 0) {
+      return device.settings.customColors;
+    }
+    try {
+      const raw = localStorage.getItem(`hesta_custom_colors_${device.id}`);
+      if (raw !== null) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          return parsed;
+        }
+      }
+    } catch (err) {
+      console.error('Lỗi đọc custom colors từ localStorage:', err);
+    }
+    return DEFAULT_SEED;
+  });
 
   useEffect(() => {
-    if (typeof device.currentState?.brightness === 'number') {
+    const loadColors = () => {
+      if (Array.isArray(device.settings?.customColors) && device.settings.customColors.length > 0) {
+        setCustomColors(device.settings.customColors);
+        return;
+      }
+      try {
+        const raw = localStorage.getItem(`hesta_custom_colors_${device.id}`);
+        if (raw !== null) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            setCustomColors(parsed);
+            return;
+          }
+        }
+      } catch (err) {
+        console.error('Lỗi đọc custom colors từ localStorage:', err);
+      }
+      setCustomColors(DEFAULT_SEED);
+    };
+
+    loadColors();
+
+    const handleUpdate = (e: Event) => {
+      const customEvt = e as CustomEvent<{ deviceId?: string }>;
+      if (!customEvt.detail?.deviceId || customEvt.detail.deviceId === device.id) {
+        loadColors();
+      }
+    };
+
+    window.addEventListener('hesta_custom_colors_updated', handleUpdate);
+    return () => {
+      window.removeEventListener('hesta_custom_colors_updated', handleUpdate);
+    };
+  }, [device.id, device.settings?.customColors]);
+
+  useEffect(() => {
+    // Chỉ đồng bộ độ sáng từ server khi người dùng KHÔNG đang giữ chuột kéo (chống giật con trượt)
+    if (!isDraggingRef.current && typeof device.currentState?.brightness === 'number') {
       setBrightness(Number(device.currentState.brightness));
     }
   }, [device.currentState?.brightness]);
@@ -63,47 +118,98 @@ export const LightCard: React.FC<LightCardProps> = ({
     onTogglePower?.(device.id, isOn ? 'ON' : 'OFF');
   };
 
+  const brightnessThrottleRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (brightnessThrottleRef.current) {
+        window.clearTimeout(brightnessThrottleRef.current);
+      }
+    };
+  }, []);
+
   const handleBrightnessChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = Number(e.target.value);
-    setBrightness(val);
-    if (!isOn && val > 0 && onTogglePower) {
-      onTogglePower(device.id, 'OFF');
+    setBrightness(val); // Phản hồi 60Hz siêu tốc nội bộ thẻ, KHÔNG gọi onStateChange gây re-render cả trang!
+
+    // Throttled gửi lệnh backend 80ms không làm nghẽn broker
+    pendingBrightnessRef.current = val;
+    if (brightnessThrottleRef.current) {
+      window.clearTimeout(brightnessThrottleRef.current);
     }
+    brightnessThrottleRef.current = window.setTimeout(() => {
+      if (pendingBrightnessRef.current !== null) {
+        void sendDeviceCommand(device.id, 'SET_BRIGHTNESS', { brightness: pendingBrightnessRef.current }).catch(() => {});
+      }
+    }, 80);
   };
 
-  const syncBrightnessToBackend = async () => {
+  const handleBrightnessPointerDown = () => {
+    isDraggingRef.current = true;
+  };
+
+  const handleBrightnessPointerUp = async () => {
+    isDraggingRef.current = false;
     if (isOffline) return;
+    if (brightnessThrottleRef.current) {
+      window.clearTimeout(brightnessThrottleRef.current);
+    }
+    // Commit lên trang cha đúng 1 lần khi người dùng nhấc tay ra
+    onStateChange?.({
+      ...device,
+      currentState: {
+        ...device.currentState,
+        brightness,
+        power: brightness > 0 ? 'ON' : device.currentState?.power,
+      },
+    });
     try {
       await sendDeviceCommand(device.id, 'SET_BRIGHTNESS', { brightness });
     } catch (err) {
-      if (isDuplicateCommandError(err)) {
-        notify.warning('Thiết bị đang thực thi lệnh trước, vui lòng không click liên tục.');
-      } else {
+      if (!isDuplicateCommandError(err)) {
         notify.error(getErrorMessage(err, 'Lỗi chỉnh độ sáng'));
       }
     }
   };
 
-  const handleApplyColor = async (preset: (typeof COLOR_PRESETS)[0], e: React.MouseEvent) => {
+  const handleApplyColor = async (p: CustomColorOption, e: React.MouseEvent) => {
     e.stopPropagation();
     if (isOffline) return;
+    const previousState = device.currentState;
+
+    // 1. Instant zero-latency UI response: glow and card theme change immediately
+    onStateChange?.({
+      ...device,
+      currentState: {
+        ...device.currentState,
+        power: 'ON',
+        color: { r: p.rgb[0], g: p.rgb[1], b: p.rgb[2] },
+        r: p.rgb[0],
+        g: p.rgb[1],
+        b: p.rgb[2],
+      },
+    });
+
+    // Instant tactile notification so user gets feedback within 0ms
+    notify.success('Đã đổi màu đèn', `Màu: ${p.name}`);
+
     try {
-      await sendDeviceCommand(device.id, 'SET_COLOR', {
-        r: preset.r,
-        g: preset.g,
-        b: preset.b,
+      await sendDeviceCommand(device.id, 'SET_RGB', {
+        r: p.rgb[0],
+        g: p.rgb[1],
+        b: p.rgb[2],
         brightness: brightness || 100,
       });
-      notify.success(`Màu: ${preset.label}`);
-      if (!isOn && onTogglePower) {
-        onTogglePower(device.id, 'OFF');
-      }
     } catch (err) {
       if (isDuplicateCommandError(err)) {
-        notify.warning('Thiết bị đang thực thi lệnh trước, vui lòng không click liên tục.');
-      } else {
-        notify.error(getErrorMessage(err, 'Lỗi đổi màu đèn'));
+        return; // Suppress duplicate toast on rapid color switches
       }
+      // Rollback on genuine error
+      onStateChange?.({
+        ...device,
+        currentState: previousState,
+      });
+      notify.error(getErrorMessage(err, 'Lỗi đổi màu đèn'));
     }
   };
 
@@ -114,30 +220,43 @@ export const LightCard: React.FC<LightCardProps> = ({
 
   const glowShadow = isOn
     ? isRgb
-      ? `0 4px 20px -2px ${currentRgbCss}40`
-      : `0 4px 20px -2px rgba(251, 191, 36, ${(brightness / 100) * 0.4})`
-    : undefined;
+      ? `0 10px 28px -4px ${currentRgbCss}35, inset 0 1px 1px 0 rgba(255, 255, 255, 0.9)`
+      : `0 10px 28px -4px rgba(251, 191, 36, ${(brightness / 100) * 0.45}), inset 0 1px 1px 0 rgba(255, 255, 255, 0.9)`
+    : '0 2px 8px -2px rgba(0, 0, 0, 0.04)';
 
   return (
-    <article
+    <motion.article
       role="button"
       tabIndex={0}
+      whileHover={{ translateY: -3 }}
+      whileTap={{ scale: 0.985 }}
+      transition={{ type: 'spring', stiffness: 450, damping: 25 }}
       onClick={() => onClick?.(device.id)}
       onKeyDown={(e) => e.key === 'Enter' && onClick?.(device.id)}
       style={{ boxShadow: glowShadow }}
-      className={`relative flex flex-col justify-between p-4 sm:p-5 rounded-2xl border transition-all duration-200 select-none cursor-pointer ${
+      className={`relative flex flex-col justify-between p-4 sm:p-5 rounded-2xl border transition-all duration-300 select-none cursor-pointer overflow-hidden transform-gpu ${
         isOffline
           ? 'bg-off-soft/60 border-line/50 opacity-70 grayscale'
           : isOn
           ? isPlug
-            ? 'bg-gradient-to-br from-white via-emerald-50/40 to-emerald-100/30 border-emerald-200 shadow-sm hover:shadow-md'
+            ? 'bg-gradient-to-br from-white via-emerald-50/50 to-emerald-100/35 border-emerald-300/80 shadow-sm'
             : isRgb
-            ? 'bg-gradient-to-br from-white via-violet-50/40 to-violet-100/30 border-violet-200 shadow-sm hover:shadow-md'
-            : 'bg-gradient-to-br from-white via-amber-50/40 to-amber-100/30 border-amber-200 shadow-sm hover:shadow-md'
+            ? 'bg-gradient-to-br from-white via-violet-50/45 to-violet-100/35 border-violet-300/80 shadow-sm'
+            : 'bg-gradient-to-br from-white via-amber-50/50 to-amber-100/35 border-amber-300/80 shadow-sm'
           : 'bg-white border-line hover:bg-off-soft/40 shadow-xs'
       }`}
       aria-label={`${device.name} — ${isOn ? 'Đang bật' : 'Đang tắt'}`}
     >
+      {/* Dynamic Ambient Glow Spotlight */}
+      {isOn && (
+        <div
+          className="absolute -top-12 -right-12 w-44 h-44 rounded-full pointer-events-none opacity-30 transition-all duration-500"
+          style={{
+            background: `radial-gradient(circle, ${isRgb ? currentRgbCss : '#f59e0b'} 0%, transparent 70%)`,
+            filter: 'blur(20px)',
+          }}
+        />
+      )}
       {/* ── TOP ROW: Icon + Title + Switch ── */}
       <div className="flex items-center justify-between gap-3 mb-3">
         <div className="flex items-center gap-3 min-w-0">
@@ -215,9 +334,13 @@ export const LightCard: React.FC<LightCardProps> = ({
                   ? 'bg-violet-100 text-violet-700 hover:bg-violet-200'
                   : 'bg-amber-100 text-amber-700 hover:bg-amber-200'
                 : 'bg-sidebar border border-line text-icon hover:bg-sidebar-hover hover:text-text'
-            } ${powerPending ? 'animate-pulse' : 'active:scale-95'}`}
+            } ${powerPending ? 'opacity-70 cursor-wait' : 'active:scale-95'}`}
           >
-            <Power className="w-4 h-4" />
+            {powerPending ? (
+              <Loader2 className="w-4 h-4 animate-spin text-primary" />
+            ) : (
+              <Power className="w-4 h-4" />
+            )}
           </button>
         </div>
       </div>
@@ -228,7 +351,7 @@ export const LightCard: React.FC<LightCardProps> = ({
           <div className="relative h-10 w-full bg-slate-100 rounded-xl overflow-hidden flex items-center select-none cursor-pointer border border-line/60">
             {/* Active Slider Track Fill */}
             <div
-              className={`absolute left-0 top-0 bottom-0 transition-all ${
+              className={`absolute left-0 top-0 bottom-0 transition-colors duration-200 ${
                 isOn
                   ? isRgb
                     ? 'bg-gradient-to-r from-violet-300 to-violet-500 opacity-90'
@@ -248,9 +371,11 @@ export const LightCard: React.FC<LightCardProps> = ({
               max={100}
               value={brightness}
               disabled={isOffline}
+              onPointerDown={handleBrightnessPointerDown}
+              onTouchStart={handleBrightnessPointerDown}
               onChange={handleBrightnessChange}
-              onPointerUp={syncBrightnessToBackend}
-              onTouchEnd={syncBrightnessToBackend}
+              onPointerUp={handleBrightnessPointerUp}
+              onTouchEnd={handleBrightnessPointerUp}
               className="absolute inset-0 w-full h-full opacity-0 cursor-ew-resize disabled:cursor-not-allowed z-20"
               aria-label={`Độ sáng ${device.name}`}
             />
@@ -266,16 +391,16 @@ export const LightCard: React.FC<LightCardProps> = ({
           </div>
 
           {/* Quick Color Swatches for LED_RGB */}
-          {isRgb && (
-            <div className="flex items-center justify-between gap-1 pt-1">
-              {COLOR_PRESETS.map((p, idx) => (
+          {isRgb && customColors.length > 0 && (
+            <div className="flex items-center justify-start gap-1.5 pt-1 overflow-x-auto no-scrollbar">
+              {customColors.map((p) => (
                 <button
-                  key={idx}
+                  key={p.id}
                   type="button"
-                  title={p.label}
+                  title={p.name}
                   disabled={isOffline}
                   onClick={(e) => handleApplyColor(p, e)}
-                  className={`w-6 h-6 rounded-full border-2 border-white shadow-xs transition-transform ${
+                  className={`w-6 h-6 rounded-full border-2 border-white shadow-xs shrink-0 transition-transform ${
                     isOffline ? 'opacity-30' : 'hover:scale-125 active:scale-95'
                   }`}
                   style={{ backgroundColor: p.hex }}
@@ -303,7 +428,30 @@ export const LightCard: React.FC<LightCardProps> = ({
         deviceId={device.id}
         deviceName={device.name}
         formattedTime={formattedTime}
+        onOverrideChanged={(newUntil) => {
+          setOverrideUntil(newUntil);
+          onStateChange?.({
+            ...device,
+            manualOverrideUntil: newUntil,
+            manualOverrideActive: Boolean(newUntil),
+          });
+        }}
       />
-    </article>
+    </motion.article>
   );
 };
+
+export const LightCard = React.memo(LightCardComponent, (prev, next) => {
+  return (
+    prev.device.id === next.device.id &&
+    prev.device.status === next.device.status &&
+    prev.powerPending === next.powerPending &&
+    prev.device.name === next.device.name &&
+    prev.device.currentState?.power === next.device.currentState?.power &&
+    prev.device.currentState?.brightness === next.device.currentState?.brightness &&
+    prev.device.currentState?.r === next.device.currentState?.r &&
+    prev.device.currentState?.g === next.device.currentState?.g &&
+    prev.device.currentState?.b === next.device.currentState?.b &&
+    prev.device.manualOverrideUntil === next.device.manualOverrideUntil
+  );
+});

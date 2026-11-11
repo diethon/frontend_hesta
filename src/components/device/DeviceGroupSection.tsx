@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Layers,
   Plus,
@@ -35,8 +35,18 @@ export const DeviceGroupSection: React.FC<DeviceGroupSectionProps> = ({
   const [groups, setGroups] = useState<DeviceGroupResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isExpanded, setIsExpanded] = useState(false);
-  const [executingGroupId, setExecutingGroupId] = useState<string | null>(null);
+  const [executingGroupIds, setExecutingGroupIds] = useState<Record<string, boolean>>({});
   const [groupFeedback, setGroupFeedback] = useState<Record<string, string>>({});
+  const [groupBrightness, setGroupBrightness] = useState<Record<string, number>>({});
+  const debounceTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const feedbackTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
+  useEffect(() => {
+    return () => {
+      Object.values(debounceTimersRef.current).forEach((timer) => clearTimeout(timer));
+      Object.values(feedbackTimersRef.current).forEach((timer) => clearTimeout(timer));
+    };
+  }, []);
 
   // Modal create group state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -96,6 +106,10 @@ export const DeviceGroupSection: React.FC<DeviceGroupSectionProps> = ({
 
   const handleDeleteGroup = async (groupId: string, name: string) => {
     if (!window.confirm(`Bạn có chắc muốn xóa nhóm "${name}"?`)) return;
+    if (debounceTimersRef.current[groupId]) {
+      clearTimeout(debounceTimersRef.current[groupId]);
+      delete debounceTimersRef.current[groupId];
+    }
     try {
       await deleteDeviceGroup(groupId);
       notify(`Đã xóa nhóm "${name}"`, 'success');
@@ -106,48 +120,110 @@ export const DeviceGroupSection: React.FC<DeviceGroupSectionProps> = ({
   };
 
   const handleGroupPower = async (groupId: string, powerAction: 'TURN_ON' | 'TURN_OFF') => {
-    setExecutingGroupId(groupId);
+    // RACE CONDITION FIX: Clear any pending debounce dimmer commands for this group!
+    if (debounceTimersRef.current[groupId]) {
+      clearTimeout(debounceTimersRef.current[groupId]);
+      delete debounceTimersRef.current[groupId];
+    }
+
+    setExecutingGroupIds((prev) => ({ ...prev, [groupId]: true }));
     setGroupFeedback((prev) => ({ ...prev, [groupId]: 'Đang gửi lệnh đồng thời...' }));
     try {
       const res = await sendGroupCommand(groupId, powerAction);
+      const isSuccess = (res.successCount ?? 0) > 0;
       setGroupFeedback((prev) => ({
         ...prev,
-        [groupId]: `✓ ${res.successCount}/${res.totalDevices} thiết bị thành công`
+        [groupId]: isSuccess
+          ? `✓ ${res.successCount}/${res.totalDevices} thiết bị thành công`
+          : `⚠ 0/${res.totalDevices} thiết bị phản hồi`
       }));
-      notify(
-        `Đã ${powerAction === 'TURN_ON' ? 'bật' : 'tắt'} nhóm (${res.successCount}/${res.totalDevices} thiết bị)`,
-        'success'
-      );
+      if (isSuccess) {
+        notify(
+          `Đã ${powerAction === 'TURN_ON' ? 'bật' : 'tắt'} nhóm (${res.successCount}/${res.totalDevices} thiết bị)`,
+          'success'
+        );
+      } else {
+        notify(
+          `Không có thiết bị nào trong nhóm phản hồi lệnh ${powerAction === 'TURN_ON' ? 'bật' : 'tắt'}`,
+          'error'
+        );
+      }
       onRefreshDevices?.();
     } catch {
       setGroupFeedback((prev) => ({ ...prev, [groupId]: 'Lỗi thực thi lệnh' }));
       notify('Lỗi khi điều khiển nhóm thiết bị', 'error');
     } finally {
-      setExecutingGroupId(null);
-      setTimeout(() => {
+      setExecutingGroupIds((prev) => {
+        const next = { ...prev };
+        delete next[groupId];
+        return next;
+      });
+      if (feedbackTimersRef.current[groupId]) {
+        clearTimeout(feedbackTimersRef.current[groupId]);
+      }
+      feedbackTimersRef.current[groupId] = setTimeout(() => {
         setGroupFeedback((prev) => {
           const next = { ...prev };
           delete next[groupId];
           return next;
         });
+        delete feedbackTimersRef.current[groupId];
       }, 4000);
     }
   };
 
-  const handleMasterBrightness = async (groupId: string, brightnessVal: number) => {
-    setExecutingGroupId(groupId);
+  const handleGroupBrightnessChange = async (groupId: string, brightnessVal: number) => {
+    setExecutingGroupIds((prev) => ({ ...prev, [groupId]: true }));
     try {
       const res = await sendGroupCommand(groupId, 'SET_BRIGHTNESS', { brightness: brightnessVal });
+      const isSuccess = (res.successCount ?? 0) > 0;
       setGroupFeedback((prev) => ({
         ...prev,
-        [groupId]: `✓ Độ sáng ${brightnessVal}% (${res.successCount}/${res.totalDevices})`
+        [groupId]: isSuccess
+          ? `✓ Độ sáng ${brightnessVal}% (${res.successCount}/${res.totalDevices})`
+          : `⚠ 0/${res.totalDevices} thiết bị cập nhật`
       }));
+      if (!isSuccess) {
+        notify(`Không có thiết bị nào trong nhóm áp dụng độ sáng`, 'error');
+      }
       onRefreshDevices?.();
     } catch {
       notify('Lỗi khi chỉnh độ sáng nhóm', 'error');
     } finally {
-      setExecutingGroupId(null);
+      setExecutingGroupIds((prev) => {
+        const next = { ...prev };
+        delete next[groupId];
+        return next;
+      });
     }
+  };
+
+  const handleSliderChange = (groupId: string, val: number) => {
+    setGroupBrightness((prev) => ({ ...prev, [groupId]: val }));
+    if (debounceTimersRef.current[groupId]) {
+      clearTimeout(debounceTimersRef.current[groupId]);
+    }
+    debounceTimersRef.current[groupId] = setTimeout(() => {
+      handleGroupBrightnessChange(groupId, val);
+      delete debounceTimersRef.current[groupId];
+    }, 250);
+  };
+
+  const handleSliderCommit = (groupId: string, val: number) => {
+    if (debounceTimersRef.current[groupId]) {
+      clearTimeout(debounceTimersRef.current[groupId]);
+      delete debounceTimersRef.current[groupId];
+    }
+    handleGroupBrightnessChange(groupId, val);
+  };
+
+  const handlePresetClick = (groupId: string, b: number) => {
+    if (debounceTimersRef.current[groupId]) {
+      clearTimeout(debounceTimersRef.current[groupId]);
+      delete debounceTimersRef.current[groupId];
+    }
+    setGroupBrightness((prev) => ({ ...prev, [groupId]: b }));
+    handleGroupBrightnessChange(groupId, b);
   };
 
   return (
@@ -166,7 +242,7 @@ export const DeviceGroupSection: React.FC<DeviceGroupSectionProps> = ({
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-base font-bold text-text">Nhóm thiết bị ảo (Master Control)</h2>
+              <h2 className="text-base font-bold text-text">Nhóm thiết bị thông minh</h2>
               <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-off-soft text-muted border border-line">
                 {groups.length} nhóm
               </span>
@@ -218,7 +294,7 @@ export const DeviceGroupSection: React.FC<DeviceGroupSectionProps> = ({
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5">
               {groups.map((group) => {
-                const isBusy = executingGroupId === group.id;
+                const isBusy = !!executingGroupIds[group.id];
                 const feedback = groupFeedback[group.id];
 
                 return (
@@ -262,7 +338,7 @@ export const DeviceGroupSection: React.FC<DeviceGroupSectionProps> = ({
                       </div>
                     </div>
 
-                    {/* Master Actions */}
+                    {/* Group Actions */}
                     <div className="space-y-2 pt-2 border-t border-line/60">
                       {feedback && (
                         <div className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
@@ -291,17 +367,38 @@ export const DeviceGroupSection: React.FC<DeviceGroupSectionProps> = ({
                         </button>
                       </div>
 
-                      {/* Master Brightness Preset slider / button */}
-                      <div className="flex items-center gap-1.5 pt-1">
-                        <SunMedium className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                        <span className="text-[11px] text-muted font-medium shrink-0">Độ sáng:</span>
-                        <div className="flex items-center gap-1 flex-1">
-                          {[30, 60, 100].map((b) => (
+                      {/* Group Brightness Slider & Presets */}
+                      <div className="space-y-1.5 pt-1">
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="flex items-center gap-1.5 text-muted font-medium">
+                            <SunMedium className="w-3.5 h-3.5 text-amber-500" />
+                            Độ sáng chung nhóm
+                          </span>
+                          <span className="font-bold text-text">{groupBrightness[group.id] ?? 80}%</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="1"
+                          max="100"
+                          value={groupBrightness[group.id] ?? 80}
+                          disabled={isBusy}
+                          onChange={(e) => handleSliderChange(group.id, Number(e.target.value))}
+                          onPointerUp={(e) => handleSliderCommit(group.id, Number((e.target as HTMLInputElement).value))}
+                          onKeyUp={(e) => {
+                            if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End'].includes(e.key)) {
+                              handleSliderCommit(group.id, Number((e.target as HTMLInputElement).value));
+                            }
+                          }}
+                          className="w-full h-1.5 bg-line rounded-lg appearance-none cursor-pointer accent-amber-500 disabled:opacity-50"
+                          title="Kéo hoặc dùng phím mũi tên để điều chỉnh độ sáng đồng loạt cho cả nhóm"
+                        />
+                        <div className="flex items-center gap-1">
+                          {[25, 50, 75, 100].map((b) => (
                             <button
                               key={b}
                               type="button"
                               disabled={isBusy}
-                              onClick={() => handleMasterBrightness(group.id, b)}
+                              onClick={() => handlePresetClick(group.id, b)}
                               className="flex-1 py-0.5 text-[10px] font-bold rounded-md border border-line bg-surface hover:bg-amber-50 hover:border-amber-200 hover:text-amber-800 text-text transition-colors"
                             >
                               {b}%
@@ -368,11 +465,12 @@ export const DeviceGroupSection: React.FC<DeviceGroupSectionProps> = ({
                             type="checkbox"
                             checked={isSelected}
                             onChange={(e) => {
-                              if (e.target.checked) {
-                                setSelectedDeviceIds([...selectedDeviceIds, d.id]);
-                              } else {
-                                setSelectedDeviceIds(selectedDeviceIds.filter((id) => id !== d.id));
-                              }
+                              const isChecked = e.target.checked;
+                              setSelectedDeviceIds((prev) =>
+                                isChecked
+                                  ? (prev.includes(d.id) ? prev : [...prev, d.id])
+                                  : prev.filter((id) => id !== d.id)
+                              );
                             }}
                             className="rounded border-line text-primary focus:ring-0"
                           />

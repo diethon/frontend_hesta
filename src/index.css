@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "./components/twin/v2/dashboard.css";
+@import "./components/home/dashboard.css";
 
 .hesta-toast {
   opacity: 1;
@@ -415,7 +416,6 @@ textarea:disabled {
 }
 
 .auth-surface {
-  max-width: calc(100vw - 2rem);
   min-width: 0;
   border: 1px solid #dceaf2;
   border-radius: 1.5rem;
@@ -598,6 +598,42 @@ textarea:disabled {
   transform: scale(0.97);
 }
 
+/* ===== Modern Smart Home Glassmorphism & React-Colorful Overrides ===== */
+.react-colorful {
+  width: 100% !important;
+  height: 180px !important;
+  border-radius: 1rem !important;
+  border: 1px solid var(--color-line) !important;
+  overflow: hidden !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+}
+
+.react-colorful__saturation {
+  border-radius: 0.875rem 0.875rem 0 0 !important;
+}
+
+.react-colorful__hue {
+  height: 22px !important;
+  border-radius: 0 0 0.875rem 0.875rem !important;
+}
+
+.react-colorful__pointer {
+  width: 22px !important;
+  height: 22px !important;
+  border: 2.5px solid #ffffff !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35) !important;
+}
+
+.glass-card {
+  backdrop-filter: blur(16px);
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  box-shadow:
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.9),
+    0 8px 24px -4px rgba(0, 0, 0, 0.06);
+}
+
+
 /* The mock apartment shares the product shell; evening lighting is scene-only. */
 .twin-demo-stage {
   height: clamp(29rem, 48vw, 43rem);
@@ -730,7 +766,7 @@ textarea:disabled {
   background: var(--color-primary);
 }
 
-.twin-control-form > button {
+.twin-control-form>button {
   width: 100%;
   justify-content: center;
   border-color: transparent;
@@ -738,7 +774,7 @@ textarea:disabled {
   font-size: .75rem;
 }
 
-.twin-control-form > button:hover:not(:disabled) {
+.twin-control-form>button:hover:not(:disabled) {
   background: var(--color-sidebar-hover);
 }
 
@@ -788,10 +824,25 @@ textarea:disabled {
   align-items: start;
 }
 
-.twin-scene-column { grid-area: scene; container-type: inline-size; }
-.twin-dashboard-analytics { grid-area: analytics; }
-.twin-explorer-column { grid-area: explorer; height: 100%; }
-.twin-controls-column { grid-area: controls; min-width: 0; }
+.twin-scene-column {
+  grid-area: scene;
+  container-type: inline-size;
+}
+
+.twin-dashboard-analytics {
+  grid-area: analytics;
+}
+
+.twin-explorer-column {
+  grid-area: explorer;
+  height: 100%;
+}
+
+.twin-controls-column {
+  grid-area: controls;
+  min-width: 0;
+}
+
 .twin-stage-caption {
   border-radius: .75rem;
   padding: .5rem .75rem;
@@ -804,18 +855,29 @@ textarea:disabled {
   background: var(--color-app);
 }
 
-.twin-dashboard-analytics article > p {
+.twin-dashboard-analytics article>p {
   white-space: normal;
   overflow-wrap: anywhere;
 }
 
 @media (min-width: 768px) {
-  .twin-metric-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .twin-metric-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
 }
 
 @media (min-width: 1024px) {
-  .twin-dashboard-header { display: grid; grid-template-columns: minmax(15rem, 1fr) auto; align-items: center; gap: 1.5rem; }
-  .twin-dashboard-header > div:nth-child(2) { margin-top: 0; gap: 1rem; }
+  .twin-dashboard-header {
+    display: grid;
+    grid-template-columns: minmax(15rem, 1fr) auto;
+    align-items: center;
+    gap: 1.5rem;
+  }
+
+  .twin-dashboard-header>div:nth-child(2) {
+    margin-top: 0;
+    gap: 1rem;
+  }
 }
 
 .twin-premium-dashboard .twin-living-stage {
@@ -835,7 +897,9 @@ textarea:disabled {
   scrollbar-color: var(--color-line) transparent;
 }
 
-.twin-controls-scroll { max-height: var(--twin-dashboard-scene-height); }
+.twin-controls-scroll {
+  max-height: var(--twin-dashboard-scene-height);
+}
 
 .twin-house-explorer {
   min-width: 0;
@@ -886,8 +950,15 @@ textarea:disabled {
 }
 
 @keyframes twin-panel-appear {
-  from { opacity: 0; transform: translateY(.75rem); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(.75rem);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* Leave room for the shared 16rem HESTA navigation at laptop widths. */
@@ -896,6 +967,7 @@ textarea:disabled {
     grid-template-areas: "scene controls" "analytics controls";
     grid-template-columns: minmax(0, 1fr) 18rem;
   }
+
   .twin-premium-layout[data-controls-collapsed="true"] {
     grid-template-areas: "scene" "analytics";
     grid-template-columns: minmax(0, 1fr);
@@ -907,14 +979,17 @@ textarea:disabled {
     grid-template-areas: "explorer scene controls" "analytics analytics controls";
     grid-template-columns: 13rem minmax(0, 1fr) 18rem;
   }
+
   .twin-premium-layout[data-explorer-collapsed="true"] {
     grid-template-areas: "scene controls" "analytics controls";
     grid-template-columns: minmax(0, 1fr) 18rem;
   }
+
   .twin-premium-layout[data-controls-collapsed="true"] {
     grid-template-areas: "explorer scene" "analytics analytics";
     grid-template-columns: 13rem minmax(0, 1fr);
   }
+
   .twin-premium-layout[data-controls-collapsed="true"][data-explorer-collapsed="true"] {
     grid-template-areas: "scene" "analytics";
     grid-template-columns: minmax(0, 1fr);
@@ -935,7 +1010,9 @@ textarea:disabled {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .twin-panel-dialog[open] { animation: none; }
+  .twin-panel-dialog[open] {
+    animation: none;
+  }
 }
 
 /* ── Voice Assistant ── */
