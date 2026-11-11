@@ -34,7 +34,7 @@ import {
   RotateCw,
   ArrowLeft,
 } from "lucide-react";
-import { currentHomeChanged, currentHomeCleared } from "../../store/homeSlice";
+import { currentHomeDetailsChanged, currentHomeCleared } from "../../store/homeSlice";
 import { useAppDispatch } from "../../store/hooks";
 import { getErrorMessage } from "../../utils/errors";
 import { notify } from '../ui/notify';
@@ -163,8 +163,12 @@ export const HomePage: React.FC<HomePageProps> = ({
   }, [location.hash, location.key, userHome, navigate]);
 
   useEffect(() => {
-    dispatch(currentHomeChanged(userHome?.homeId ?? null));
-  }, [dispatch, userHome?.homeId]);
+    dispatch(currentHomeDetailsChanged({
+      homeId: userHome?.homeId ?? null,
+      role: userHome?.role ?? null,
+      accessScope: userHome?.accessScope ?? null,
+    }));
+  }, [dispatch, userHome?.homeId, userHome?.role, userHome?.accessScope]);
 
   useEffect(
     () => () => {

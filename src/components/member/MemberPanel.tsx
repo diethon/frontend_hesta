@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import type { HomeMember } from '../../services/homeApi';
+import { updateMemberAccess, type HomeMember, type UpdateMemberAccessPayload } from '../../services/homeApi';
 import { UserAvatar } from '../ui/UserAvatar';
 import { Icon } from '../home/HomeIcons';
 import { sanitizeMemberName, formatJoinDate } from './MemberCard';
 import { ConfirmModal } from '../ui/ConfirmModal';
+import { AccessEditor } from './AccessEditor';
 
 export interface MemberPanelProps {
+  homeId: string;
   member: HomeMember | null;
   isOpen: boolean;
   currentUserRole: 'OWNER' | 'MEMBER';
@@ -13,9 +15,11 @@ export interface MemberPanelProps {
   onClose: () => void;
   onUpdateRole: (memberId: string, newRole: 'OWNER' | 'MEMBER') => Promise<void>;
   onRemoveMember: (member: HomeMember) => void;
+  onAccessUpdated?: () => void;
 }
 
 export const MemberPanel: React.FC<MemberPanelProps> = ({
+  homeId,
   member,
   isOpen,
   currentUserRole,
@@ -23,6 +27,7 @@ export const MemberPanel: React.FC<MemberPanelProps> = ({
   onClose,
   onUpdateRole,
   onRemoveMember,
+  onAccessUpdated,
 }) => {
   const [selectedRole, setSelectedRole] = useState<'OWNER' | 'MEMBER'>('MEMBER');
   const [savingRole, setSavingRole] = useState(false);
@@ -73,6 +78,12 @@ export const MemberPanel: React.FC<MemberPanelProps> = ({
       setSavingRole(false);
       setShowPromoteConfirm(false);
     }
+  };
+
+  const handleSaveAccess = async (payload: UpdateMemberAccessPayload) => {
+    if (!homeId || !member) return;
+    await updateMemberAccess(homeId, member.id, payload);
+    onAccessUpdated?.();
   };
 
   return (
@@ -238,6 +249,21 @@ export const MemberPanel: React.FC<MemberPanelProps> = ({
               </div>
             )}
           </section>
+
+          {/* Section: Quyền truy cập */}
+          {canEditRole && (
+            <section className="space-y-3">
+              <h4 className="text-xs font-semibold text-[var(--secondary)]">
+                Quyền truy cập
+              </h4>
+              <AccessEditor
+                homeId={homeId}
+                targetUserId={member.id}
+                onSave={handleSaveAccess}
+                showSaveButton={true}
+              />
+            </section>
+          )}
 
           {/* Section: Thông tin */}
           <section className="space-y-3">

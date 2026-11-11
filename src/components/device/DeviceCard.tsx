@@ -36,6 +36,8 @@ export interface DeviceCardProps {
  * Dispatches specialized UI cards with inline controls according to device type.
  */
 const DeviceCardComponent: React.FC<DeviceCardProps> = (props) => {
+  if (props.device.accessLevel === 'NONE') return null;
+
   const effectiveType = resolveEffectiveType(props.device);
 
   switch (effectiveType) {

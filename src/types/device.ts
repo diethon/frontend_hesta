@@ -49,6 +49,7 @@ export interface DeviceResponse {
   manualOverrideActive?: boolean;
   lastSeen?: string;
   settings?: Record<string, any>;
+  accessLevel?: 'NONE' | 'VIEW' | 'CONTROL';
 }
 
 export interface DeviceUpdateRequest {

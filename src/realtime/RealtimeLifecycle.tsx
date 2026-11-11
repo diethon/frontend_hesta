@@ -1,6 +1,10 @@
 import { useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { selectAccessToken, selectCurrentHomeId } from '../store/selectors';
+import {
+  selectAccessToken,
+  selectCurrentHomeId,
+  selectCurrentHomeAccessScope,
+} from '../store/selectors';
 import {
   connectionStatusChanged,
   homeSubscriptionChanged,
@@ -14,6 +18,8 @@ export function RealtimeLifecycle() {
   const dispatch = useAppDispatch();
   const accessToken = useAppSelector(selectAccessToken);
   const currentHomeId = useAppSelector(selectCurrentHomeId);
+  const currentAccessScope = useAppSelector(selectCurrentHomeAccessScope);
+  const isCustom = currentAccessScope === 'CUSTOM';
 
   useEffect(() => {
     realtimeClient.setCallbacks({
@@ -36,12 +42,12 @@ export function RealtimeLifecycle() {
   }, [accessToken]);
 
   useEffect(() => {
-    if (currentHomeId) realtimeClient.subscribeToHome(currentHomeId);
+    if (currentHomeId) realtimeClient.subscribeToHome(currentHomeId, isCustom);
     else realtimeClient.unsubscribeFromHome();
     return () => {
       realtimeClient.unsubscribeFromHome(currentHomeId ?? undefined);
     };
-  }, [currentHomeId]);
+  }, [currentHomeId, isCustom]);
 
   return null;
 }

@@ -136,9 +136,20 @@ export const MemberRow: React.FC<MemberRowProps> = ({
             Chủ nhà
           </span>
         ) : (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[var(--muted)] text-[var(--secondary)] border border-[var(--border)] shrink-0">
-            Thành viên
-          </span>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[var(--muted)] text-[var(--secondary)] border border-[var(--border)] shrink-0">
+              Thành viên
+            </span>
+            {canManage && (
+              <span className="hidden md:inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-[var(--muted)] text-[var(--secondary)] border border-[var(--border)] shrink-0">
+                {member.accessSummary?.allAccess || member.accessScope === 'ALL' || (!member.accessSummary && !member.accessScope)
+                  ? 'Toàn bộ nhà'
+                  : `${member.accessSummary?.roomCount ?? member.accessRoomCount ?? 0} phòng · ${
+                      member.accessSummary?.deviceCount ?? member.accessDeviceOverrideCount ?? 0
+                    } thiết bị`}
+              </span>
+            )}
+          </div>
         )}
 
         {/* "⋯" Action Menu (44px target) or Reserved Spacer */}

@@ -353,6 +353,7 @@ export function MemberPage({ embeddedHomeId, embeddedUserRole }: MemberPageProps
 
       {/* Member Details Right Panel */}
       <MemberPanel
+        homeId={homeId}
         member={selectedMember}
         isOpen={panelOpen}
         currentUserRole={currentUserRole}
@@ -365,6 +366,7 @@ export function MemberPage({ embeddedHomeId, embeddedUserRole }: MemberPageProps
         onRemoveMember={(m) => {
           setMemberToRemove(m);
         }}
+        onAccessUpdated={loadMembers}
       />
 
       {/* Invite Member Dialog */}

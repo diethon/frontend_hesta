@@ -462,9 +462,16 @@ const AcCardComponent: React.FC<AcCardProps> = ({
             />
           </div>
           <div className="min-w-0">
-            <h3 className="font-bold text-base sm:text-lg text-slate-800 leading-tight truncate">
-              {device.name || 'Điều khiển Máy lạnh'}
-            </h3>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="font-bold text-base sm:text-lg text-slate-800 leading-tight truncate">
+                {device.name || 'Điều khiển Máy lạnh'}
+              </h3>
+              {device.accessLevel === 'VIEW' && (
+                <span className="inline-flex items-center px-2 py-0.5 text-[10px] font-semibold rounded-md bg-amber-500/10 text-amber-600 border border-amber-500/20">
+                  Chỉ xem
+                </span>
+              )}
+            </div>
             {/* Sub-text tóm tắt đồng bộ thời gian thực: 24°C • Hút ẩm • Quạt AUTO */}
             <div className="flex items-center gap-2 flex-wrap mt-0.5">
               <p className="text-xs sm:text-[13px] text-slate-500 font-medium truncate">
@@ -506,8 +513,8 @@ const AcCardComponent: React.FC<AcCardProps> = ({
           </button>
           <button
             type="button"
-            title={power ? 'Tắt điều hòa' : 'Bật điều hòa'}
-            disabled={isOffline || isPowerBusy || powerPending}
+            title={device.accessLevel === 'VIEW' ? 'Chỉ xem' : (power ? 'Tắt điều hòa' : 'Bật điều hòa')}
+            disabled={isOffline || isPowerBusy || powerPending || device.accessLevel === 'VIEW'}
             onClick={handleToggle}
             className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-all ${
               power
@@ -613,7 +620,7 @@ const AcCardComponent: React.FC<AcCardProps> = ({
             {/* Quick Stepper Minus Button [-] */}
             <button
               type="button"
-              disabled={!power || isOffline || temperature <= 16}
+              disabled={!power || isOffline || temperature <= 16 || device.accessLevel === 'VIEW'}
               onClick={handleTempDown}
               className="absolute left-1.5 p-1 rounded-full text-slate-400 hover:text-slate-800 hover:bg-slate-100 active:scale-90 transition-all disabled:opacity-20"
               aria-label="Giảm 1 độ"
@@ -647,7 +654,7 @@ const AcCardComponent: React.FC<AcCardProps> = ({
             {/* Quick Stepper Plus Button [+] */}
             <button
               type="button"
-              disabled={!power || isOffline || temperature >= 30}
+              disabled={!power || isOffline || temperature >= 30 || device.accessLevel === 'VIEW'}
               onClick={handleTempUp}
               className="absolute right-1.5 p-1 rounded-full text-slate-400 hover:text-slate-800 hover:bg-slate-100 active:scale-90 transition-all disabled:opacity-20"
               aria-label="Tăng 1 độ"

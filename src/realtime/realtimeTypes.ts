@@ -3,6 +3,7 @@ export const REALTIME_EVENT_TYPES = [
   'DEVICE_STATE_CHANGED',
   'TWIN_HEALTH_STATUS_CHANGED',
   'NOTIFICATION_CREATED',
+  'MEMBER_ACCESS_UPDATED',
 ] as const;
 
 export type RealtimeEventType = (typeof REALTIME_EVENT_TYPES)[number];
