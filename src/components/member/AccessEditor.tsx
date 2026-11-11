@@ -473,7 +473,7 @@ export const AccessEditor: React.FC<AccessEditorProps> = ({
                             key={lvl}
                             type="button"
                             onClick={() => handleRoomLevelChange(room.id, lvl)}
-                            className={`h-8 rounded-lg text-xs font-medium transition-all cursor-pointer flex items-center justify-center ${
+                            className={`h-8 px-1 rounded-lg text-xs font-medium transition-all cursor-pointer flex items-center justify-center whitespace-nowrap ${
                               isSelected
                                 ? 'bg-[var(--solid)] text-[var(--accent)] font-semibold shadow-xs border border-[var(--border)]'
                                 : 'text-[var(--secondary)] hover:text-[var(--text)] hover:bg-[var(--solid)]/40'
@@ -534,19 +534,19 @@ export const AccessEditor: React.FC<AccessEditorProps> = ({
                               {(['INHERIT', 'NONE', 'VIEW', 'CONTROL'] as const).map((opt) => {
                                 const isSelected = override === opt;
                                 const label =
-                                  opt === 'INHERIT' ? 'Theo phòng' : opt === 'NONE' ? 'Không' : opt === 'VIEW' ? 'Xem' : 'Điều khiển';
+                                  opt === 'INHERIT' ? 'Theo phòng' : opt === 'NONE' ? 'Không' : opt === 'VIEW' ? 'Xem' : 'Đ.khiển';
                                 return (
                                   <button
                                     key={opt}
                                     type="button"
                                     onClick={() => handleDeviceLevelChange(dev.deviceId, opt)}
-                                    className={`h-7 rounded-md text-[11px] font-medium transition-all cursor-pointer flex items-center justify-center text-center ${
+                                    className={`min-h-[32px] py-1 px-0.5 rounded-md text-[10.5px] sm:text-[11px] font-medium transition-all cursor-pointer flex items-center justify-center text-center whitespace-nowrap ${
                                       isSelected
                                         ? 'bg-[var(--solid)] text-[var(--accent)] font-semibold shadow-xs border border-[var(--border)]'
                                         : 'text-[var(--secondary)] hover:text-[var(--text)] hover:bg-[var(--solid)]/40'
                                     }`}
                                   >
-                                    {label}
+                                    <span>{label}</span>
                                   </button>
                                 );
                               })}
@@ -607,7 +607,7 @@ export const AccessEditor: React.FC<AccessEditorProps> = ({
                                 key={lvl}
                                 type="button"
                                 onClick={() => handleDeviceLevelChange(dev.deviceId, lvl)}
-                                className={`h-7 rounded-md text-[11px] font-medium transition-all cursor-pointer flex items-center justify-center ${
+                                className={`min-h-[30px] py-1 px-1 rounded-md text-[11px] font-medium transition-all cursor-pointer flex items-center justify-center whitespace-nowrap ${
                                   isSelected
                                     ? 'bg-[var(--solid)] text-[var(--accent)] font-semibold shadow-xs border border-[var(--border)]'
                                     : 'text-[var(--secondary)] hover:text-[var(--text)] hover:bg-[var(--solid)]/40'
