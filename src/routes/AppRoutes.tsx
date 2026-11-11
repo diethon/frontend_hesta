@@ -76,7 +76,13 @@ export function AppRoutes() {
           state={state} replace />
       )} />
       <Route path="/join" element={user ? (
-        <JoinHome key={location.search} onSuccess={leaveInvitation} onCancel={leaveInvitation} />
+        <JoinHome
+          key={location.search}
+          user={user}
+          onSuccess={leaveInvitation}
+          onCancel={leaveInvitation}
+          onSwitchAccount={logout}
+        />
       ) : invitationToken(location.search) ? (
         <UnauthenticatedJoin
           onSelectLogin={() => go('/login', state, false, invitationSearch(location.search, 'inviteToken'))}
