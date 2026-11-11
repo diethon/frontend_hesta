@@ -292,7 +292,7 @@ export function MemberPage({ embeddedHomeId, embeddedUserRole }: MemberPageProps
         </div>
       ) : (
         /* Single G1 List Container */
-        <div className="glass-g1 rounded-[24px] border border-[var(--border)] overflow-hidden shadow-card divide-y divide-[var(--border)]">
+        <div className="glass-g1 rounded-[24px] border border-[var(--border)] shadow-card divide-y divide-[var(--border)]">
           {filteredMembers.map((member) => {
             const isCurrentUser = member.id === authUser?.id;
             const isOwner = member.role === 'OWNER';

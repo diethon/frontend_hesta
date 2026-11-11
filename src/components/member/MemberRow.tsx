@@ -21,6 +21,7 @@ export const MemberRow: React.FC<MemberRowProps> = ({
   onRequestRemove,
 }) => {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [openUpward, setOpenUpward] = useState(false);
   const [imgError, setImgError] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -32,6 +33,16 @@ export const MemberRow: React.FC<MemberRowProps> = ({
   const initial = displayName
     ? displayName.trim().split(' ').slice(-1)[0]?.charAt(0).toUpperCase() || 'M'
     : 'M';
+
+  const handleToggleMenu = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!menuOpen && triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      setOpenUpward(spaceBelow < 180 && rect.top > 180);
+    }
+    setMenuOpen((prev) => !prev);
+  };
 
   // Close menu on click outside
   useEffect(() => {
@@ -78,7 +89,9 @@ export const MemberRow: React.FC<MemberRowProps> = ({
       aria-label={`Xem chi tiết thành viên ${displayName}`}
       onClick={handleRowClick}
       onKeyDown={handleKeyDown}
-      className="group relative flex items-center justify-between gap-3 sm:gap-4 px-4 sm:px-5 py-3.5 min-h-[72px] hover:bg-[var(--muted)]/60 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-inset"
+      className={`group relative flex items-center justify-between gap-3 sm:gap-4 px-4 sm:px-5 py-3.5 min-h-[72px] hover:bg-[var(--muted)]/60 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-inset first:rounded-t-[24px] last:rounded-b-[24px] ${
+        menuOpen ? 'z-30' : 'z-0'
+      }`}
     >
       {/* ── Left: 44px Avatar ── */}
       <div
@@ -166,7 +179,7 @@ export const MemberRow: React.FC<MemberRowProps> = ({
               aria-label={`Tùy chọn cho ${displayName}`}
               aria-haspopup="true"
               aria-expanded={menuOpen}
-              onClick={() => setMenuOpen(!menuOpen)}
+              onClick={handleToggleMenu}
             >
               <Icon name="more" size={16} />
             </button>
@@ -174,7 +187,9 @@ export const MemberRow: React.FC<MemberRowProps> = ({
             {menuOpen && (
               <div
                 role="menu"
-                className="absolute right-0 top-11 w-44 rounded-2xl glass-g2 border border-[var(--border)] shadow-xl p-1.5 z-30 animate-in fade-in zoom-in-95 duration-150"
+                className={`absolute right-0 ${
+                  openUpward ? 'bottom-11' : 'top-11'
+                } w-44 rounded-2xl glass-g2 border border-[var(--border)] shadow-2xl p-1.5 z-50 animate-in fade-in zoom-in-95 duration-150`}
               >
                 <button
                   type="button"
