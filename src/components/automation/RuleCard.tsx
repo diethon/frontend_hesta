@@ -1,11 +1,11 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Icon, type IconName } from '../home/HomeIcons';
+import React, { useState, useRef, useEffect } from 'react';
+import { Icon, type IconName } from '../ui/LucideIcon';
 import type { AutomationRule, DeviceSummary } from '../../types/automation';
 import type { SceneResponse } from '../../types/scene';
+import { actionLabels, describeCondition, EVENT_FRIENDLY_NAMES } from './ruleLabels';
 
 export interface RuleCardProps {
-  rule?: AutomationRule;
-  loading?: boolean;
+  rule: AutomationRule;
   devices?: DeviceSummary[];
   scenes?: SceneResponse[];
   lastRunFailed?: boolean;
@@ -18,9 +18,37 @@ export interface RuleCardProps {
   onDelete?: () => void;
 }
 
+const TRIGGER_ICONS: Record<string, IconName> = { SENSOR: 'activity', EVENT: 'zap', SCHEDULE: 'clock' };
+
+function describeTrigger(rule: AutomationRule, devices: DeviceSummary[]): string {
+  if (rule.triggerType === 'SCHEDULE') return 'Tự chạy vào giờ đã hẹn';
+  if (rule.triggerType === 'EVENT') {
+    const raw = String(rule.conditions[0]?.expectedValue || '');
+    const source = devices.find((d) => d.id === rule.conditions[0]?.deviceId)?.name;
+    const event = EVENT_FRIENDLY_NAMES[raw] || 'thiết bị báo có sự kiện';
+    return `Khi ${event}${source ? ` (${source})` : ''}`;
+  }
+  const first = rule.conditions[0];
+  if (!first) return 'Chưa có điều kiện';
+  const device = devices.find((d) => d.id === first.deviceId)?.name;
+  const more = rule.conditions.length > 1 ? ` và ${rule.conditions.length - 1} điều kiện khác` : '';
+  return `Khi ${describeCondition(first.attribute, first.operator, first.expectedValue, device)}${more}`;
+}
+
+function describeActions(rule: AutomationRule, devices: DeviceSummary[], scenes: SceneResponse[]): string {
+  const items = rule.actions.map((action) => {
+    if (action.sceneId || action.action === 'EXECUTE_SCENE') {
+      return `Chạy ${scenes.find((s) => s.id === action.sceneId)?.name || 'kịch bản'}`;
+    }
+    const device = devices.find((d) => d.id === action.deviceId)?.name || 'thiết bị';
+    return `${actionLabels[action.action] || action.action} ${device}`;
+  });
+  return items.slice(0, 2).join(', ') + (items.length > 2 ? ` +${items.length - 2}` : '');
+}
+
+/** One automation rule as a list row: trigger → actions, with toggle and actions menu. */
 export const RuleCard: React.FC<RuleCardProps> = ({
   rule,
-  loading = false,
   devices = [],
   scenes = [],
   lastRunFailed = false,
@@ -36,266 +64,116 @@ export const RuleCard: React.FC<RuleCardProps> = ({
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const handleOutsideClick = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false);
-      }
+    if (!menuOpen) return;
+    const close = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
     };
-    if (menuOpen) {
-      document.addEventListener('mousedown', handleOutsideClick);
-    }
-    return () => {
-      document.removeEventListener('mousedown', handleOutsideClick);
-    };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
   }, [menuOpen]);
-
-  // Loading skeleton state
-  if (loading || !rule) {
-    return (
-      <article className="scenario-card glass-g1 off animate-pulse min-h-[170px] flex flex-col justify-between">
-        <div className="flex items-center justify-between">
-          <div className="w-10 h-10 rounded-2xl bg-slate-200/50" />
-          <div className="w-11 h-6 rounded-full bg-slate-200/50" />
-        </div>
-        <div className="space-y-2 py-2">
-          <div className="h-4 bg-slate-200/60 rounded-md w-3/4" />
-          <div className="h-3 bg-slate-200/40 rounded-md w-1/2" />
-        </div>
-        <div className="flex items-center justify-between pt-2 border-t border-[var(--border)]">
-          <div className="h-3 bg-slate-200/40 rounded-md w-1/3" />
-          <div className="w-8 h-8 rounded-full bg-slate-200/40" />
-        </div>
-      </article>
-    );
-  }
 
   const isIncomplete = !rule.actions || rule.actions.length === 0;
   const isSchedule = rule.triggerType === 'SCHEDULE';
-  const triggerIcon: IconName =
-    rule.triggerType === 'SENSOR' ? 'activity' : isSchedule ? 'clock' : 'zap';
+  const canTest = !isSchedule && !!onTest;
 
-  // Format trigger summary
-  const triggerSummary = useMemo(() => {
-    if (isSchedule) {
-      return 'Theo lịch hẹn giờ';
-    }
-    if (rule.triggerType === 'EVENT') {
-      const first = rule.conditions[0];
-      return `Khi có sự kiện ${first?.expectedValue || first?.attribute || 'hệ thống'}`;
-    }
-    if (!rule.conditions.length) {
-      return 'Chưa cấu hình điều kiện';
-    }
-    const first = rule.conditions[0];
-    const dev = devices.find((d) => d.id === first.deviceId);
-    const devName = dev?.name || 'cảm biến';
-    const attr = first.attribute === 'temperature' ? 'nhiệt độ' : first.attribute === 'motion' ? 'chuyển động' : first.attribute;
-    const op = first.operator === 'GT' ? '>' : first.operator === 'LT' ? '<' : '=';
-    return `Khi ${attr} ${devName} ${op} ${first.expectedValue ?? ''}`;
-  }, [rule, devices, isSchedule]);
-
-  // Format result line (actions)
-  const resultSummary = useMemo(() => {
-    if (isIncomplete) {
-      return 'Chưa có hành động nào';
-    }
-    const items = rule.actions.map((act) => {
-      if (act.sceneId || act.action === 'EXECUTE_SCENE') {
-        const sc = scenes.find((s) => s.id === act.sceneId);
-        return `Chạy ${sc?.name || 'kịch bản'}`;
-      }
-      const dev = devices.find((d) => d.id === act.deviceId);
-      const name = dev?.name || 'thiết bị';
-      if (act.action === 'TURN_ON') return `Bật ${name}`;
-      if (act.action === 'TURN_OFF') return `Tắt ${name}`;
-      if (act.action === 'TOGGLE') return `Đảo ${name}`;
-      return `${act.action} ${name}`;
-    });
-    return `→ ${items.slice(0, 2).join(' · ')}${items.length > 2 ? ` +${items.length - 2}` : ''}`;
-  }, [rule, devices, scenes, isIncomplete]);
+  const menuItem = (label: string, icon: IconName, handler?: () => void, danger = false) => (
+    <button
+      type="button"
+      className={danger ? 'danger' : ''}
+      onClick={() => {
+        setMenuOpen(false);
+        handler?.();
+      }}
+    >
+      <Icon name={icon} />
+      <span>{label}</span>
+    </button>
+  );
 
   return (
-    <article
+    <div
+      role="button"
       tabIndex={0}
       onClick={onEdit}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') onEdit?.();
-      }}
-      className={`scenario-card rule-card glass-g1 min-h-[190px] h-auto transition-all flex flex-col justify-between cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40 ${
-        rule.enabled ? 'on' : 'off'
-      } ${lastRunFailed ? 'failed' : ''}`}
+      onKeyDown={(e) => e.key === 'Enter' && e.target === e.currentTarget && onEdit?.()}
+      className={`st-rule ${rule.enabled ? '' : 'is-off'}`}
+      aria-label={`Quy tắc ${rule.name}`}
     >
-      {/* Top row: 40px icon bubble + Toggle */}
-      <div className="scenario-top">
-        <span
-          className={`scenario-icon w-10 h-10 rounded-2xl flex items-center justify-center transition-colors ${
-            rule.enabled
-              ? 'bg-[var(--accent-soft)] text-[var(--accent)]'
-              : 'bg-[var(--muted)] text-[var(--secondary)]'
-          }`}
-        >
-          <Icon name={triggerIcon} size={20} />
-        </span>
+      <span className="st-rule-icon">
+        <Icon name={TRIGGER_ICONS[rule.triggerType] || 'zap'} />
+      </span>
 
+      <div className="st-rule-main">
+        <div className="st-rule-title">
+          <h4 title={rule.name}>{rule.name}</h4>
+          {isIncomplete && <span className="st-tag warn">Thiếu hành động</span>}
+          {lastRunFailed && <span className="st-tag err">Lần chạy gần nhất lỗi</span>}
+        </div>
+        <div className="st-flow">
+          <span>{describeTrigger(rule, devices)}</span>
+          {!isIncomplete && (
+            <>
+              <Icon name="chevronDown" />
+              <span>
+                <b>{describeActions(rule, devices, scenes)}</b>
+              </span>
+            </>
+          )}
+        </div>
+      </div>
+
+      <div className="st-rule-side" onClick={(e) => e.stopPropagation()}>
+        <span className="st-rule-meta">
+          {isSchedule ? '' : `${rule.conditions.length} điều kiện · `}
+          {rule.actions.length} hành động
+        </span>
+        {/* Keeps the toggles of all rows aligned when a row has no test button. */}
+        {!canTest && <span className="st-icon-btn test" aria-hidden="true" style={{ visibility: 'hidden' }} />}
+        {canTest && (
+          <button
+            type="button"
+            className="st-icon-btn test"
+            onClick={onTest}
+            title="Kiểm tra quy tắc"
+            aria-label={`Kiểm tra quy tắc ${rule.name}`}
+          >
+            <Icon name="test" size={17} />
+          </button>
+        )}
         <button
           type="button"
           disabled={isIncomplete}
           aria-pressed={rule.enabled}
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggle?.(!rule.enabled);
-          }}
-          className={`toggle ${rule.enabled ? 'active' : ''} ${
-            isIncomplete ? 'opacity-40 cursor-not-allowed' : ''
-          }`}
+          aria-label={rule.enabled ? `Tắt quy tắc ${rule.name}` : `Bật quy tắc ${rule.name}`}
+          onClick={() => onToggle?.(!rule.enabled)}
+          className={`toggle ${rule.enabled ? 'active' : ''} ${isIncomplete ? 'opacity-40 cursor-not-allowed' : ''}`}
           title={isIncomplete ? 'Chưa thể bật · Thiếu hành động' : rule.enabled ? 'Tắt quy tắc' : 'Bật quy tắc'}
         >
           <span />
         </button>
-      </div>
-
-      {/* Middle: Title, trigger line, result line */}
-      <div className="scenario-copy py-1">
-        <h3 className="text-sm font-bold text-[var(--text)] line-clamp-1 break-words" title={rule.name}>
-          {rule.name}
-        </h3>
-
-        <p className="text-[11px] font-medium text-[var(--secondary)] line-clamp-1 break-words mt-0.5" title={triggerSummary}>
-          {triggerSummary}
-        </p>
-
-        <p className="text-[11px] text-[var(--tertiary)] line-clamp-1 break-words mt-0.5 font-medium" title={resultSummary}>
-          {isIncomplete ? (
-            <span className="text-amber-600 font-semibold">Chưa hoàn tất · Thiếu hành động</span>
-          ) : lastRunFailed ? (
-            <span className="text-rose-500 font-semibold flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-rose-500 inline-block" />
-              Lần chạy gần nhất lỗi
-            </span>
-          ) : (
-            resultSummary
+        <div ref={menuRef} className="st-menu-wrap">
+          <button
+            type="button"
+            className="st-icon-btn"
+            onClick={() => setMenuOpen((open) => !open)}
+            aria-label="Thao tác khác"
+            aria-expanded={menuOpen}
+          >
+            <Icon name="more" size={18} />
+          </button>
+          {menuOpen && (
+            <div className="st-menu">
+              {menuItem('Chỉnh sửa', 'pencil', onEdit)}
+              {canTest && menuItem('Kiểm tra', 'test', onTest)}
+              {menuItem('Xem lịch sử', 'clock', onHistory)}
+              {isSchedule && onSchedule && menuItem('Lịch chạy', 'clock', onSchedule)}
+              {menuItem('Nhân bản', 'copy', onDuplicate)}
+              <hr />
+              {menuItem('Xóa quy tắc', 'trash', onDelete, true)}
+            </div>
           )}
-        </p>
-      </div>
-
-      {/* Bottom row: Counter caption, round 40px test button, ⋯ menu */}
-      <div className="scenario-bottom pt-2 border-t border-[var(--border)]">
-        <span className="text-[11px] text-[var(--tertiary)] font-medium">
-          {rule.conditions.length} điều kiện · {rule.actions.length} hành động
-        </span>
-
-        <div className="flex items-center gap-1.5">
-          {/* Round 32px "Kiểm tra" button (hide for SCHEDULE rules) */}
-          {!isSchedule && onTest && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onTest();
-              }}
-              className="w-8 h-8 rounded-full bg-[var(--g1)] hover:bg-[var(--border)] text-[var(--text)] flex items-center justify-center transition-colors cursor-pointer"
-              title="Kiểm tra quy tắc (mô phỏng điều kiện)"
-              aria-label="Kiểm tra quy tắc"
-            >
-              <Icon name="test" size={14} />
-            </button>
-          )}
-
-          {/* ⋯ Menu */}
-          <div ref={menuRef} className="relative scene-menu-wrap">
-            <button
-              type="button"
-              className="card-affordance w-8 h-8 rounded-full hover:bg-[var(--border)] flex items-center justify-center text-[var(--secondary)] cursor-pointer"
-              onClick={(e) => {
-                e.stopPropagation();
-                setMenuOpen((prev) => !prev);
-              }}
-              aria-label="Thao tác khác"
-            >
-              <Icon name="more" size={16} />
-            </button>
-
-            {menuOpen && (
-              <div
-                className="scene-menu glass-g2 z-30"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    onEdit?.();
-                  }}
-                >
-                  <Icon name="pencil" size={13} />
-                  <span>Sửa</span>
-                </button>
-
-                {!isSchedule && onTest && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMenuOpen(false);
-                      onTest();
-                    }}
-                  >
-                    <Icon name="test" size={13} />
-                    <span>Kiểm tra</span>
-                  </button>
-                )}
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    onHistory?.();
-                  }}
-                >
-                  <Icon name="clock" size={13} />
-                  <span>Xem lịch sử</span>
-                </button>
-
-                {isSchedule && onSchedule && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMenuOpen(false);
-                      onSchedule();
-                    }}
-                  >
-                    <Icon name="clock" size={13} />
-                    <span>Lịch chạy</span>
-                  </button>
-                )}
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    onDuplicate?.();
-                  }}
-                >
-                  <Icon name="copy" size={13} />
-                  <span>Nhân bản</span>
-                </button>
-
-                <button
-                  type="button"
-                  className="danger"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    onDelete?.();
-                  }}
-                >
-                  <Icon name="trash" size={13} />
-                  <span>Xóa quy tắc</span>
-                </button>
-              </div>
-            )}
-          </div>
         </div>
       </div>
-    </article>
+    </div>
   );
 };
-

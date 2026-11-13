@@ -3,25 +3,25 @@ import { VoiceAssistantButton } from '../ui/VoiceAssistant';
 import { NotificationBell } from '../notification/NotificationBell';
 
 export interface AutomationTopBarProps {
-  totalCount: number;
-  activeCount: number;
+  caption: string;
+  title: React.ReactNode;
+  subtitle?: string;
   userInitial?: string;
 }
 
+/** Page header shared by the Scene, Automation and Recommendation pages. */
 export const AutomationTopBar: React.FC<AutomationTopBarProps> = ({
-  totalCount,
-  activeCount,
+  caption,
+  title,
+  subtitle,
   userInitial = 'U',
 }) => {
   return (
     <header className="topbar scenes-topbar">
       <div>
-        <span className="text-xs text-[var(--secondary)] font-normal block mb-0.5">
-          {totalCount} quy tắc · {activeCount} đang bật
-        </span>
-        <h2>
-          Tự động hóa <span className="sr-only">Quy tắc tự động</span>
-        </h2>
+        <span className="st-eyebrow">{caption}</span>
+        <h2>{title}</h2>
+        {subtitle && <p className="st-subtitle">{subtitle}</p>}
       </div>
       <div className="top-actions">
         <VoiceAssistantButton />
