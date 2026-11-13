@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Icon } from '../home/HomeIcons';
+import { Icon } from '../ui/LucideIcon';
 
 interface AccordionProps {
   title: string;
