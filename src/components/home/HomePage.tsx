@@ -455,7 +455,7 @@ export const HomePage: React.FC<HomePageProps> = ({
             <SpotlightRecommendationBanner
               homeId={userHome?.homeId}
               onApplied={() => {
-                if (userHome?.homeId) loadHomeDashboardData(userHome.homeId);
+                reloadDashboard();
               }}
             />
 
