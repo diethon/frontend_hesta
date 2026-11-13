@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router';
 import { useAppSelector } from '../../store/hooks';
 import { VoiceAssistantButton } from '../ui/VoiceAssistant';
 import { NotificationBell } from '../notification/NotificationBell';
-import { Icon } from '../home/HomeIcons';
+import { Icon } from '../ui/LucideIcon';
 import type { ParentalGuardianRule, ParentalGuardianLog, CreateGuardianRuleInput } from '../../types/guardian';
 import {
   getGuardianRules,
