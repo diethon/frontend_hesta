@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import type { DeviceSummary } from '../../types/automation';
-import { Icon, type IconName } from '../home/HomeIcons';
+import { Icon, type IconName } from '../ui/LucideIcon';
 import { getFigmaIconForDevice } from './ScenePage';
 
 interface DevicePickerSheetProps {
@@ -127,7 +127,7 @@ export const DevicePickerSheet: React.FC<DevicePickerSheetProps> = ({
         {/* Search Field */}
         <input
           autoFocus
-          className="picker-search"
+          className="picker-search search"
           placeholder={isSensorsMode ? "Tìm theo tên cảm biến hoặc phòng..." : "Tìm theo tên thiết bị hoặc phòng..."}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
