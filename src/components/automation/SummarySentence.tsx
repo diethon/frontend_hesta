@@ -1,5 +1,6 @@
 import React from 'react';
-import { Icon } from '../home/HomeIcons';
+import { actionLabels, describeCondition, EVENT_FRIENDLY_NAMES } from './ruleLabels';
+import { Icon } from '../ui/LucideIcon';
 import type { DeviceSummary } from '../../types/automation';
 import type { SceneResponse } from '../../types/scene';
 
@@ -31,51 +32,6 @@ export interface SummarySentenceProps {
   className?: string;
 }
 
-const operatorLabels: Record<string, string> = {
-  EQ: '=',
-  NE: '≠',
-  GT: '>',
-  GTE: '≥',
-  LT: '<',
-  LTE: '≤',
-};
-
-const attributeLabels: Record<string, string> = {
-  temperature: 'nhiệt độ',
-  humidity: 'độ ẩm',
-  motion: 'chuyển động',
-  light: 'ánh sáng',
-  power: 'công suất',
-  state: 'trạng thái',
-  eventType: 'sự kiện',
-};
-
-const EVENT_FRIENDLY_NAMES: Record<string, string> = {
-  DEVICE_STATE_CHANGED: 'thiết bị thay đổi trạng thái',
-  SECURITY_ALERT: 'có cảnh báo an ninh',
-  SECURITY_EVENT: 'có sự kiện an ninh',
-  GAS_LEAK_DETECTED: 'phát hiện rò rỉ khí gas',
-  DOOR_OPENED: 'Cửa mở',
-  GATE_OPENED: 'Cổng mở',
-  MANUAL_OVERRIDE: 'điều khiển thủ công thiết bị',
-  MOTION_DETECTED: 'phát hiện chuyển động',
-};
-
-const actionLabels: Record<string, string> = {
-  TURN_ON: 'Bật',
-  TURN_OFF: 'Tắt',
-  TOGGLE: 'Đảo trạng thái',
-  OPEN: 'Mở',
-  CLOSE: 'Đóng',
-  STOP: 'Dừng',
-  SET_BRIGHTNESS: 'Đặt độ sáng',
-  SET_RGB: 'Đổi màu',
-  SET_COLOR: 'Đổi màu',
-  SET_TEMPERATURE: 'Cài nhiệt độ',
-  SET_SPEED: 'Đặt tốc độ',
-  EXECUTE_SCENE: 'Chạy kịch bản',
-};
-
 export const SummarySentence: React.FC<SummarySentenceProps> = ({
   triggerType,
   conditions,
@@ -101,7 +57,7 @@ export const SummarySentence: React.FC<SummarySentenceProps> = ({
   } else if (triggerType === 'EVENT') {
     const firstCond = conditions[0];
     const rawVal = String(firstCond?.expected || firstCond?.attribute || '');
-    const friendly = EVENT_FRIENDLY_NAMES[rawVal] || rawVal || 'sự kiện hệ thống';
+    const friendly = EVENT_FRIENDLY_NAMES[rawVal] || 'thiết bị báo có sự kiện';
     const dev = firstCond?.deviceId ? devices.find((d) => d.id === firstCond.deviceId) : undefined;
 
     triggerPhrase = (
@@ -120,22 +76,15 @@ export const SummarySentence: React.FC<SummarySentenceProps> = ({
       triggerPhrase = <span className="text-[var(--tertiary)] italic">…chọn cảm biến…</span>;
     } else {
       const parts = conditions.map((cond, idx) => {
-        const dev = devices.find((d) => d.id === cond.deviceId);
-        const devName = dev?.name || 'cảm biến';
-        const attr = attributeLabels[cond.attribute || ''] || cond.attribute || 'chỉ số';
-        const op = operatorLabels[cond.operator || ''] || cond.operator || '>';
-        let exp = cond.expected !== undefined && cond.expected !== '' ? String(cond.expected) : '…';
-        if (exp === 'true') exp = 'Có';
-        else if (exp === 'false') exp = 'Không';
-
+        const devName = devices.find((d) => d.id === cond.deviceId)?.name;
         const joinWord = cond.logicalOperator === 'OR' || globalLogicalOperator === 'OR' ? ' hoặc ' : ' và ';
 
         return (
           <span key={idx}>
             {idx > 0 && <span className="text-[var(--tertiary)] font-bold">{joinWord}</span>}
-            <strong className="text-[var(--text)]">{attr}</strong>{' '}
-            <strong className="text-[var(--text)]">{devName}</strong> {op}{' '}
-            <strong className="text-[var(--text)]">{exp}</strong>
+            <strong className="text-[var(--text)]">
+              {describeCondition(cond.attribute, cond.operator, cond.expected, devName)}
+            </strong>
           </span>
         );
       });
