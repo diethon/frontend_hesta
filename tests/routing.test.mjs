@@ -39,6 +39,7 @@ function loadSource(path) {
   });
   const executableSource = outputText.replaceAll('import.meta.env', '{}');
   const sourceRequire = (name) => {
+    if (name.endsWith('.css')) return {};
     if (name === 'react-router') return routerForTests;
     if (name === 'react-hot-toast') return toastForServerRender;
     if (!name.startsWith('.')) return require(name);

@@ -50,8 +50,8 @@ export const RoomManagementModal: React.FC<RoomManagementModalProps> = ({
   const [roomToDelete, setRoomToDelete] = useState<RoomResponse | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // ── Fetch rooms ──
-  const fetchRoomList = useCallback(async () => {
+  // ── Reusable Fetch rooms for actions ──
+  const reloadRooms = useCallback(async () => {
     if (!homeId) return;
     setLoading(true);
     setError('');
@@ -65,15 +65,41 @@ export const RoomManagementModal: React.FC<RoomManagementModalProps> = ({
     }
   }, [homeId]);
 
+  // Initial load when modal opens (deferred to next tick to avoid cascading renders warning in React 19)
   useEffect(() => {
-    if (isOpen) {
-      void fetchRoomList();
-      setEditingRoomId(null);
-      setRoomToDelete(null);
-      setNewRoomName('');
-      setError('');
+    let active = true;
+    if (isOpen && homeId) {
+      const load = async () => {
+        setLoading(true);
+        setError('');
+        try {
+          const data = await getRooms(homeId);
+          if (!active) return;
+          setRooms(data || []);
+        } catch (err) {
+          if (!active) return;
+          setError(getErrorMessage(err, 'Không thể tải danh sách phòng'));
+        } finally {
+          if (active) setLoading(false);
+        }
+      };
+
+      const timer = setTimeout(() => {
+        if (active) {
+          setEditingRoomId(null);
+          setRoomToDelete(null);
+          setNewRoomName('');
+          setError('');
+          void load();
+        }
+      }, 0);
+
+      return () => {
+        active = false;
+        clearTimeout(timer);
+      };
     }
-  }, [isOpen, fetchRoomList]);
+  }, [isOpen, homeId]);
 
   // ── Handle Add Room ──
   const handleCreateRoom = async (e: FormEvent) => {
@@ -90,7 +116,7 @@ export const RoomManagementModal: React.FC<RoomManagementModalProps> = ({
       });
       setNewRoomName('');
       notify.success('Đã thêm phòng mới', trimmed);
-      await fetchRoomList();
+      await reloadRooms();
       onRoomsChanged?.();
     } catch (err) {
       const msg = getErrorMessage(err, 'Không thể tạo phòng mới');
@@ -127,7 +153,7 @@ export const RoomManagementModal: React.FC<RoomManagementModalProps> = ({
       });
       notify.success('Cập nhật phòng thành công', trimmed);
       setEditingRoomId(null);
-      await fetchRoomList();
+      await reloadRooms();
       onRoomsChanged?.();
     } catch (err) {
       const msg = getErrorMessage(err, 'Không thể cập nhật thông tin phòng');
@@ -149,7 +175,7 @@ export const RoomManagementModal: React.FC<RoomManagementModalProps> = ({
       notify.success('Đã xóa phòng', roomToDelete.name);
       onRoomDeleted?.(roomToDelete.id);
       setRoomToDelete(null);
-      await fetchRoomList();
+      await reloadRooms();
       onRoomsChanged?.();
     } catch (err) {
       const msg = getErrorMessage(err, 'Không thể xóa phòng');
@@ -163,17 +189,28 @@ export const RoomManagementModal: React.FC<RoomManagementModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-200">
-      <div className="surface-card w-full max-w-xl rounded-2xl shadow-2xl border border-line flex flex-col max-h-[90vh] overflow-hidden">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="room-management-title"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-[#0f172a]/55 backdrop-blur-md overflow-y-auto animate-in fade-in duration-200"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-xl rounded-3xl shadow-2xl border border-[var(--border)] bg-[var(--solid)] flex flex-col max-h-[90vh] overflow-hidden animate-in zoom-in-95 duration-200"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* ── Modal Header ── */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-line">
+        <div className="flex items-center justify-between px-6 py-4.5 border-b border-[var(--border)] bg-[var(--g1)]">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+            <div className="w-10 h-10 rounded-2xl bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]/20 flex items-center justify-center shrink-0 shadow-xs">
               <DoorOpen className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-text">Quản Lý Phòng</h2>
-              <p className="text-xs text-muted">
+              <h2 id="room-management-title" className="text-lg font-bold text-[var(--text)]">
+                Quản Lý Phòng
+              </h2>
+              <p className="text-xs text-[var(--secondary)] mt-0.5">
                 Tổ chức và phân loại thiết bị theo từng không gian sống trong nhà
               </p>
             </div>
@@ -181,7 +218,7 @@ export const RoomManagementModal: React.FC<RoomManagementModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="p-2 text-icon hover:text-text rounded-lg hover:bg-sidebar-hover transition-colors"
+            className="flex h-9 w-9 items-center justify-center rounded-xl text-[var(--secondary)] hover:text-[var(--text)] hover:bg-[var(--muted)] transition-colors cursor-pointer"
             aria-label="Đóng"
           >
             <X className="w-5 h-5" />
@@ -191,16 +228,16 @@ export const RoomManagementModal: React.FC<RoomManagementModalProps> = ({
         {/* ── Modal Body ── */}
         <div className="p-6 overflow-y-auto space-y-6 custom-scrollbar flex-1">
           {error && (
-            <div className="p-3 text-xs font-medium text-rose-700 bg-rose-50 border border-rose-200 rounded-xl flex items-center gap-2">
+            <div className="p-3.5 text-xs font-medium text-rose-700 bg-rose-500/10 border border-rose-500/20 rounded-2xl flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600" />
               <span>{error}</span>
             </div>
           )}
 
           {/* ── Add New Room Card ── */}
-          <div className="p-4 rounded-xl border border-line bg-off-soft/30 space-y-3">
-            <h3 className="text-xs font-bold text-text uppercase tracking-wider flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-primary" />
+          <div className="p-4 rounded-2xl border border-[var(--border)] bg-[var(--g1)] space-y-3">
+            <h3 className="text-xs font-bold text-[var(--text)] uppercase tracking-wider flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-[var(--accent)]" />
               Thêm phòng mới
             </h3>
 
@@ -212,13 +249,13 @@ export const RoomManagementModal: React.FC<RoomManagementModalProps> = ({
                   value={newRoomName}
                   onChange={(e) => setNewRoomName(e.target.value)}
                   placeholder="Nhập tên phòng (VD: Phòng khách, Bếp, Sân thượng...)"
-                  className="flex-1 px-3.5 py-2 text-sm rounded-xl border border-line bg-surface text-text placeholder:text-muted focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
+                  className="flex-1 px-3.5 py-2.5 text-sm rounded-xl border border-[var(--border)] bg-[var(--solid)] text-[var(--text)] placeholder:text-[var(--tertiary)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/20 transition-all"
                   disabled={isCreating}
                 />
                 <button
                   type="submit"
                   disabled={!newRoomName.trim() || isCreating}
-                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-primary hover:bg-primary-hover text-white text-xs sm:text-sm font-bold shadow-xs transition-all disabled:opacity-50 shrink-0 cursor-pointer"
+                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-[var(--accent)] hover:opacity-95 text-white text-xs sm:text-sm font-bold shadow-xs transition-all disabled:opacity-50 shrink-0 cursor-pointer"
                 >
                   <Plus className="w-4 h-4" />
                   <span>{isCreating ? 'Đang thêm...' : 'Thêm phòng'}</span>
@@ -227,7 +264,7 @@ export const RoomManagementModal: React.FC<RoomManagementModalProps> = ({
 
               {/* Icon selector pills */}
               <div>
-                <label className="block text-[11px] font-semibold text-muted mb-1.5">
+                <label className="block text-[11px] font-semibold text-[var(--secondary)] mb-1.5">
                   Biểu tượng không gian:
                 </label>
                 <div className="flex flex-wrap gap-1.5">
@@ -239,10 +276,10 @@ export const RoomManagementModal: React.FC<RoomManagementModalProps> = ({
                         key={item.id}
                         type="button"
                         onClick={() => setNewRoomIcon(item.id)}
-                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium border transition-all ${
+                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium border transition-all cursor-pointer ${
                           isSelected
-                            ? 'bg-primary text-white border-primary shadow-2xs scale-102'
-                            : 'bg-surface border-line text-muted hover:text-text hover:bg-off-soft'
+                            ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-2xs scale-102 font-semibold'
+                            : 'bg-[var(--solid)] border-[var(--border)] text-[var(--secondary)] hover:text-[var(--text)] hover:bg-[var(--muted)]'
                         }`}
                       >
                         <IconComp className="w-3.5 h-3.5" />
@@ -258,21 +295,21 @@ export const RoomManagementModal: React.FC<RoomManagementModalProps> = ({
           {/* ── Room List Section ── */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <h3 className="text-xs font-bold text-text uppercase tracking-wider flex items-center gap-2">
-                <Layers className="w-4 h-4 text-muted" />
+              <h3 className="text-xs font-bold text-[var(--text)] uppercase tracking-wider flex items-center gap-2">
+                <Layers className="w-4 h-4 text-[var(--secondary)]" />
                 Danh sách phòng ({rooms.length})
               </h3>
             </div>
 
             {loading ? (
-              <div className="py-8 text-center text-xs text-muted">
+              <div className="py-8 text-center text-xs text-[var(--secondary)]">
                 Đang tải danh sách phòng...
               </div>
             ) : rooms.length === 0 ? (
-              <div className="py-8 text-center border border-dashed border-line rounded-xl bg-off-soft/20 space-y-1">
-                <DoorOpen className="w-8 h-8 text-muted mx-auto opacity-50 mb-2" />
-                <p className="text-sm font-medium text-text">Chưa có phòng nào</p>
-                <p className="text-xs text-muted">
+              <div className="py-8 text-center border border-dashed border-[var(--border)] rounded-2xl bg-[var(--g1)]/40 space-y-1">
+                <DoorOpen className="w-8 h-8 text-[var(--secondary)] mx-auto opacity-50 mb-2" />
+                <p className="text-sm font-bold text-[var(--text)]">Chưa có phòng nào</p>
+                <p className="text-xs text-[var(--secondary)]">
                   Hãy thêm phòng đầu tiên để bắt đầu phân loại thiết bị trong nhà.
                 </p>
               </div>
@@ -287,7 +324,7 @@ export const RoomManagementModal: React.FC<RoomManagementModalProps> = ({
                     return (
                       <div
                         key={room.id}
-                        className="p-3.5 rounded-xl border border-primary/40 bg-primary/5 space-y-3"
+                        className="p-3.5 rounded-2xl border border-[var(--accent)]/40 bg-[var(--accent-soft)] space-y-3"
                       >
                         <div className="flex items-center gap-2">
                           <input
@@ -295,14 +332,14 @@ export const RoomManagementModal: React.FC<RoomManagementModalProps> = ({
                             maxLength={50}
                             value={editName}
                             onChange={(e) => setEditName(e.target.value)}
-                            className="flex-1 px-3 py-1.5 text-sm rounded-lg border border-line bg-surface text-text focus:outline-none focus:border-primary"
+                            className="flex-1 px-3 py-1.5 text-sm rounded-xl border border-[var(--border)] bg-[var(--solid)] text-[var(--text)] focus:outline-none focus:border-[var(--accent)]"
                             autoFocus
                           />
                           <button
                             type="button"
                             disabled={!editName.trim() || isUpdating}
                             onClick={() => handleSaveEdit(room.id)}
-                            className="p-2 rounded-lg bg-primary text-white hover:bg-primary-hover transition-colors disabled:opacity-50"
+                            className="p-2 rounded-xl bg-[var(--accent)] text-white hover:opacity-95 transition-colors disabled:opacity-50 cursor-pointer"
                             title="Lưu thay đổi"
                           >
                             <Check className="w-4 h-4" />
@@ -310,7 +347,7 @@ export const RoomManagementModal: React.FC<RoomManagementModalProps> = ({
                           <button
                             type="button"
                             onClick={handleCancelEdit}
-                            className="p-2 rounded-lg border border-line text-muted hover:text-text hover:bg-surface transition-colors"
+                            className="p-2 rounded-xl border border-[var(--border)] bg-[var(--solid)] text-[var(--secondary)] hover:text-[var(--text)] transition-colors cursor-pointer"
                             title="Hủy"
                           >
                             <X className="w-4 h-4" />
@@ -327,10 +364,10 @@ export const RoomManagementModal: React.FC<RoomManagementModalProps> = ({
                                 key={item.id}
                                 type="button"
                                 onClick={() => setEditIcon(item.id)}
-                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium border transition-all ${
+                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium border transition-all cursor-pointer ${
                                   isSelected
-                                    ? 'bg-primary text-white border-primary'
-                                    : 'bg-surface border-line text-muted hover:text-text'
+                                    ? 'bg-[var(--accent)] text-white border-[var(--accent)] font-semibold'
+                                    : 'bg-[var(--solid)] border-[var(--border)] text-[var(--secondary)] hover:text-[var(--text)]'
                                 }`}
                               >
                                 <IconComp className="w-3 h-3" />
@@ -346,23 +383,25 @@ export const RoomManagementModal: React.FC<RoomManagementModalProps> = ({
                   return (
                     <div
                       key={room.id}
-                      className="flex items-center justify-between p-3 rounded-xl border border-line bg-surface hover:border-primary/30 transition-all shadow-2xs"
+                      className="flex items-center justify-between p-3.5 rounded-2xl border border-[var(--border)] bg-[var(--solid)] hover:border-[var(--accent)]/40 transition-all shadow-xs"
                     >
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-9 h-9 rounded-lg bg-off-soft text-text flex items-center justify-center shrink-0 border border-line">
-                          <RoomIcon className="w-4 h-4 text-primary" />
+                        <div className="w-10 h-10 rounded-xl bg-[var(--g1)] text-[var(--text)] flex items-center justify-center shrink-0 border border-[var(--border)]">
+                          <RoomIcon className="w-4 h-4 text-[var(--accent)]" />
                         </div>
                         <div className="min-w-0">
-                          <h4 className="text-sm font-semibold text-text truncate">
+                          <h4 className="text-sm font-bold text-[var(--text)] truncate">
                             {room.name}
                           </h4>
-                          <span className="text-[11px] text-muted font-medium">
+                          <span className="text-[11px] font-medium mt-0.5 block">
                             {devCount > 0 ? (
-                              <span className="text-primary font-semibold">
+                              <span className="text-[var(--accent)] font-semibold bg-[var(--accent-soft)] px-2 py-0.5 rounded-md">
                                 {devCount} thiết bị
                               </span>
                             ) : (
-                              'Chưa có thiết bị'
+                              <span className="text-[var(--tertiary)] bg-[var(--g1)] px-2 py-0.5 rounded-md">
+                                Chưa có thiết bị
+                              </span>
                             )}
                           </span>
                         </div>
@@ -372,7 +411,7 @@ export const RoomManagementModal: React.FC<RoomManagementModalProps> = ({
                         <button
                           type="button"
                           onClick={() => handleStartEdit(room)}
-                          className="p-1.5 text-icon hover:text-primary rounded-lg hover:bg-off-soft transition-colors"
+                          className="p-2 text-[var(--secondary)] hover:text-[var(--accent)] rounded-xl hover:bg-[var(--g1)] transition-colors cursor-pointer"
                           title="Đổi tên và biểu tượng"
                         >
                           <Edit2 className="w-4 h-4" />
@@ -380,7 +419,7 @@ export const RoomManagementModal: React.FC<RoomManagementModalProps> = ({
                         <button
                           type="button"
                           onClick={() => setRoomToDelete(room)}
-                          className="p-1.5 text-icon hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors"
+                          className="p-2 text-[var(--secondary)] hover:text-rose-600 rounded-xl hover:bg-rose-500/10 transition-colors cursor-pointer"
                           title="Xóa phòng này"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -395,11 +434,11 @@ export const RoomManagementModal: React.FC<RoomManagementModalProps> = ({
         </div>
 
         {/* ── Modal Footer ── */}
-        <div className="flex items-center justify-end px-6 py-3 border-t border-line bg-off-soft/20">
+        <div className="flex items-center justify-end px-6 py-3.5 border-t border-[var(--border)] bg-[var(--g1)]">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 text-xs font-semibold rounded-xl border border-line bg-surface text-text hover:bg-off-soft transition-colors"
+            className="px-4 py-2 text-xs font-semibold rounded-xl border border-[var(--border)] bg-[var(--solid)] text-[var(--text)] hover:bg-[var(--muted)] transition-colors cursor-pointer"
           >
             Đóng
           </button>
@@ -408,30 +447,30 @@ export const RoomManagementModal: React.FC<RoomManagementModalProps> = ({
 
       {/* ── Safe Deletion Confirmation Dialog ── */}
       {roomToDelete && (
-        <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in zoom-in-95">
-          <div className="surface-card w-full max-w-md p-6 rounded-2xl shadow-2xl border border-line space-y-4">
+        <div className="fixed inset-0 z-60 flex items-center justify-center bg-[#0f172a]/65 backdrop-blur-md p-4 animate-in fade-in zoom-in-95">
+          <div className="w-full max-w-md p-6 rounded-3xl shadow-2xl border border-[var(--border)] bg-[var(--solid)] space-y-4">
             <div className="flex items-center gap-3 text-rose-600">
-              <div className="w-10 h-10 rounded-xl bg-rose-50 border border-rose-200 flex items-center justify-center shrink-0">
+              <div className="w-10 h-10 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center shrink-0">
                 <AlertTriangle className="w-5 h-5 text-rose-600" />
               </div>
               <div>
-                <h3 className="text-base font-bold text-text">
+                <h3 className="text-base font-bold text-[var(--text)]">
                   Xác nhận xóa phòng
                 </h3>
-                <p className="text-xs text-muted">Thao tác này không thể hoàn tác</p>
+                <p className="text-xs text-[var(--secondary)]">Thao tác này không thể hoàn tác</p>
               </div>
             </div>
 
-            <p className="text-sm text-text">
+            <p className="text-sm text-[var(--text)]">
               Bạn có chắc chắn muốn xóa phòng{' '}
               <span className="font-bold text-rose-600">&ldquo;{roomToDelete.name}&rdquo;</span>?
             </p>
 
             {(roomToDelete.deviceCount ?? 0) > 0 ? (
-              <div className="p-3.5 rounded-xl border border-amber-200 bg-amber-50 text-amber-900 text-xs space-y-1.5 leading-relaxed">
-                <p className="font-bold flex items-center gap-1.5">
-                  <span className="text-amber-600">🛡️ An toàn phần cứng:</span>
-                  Phòng này có {roomToDelete.deviceCount} thiết bị
+              <div className="p-4 rounded-2xl border border-amber-600/30 bg-amber-600/10 text-amber-900 dark:text-amber-200 text-xs space-y-1.5 leading-relaxed">
+                <p className="font-bold flex items-center gap-1.5 text-amber-700 dark:text-amber-300">
+                  <span>🛡️ An toàn phần cứng:</span>
+                  <span>Phòng này có {roomToDelete.deviceCount} thiết bị</span>
                 </p>
                 <p>
                   Khi xóa phòng, các thiết bị sẽ được chuyển về trạng thái{' '}
@@ -440,17 +479,17 @@ export const RoomManagementModal: React.FC<RoomManagementModalProps> = ({
                 </p>
               </div>
             ) : (
-              <p className="text-xs text-muted">
+              <p className="text-xs text-[var(--secondary)]">
                 Phòng này hiện không có thiết bị nào. Phòng sẽ được xóa an toàn khỏi hệ thống.
               </p>
             )}
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-line">
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-[var(--border)]">
               <button
                 type="button"
                 disabled={isDeleting}
                 onClick={() => setRoomToDelete(null)}
-                className="px-4 py-2 text-xs font-semibold rounded-xl border border-line text-muted hover:text-text transition-colors"
+                className="px-4 py-2 text-xs font-semibold rounded-xl border border-[var(--border)] bg-[var(--g1)] text-[var(--secondary)] hover:text-[var(--text)] transition-colors cursor-pointer"
               >
                 Hủy
               </button>
@@ -458,7 +497,7 @@ export const RoomManagementModal: React.FC<RoomManagementModalProps> = ({
                 type="button"
                 disabled={isDeleting}
                 onClick={handleConfirmDelete}
-                className="px-4 py-2 text-xs font-bold rounded-xl bg-rose-600 text-white hover:bg-rose-700 transition-colors shadow-xs disabled:opacity-50"
+                className="px-4 py-2 text-xs font-bold rounded-xl bg-rose-600 text-white hover:bg-rose-700 transition-colors shadow-xs disabled:opacity-50 cursor-pointer"
               >
                 {isDeleting ? 'Đang xóa...' : 'Xóa phòng'}
               </button>
