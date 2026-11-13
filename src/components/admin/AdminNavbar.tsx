@@ -43,7 +43,7 @@ export const AdminNavbar: React.FC<AdminNavbarProps> = ({
   }, []);
 
   return (
-    <nav className="sticky top-0 z-20 flex items-center justify-between gap-2 border-b border-line bg-surface/90 px-4 py-3 backdrop-blur-xl sm:px-6">
+    <nav className="sticky top-0 z-20 flex items-center justify-between gap-2 border-b border-[var(--border)] bg-[var(--solid)]/85 px-4 py-3 backdrop-blur-xl sm:px-6">
       {/* Left: Optional Back + Icon + Title */}
       <div className="flex min-w-0 items-center gap-3">
         {showBackButton && (
@@ -57,7 +57,7 @@ export const AdminNavbar: React.FC<AdminNavbarProps> = ({
           </button>
         )}
 
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 text-amber-500 shadow-soft">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600 shadow-soft">
           {icon || <Layers className="w-6 h-6" />}
         </div>
 
@@ -131,7 +131,7 @@ export const AdminNavbar: React.FC<AdminNavbarProps> = ({
                       : 'text-text hover:bg-surface-hover'
                   }`}
                 >
-                  <Layers className="w-4 h-4 text-amber-500" />
+                  <Layers className="w-4 h-4 text-amber-600" />
                   <span>Quản lý Thiết bị &amp; QR</span>
                 </button>
 

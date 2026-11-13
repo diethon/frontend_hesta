@@ -23,7 +23,7 @@ interface NavItemDef {
 const navItems: NavItemDef[] = [
   { id: 'overview', icon: 'home', label: 'Tổng quan' },
   { id: 'devices', icon: 'grid', label: 'Thiết bị' },
-  { id: 'twin', icon: 'cube', label: 'Mô hình 3D' },
+  { id: 'twin', icon: 'cube', label: 'Digital Twin' },
   { id: 'energy', icon: 'energy', label: 'Tiêu thụ điện' },
   { id: 'scenes', icon: 'sparkles', label: 'Kịch bản' },
   { id: 'automations', icon: 'automation', label: 'Tự động hóa' },

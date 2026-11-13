@@ -438,7 +438,7 @@ export const DeviceStateVisualizer: React.FC<DeviceStateVisualizerProps> = ({
       )}
 
       {showJson ? (
-        <pre className="text-xs text-emerald-400 font-mono bg-slate-950 p-3 rounded-xl overflow-x-auto border border-slate-800 leading-relaxed shadow-inner">
+        <pre className="text-xs text-emerald-400 font-mono bg-[#0b1320] p-3 rounded-xl overflow-x-auto border border-[#1e293b] leading-relaxed shadow-inner tabular-nums">
           {getSortedFormattedJson(state, true, deviceType)}
         </pre>
       ) : (

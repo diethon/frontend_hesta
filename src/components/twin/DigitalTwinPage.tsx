@@ -43,8 +43,8 @@ export function DigitalTwinView({ homeId, initialMode }: { homeId: string; initi
     {matchesHome && error ? <div role="alert" className="rounded-2xl border border-error bg-error-soft p-5 text-text">
       <p>{error}</p><button type="button" disabled={loading} onClick={() => void dispatch(loadTwinSnapshot(homeId))} className="mt-3 rounded-xl bg-surface px-4 py-3 text-sm font-semibold disabled:opacity-50">Thử lại</button>
     </div> : null}
-    {!matchesHome || (!initialized && !error) ? <div role="status" aria-label="Đang tải Mô hình 3D" className="surface-card p-6">
-      <p className="text-sm text-muted">Đang tải Mô hình 3D…</p><div className="mt-4 h-32 animate-pulse rounded-2xl bg-off-soft" />
+    {!matchesHome || (!initialized && !error) ? <div role="status" aria-label="Đang tải Digital Twin" className="surface-card p-6">
+      <p className="text-sm text-muted">Đang tải Digital Twin (Mô hình 3D)…</p><div className="mt-4 h-32 animate-pulse rounded-2xl bg-off-soft" />
     </div> : initialized ? <>
       <TwinLayoutEditor key={homeId} homeId={homeId} initialMode={initialMode} />
     </> : null}

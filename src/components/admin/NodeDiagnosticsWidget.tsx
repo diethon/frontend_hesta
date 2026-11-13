@@ -116,12 +116,6 @@ export const NodeDiagnosticsWidget: React.FC = () => {
   const [resettingId, setResettingId] = useState<string | null>(null);
   const [trippingCode, setTrippingCode] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchData();
-    const interval = setInterval(fetchData, 20000);
-    return () => clearInterval(interval);
-  }, []);
-
   const fetchData = async () => {
     try {
       const [sumRes, nodeRes] = await Promise.all([
@@ -136,6 +130,13 @@ export const NodeDiagnosticsWidget: React.FC = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void fetchData();
+    const interval = setInterval(fetchData, 20000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handlePing = async (nodeId: string, nodeCode: string) => {
     setPingingId(nodeId);
@@ -180,6 +181,7 @@ export const NodeDiagnosticsWidget: React.FC = () => {
 
   const formatLastSeen = (lastPingAt?: string): string => {
     if (!lastPingAt) return 'Chưa có tín hiệu';
+    // eslint-disable-next-line react-hooks/purity
     const diffSec = Math.max(0, Math.floor((Date.now() - new Date(lastPingAt).getTime()) / 1000));
     if (diffSec < 10) return 'Vừa xong';
     if (diffSec < 60) return `${diffSec}s trước`;
@@ -215,11 +217,11 @@ export const NodeDiagnosticsWidget: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 tabular-nums">
       {/* ── Summary Cards ── */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {/* Card 1: Broker Status */}
-        <div className="surface-card group p-5 transition hover:-translate-y-0.5 hover:border-primary">
+        <div className="glass-card glass-g2 rounded-3xl border border-[var(--border)] group p-5 transition hover:-translate-y-0.5">
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-bold text-muted uppercase tracking-wider">MQTT Broker</span>
             <div className="w-9 h-9 bg-emerald-500/10 text-emerald-600 rounded-xl flex items-center justify-center">
@@ -238,7 +240,7 @@ export const NodeDiagnosticsWidget: React.FC = () => {
         </div>
 
         {/* Card 2: Edge Nodes Online/Total */}
-        <div className="surface-card group p-5 transition hover:-translate-y-0.5 hover:border-primary">
+        <div className="glass-card glass-g2 rounded-3xl border border-[var(--border)] group p-5 transition hover:-translate-y-0.5">
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-bold text-muted uppercase tracking-wider">ESP32 Edge Nodes</span>
             <div className="w-9 h-9 bg-blue-500/10 text-blue-500 rounded-xl flex items-center justify-center">
@@ -257,7 +259,7 @@ export const NodeDiagnosticsWidget: React.FC = () => {
         </div>
 
         {/* Card 3: Circuit Breaker Quarantined */}
-        <div className="surface-card group p-5 transition hover:-translate-y-0.5 hover:border-warning">
+        <div className="glass-card glass-g2 rounded-3xl border border-[var(--border)] group p-5 transition hover:-translate-y-0.5">
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-bold text-muted uppercase tracking-wider">Circuit Breakers</span>
             <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${
@@ -280,10 +282,10 @@ export const NodeDiagnosticsWidget: React.FC = () => {
         </div>
 
         {/* Card 4: Network Reliability & Latency Gauge Arc [PHO-036] */}
-        <div className="surface-card group p-4 transition hover:-translate-y-0.5 hover:border-primary flex flex-col justify-between">
+        <div className="glass-card glass-g2 rounded-3xl border border-[var(--border)] group p-4 transition hover:-translate-y-0.5 flex flex-col justify-between">
           <div className="flex items-center justify-between mb-1">
             <span className="text-xs font-bold text-muted uppercase tracking-wider">Độ Trễ RTT Gauge</span>
-            <div className="w-7 h-7 bg-amber-500/10 text-amber-500 rounded-lg flex items-center justify-center">
+            <div className="w-7 h-7 bg-amber-500/10 text-amber-600 rounded-lg flex items-center justify-center">
               <Zap className="w-4 h-4" />
             </div>
           </div>
@@ -295,7 +297,7 @@ export const NodeDiagnosticsWidget: React.FC = () => {
       </div>
 
       {/* ── Detailed Edge Nodes Monitor Table ── */}
-      <div className="surface-card p-5 sm:p-6 rounded-2xl border border-line shadow-xs space-y-4">
+      <div className="glass-card glass-g2 p-5 sm:p-6 rounded-3xl border border-[var(--border)] shadow-xs space-y-4">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
             <h2 className="text-base sm:text-lg font-bold text-text flex items-center gap-2">
@@ -345,7 +347,7 @@ export const NodeDiagnosticsWidget: React.FC = () => {
                   const isTripping = trippingCode === node.nodeCode;
 
                   return (
-                    <tr key={node.nodeId} className={`hover:bg-off-soft/30 transition-colors ${node.status === 'OFFLINE' ? 'opacity-70 bg-slate-50/40' : ''}`}>
+                    <tr key={node.nodeId} className={`hover:bg-off-soft/30 transition-colors ${node.status === 'OFFLINE' ? 'opacity-70 bg-[var(--g1)]/50' : ''}`}>
                       <td className="py-3.5 px-3 font-mono font-bold text-text">
                         {node.nodeCode}
                       </td>
@@ -355,10 +357,10 @@ export const NodeDiagnosticsWidget: React.FC = () => {
                       <td className="py-3.5 px-3">
                         <div className="flex flex-col">
                           <span className={`inline-flex items-center gap-1.5 font-semibold ${
-                            node.status === 'ONLINE' ? 'text-emerald-700' : 'text-slate-400'
+                            node.status === 'ONLINE' ? 'text-emerald-700' : 'text-[var(--secondary)]'
                           }`}>
                             <span className={`w-2 h-2 rounded-full ${
-                              node.status === 'ONLINE' ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'
+                              node.status === 'ONLINE' ? 'bg-emerald-500 animate-pulse' : 'bg-[var(--tertiary)]'
                             }`} />
                             {node.status}
                           </span>
@@ -398,7 +400,7 @@ export const NodeDiagnosticsWidget: React.FC = () => {
                             className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-lg border border-line bg-surface hover:bg-primary hover:text-white text-text transition-colors shadow-xs disabled:opacity-50"
                             title="Gửi gói tin ping kiểm tra kết nối MQTT thực tế"
                           >
-                            <Send className={`w-3 h-3 ${isPinging ? 'animate-bounce' : ''}`} />
+                            <Send className={`w-3 h-3 ${isPinging ? 'animate-pulse' : ''}`} />
                             Ping
                           </button>
 

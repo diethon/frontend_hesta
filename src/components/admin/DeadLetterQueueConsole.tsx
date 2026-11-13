@@ -45,6 +45,7 @@ export const DeadLetterQueueConsole: React.FC = () => {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchLetters();
     const timer = setInterval(fetchLetters, 5000);
     return () => clearInterval(timer);
@@ -102,7 +103,7 @@ export const DeadLetterQueueConsole: React.FC = () => {
     if (reason.includes('RATE_LIMIT')) {
       return {
         label: 'Gửi dồn dập (Tạm giữ chống quá tải)',
-        color: 'bg-amber-500/10 text-amber-500 border-amber-500/20',
+        color: 'bg-amber-500/10 text-amber-600 border-amber-500/20',
       };
     }
     if (reason.includes('MALFORMED') || reason.includes('JSON')) {
@@ -166,11 +167,11 @@ export const DeadLetterQueueConsole: React.FC = () => {
   const replayedCount = letters.filter((l) => l.replayed).length;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 tabular-nums">
       {/* Banner Giới Thiệu Chức Năng Dễ Hiểu */}
-      <div className="p-5 rounded-3xl bg-gradient-to-r from-primary/10 via-surface to-surface border border-line">
+      <div className="glass-card glass-g2 p-5 rounded-3xl border border-[var(--border)]">
         <div className="flex items-start gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-primary/20 text-primary flex items-center justify-center shrink-0 mt-0.5">
+          <div className="w-10 h-10 rounded-2xl bg-primary/15 text-primary flex items-center justify-center shrink-0 mt-0.5">
             <Inbox className="w-5 h-5" />
           </div>
           <div>
@@ -192,7 +193,7 @@ export const DeadLetterQueueConsole: React.FC = () => {
 
       {/* 4 Thẻ Trạng Thái Trực Quan */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-4 rounded-2xl bg-surface border border-line flex items-center justify-between">
+        <div className="glass-card glass-g2 p-4 rounded-3xl border border-[var(--border)] flex items-center justify-between">
           <div>
             <p className="text-xs text-muted font-medium">Tín hiệu chờ gửi lại</p>
             <p className="text-2xl font-bold text-red-500 mt-1">{unhandledCount}</p>
@@ -203,7 +204,7 @@ export const DeadLetterQueueConsole: React.FC = () => {
           </div>
         </div>
 
-        <div className="p-4 rounded-2xl bg-surface border border-line flex items-center justify-between">
+        <div className="glass-card glass-g2 p-4 rounded-3xl border border-[var(--border)] flex items-center justify-between">
           <div>
             <p className="text-xs text-muted font-medium">Đã gửi lại thành công</p>
             <p className="text-2xl font-bold text-emerald-500 mt-1">{replayedCount}</p>
@@ -214,7 +215,7 @@ export const DeadLetterQueueConsole: React.FC = () => {
           </div>
         </div>
 
-        <div className="p-4 rounded-2xl bg-surface border border-line flex items-center justify-between">
+        <div className="glass-card glass-g2 p-4 rounded-3xl border border-[var(--border)] flex items-center justify-between">
           <div>
             <p className="text-xs text-muted font-medium">Tốc độ tiếp nhận</p>
             <p className="text-xl font-bold text-primary mt-1">An Toàn</p>
@@ -225,20 +226,20 @@ export const DeadLetterQueueConsole: React.FC = () => {
           </div>
         </div>
 
-        <div className="p-4 rounded-2xl bg-surface border border-line flex items-center justify-between">
+        <div className="glass-card glass-g2 p-4 rounded-3xl border border-[var(--border)] flex items-center justify-between">
           <div>
             <p className="text-xs text-muted font-medium">Bộ nhớ lưu tạm</p>
             <p className="text-xl font-bold text-text mt-1">{letters.length} / 500</p>
             <p className="text-[10px] text-muted mt-0.5">Tự động xoay vòng an toàn</p>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center">
+          <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center">
             <Clock className="w-5 h-5" />
           </div>
         </div>
       </div>
 
       {/* Danh Sách Tín Hiệu */}
-      <div className="rounded-2xl border border-line bg-surface overflow-hidden shadow-sm">
+      <div className="glass-card glass-g2 rounded-3xl border border-[var(--border)] overflow-hidden shadow-xs">
         {/* Thanh Công Cụ */}
         <div className="p-4 border-b border-line flex flex-wrap items-center justify-between gap-3 bg-surface/50">
           <div className="flex items-center gap-2">
@@ -378,7 +379,7 @@ export const DeadLetterQueueConsole: React.FC = () => {
                           <Copy className="w-3 h-3" /> Sao chép dữ liệu
                         </button>
                       </div>
-                      <pre className="font-mono overflow-x-auto whitespace-pre-wrap break-all max-h-48 text-[11px] text-emerald-400 bg-slate-950 p-2.5 rounded-lg border border-slate-800">
+                      <pre className="font-mono overflow-x-auto whitespace-pre-wrap break-all max-h-48 text-[11px] text-emerald-400 bg-[#0b1320] p-2.5 rounded-lg border border-[#1e293b]">
                         {(() => {
                           try {
                             const obj = JSON.parse(item.payload);

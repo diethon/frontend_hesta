@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { Icon } from './HomeIcons';
 import { notify } from '../ui/notify';
+import { fallDetectionService } from '../../services/fallDetectionService';
 
 export type CameraState = 'live' | 'loading' | 'offline' | 'empty';
 
@@ -10,8 +11,8 @@ interface HomeHeroLiveCameraProps {
   totalDevices: number;
   onlineDevices: number;
   activeLightsCount: number;
-  avgTemperature?: number;
-  avgHumidity?: number;
+  avgTemperature?: number | null;
+  avgHumidity?: number | null;
   activePowerWatts?: number;
   onTurnOffAllLights?: () => void;
   state?: CameraState;
@@ -19,12 +20,12 @@ interface HomeHeroLiveCameraProps {
 
 export const HomeHeroLiveCamera: React.FC<HomeHeroLiveCameraProps> = ({
   homeId,
-  totalDevices = 8,
-  onlineDevices = 8,
-  activeLightsCount = 2,
-  avgTemperature = 26.9,
-  avgHumidity = 61.8,
-  activePowerWatts = 350,
+  totalDevices = 0,
+  onlineDevices = 0,
+  activeLightsCount = 0,
+  avgTemperature = null,
+  avgHumidity = null,
+  activePowerWatts = 0,
   onTurnOffAllLights,
   state = 'live',
 }) => {
@@ -32,15 +33,56 @@ export const HomeHeroLiveCamera: React.FC<HomeHeroLiveCameraProps> = ({
   const [selectedCamera, setSelectedCamera] = useState('Camera phòng khách');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isSnapping, setIsSnapping] = useState(false);
+  const [aiInfo, setAiInfo] = useState<{
+    isOnline: boolean;
+    fps: number;
+    alert: boolean;
+    state: string;
+  }>({
+    isOnline: false,
+    fps: 0,
+    alert: false,
+    state: 'STANDING',
+  });
 
   const cameras = ['Camera phòng khách', 'Camera sân trước', 'Camera ban công'];
+
+  // Poll local AI Fall Detection status
+  useEffect(() => {
+    let isMounted = true;
+    const fetchStatus = async () => {
+      try {
+        const data = await fallDetectionService.checkAiStatus();
+        if (!isMounted) return;
+        if (data) {
+          setAiInfo({
+            isOnline: true,
+            fps: data.fps || 30,
+            alert: Boolean(data.alert),
+            state: data.state || 'STANDING',
+          });
+        } else {
+          setAiInfo((prev) => ({ ...prev, isOnline: false }));
+        }
+      } catch {
+        if (isMounted) setAiInfo((prev) => ({ ...prev, isOnline: false }));
+      }
+    };
+
+    fetchStatus();
+    const interval = setInterval(fetchStatus, 3000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
 
   const handleSnapshot = () => {
     setIsSnapping(true);
     setTimeout(() => {
       setIsSnapping(false);
       notify.success('Đã chụp ảnh camera', 'Hình ảnh camera an ninh đã được lưu vào nhật ký.');
-    }, 450);
+    }, 400);
   };
 
   const handleFullscreen = () => {
@@ -59,48 +101,47 @@ export const HomeHeroLiveCamera: React.FC<HomeHeroLiveCameraProps> = ({
     }
   };
 
-  const SensorChips = () => (
-    <div className="camera-sensors">
-      <span className="camera-chip">
-        <Icon name="thermometer" size={16} />
-        {avgTemperature.toFixed(1)}°C
-      </span>
-      <span className="camera-chip">
-        <Icon name="droplet" size={16} />
-        {avgHumidity.toFixed(1)}%
-      </span>
-      <span className="camera-chip">
-        <Icon name="energy" size={16} />
-        {activePowerWatts} W
-      </span>
-      <span className="camera-chip success">
-        <Icon name="shield" size={16} />
-        An toàn
-      </span>
-    </div>
-  );
-
   return (
-    <section className={`hero camera-card glass-g2 camera-${state}`}>
+    <section className={`hero camera-card camera-${state}`}>
       <div className="camera-viewport">
         {state === 'live' && (
-          <img
-            className={`camera-image transition-all duration-300 ${
-              isSnapping ? 'brightness-150 scale-[1.01]' : ''
-            }`}
-            src="https://images.unsplash.com/photo-1632829882891-5047ccc421bc?crop=entropy&cs=tinysrgb&fit=crop&fm=jpg&q=85&w=1600"
-            alt="Hình ảnh trực tiếp phòng khách sáng và yên tĩnh"
-            onError={(e) => {
-              // Fallback to local image if internet is slow
-              e.currentTarget.src = '/camera_living_room.jpg';
-            }}
-          />
+          <>
+            {/* Ambient background blur to soften video edges */}
+            <img
+              className="camera-ambient-blur"
+              src={
+                selectedCamera === 'Camera phòng khách'
+                  ? 'http://localhost:5000/video_feed'
+                  : '/camera_living_room.jpg'
+              }
+              alt=""
+              aria-hidden="true"
+            />
+
+            {/* Main video feed with soft rounded corners */}
+            <img
+              className={`camera-image transition-all duration-300 ${
+                isSnapping ? 'brightness-125' : ''
+              }`}
+              src={
+                selectedCamera === 'Camera phòng khách'
+                  ? 'http://localhost:5000/video_feed'
+                  : '/camera_living_room.jpg'
+              }
+              alt="Hình ảnh trực tiếp camera an ninh"
+              onError={(e) => {
+                e.currentTarget.src = '/camera_living_room.jpg';
+              }}
+            />
+          </>
         )}
+
+        {isSnapping && <div className="camera-snap-flash" />}
 
         {state === 'loading' && (
           <div className="camera-state camera-loading">
             <Icon name="camera" size={34} />
-            <span>Đang kết nối camera</span>
+            <span>Đang kết nối camera…</span>
           </div>
         )}
 
@@ -110,11 +151,11 @@ export const HomeHeroLiveCamera: React.FC<HomeHeroLiveCameraProps> = ({
             <strong>Camera ngoại tuyến</strong>
             <button
               type="button"
-              className="secondary-button"
+              className="camera-control-btn w-auto px-4 rounded-full flex items-center gap-2"
               onClick={() => notify.info('Đang kết nối lại camera…')}
             >
-              <Icon name="refresh" size={17} />
-              Thử lại
+              <Icon name="refresh" size={16} />
+              <span>Thử lại</span>
             </button>
           </div>
         )}
@@ -125,105 +166,182 @@ export const HomeHeroLiveCamera: React.FC<HomeHeroLiveCameraProps> = ({
             <strong>Chưa có camera</strong>
             <button
               type="button"
-              className="camera-primary"
+              className="camera-light-btn active"
               onClick={() => notify.info('Thêm camera an ninh mới')}
             >
-              <Icon name="plus" size={17} />
-              Thêm camera
+              <Icon name="plus" size={16} />
+              <span>Thêm camera</span>
             </button>
           </div>
         )}
 
+        {/* ── Top HUD Header Bar ── */}
         {state !== 'empty' && (
-          <div className="camera-top-left">
-            <span className="live-badge">
-              <span className="live-dot" />
-              Trực tiếp
-            </span>
+          <div className="camera-hud-header">
+            <div className="camera-hud-left">
+              {/* Live Badge */}
+              <div className="camera-live-badge">
+                <span className="camera-live-dot" />
+                <span>TRỰC TIẾP</span>
+              </div>
 
-            <div className="relative">
+              {/* Camera Selector Dropdown */}
+              <div className="relative">
+                <button
+                  type="button"
+                  className="camera-name-pill"
+                  onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                  title="Chọn camera quan sát"
+                >
+                  <Icon name="camera" size={14} className="opacity-80" />
+                  <span>{selectedCamera}</span>
+                  <Icon
+                    name="chevronDown"
+                    size={13}
+                    className={`opacity-70 transition-transform duration-200 ${
+                      isDropdownOpen ? 'rotate-180' : ''
+                    }`}
+                  />
+                </button>
+
+                {isDropdownOpen && (
+                  <div className="camera-dropdown-menu">
+                    {cameras.map((cam) => {
+                      const isSelected = selectedCamera === cam;
+                      return (
+                        <button
+                          key={cam}
+                          type="button"
+                          onClick={() => {
+                            setSelectedCamera(cam);
+                            setIsDropdownOpen(false);
+                            notify.info(`Đã chuyển sang ${cam}`);
+                          }}
+                          className={`camera-dropdown-item ${isSelected ? 'active' : ''}`}
+                        >
+                          <span>{cam}</span>
+                          {isSelected && (
+                            <Icon name="check" size={14} className="shrink-0" />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="camera-hud-right">
+              {/* AI Fall Detection Live Badge */}
               <button
                 type="button"
-                className="camera-name"
-                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                onClick={() =>
+                  navigate(
+                    homeId
+                      ? `/home/${encodeURIComponent(homeId)}/fall-detection`
+                      : '/fall-detection'
+                  )
+                }
+                className={`camera-ai-pill ${aiInfo.alert ? 'alert' : ''}`}
+                title="Mở Trung Tâm Giám Sát Thị Giác & Cứu Hộ Té Ngã AI"
               >
-                <span>{selectedCamera}</span>
-                <Icon name="chevronDown" size={15} />
+                <span className={`camera-ai-dot ${aiInfo.alert ? 'alert' : ''}`} />
+                <span>
+                  {aiInfo.alert
+                    ? 'CẢNH BÁO TÉ NGÃ!'
+                    : aiInfo.isOnline
+                    ? `AI Pose · ${Math.round(aiInfo.fps || 30)} FPS`
+                    : 'AI Giám Sát'}
+                </span>
               </button>
 
-              {isDropdownOpen && (
-                <div className="absolute left-0 mt-2 w-48 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xl py-1 z-30">
-                  {cameras.map((cam) => (
-                    <button
-                      key={cam}
-                      type="button"
-                      onClick={() => {
-                        setSelectedCamera(cam);
-                        setIsDropdownOpen(false);
-                        notify.info(`Đã chuyển sang ${cam}`);
-                      }}
-                      className={`w-full text-left px-3.5 py-2 text-xs font-semibold transition-colors ${
-                        selectedCamera === cam
-                          ? 'text-primary bg-primary/10'
-                          : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
-                      }`}
-                    >
-                      {cam}
-                    </button>
-                  ))}
+              {/* Compact Environment Chip */}
+              {(avgTemperature != null || avgHumidity != null || activePowerWatts > 0) && (
+                <div className="camera-env-pill">
+                  {avgTemperature != null && (
+                    <span className="flex items-center gap-1">
+                      <Icon name="thermometer" size={13} className="text-amber-400" />
+                      <span>{avgTemperature.toFixed(1)}°C</span>
+                    </span>
+                  )}
+                  {avgTemperature != null && avgHumidity != null && (
+                    <span className="opacity-40">·</span>
+                  )}
+                  {avgHumidity != null && (
+                    <span className="flex items-center gap-1 opacity-90">
+                      <Icon name="droplet" size={13} className="text-sky-400" />
+                      <span>{avgHumidity.toFixed(0)}%</span>
+                    </span>
+                  )}
+                  {activePowerWatts > 0 && (
+                    <>
+                      <span className="opacity-40">·</span>
+                      <span className="flex items-center gap-1 text-emerald-400">
+                        <Icon name="energy" size={13} />
+                        <span>{activePowerWatts} W</span>
+                      </span>
+                    </>
+                  )}
                 </div>
               )}
             </div>
           </div>
         )}
 
-        {/* Overlaid inside viewport on desktop */}
-        <SensorChips />
-
+        {/* ── Bottom HUD Footer Bar ── */}
         {state !== 'empty' && (
           <div className="camera-bottom">
-            <p>
-              <span className="safe-dot" /> Nhà an toàn · {activeLightsCount} đèn đang bật ·{' '}
-              {onlineDevices}/{totalDevices} thiết bị trực tuyến
-            </p>
+            <div className="camera-bottom-status">
+              <span className="camera-safe-dot" />
+              <span>
+                Nhà an toàn
+                <span className="opacity-40 mx-1.5">·</span>
+                {activeLightsCount} đèn bật
+                <span className="opacity-40 mx-1.5">·</span>
+                {onlineDevices}/{totalDevices} trực tuyến
+              </span>
+            </div>
 
             <div className="camera-controls">
               <button
                 type="button"
-                className="camera-control"
+                className="camera-control-btn"
                 aria-label="Chụp ảnh camera"
                 title="Chụp ảnh camera"
                 onClick={handleSnapshot}
               >
-                <Icon name="camera" size={18} />
+                <Icon name="camera" size={17} />
               </button>
 
               <button
                 type="button"
-                className="camera-control"
+                className="camera-control-btn"
                 aria-label="Toàn màn hình Digital Twin"
                 title="Toàn màn hình Digital Twin"
                 onClick={handleFullscreen}
               >
-                <Icon name="maximize" size={18} />
+                <Icon name="maximize" size={17} />
               </button>
 
               <button
                 type="button"
-                className="secondary-button"
+                className={`camera-light-btn ${activeLightsCount > 0 ? 'active' : ''}`}
                 onClick={handleQuickTurnOff}
-                title="Tắt nhanh các đèn đang bật"
+                title={
+                  activeLightsCount > 0
+                    ? `Tắt nhanh ${activeLightsCount} đèn đang bật`
+                    : 'Tắt nhanh đèn'
+                }
               >
-                <Icon name="power" size={18} />
-                <span>Tắt nhanh đèn</span>
+                <Icon name="power" size={15} />
+                <span>
+                  {activeLightsCount > 0 ? `Tắt ${activeLightsCount} đèn` : 'Tắt nhanh'}
+                </span>
               </button>
             </div>
           </div>
         )}
       </div>
-
-      {/* Rendered below viewport on mobile viewports via responsive CSS */}
-      <SensorChips />
     </section>
   );
 };

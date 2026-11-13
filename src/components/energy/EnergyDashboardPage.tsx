@@ -1,12 +1,13 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { useAppSelector } from '../../store/hooks';
 import { DashboardNavRail } from '../home/DashboardNavRail';
 import { DashboardBottomNav } from '../home/DashboardBottomNav';
 import { VoiceAssistantButton } from '../ui/VoiceAssistant';
 import { NotificationBell } from '../notification/NotificationBell';
-import { getHomeEnergyAnalytics } from '../../services/energyApi';
-import type { EnergyAnalyticsResponse, DeviceEnergyBreakdown, EnergyTimeSeriesPoint } from '../../types/energy';
+import { getHomeEnergyAnalytics, energyAnalyticsKey } from '../../services/energyApi';
+import { peekCache } from '../../services/queryCache';
+import type { EnergyAnalyticsResponse, DeviceEnergyBreakdown } from '../../types/energy';
 import { getErrorMessage } from '../../utils/errors';
 import {
   Zap,
@@ -14,14 +15,20 @@ import {
   TrendingDown,
   AlertCircle,
   DollarSign,
-  Clock,
   RefreshCw,
-  Layers,
   PieChart,
   BarChart3,
   ShieldCheck,
+  Activity,
+  Layers,
 } from 'lucide-react';
 import { DemandResponseCard } from './DemandResponseCard';
+import { EnergyTrendChart } from './EnergyTrendChart';
+import { EvnTierLadder } from './EvnTierLadder';
+import { RoomBreakdownCard } from './RoomBreakdownCard';
+import { TopConsumersCard } from './TopConsumersCard';
+import { formatVnd, formatKwh, getTierColorClass } from './energyUtils';
+import './energy.css';
 
 const DONUT_COLORS = [
   '#f59e0b', // Amber
@@ -44,67 +51,107 @@ export const EnergyDashboardPage: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<'overview' | 'protection'>('overview');
   const [period, setPeriod] = useState<'24H' | '7D' | '30D'>('30D');
-  const [data, setData] = useState<EnergyAnalyticsResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<EnergyAnalyticsResponse | null>(
+    () => (homeId ? peekCache<EnergyAnalyticsResponse>(energyAnalyticsKey(homeId, '30D')) ?? null : null)
+  );
+  const [loading, setLoading] = useState(
+    () => !(homeId && peekCache(energyAnalyticsKey(homeId, '30D')))
+  );
   const [error, setError] = useState('');
-  const [hoveredPoint, setHoveredPoint] = useState<EnergyTimeSeriesPoint | null>(null);
   const [hoveredBreakdown, setHoveredBreakdown] = useState<DeviceEnergyBreakdown | null>(null);
+  const [showZeroDevices, setShowZeroDevices] = useState(false);
 
-  const fetchEnergy = useCallback(async (isCancelled?: unknown) => {
+  // Fetch energy data on mount and period changes
+  useEffect(() => {
+    let active = true;
     if (!homeId) return;
-    try {
-      setLoading(true);
-      setError('');
-      const res = await getHomeEnergyAnalytics(homeId, period);
-      if (!(typeof isCancelled === 'function' && isCancelled())) {
-        setData(res);
-      }
-    } catch (err) {
-      if (!(typeof isCancelled === 'function' && isCancelled())) {
-        setError(getErrorMessage(err, 'Không thể tải dữ liệu phân tích năng lượng'));
-      }
-    } finally {
-      if (!(typeof isCancelled === 'function' && isCancelled())) {
-        setLoading(false);
-      }
+
+    // Fast-path: if cached data exists, render immediately with 0ms delay
+    const cached = peekCache<EnergyAnalyticsResponse>(energyAnalyticsKey(homeId, period));
+    if (cached) {
+      setData(cached);
+      setLoading(false);
     }
+
+    getHomeEnergyAnalytics(homeId, period)
+      .then((res) => {
+        if (!active) return;
+        setData(res);
+        setError('');
+        setLoading(false);
+
+        // Silently prefetch remaining periods so future tab switches are instant (0ms)
+        const otherPeriods = (['24H', '7D', '30D'] as const).filter((p) => p !== period);
+        setTimeout(() => {
+          if (!active) return;
+          otherPeriods.forEach((p) => {
+            getHomeEnergyAnalytics(homeId, p).catch(() => null);
+          });
+        }, 150);
+      })
+      .catch((err: unknown) => {
+        if (!active) return;
+        setError(getErrorMessage(err, 'Không thể tải dữ liệu phân tích năng lượng'));
+        setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
   }, [homeId, period]);
 
-  useEffect(() => {
-    let ignore = false;
-    void fetchEnergy(() => ignore);
-    return () => {
-      ignore = true;
-    };
-  }, [fetchEnergy]);
-
-  const summary = data?.summary;
-  const timeSeries = data?.timeSeries || [];
-  const breakdown = data?.breakdown || [];
-  const sortedBreakdown = [...breakdown].sort((a, b) => (b.kwh || 0) - (a.kwh || 0));
-
-  const maxKwh = Math.max(...timeSeries.map((p) => p.kwh), 1.0);
-
-  const formatCurrency = (val?: number) => {
-    if (!val) return '0 ₫';
-    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(val);
-  };
-
-  const getTierBadgeColor = (tier?: number) => {
-    switch (tier) {
-      case 1:
-      case 2:
-        return 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30';
-      case 3:
-      case 4:
-        return 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30';
-      case 5:
-      case 6:
-        return 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/30';
-      default:
-        return 'bg-slate-500/15 text-slate-600 dark:text-slate-400 border-slate-500/30';
+  const handlePeriodChange = (newPeriod: '24H' | '7D' | '30D') => {
+    if (newPeriod !== period) {
+      const cached = homeId ? peekCache<EnergyAnalyticsResponse>(energyAnalyticsKey(homeId, newPeriod)) : undefined;
+      if (cached) {
+        setData(cached);
+        setLoading(false);
+      } else {
+        setLoading(true);
+      }
+      setPeriod(newPeriod);
     }
   };
+
+  const handleRefresh = async () => {
+    if (!homeId) return;
+    setLoading(true);
+    try {
+      const res = await getHomeEnergyAnalytics(homeId, period, true);
+      setData(res);
+      setError('');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Không thể tải dữ liệu phân tích năng lượng'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const summary = data?.summary;
+  const timeSeries = useMemo(() => data?.timeSeries || [], [data?.timeSeries]);
+  const breakdown = useMemo(() => data?.breakdown || [], [data?.breakdown]);
+  const sortedBreakdown = useMemo(
+    () => [...breakdown].sort((a, b) => (b.kwh || 0) - (a.kwh || 0)),
+    [breakdown]
+  );
+
+  // Compute average per point and peak point from timeSeries
+  const { avgPointKwh, peakPoint } = useMemo(() => {
+    if (!timeSeries || timeSeries.length === 0) {
+      return { avgPointKwh: 0, peakPoint: null };
+    }
+    const sum = timeSeries.reduce((s, p) => s + (p.kwh || 0), 0);
+    const avg = sum / timeSeries.length;
+    let peak = timeSeries[0];
+    for (const p of timeSeries) {
+      if ((p.kwh || 0) > (peak.kwh || 0)) {
+        peak = p;
+      }
+    }
+    return { avgPointKwh: avg, peakPoint: peak };
+  }, [timeSeries]);
+
+  const tierColors = getTierColorClass(summary?.currentTier ?? 1);
 
   return (
     <div className="app-shell energy-page">
@@ -122,14 +169,10 @@ export const EnergyDashboardPage: React.FC = () => {
       />
 
       <main>
-        {/* Topbar matching Figma v2/v3 & Đức's redesign */}
+        {/* Topbar matching Figma v2/v3 design */}
         <header className="topbar scenes-topbar">
           <div>
-            <span className="eyebrow">
-              {summary
-                ? `${summary.totalKwh} KWH TIÊU THỤ · ${summary.activeDeviceCount}/${summary.totalDeviceCount} THIẾT BỊ HOẠT ĐỘNG`
-                : 'THEO DÕI THỜI GIAN THỰC'}
-            </span>
+            <span className="eyebrow">QUẢN LÝ ĐIỆN NĂNG &amp; HÓA ĐƠN</span>
             <h2>
               Tiêu thụ điện năng <span className="sr-only">Phân tích năng lượng</span>
             </h2>
@@ -171,7 +214,7 @@ export const EnergyDashboardPage: React.FC = () => {
                   <button
                     key={p}
                     type="button"
-                    onClick={() => setPeriod(p)}
+                    onClick={() => handlePeriodChange(p)}
                     className={`px-3 py-1 text-xs font-semibold rounded-full transition-all cursor-pointer ${
                       period === p
                         ? 'bg-[var(--accent)] text-white shadow-xs'
@@ -186,9 +229,9 @@ export const EnergyDashboardPage: React.FC = () => {
 
             <button
               type="button"
-              onClick={() => void fetchEnergy()}
+              onClick={() => void handleRefresh()}
               disabled={loading}
-              className="scene-ghost flex items-center gap-1.5"
+              className="scene-ghost flex items-center gap-1.5 cursor-pointer"
               title="Làm mới dữ liệu"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
@@ -197,22 +240,13 @@ export const EnergyDashboardPage: React.FC = () => {
 
             <button
               type="button"
-              className="scene-ghost flex items-center gap-1.5"
+              className="scene-ghost flex items-center gap-1.5 cursor-pointer"
               onClick={() => navigate(homeId ? `/home/${homeId}/devices` : '/home')}
             >
-              Thiết bị
+              <Layers className="w-3.5 h-3.5" />
+              <span>Thiết bị</span>
             </button>
           </div>
-        </div>
-
-        {/* Summary Strip (Neutral StatChips) */}
-        <div className="scene-summary flex-wrap">
-          <span className="stat">{summary?.totalKwh ?? 0} kWh tiêu thụ</span>
-          <span className="stat">{formatCurrency(summary?.estimatedCostVnd)} tạm tính</span>
-          <span className="stat">Bậc {summary?.currentTier ?? 1} EVN</span>
-          <span className="stat">
-            Dự báo {summary?.projectedMonthKwh ?? 0} kWh ({formatCurrency(summary?.projectedMonthCostVnd)})
-          </span>
         </div>
 
         {error && (
@@ -225,7 +259,7 @@ export const EnergyDashboardPage: React.FC = () => {
         {/* TAB 1: TỔNG QUAN & HÓA ĐƠN */}
         {activeTab === 'overview' && (
           <div className="space-y-6">
-            {/* 4 KPI Summary Cards with Pastel Glassmorphism */}
+            {/* 1. KPI ROW: 4 CARDS */}
             {loading && !data ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 animate-pulse">
                 {[1, 2, 3, 4].map((i) => (
@@ -240,8 +274,8 @@ export const EnergyDashboardPage: React.FC = () => {
                 ))}
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {/* Card 1: Tổng điện năng */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 tabular-nums">
+                {/* KPI Card 1: Tổng điện năng tiêu thụ */}
                 <div className="glass-card glass-g2 p-5 rounded-2xl relative overflow-hidden shadow-xs border border-[var(--border)] transition-all duration-200 hover:-translate-y-0.5">
                   <div className="flex justify-between items-start">
                     <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--secondary)]">
@@ -253,7 +287,7 @@ export const EnergyDashboardPage: React.FC = () => {
                   </div>
                   <div className="mt-3 flex items-baseline gap-2">
                     <span className="text-3xl font-extrabold text-[var(--text)] tracking-tight">
-                      {summary?.totalKwh ?? 0}
+                      {formatKwh(summary?.totalKwh)}
                     </span>
                     <span className="text-sm font-bold text-amber-500">kWh</span>
                   </div>
@@ -288,7 +322,7 @@ export const EnergyDashboardPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Card 2: Tiền điện tạm tính */}
+                {/* KPI Card 2: Tiền điện tạm tính */}
                 <div className="glass-card glass-g2 p-5 rounded-2xl relative overflow-hidden shadow-xs border border-[var(--border)] transition-all duration-200 hover:-translate-y-0.5">
                   <div className="flex justify-between items-start">
                     <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--secondary)]">
@@ -300,14 +334,12 @@ export const EnergyDashboardPage: React.FC = () => {
                   </div>
                   <div className="mt-3">
                     <span className="text-2xl sm:text-3xl font-extrabold text-emerald-600 dark:text-emerald-400 tracking-tight">
-                      {formatCurrency(summary?.estimatedCostVnd)}
+                      {formatVnd(summary?.estimatedCostVnd)}
                     </span>
                   </div>
                   <div className="mt-2 flex items-center gap-2">
                     <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${getTierBadgeColor(
-                        summary?.currentTier
-                      )}`}
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${tierColors.badge}`}
                     >
                       Bậc {summary?.currentTier ?? 1}
                     </span>
@@ -315,7 +347,7 @@ export const EnergyDashboardPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Card 3: Dự báo cả tháng */}
+                {/* KPI Card 3: Dự báo cuối tháng */}
                 <div className="glass-card glass-g2 p-5 rounded-2xl relative overflow-hidden shadow-xs border border-[var(--border)] transition-all duration-200 hover:-translate-y-0.5">
                   <div className="flex justify-between items-start">
                     <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--secondary)]">
@@ -327,368 +359,333 @@ export const EnergyDashboardPage: React.FC = () => {
                   </div>
                   <div className="mt-3 flex items-baseline gap-2">
                     <span className="text-3xl font-extrabold text-[var(--text)] tracking-tight">
-                      {summary?.projectedMonthKwh ?? 0}
+                      {formatKwh(summary?.projectedMonthKwh)}
                     </span>
                     <span className="text-sm font-bold text-[var(--accent)]">kWh</span>
                   </div>
                   <div className="mt-2 text-xs text-[var(--secondary)]">
                     Ước tính:{' '}
-                    <span className="font-semibold text-[var(--text)]">
-                      {formatCurrency(summary?.projectedMonthCostVnd)}
+                    <span className="font-semibold text-[var(--text)] font-mono">
+                      {formatVnd(summary?.projectedMonthCostVnd)}
                     </span>
                   </div>
                 </div>
 
-                {/* Card 4: Cơ cấu Bậc Thang EVN */}
+                {/* KPI Card 4: Trung bình mỗi mốc / Đỉnh tiêu thụ */}
                 <div className="glass-card glass-g2 p-5 rounded-2xl relative overflow-hidden shadow-xs border border-[var(--border)] transition-all duration-200 hover:-translate-y-0.5">
                   <div className="flex justify-between items-start">
                     <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--secondary)]">
-                      Bậc Thang EVN
+                      Trung Bình &amp; Đỉnh Mốc
                     </span>
                     <span className="p-2 bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 rounded-xl border border-indigo-500/20">
-                      <Layers className="h-4 w-4" />
+                      <Activity className="h-4 w-4" />
                     </span>
                   </div>
-                  <div className="mt-3">
-                    <div className="flex justify-between text-xs text-[var(--text)] font-semibold mb-1.5">
-                      <span>Tiến độ Bậc {summary?.currentTier ?? 1}</span>
-                      <span>{summary?.totalKwh ?? 0} kWh</span>
-                    </div>
-                    {/* 6-step progress bar */}
-                    <div className="grid grid-cols-6 gap-1 h-2 bg-[var(--muted)] rounded-full overflow-hidden p-0.5 border border-[var(--border)]">
-                      {[1, 2, 3, 4, 5, 6].map((tier) => (
-                        <div
-                          key={tier}
-                          className={`h-full rounded-sm transition-all ${
-                            (summary?.currentTier ?? 1) >= tier
-                              ? tier <= 2
-                                ? 'bg-emerald-500'
-                                : tier <= 4
-                                ? 'bg-amber-500'
-                                : 'bg-rose-500'
-                              : 'bg-transparent'
-                          }`}
-                        />
-                      ))}
-                    </div>
+                  <div className="mt-3 flex items-baseline gap-2">
+                    <span className="text-3xl font-extrabold text-[var(--text)] tracking-tight">
+                      {formatKwh(avgPointKwh, 1)}
+                    </span>
+                    <span className="text-sm font-bold text-indigo-500">kWh/mốc</span>
                   </div>
-                  <div className="mt-3 text-[11px] text-[var(--secondary)] truncate">
-                    Biểu giá điện sinh hoạt 6 bậc
+                  <div className="mt-2 text-xs text-[var(--secondary)] truncate">
+                    {peakPoint ? (
+                      <span>
+                        Đỉnh: <strong className="text-rose-500 font-mono">{formatKwh(peakPoint.kwh)} kWh</strong> ({peakPoint.label})
+                      </span>
+                    ) : (
+                      <span>Chưa có mốc phát sinh</span>
+                    )}
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Time Series Bar Chart */}
-            <div className="glass-card glass-g2 p-5 sm:p-6 rounded-3xl border border-[var(--border)] shadow-xs space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-[var(--border)]/60 pb-3">
-                <div>
-                  <h3 className="text-base sm:text-lg font-bold text-[var(--text)] flex items-center gap-2">
-                    <Clock className="h-5 w-5 text-amber-500" />
-                    Mức Tiêu Thụ Theo Thời Gian ({period})
-                  </h3>
-                  <p className="text-xs text-[var(--secondary)] mt-0.5">
-                    Điện năng tiêu thụ theo từng mốc thời gian
-                  </p>
-                </div>
+            {/* 2. GRID ROW: TREND CHART (SPAN 8) + EVN TIER LADDER (SPAN 4) */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+              <div className="lg:col-span-8 flex flex-col">
+                <EnergyTrendChart
+                  timeSeries={timeSeries}
+                  period={period}
+                  comparisonPercent={summary?.comparisonLastPeriodPercent}
+                  isLoading={loading && !data}
+                />
+              </div>
 
-                <div className="min-h-[36px] flex items-center">
-                  {hoveredPoint ? (
-                    <div className="text-xs px-3 py-1.5 rounded-xl bg-[var(--solid)] border border-[var(--border)] text-[var(--text)] flex items-center gap-3 shadow-xs">
-                      <span>
-                        Mốc: <b>{hoveredPoint.label}</b>
+              <div className="lg:col-span-4 flex flex-col">
+                <EvnTierLadder
+                  totalKwh={summary?.totalKwh ?? 0}
+                  projectedMonthKwh={summary?.projectedMonthKwh ?? 0}
+                  currentTier={summary?.currentTier ?? 1}
+                  period={period}
+                />
+              </div>
+            </div>
+
+            {/* 3. GRID ROW: DEVICE BREAKDOWN DONUT (SPAN 7) + ROOM BREAKDOWN (SPAN 5) */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+              {/* Device Breakdown Donut & List (span 7) */}
+              <div className="lg:col-span-7 flex flex-col">
+                <div className="glass-card glass-g2 p-5 sm:p-6 rounded-3xl border border-[var(--border)] shadow-xs space-y-6 h-full flex flex-col justify-between">
+                  <div className="flex items-center justify-between gap-2 border-b border-[var(--border)]/60 pb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="p-1.5 rounded-lg bg-amber-500/15 text-amber-500">
+                        <PieChart className="h-4 w-4" />
                       </span>
-                      <span>
-                        Điện: <b className="text-amber-500">{hoveredPoint.kwh} kWh</b>
-                      </span>
-                      <span>
-                        Tiền: <b className="text-emerald-600 dark:text-emerald-400">{formatCurrency(hoveredPoint.costVnd)}</b>
-                      </span>
+                      <h3 className="text-base sm:text-lg font-bold text-[var(--text)] tracking-tight">
+                        Theo Thiết Bị
+                      </h3>
+                    </div>
+                    {hoveredBreakdown && (
+                      <button
+                        type="button"
+                        onClick={() => setHoveredBreakdown(null)}
+                        className="scene-ghost text-xs px-2.5 py-1 cursor-pointer"
+                      >
+                        Bỏ chọn lọc
+                      </button>
+                    )}
+                  </div>
+
+                  {sortedBreakdown.length === 0 ? (
+                    <div className="py-12 text-center text-xs text-[var(--secondary)] flex flex-col items-center justify-center space-y-2">
+                      <Layers className="w-8 h-8 text-[var(--tertiary)] stroke-[1.5]" />
+                      <p>Chưa có dữ liệu tiêu thụ điện của thiết bị trong khoảng thời gian này.</p>
                     </div>
                   ) : (
-                    <div className="text-xs text-[var(--secondary)] flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5 text-amber-500/70" />
-                      <span>Rê chuột vào cột để xem chi tiết mốc</span>
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center my-auto">
+                      {/* Left: SVG Donut Chart */}
+                      <div className="md:col-span-5 flex flex-col items-center justify-center relative">
+                        <div className="relative w-56 h-56 sm:w-64 sm:h-64">
+                          <svg viewBox="0 0 280 280" className="w-full h-full transform -rotate-90">
+                            {/* Background track circle */}
+                            <circle
+                              cx="140"
+                              cy="140"
+                              r="90"
+                              fill="none"
+                              stroke="currentColor"
+                              className="text-[var(--border)] opacity-40"
+                              strokeWidth="32"
+                              style={{ pointerEvents: 'none' }}
+                            />
+                            {/* Slices */}
+                            {(() => {
+                              const activeBreakdown = sortedBreakdown.filter((d) => (d.kwh || 0) > 0.001);
+                              const totalActiveKwh = activeBreakdown.reduce((sum, d) => sum + (d.kwh || 0), 0);
+                              const circumference = 2 * Math.PI * 90;
+
+                              if (activeBreakdown.length === 0 || totalActiveKwh <= 0.001) {
+                                return (
+                                  <circle
+                                    cx="140"
+                                    cy="140"
+                                    r="90"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    className="text-[var(--border)] opacity-60"
+                                    strokeWidth="24"
+                                    strokeDasharray="6 8"
+                                    style={{ pointerEvents: 'none' }}
+                                  />
+                                );
+                              }
+
+                              if (activeBreakdown.length === 1) {
+                                const dev = activeBreakdown[0];
+                                const originalIdx = sortedBreakdown.findIndex((d) => d.deviceId === dev.deviceId);
+                                const color = DONUT_COLORS[(originalIdx >= 0 ? originalIdx : 0) % DONUT_COLORS.length];
+                                const isHovered = hoveredBreakdown?.deviceId === dev.deviceId;
+                                return (
+                                  <circle
+                                    key={dev.deviceId}
+                                    cx="140"
+                                    cy="140"
+                                    r="90"
+                                    fill="none"
+                                    stroke={color}
+                                    strokeWidth={isHovered ? 34 : 28}
+                                    strokeLinecap="butt"
+                                    className="transition-all duration-300 cursor-pointer"
+                                    style={{
+                                      pointerEvents: 'stroke',
+                                      opacity: hoveredBreakdown && !isHovered ? 0.35 : 1,
+                                      filter: isHovered ? `drop-shadow(0 0 10px ${color}80)` : undefined,
+                                    }}
+                                    onMouseEnter={() => setHoveredBreakdown(dev)}
+                                    onMouseLeave={() => setHoveredBreakdown(null)}
+                                  />
+                                );
+                              }
+
+                              let accumulated = 0;
+                              return activeBreakdown.map((dev) => {
+                                const originalIdx = sortedBreakdown.findIndex((d) => d.deviceId === dev.deviceId);
+                                const color = DONUT_COLORS[(originalIdx >= 0 ? originalIdx : 0) % DONUT_COLORS.length];
+                                const pct = (dev.kwh / totalActiveKwh) * 100;
+                                const sliceLen = (pct / 100) * circumference;
+                                const gap = 3;
+                                const dashLength = Math.max(sliceLen - gap, 1);
+                                const strokeDasharray = `${dashLength} ${circumference - dashLength}`;
+                                const strokeDashoffset = -accumulated;
+                                accumulated += sliceLen;
+
+                                const isHovered = hoveredBreakdown?.deviceId === dev.deviceId;
+
+                                return (
+                                  <circle
+                                    key={dev.deviceId}
+                                    cx="140"
+                                    cy="140"
+                                    r="90"
+                                    fill="none"
+                                    stroke={color}
+                                    strokeWidth={isHovered ? 34 : 28}
+                                    strokeDasharray={strokeDasharray}
+                                    strokeDashoffset={strokeDashoffset}
+                                    strokeLinecap="butt"
+                                    className="transition-all duration-300 cursor-pointer"
+                                    style={{
+                                      pointerEvents: 'stroke',
+                                      opacity: hoveredBreakdown && !isHovered ? 0.35 : 1,
+                                      filter: isHovered ? `drop-shadow(0 0 10px ${color}80)` : undefined,
+                                    }}
+                                    onMouseEnter={() => setHoveredBreakdown(dev)}
+                                    onMouseLeave={() => setHoveredBreakdown(null)}
+                                  />
+                                );
+                              });
+                            })()}
+                          </svg>
+
+                          {/* Center hole statistics */}
+                          <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-4 pointer-events-none tabular-nums">
+                            <span className="text-[11px] font-bold text-[var(--secondary)] uppercase tracking-wider truncate max-w-[130px]">
+                              {hoveredBreakdown ? hoveredBreakdown.deviceName : 'Tổng Tiêu Thụ'}
+                            </span>
+                            <div className="flex items-baseline gap-1 my-0.5">
+                              <span className="text-2xl font-extrabold text-[var(--text)] tracking-tight">
+                                {formatKwh(hoveredBreakdown ? hoveredBreakdown.kwh : (summary?.totalKwh ?? 0))}
+                              </span>
+                              <span className="text-xs font-bold text-amber-500">kWh</span>
+                            </div>
+                            <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 truncate max-w-[140px]">
+                              {hoveredBreakdown
+                                ? `${hoveredBreakdown.percentage}% (${formatVnd(hoveredBreakdown.costVnd)})`
+                                : (summary?.totalKwh ?? 0) <= 0
+                                ? 'Chưa phát sinh tiêu thụ'
+                                : formatVnd(summary?.estimatedCostVnd)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Right: Device list */}
+                      <div className="md:col-span-7 space-y-2">
+                        <div className="space-y-2 max-h-[340px] overflow-y-auto pr-1 energy-scroll-area">
+                          {(() => {
+                            const activeDevs = sortedBreakdown.filter((d) => (d.kwh || 0) > 0.001);
+                            const zeroCount = sortedBreakdown.length - activeDevs.length;
+                            const visibleDevs = showZeroDevices ? sortedBreakdown : activeDevs;
+
+                            return (
+                              <>
+                                {visibleDevs.map((dev, idx) => {
+                                  const color = DONUT_COLORS[idx % DONUT_COLORS.length];
+                                  const isHovered = hoveredBreakdown?.deviceId === dev.deviceId;
+
+                                  return (
+                                    <div
+                                      key={dev.deviceId}
+                                      onMouseEnter={() => setHoveredBreakdown(dev)}
+                                      onMouseLeave={() => setHoveredBreakdown(null)}
+                                      className={`p-3 rounded-2xl border transition-all cursor-pointer space-y-1.5 ${
+                                        isHovered
+                                          ? 'bg-[var(--solid)] border-[var(--accent)] shadow-md ring-1 ring-[var(--accent)]/30'
+                                          : 'bg-[var(--g1)] border-[var(--border)] hover:bg-[var(--solid)]/80'
+                                      }`}
+                                    >
+                                      <div className="flex items-center justify-between gap-2">
+                                        <div className="flex items-center gap-2 min-w-0">
+                                          <span
+                                            className="w-2.5 h-2.5 rounded-full shrink-0 shadow-xs"
+                                            style={{ backgroundColor: color }}
+                                          />
+                                          <div className="min-w-0">
+                                            <span className="text-xs font-bold text-[var(--text)] truncate block">
+                                              {dev.deviceName}
+                                            </span>
+                                            <span className="text-[10px] text-[var(--secondary)] truncate block">
+                                              {dev.roomName || dev.deviceType}
+                                              {dev.totalOnHours ? ` • ${dev.totalOnHours}h` : ''}
+                                            </span>
+                                          </div>
+                                        </div>
+                                        <div className="text-right shrink-0 font-mono">
+                                          <div className="flex items-baseline justify-end gap-1.5">
+                                            <span className="text-xs font-bold text-amber-500">
+                                              {formatKwh(dev.kwh)} kWh
+                                            </span>
+                                            <span className="text-[11px] font-semibold text-[var(--secondary)]">
+                                              ({dev.percentage}%)
+                                            </span>
+                                          </div>
+                                          <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 block">
+                                            {formatVnd(dev.costVnd)}
+                                          </span>
+                                        </div>
+                                      </div>
+
+                                      <div className="w-full h-1.5 bg-[var(--muted)] rounded-full overflow-hidden">
+                                        <div
+                                          style={{
+                                            width: `${Math.min(dev.percentage, 100)}%`,
+                                            backgroundColor: color,
+                                          }}
+                                          className="h-full rounded-full transition-all duration-300"
+                                        />
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+
+                                {zeroCount > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowZeroDevices((prev) => !prev)}
+                                    className="w-full py-2 text-[11px] font-semibold text-[var(--secondary)] hover:text-[var(--text)] transition-colors cursor-pointer text-center"
+                                  >
+                                    {showZeroDevices
+                                      ? 'Ẩn các thiết bị 0 kWh'
+                                      : `+ Xem thêm ${zeroCount} thiết bị chưa tiêu thụ điện (0 kWh)`}
+                                  </button>
+                                )}
+                              </>
+                            );
+                          })()}
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* SVG Interactive Bar Chart */}
-              <div className="h-56 w-full pt-4 flex items-end gap-1 sm:gap-2">
-                {timeSeries.map((point, idx) => {
-                  const isZero = point.kwh <= 0.001;
-                  const heightPercent = isZero ? 0 : Math.max((point.kwh / maxKwh) * 100, 6);
-                  const isHovered = hoveredPoint?.label === point.label;
-                  return (
-                    <div
-                      key={idx}
-                      className="flex-1 flex flex-col items-center h-full justify-end group relative cursor-pointer"
-                      onMouseEnter={() => setHoveredPoint(point)}
-                      onMouseLeave={() => setHoveredPoint(null)}
-                    >
-                      {isZero ? (
-                        <div
-                          className={`w-full max-w-[28px] h-1 rounded-full transition-all duration-200 ${
-                            isHovered ? 'bg-amber-400 h-1.5' : 'bg-[var(--border)]'
-                          }`}
-                          title={`${point.label}: 0 kWh`}
-                        />
-                      ) : (
-                        <div
-                          style={{ height: `${heightPercent}%` }}
-                          className={`w-full max-w-[28px] rounded-t-lg transition-all duration-200 ${
-                            isHovered
-                              ? 'bg-amber-400 shadow-md shadow-amber-500/30'
-                              : 'bg-gradient-to-t from-amber-600/70 to-amber-500 hover:from-amber-500 hover:to-amber-400'
-                          }`}
-                        />
-                      )}
-                      <span className="text-[10px] text-[var(--secondary)] mt-2 font-mono truncate max-w-full text-center">
-                        <span className="hidden sm:inline">
-                          {idx % (period === '24H' ? 3 : period === '7D' ? 1 : 5) === 0 ? point.label : ''}
-                        </span>
-                        <span className="inline sm:hidden">
-                          {idx % (period === '24H' ? 6 : period === '7D' ? 2 : 10) === 0 ? point.label : ''}
-                        </span>
-                      </span>
-                    </div>
-                  );
-                })}
+              {/* Room Breakdown Card (span 5) */}
+              <div className="lg:col-span-5 flex flex-col">
+                <RoomBreakdownCard
+                  breakdown={breakdown}
+                  totalKwh={summary?.totalKwh ?? 0}
+                  period={period}
+                />
               </div>
             </div>
 
-            {/* HỢP NHẤT: Biểu Đồ Tròn & Chi Tiết Thiết Bị Tiêu Thụ */}
-            <div className="glass-card glass-g2 p-5 sm:p-6 rounded-3xl border border-[var(--border)] shadow-xs space-y-6">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-[var(--border)]/60 pb-3">
-                <div>
-                  <h3 className="text-base sm:text-lg font-bold text-[var(--text)] flex items-center gap-2">
-                    <PieChart className="h-5 w-5 text-amber-500" />
-                    Cơ Cấu Tiêu Thụ Theo Thiết Bị
-                  </h3>
-                  <p className="text-xs text-[var(--secondary)] mt-0.5">
-                    Tỷ lệ phần trăm và chi phí điện của các thiết bị trong nhà ({period})
-                  </p>
-                </div>
-                {hoveredBreakdown && (
-                  <button
-                    type="button"
-                    onClick={() => setHoveredBreakdown(null)}
-                    className="scene-ghost text-xs px-2.5 py-1"
-                  >
-                    Bỏ chọn lọc
-                  </button>
-                )}
-              </div>
-
-              {sortedBreakdown.length === 0 ? (
-                <p className="text-sm text-[var(--secondary)] py-8 text-center">
-                  Chưa có dữ liệu tiêu thụ điện trong khoảng thời gian này.
-                </p>
-              ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-                  {/* Cột trái: SVG Donut Chart */}
-                  <div className="lg:col-span-5 flex flex-col items-center justify-center relative">
-                    <div className="relative w-64 h-64 sm:w-72 sm:h-72">
-                      <svg viewBox="0 0 280 280" className="w-full h-full transform -rotate-90">
-                        {/* Vòng nền */}
-                        <circle
-                          cx="140"
-                          cy="140"
-                          r="90"
-                          fill="none"
-                          stroke="currentColor"
-                          className="text-[var(--border)] opacity-40"
-                          strokeWidth="32"
-                          style={{ pointerEvents: 'none' }}
-                        />
-                        {/* Lát cắt của từng thiết bị */}
-                        {(() => {
-                          const activeBreakdown = sortedBreakdown.filter((d) => (d.kwh || 0) > 0.001);
-                          const totalActiveKwh = activeBreakdown.reduce((sum, d) => sum + (d.kwh || 0), 0);
-                          const circumference = 2 * Math.PI * 90;
-
-                          if (activeBreakdown.length === 0 || totalActiveKwh <= 0.001) {
-                            return (
-                              <circle
-                                cx="140"
-                                cy="140"
-                                r="90"
-                                fill="none"
-                                stroke="currentColor"
-                                className="text-[var(--border)] opacity-60"
-                                strokeWidth="24"
-                                strokeDasharray="6 8"
-                                style={{ pointerEvents: 'none' }}
-                              />
-                            );
-                          }
-
-                          if (activeBreakdown.length === 1) {
-                            const dev = activeBreakdown[0];
-                            const originalIdx = sortedBreakdown.findIndex((d) => d.deviceId === dev.deviceId);
-                            const color = DONUT_COLORS[(originalIdx >= 0 ? originalIdx : 0) % DONUT_COLORS.length];
-                            const isHovered = hoveredBreakdown?.deviceId === dev.deviceId;
-                            return (
-                              <circle
-                                key={dev.deviceId}
-                                cx="140"
-                                cy="140"
-                                r="90"
-                                fill="none"
-                                stroke={color}
-                                strokeWidth={isHovered ? 34 : 28}
-                                strokeLinecap="butt"
-                                className="transition-all duration-300 cursor-pointer"
-                                style={{
-                                  pointerEvents: 'stroke',
-                                  opacity: hoveredBreakdown && !isHovered ? 0.35 : 1,
-                                  filter: isHovered ? `drop-shadow(0 0 10px ${color}80)` : undefined,
-                                }}
-                                onMouseEnter={() => setHoveredBreakdown(dev)}
-                                onMouseLeave={() => setHoveredBreakdown(null)}
-                              />
-                            );
-                          }
-
-                          let accumulated = 0;
-                          return activeBreakdown.map((dev) => {
-                            const originalIdx = sortedBreakdown.findIndex((d) => d.deviceId === dev.deviceId);
-                            const color = DONUT_COLORS[(originalIdx >= 0 ? originalIdx : 0) % DONUT_COLORS.length];
-                            const pct = (dev.kwh / totalActiveKwh) * 100;
-                            const sliceLen = (pct / 100) * circumference;
-                            const gap = 3;
-                            const dashLength = Math.max(sliceLen - gap, 1);
-                            const strokeDasharray = `${dashLength} ${circumference - dashLength}`;
-                            const strokeDashoffset = -accumulated;
-                            accumulated += sliceLen;
-
-                            const isHovered = hoveredBreakdown?.deviceId === dev.deviceId;
-
-                            return (
-                              <circle
-                                key={dev.deviceId}
-                                cx="140"
-                                cy="140"
-                                r="90"
-                                fill="none"
-                                stroke={color}
-                                strokeWidth={isHovered ? 34 : 28}
-                                strokeDasharray={strokeDasharray}
-                                strokeDashoffset={strokeDashoffset}
-                                strokeLinecap="butt"
-                                className="transition-all duration-300 cursor-pointer"
-                                style={{
-                                  pointerEvents: 'stroke',
-                                  opacity: hoveredBreakdown && !isHovered ? 0.35 : 1,
-                                  filter: isHovered ? `drop-shadow(0 0 10px ${color}80)` : undefined,
-                                }}
-                                onMouseEnter={() => setHoveredBreakdown(dev)}
-                                onMouseLeave={() => setHoveredBreakdown(null)}
-                              />
-                            );
-                          });
-                        })()}
-                      </svg>
-
-                      {/* Tâm rỗng hiển thị thông số */}
-                      <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6 pointer-events-none">
-                        <span className="text-[11px] font-bold text-[var(--secondary)] uppercase tracking-wider truncate max-w-[140px]">
-                          {hoveredBreakdown ? hoveredBreakdown.deviceName : 'Tổng Tiêu Thụ'}
-                        </span>
-                        <div className="flex items-baseline gap-1 my-0.5">
-                          <span className="text-2xl sm:text-3xl font-extrabold text-[var(--text)] tracking-tight">
-                            {hoveredBreakdown ? hoveredBreakdown.kwh : (summary?.totalKwh ?? 0)}
-                          </span>
-                          <span className="text-xs font-bold text-amber-500">kWh</span>
-                        </div>
-                        <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 truncate max-w-[150px]">
-                          {hoveredBreakdown
-                            ? `${hoveredBreakdown.percentage}% (${formatCurrency(hoveredBreakdown.costVnd)})`
-                            : (summary?.totalKwh ?? 0) <= 0
-                            ? 'Chưa phát sinh tiêu thụ'
-                            : formatCurrency(summary?.estimatedCostVnd)}
-                        </span>
-                      </div>
-                    </div>
-                    <p className="text-[11px] text-[var(--secondary)] mt-2">
-                      Rê chuột vào vòng tròn hoặc danh sách bên cạnh
-                    </p>
-                  </div>
-
-                  {/* Cột phải: Danh sách chi tiết thiết bị & mức tiêu thụ */}
-                  <div className="lg:col-span-7 space-y-2">
-                    <div className="flex items-center justify-between pb-1 text-xs text-[var(--secondary)] font-semibold px-1">
-                      <span>Thiết bị &amp; Công suất</span>
-                      <span>Điện năng &amp; Chi phí</span>
-                    </div>
-
-                    <div className="space-y-2 max-h-[380px] overflow-y-auto pr-2">
-                      {sortedBreakdown.map((dev, idx) => {
-                        const color = DONUT_COLORS[idx % DONUT_COLORS.length];
-                        const isHovered = hoveredBreakdown?.deviceId === dev.deviceId;
-
-                        return (
-                          <div
-                            key={dev.deviceId}
-                            onMouseEnter={() => setHoveredBreakdown(dev)}
-                            onMouseLeave={() => setHoveredBreakdown(null)}
-                            className={`p-3.5 rounded-2xl border transition-all cursor-pointer space-y-2 ${
-                              isHovered
-                                ? 'bg-[var(--solid)] border-[var(--accent)] shadow-md ring-1 ring-[var(--accent)]/30'
-                                : 'bg-[var(--g1)] border-[var(--border)] hover:bg-[var(--solid)]/80'
-                            }`}
-                          >
-                            <div className="flex items-center justify-between gap-2">
-                              <div className="flex items-center gap-2.5 min-w-0">
-                                <span
-                                  className="w-3 h-3 rounded-full shrink-0 shadow-xs"
-                                  style={{ backgroundColor: color }}
-                                />
-                                <div className="min-w-0">
-                                  <span className="text-xs font-bold text-[var(--text)] truncate block">
-                                    {dev.deviceName}
-                                  </span>
-                                  <span className="text-[11px] text-[var(--secondary)] truncate block">
-                                    {dev.roomName || dev.deviceType}
-                                    {dev.wattage ? ` • ${dev.wattage}W` : ''}
-                                    {dev.totalOnHours ? ` • ${dev.totalOnHours}h` : ''}
-                                  </span>
-                                </div>
-                              </div>
-                              <div className="text-right shrink-0">
-                                <div className="flex items-baseline justify-end gap-1.5">
-                                  <span className="text-xs font-extrabold text-amber-500 font-mono">
-                                    {dev.kwh} kWh
-                                  </span>
-                                  <span className="text-[11px] font-bold text-[var(--secondary)] font-mono">
-                                    ({dev.percentage}%)
-                                  </span>
-                                </div>
-                                <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 block">
-                                  {formatCurrency(dev.costVnd)}
-                                </span>
-                              </div>
-                            </div>
-
-                            {/* Thanh tỉ lệ phần trăm trực quan */}
-                            <div className="w-full h-1.5 bg-[var(--muted)] rounded-full overflow-hidden">
-                              <div
-                                style={{
-                                  width: `${Math.min(dev.percentage, 100)}%`,
-                                  backgroundColor: color,
-                                }}
-                                className="h-full rounded-full transition-all duration-300"
-                              />
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
+            {/* 4. TOP CONSUMERS & SMART SAVING TIPS (SPAN 12) */}
+            <TopConsumersCard
+              breakdown={breakdown}
+              summary={summary}
+              period={period}
+              homeId={homeId}
+            />
           </div>
         )}
 
