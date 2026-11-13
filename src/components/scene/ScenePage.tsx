@@ -17,16 +17,16 @@ import type {
   SceneActionType,
 } from '../../types/scene';
 import type { DeviceSummary } from '../../types/automation';
-import {
-  sceneToggleInput,
-} from './sceneActions';
+import { formatSceneAction, sceneToggleInput } from './sceneActions';
+import { actionLabels } from '../automation/ruleLabels';
 import { DashboardNavRail } from '../home/DashboardNavRail';
-import { Icon, IconButton, type IconName } from '../home/HomeIcons';
-import { VoiceAssistantButton } from '../ui/VoiceAssistant';
-import { NotificationBell } from '../notification/NotificationBell';
+import { DashboardBottomNav } from '../home/DashboardBottomNav';
+import { Icon, type IconName } from '../ui/LucideIcon';
+import { AutomationTopBar } from '../automation/AutomationTopBar';
 import { notify } from '../ui/notify';
 import { getErrorMessage } from '../../utils/errors';
 import { SceneEditor } from './SceneEditor';
+import { ConfirmModal } from '../ui/ConfirmModal';
 
 // ──────────────────────────────────────────────────────────────────────────
 // Icon Mapping Helpers
@@ -64,31 +64,17 @@ export function getFigmaIconForDevice(action?: string, deviceName?: string): Ico
 // Subcomponents matching Figma Design v3
 // ──────────────────────────────────────────────────────────────────────────
 
-function ScenesTopBar({
-  totalCount,
-  activeCount,
-  userInitial = 'M',
-}: {
-  totalCount: number;
-  activeCount: number;
-  userInitial?: string;
-}) {
-  return (
-    <header className="topbar scenes-topbar">
-      <div>
-        <span className="eyebrow">
-          {totalCount} KỊCH BẢN · {activeCount} ĐANG BẬT
-        </span>
-        <h2>Kịch bản</h2>
-      </div>
-      <div className="top-actions">
-        <VoiceAssistantButton />
-        <NotificationBell />
-        <div className="avatar">{userInitial}</div>
-      </div>
-    </header>
-  );
-}
+// One accent hue per kind of scene so tiles are recognisable at a glance.
+const SCENE_HUES: Partial<Record<IconName, string>> = {
+  sun: '#d17a0b',
+  moon: '#6a55e0',
+  door: '#5b6b82',
+  home: '#2a9456',
+  film: '#d9486e',
+  briefcase: '#1769d6',
+  lamp: '#b8860b',
+  energy: '#0d8f8a',
+};
 
 function ScenarioCard({
   scene,
@@ -114,48 +100,57 @@ function ScenarioCard({
   hasFailed?: boolean;
 }) {
   const [menu, setMenu] = useState(false);
-  const actionCount = scene.actions?.length || 0;
-
-  // Extract unique device icons from scene actions
-  const deviceIcons = useMemo(() => {
-    if (!scene.actions || scene.actions.length === 0) {
-      return ['lamp', 'snowflake'] as IconName[];
-    }
-    const icons: IconName[] = [];
-    scene.actions.forEach((a) => {
-      const ic = getFigmaIconForDevice(a.action, a.targetDeviceName);
-      if (!icons.includes(ic)) icons.push(ic);
-    });
-    return icons.length > 0 ? icons : (['lamp'] as IconName[]);
-  }, [scene.actions]);
-
+  const actions = scene.actions || [];
   const sceneIcon = getFigmaIconForScene(scene.name, scene.icon);
+  const hue = SCENE_HUES[sceneIcon];
 
-  const caption = running
-    ? `Đang chạy 1/${Math.max(1, actionCount)}…`
+  const status = running
+    ? { dot: 'on', text: 'Đang chạy…' }
     : hasFailed
-    ? 'Lần chạy gần nhất lỗi'
-    : actionCount
-    ? `${actionCount} hành động · Chạy thủ công`
-    : 'Chưa có hành động';
+    ? { dot: 'err', text: 'Lần chạy gần nhất lỗi' }
+    : scene.enabled
+    ? { dot: 'on', text: `${actions.length} hành động` }
+    : { dot: '', text: 'Đang tắt' };
+
+  const menuItem = (label: string, icon: IconName, handler: () => void, danger = false) => (
+    <button
+      type="button"
+      className={danger ? 'danger' : ''}
+      onClick={(e) => {
+        e.stopPropagation();
+        setMenu(false);
+        handler();
+      }}
+    >
+      <Icon name={icon} />
+      {label}
+    </button>
+  );
 
   return (
     <article
-      className={`scenario-card glass-g1 ${scene.enabled ? 'on' : 'off'} ${
-        hasFailed ? 'failed' : ''
-      } ${running ? 'running' : ''}`}
+      className={`st-scene ${scene.enabled ? '' : 'is-off'}`}
+      style={hue ? ({ '--hue': hue } as React.CSSProperties) : undefined}
       onClick={onOpen}
       tabIndex={0}
-      onKeyDown={(e) => e.key === 'Enter' && onOpen()}
+      onKeyDown={(e) => e.key === 'Enter' && e.target === e.currentTarget && onOpen()}
+      aria-label={`Kịch bản ${scene.name}`}
     >
-      <div className="scenario-top">
-        <span className="scenario-icon">
-          <Icon name={sceneIcon} />
+      {running && (
+        <span className="st-scene-progress">
+          <i />
+        </span>
+      )}
+
+      <div className="st-scene-head">
+        <span className="st-scene-icon">
+          <Icon name={sceneIcon} size={24} />
         </span>
         <button
           type="button"
           className={`toggle ${scene.enabled ? 'active' : ''}`}
           aria-pressed={scene.enabled}
+          aria-label={scene.enabled ? `Tắt kịch bản ${scene.name}` : `Bật kịch bản ${scene.name}`}
           onClick={(event) => {
             event.stopPropagation();
             onToggle();
@@ -166,99 +161,74 @@ function ScenarioCard({
         </button>
       </div>
 
-      <div className="scenario-copy">
-        <h3>{scene.name}</h3>
-        <p>{caption}</p>
-      </div>
+      <h3 title={scene.name}>{scene.name}</h3>
+      <p className="st-scene-desc" title={scene.description || undefined}>
+        {scene.description || 'Chạy thủ công hoặc theo lịch'}
+      </p>
 
-      <div className="scenario-bottom">
-        <div className="scenario-devices">
-          {deviceIcons.slice(0, 3).map((icon, index) => (
-            <span key={`${icon}-${index}`}>
-              <Icon name={icon} size={13} />
-            </span>
-          ))}
-          {deviceIcons.length > 3 && <b>+{deviceIcons.length - 3}</b>}
-        </div>
+      <ul className="st-scene-devices">
+        {actions.length === 0 && <li className="more">Chưa có hành động nào</li>}
+        {actions.slice(0, 3).map((action, index) => (
+          <li key={action.id || index}>
+            <Icon name={getFigmaIconForDevice(action.action, action.targetDeviceName)} />
+            <span title={action.targetDeviceName || undefined}>{action.targetDeviceName || 'Thiết bị'}</span>
+            {(action.action === 'SET_RGB' || (action.action as string) === 'SET_COLOR') && typeof action.value === 'string' && /^#[0-9a-f]{3,8}$/i.test(action.value) ? (
+              <em className="st-color-value" title={formatSceneAction(action)}>
+                <i style={{ background: action.value }} aria-hidden="true" />
+                {action.value.toUpperCase()}
+              </em>
+            ) : (
+              <em title={formatSceneAction(action)}>{formatSceneAction(action)}</em>
+            )}
+          </li>
+        ))}
+        {actions.length > 3 && <li className="more">+{actions.length - 3} hành động khác</li>}
+      </ul>
+
+      <footer>
+        <span className="st-status">
+          <i className={`st-dot ${status.dot}`} />
+          {status.text}
+        </span>
 
         <button
           type="button"
-          className="run-scene"
-          disabled={!actionCount || running}
+          className={`st-run ${runSuccess ? 'done' : ''}`}
+          disabled={!actions.length || running || !scene.enabled}
           onClick={(e) => {
             e.stopPropagation();
             onRun();
           }}
-          title="Chạy kịch bản ngay"
+          title={scene.enabled ? 'Chạy kịch bản ngay' : 'Bật kịch bản để chạy'}
         >
-          {running ? <i /> : runSuccess ? '✓' : '▶'}
+          {running ? <i className="st-spin" /> : <Icon name={runSuccess ? 'check' : 'play'} />}
+          {runSuccess ? 'Xong' : 'Chạy'}
         </button>
 
-        <span className="scene-menu-wrap">
+        <span className="st-menu-wrap">
           <button
             type="button"
-            className="card-affordance"
+            className="st-icon-btn"
+            aria-label="Tùy chọn kịch bản"
+            aria-expanded={menu}
             onClick={(event) => {
               event.stopPropagation();
               setMenu(!menu);
             }}
-            title="Tùy chọn kịch bản"
           >
-            <Icon name="more" size={19} />
+            <Icon name="more" size={18} />
           </button>
           {menu && (
-            <span className="scene-menu glass-g2">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setMenu(false);
-                  onOpen();
-                }}
-              >
-                Chỉnh sửa
-              </button>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setMenu(false);
-                  onHistory();
-                }}
-              >
-                Xem lịch sử
-              </button>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setMenu(false);
-                  onDuplicate();
-                }}
-              >
-                Nhân bản
-              </button>
-              <button
-                type="button"
-                className="danger"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setMenu(false);
-                  onDelete();
-                }}
-              >
-                Xóa kịch bản
-              </button>
+            <span className="st-menu up" onClick={(e) => e.stopPropagation()}>
+              {menuItem('Chỉnh sửa', 'pencil', onOpen)}
+              {menuItem('Xem lịch sử', 'clock', onHistory)}
+              {menuItem('Nhân bản', 'copy', onDuplicate)}
+              <hr />
+              {menuItem('Xóa kịch bản', 'trash', onDelete, true)}
             </span>
           )}
         </span>
-      </div>
-
-      {running && (
-        <span className="scenario-progress">
-          <i />
-        </span>
-      )}
+      </footer>
     </article>
   );
 }
@@ -336,23 +306,27 @@ export function SceneHistory({
   }, [executions, filter]);
 
   const formatTime = (iso: string) => {
-    try {
-      const d = new Date(iso);
-      return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-    } catch {
-      return '00:00';
-    }
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '--:--';
+    const time = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    const days = Math.round((new Date().setHours(0, 0, 0, 0) - new Date(d).setHours(0, 0, 0, 0)) / 86400000);
+    if (days === 0) return `Hôm nay ${time}`;
+    if (days === 1) return `Hôm qua ${time}`;
+    return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')} ${time}`;
   };
 
   const formatTrigger = (trigger: string) => {
     switch (trigger) {
-      case 'MANUAL': return 'Chạy thủ công';
-      case 'SCHEDULE': return 'Theo lịch trình';
-      case 'AUTOMATION': return 'Theo tự động hóa';
-      case 'VOICE': return 'Giọng nói AI';
-      default: return 'Kích hoạt';
+      case 'MANUAL': return 'Bạn bấm chạy';
+      case 'SCHEDULE': return 'Tự chạy theo giờ hẹn';
+      case 'AUTOMATION': return 'Do quy tắc tự động';
+      case 'VOICE': return 'Ra lệnh bằng giọng nói';
+      default: return 'Tự chạy';
     }
   };
+
+  const deviceName = (id?: string) =>
+    scene.actions?.find((a) => a.targetDeviceId === id)?.targetDeviceName || 'Thiết bị đã bị xóa';
 
   return (
     <div className="scene-panel-content">
@@ -393,7 +367,7 @@ export function SceneHistory({
                   onClick={() => setExpandedId(isExp ? null : ex.id)}
                 >
                   <span className={isSuccess ? '' : 'error'}>
-                    {isSuccess ? '✓' : '!'}
+                    <Icon name={isSuccess ? 'check' : 'alert'} size={14} />
                   </span>
                   <strong>{formatTime(ex.startedAt)}</strong>
                   <p>{formatTrigger(ex.triggerSource)}</p>
@@ -405,9 +379,9 @@ export function SceneHistory({
                     {ex.resultDetail && ex.resultDetail.length > 0 ? (
                       ex.resultDetail.map((act, idx) => (
                         <p key={idx}>
-                          <span>{`Thiết bị ${act.deviceId?.slice(0, 8) || ''} · ${act.action}`}</span>
+                          <span title={deviceName(act.deviceId)}>{`${deviceName(act.deviceId)} · ${actionLabels[act.action] || 'Điều khiển'}`}</span>
                           <b className={act.success ? 'text-emerald-600' : 'text-rose-500'}>
-                            {act.success ? 'Thành công' : act.message || 'Không phản hồi'}
+                            {act.success ? 'Thành công' : 'Thiết bị không phản hồi'}
                           </b>
                         </p>
                       ))
@@ -522,42 +496,45 @@ function ScenesEmpty({
   mode,
   onCreate,
   onQuickCreate,
+  onReset,
 }: {
-  mode: 'empty' | 'search' | 'active';
+  mode: 'empty' | 'search' | 'filter';
   onCreate: () => void;
   onQuickCreate: (name: string) => void;
+  onReset: () => void;
 }) {
   if (mode !== 'empty') {
     return (
-      <div className="scenes-empty">
-        <strong>
-          {mode === 'search'
-            ? 'Không tìm thấy kịch bản'
-            : 'Chưa có kịch bản đang bật'}
-        </strong>
-        <p>
-          {mode === 'search'
-            ? 'Thử từ khóa khác hoặc xóa bộ lọc.'
-            : 'Bật một kịch bản để hiển thị tại đây.'}
-        </p>
+      <div className="st-empty">
+        <div className="st-empty-icon">
+          <Icon name="search" />
+        </div>
+        <h3>{mode === 'search' ? 'Không tìm thấy kịch bản' : 'Không có kịch bản nào trong mục này'}</h3>
+        <p>Thử từ khóa khác hoặc xem tất cả kịch bản.</p>
+        <button type="button" className="st-btn" onClick={onReset}>
+          Xem tất cả
+        </button>
       </div>
     );
   }
   return (
-    <div className="scenes-empty">
-      <strong>Chưa có kịch bản nào</strong>
-      <p>Kịch bản giúp điều khiển nhiều thiết bị chỉ với một lần chạm</p>
-      <div>
-        {['Chào buổi sáng', 'Chúc ngủ ngon', 'Rời khỏi nhà', 'Về đến nhà'].map(
-          (item) => (
-            <button key={item} type="button" onClick={() => onQuickCreate(item)}>
-              {item}
-            </button>
-          )
-        )}
+    <div className="st-empty">
+      <div className="st-empty-icon">
+        <Icon name="sparkles" />
       </div>
-      <button className="add-device" type="button" onClick={onCreate}>
-        + Tạo kịch bản
+      <h3>Chưa có kịch bản nào</h3>
+      <p>Kịch bản gom nhiều thao tác thành một lần chạm. Bắt đầu từ một mẫu quen thuộc:</p>
+      <div className="st-chips">
+        {['Chào buổi sáng', 'Chúc ngủ ngon', 'Rời khỏi nhà', 'Về đến nhà'].map((item) => (
+          <button key={item} type="button" className="st-btn st-btn-sm" onClick={() => onQuickCreate(item)}>
+            <Icon name={getFigmaIconForScene(item)} size={16} />
+            {item}
+          </button>
+        ))}
+      </div>
+      <button className="st-btn st-btn-primary" type="button" onClick={onCreate}>
+        <Icon name="plus" size={18} />
+        Tạo kịch bản
       </button>
     </div>
   );
@@ -578,7 +555,6 @@ export function ScenePage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'Tất cả' | 'Đang bật' | 'Đang tắt'>('Tất cả');
   const [query, setQuery] = useState('');
-  const [searchOpen, setSearchOpen] = useState(false);
 
   // Devices & Action Types for Editor
   const [devices, setDevices] = useState<DeviceSummary[]>([]);
@@ -761,19 +737,16 @@ export function ScenePage() {
   }, [scenes, query, filter]);
 
   const activeCount = scenes.filter((s) => s.enabled).length;
-  const totalActions = scenes.reduce((acc, cur) => acc + (cur.actions?.length || 0), 0);
+  const resetFilters = () => {
+    setQuery('');
+    setFilter('Tất cả');
+  };
   const userInitial = authUser?.fullName
     ? authUser.fullName.trim().split(' ').slice(-1)[0]?.charAt(0).toUpperCase() || 'M'
     : 'M';
 
   return (
-    <div className="app-shell scenes-page">
-      {/* 3 Pastel glowing background meshes */}
-      <div className="mesh mesh-one" />
-      <div className="mesh mesh-two" />
-      <div className="mesh mesh-three" />
-
-      {/* Unified NavRail sidebar */}
+    <div className="app-shell scenes-page studio st-theme st-pro">
       <DashboardNavRail
         homeId={homeId}
         activeItem="scenes"
@@ -782,20 +755,21 @@ export function ScenePage() {
       />
 
       <main>
-        {/* Topbar */}
-        <ScenesTopBar
-          totalCount={scenes.length}
-          activeCount={activeCount}
+        <AutomationTopBar
+          caption={`${scenes.length} kịch bản · ${activeCount} đang bật`}
+          title="Kịch bản"
+          subtitle="Gom nhiều thao tác thành một lần chạm: chạy ngay, theo lịch hoặc từ quy tắc tự động."
           userInitial={userInitial}
         />
 
-        {/* Actions Bar */}
-        <div className="scenes-actions">
-          <div className="scene-filter">
+        <div className="st-toolbar">
+          <div className="st-seg" role="tablist" aria-label="Lọc kịch bản">
             {(['Tất cả', 'Đang bật', 'Đang tắt'] as const).map((item) => (
               <button
                 key={item}
                 type="button"
+                role="tab"
+                aria-selected={filter === item}
                 className={filter === item ? 'active' : ''}
                 onClick={() => setFilter(item)}
               >
@@ -804,85 +778,54 @@ export function ScenePage() {
             ))}
           </div>
 
-          <div className="scene-actions-right">
-            {searchOpen && (
-              <input
-                autoFocus
-                className="inline-search"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Tìm kịch bản"
-              />
-            )}
-            <IconButton
-              icon="search"
-              label="Tìm kiếm"
-              onClick={() => setSearchOpen(!searchOpen)}
+          <label className="st-search">
+            <Icon name="search" />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Tìm kịch bản"
+              aria-label="Tìm kịch bản"
             />
+          </label>
+
+          <div className="st-toolbar-end">
             <button
               type="button"
-              className="scene-ghost"
+              className="st-link"
               onClick={() => navigate(homeId ? `/homes/${homeId}/automation-rules` : '/home')}
             >
-              Quy tắc
+              <Icon name="automation" />
+              <span>Quy tắc</span>
             </button>
-            <button
-              type="button"
-              className="scene-ghost"
-              onClick={() => setSheet({ type: 'ai' })}
-            >
-              <Icon name="sparkles" size={17} />
-              Gợi ý AI
+            <button type="button" className="st-link" onClick={() => setSheet({ type: 'ai' })}>
+              <Icon name="sparkles" />
+              <span>Gợi ý</span>
             </button>
-            <button
-              type="button"
-              className="add-device"
-              onClick={handleCreateScene}
-            >
-              + Tạo kịch bản
+            <button type="button" className="st-btn st-btn-primary" onClick={handleCreateScene}>
+              <Icon name="plus" size={18} />
+              Tạo kịch bản
             </button>
           </div>
         </div>
 
-        {/* Summary Strip */}
-        <div className="scene-summary">
-          <span className="stat">{scenes.length} kịch bản</span>
-          <span className="stat">{activeCount} đang bật</span>
-          <span className="stat">{totalActions} hành động</span>
-        </div>
-
-        {/* Main Content: Skeleton, Empty, or Grid */}
         {loading && scenes.length === 0 ? (
-          <div className="scenarios-grid">
-            {sceneId && <p className="text-sm font-semibold text-text">Đang tải kịch bản...</p>}
-            {Array.from({ length: 6 }, (_, index) => (
-              <div className="scenario-skeleton glass-g1" key={index}>
-                <i />
-                <i />
-                <i />
-              </div>
+          <div className="st-scene-grid" aria-busy="true">
+            <span className="sr-only">Đang tải kịch bản...</span>
+            {Array.from({ length: 4 }, (_, index) => (
+              <div className="st-skeleton" style={{ height: 236 }} key={index} />
             ))}
           </div>
-        ) : query && visibleScenes.length === 0 ? (
-          <ScenesEmpty
-            mode="search"
-            onCreate={handleCreateScene}
-            onQuickCreate={handleQuickCreate}
-          />
-        ) : filter === 'Đang bật' && visibleScenes.length === 0 ? (
-          <ScenesEmpty
-            mode="active"
-            onCreate={handleCreateScene}
-            onQuickCreate={handleQuickCreate}
-          />
         ) : scenes.length === 0 ? (
+          <ScenesEmpty mode="empty" onCreate={handleCreateScene} onQuickCreate={handleQuickCreate} onReset={resetFilters} />
+        ) : visibleScenes.length === 0 ? (
           <ScenesEmpty
-            mode="empty"
+            mode={query ? 'search' : 'filter'}
             onCreate={handleCreateScene}
             onQuickCreate={handleQuickCreate}
+            onReset={resetFilters}
           />
         ) : (
-          <div className="scenarios-grid">
+          <div className="st-scene-grid">
             {visibleScenes.map((scene) => (
               <ScenarioCard
                 key={scene.id}
@@ -898,9 +841,19 @@ export function ScenePage() {
                 hasFailed={failedIds[scene.id]}
               />
             ))}
+            {filter !== 'Đang tắt' && !query && (
+              <button type="button" className="st-scene-new" onClick={handleCreateScene}>
+                <span>
+                  <Icon name="plus" />
+                </span>
+                Kịch bản mới
+              </button>
+            )}
           </div>
         )}
       </main>
+
+      <DashboardBottomNav activeItem="scenes" homeId={homeId} />
 
       {/* Side Panels / Sheets */}
       {sheet && (
@@ -949,22 +902,16 @@ export function ScenePage() {
 
       {/* Delete Confirmation Dialog */}
       {deletingScene && (
-        <div className="delete-dialog glass-g2">
-          <strong>Xóa {deletingScene.name}?</strong>
-          <p>Kịch bản sẽ bị xóa khỏi ngôi nhà này.</p>
-          <div>
-            <button type="button" onClick={() => setDeletingScene(null)}>
-              Hủy
-            </button>
-            <button
-              type="button"
-              className="danger"
-              onClick={handleDeleteConfirm}
-            >
-              Xóa kịch bản
-            </button>
-          </div>
-        </div>
+        <ConfirmModal
+          isOpen={true}
+          title={`Xóa “${deletingScene.name}”?`}
+          description="Kịch bản sẽ bị xóa khỏi ngôi nhà này. Thao tác này không thể hoàn tác."
+          confirmText="Xóa kịch bản"
+          cancelText="Hủy"
+          variant="danger"
+          onConfirm={handleDeleteConfirm}
+          onCancel={() => setDeletingScene(null)}
+        />
       )}
     </div>
   );
