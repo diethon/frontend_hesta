@@ -1,0 +1,2226 @@
+/* Shared look for the Scene, Automation and Recommendation pages.
+   Scoped to `.app-shell.studio`: flat surfaces, hairline borders, one accent colour. */
+
+.app-shell.studio {
+  --bg-base: #f5f6f8;
+  --g1: #ffffff;
+  --g2: #ffffff;
+  --solid: #ffffff;
+  --border: #e4e7ec;
+  --muted: #f2f4f7;
+  --text: #101828;
+  --secondary: #475467;
+  --tertiary: #8a94a6;
+  --accent: #2563eb;
+  --accent-soft: rgba(37, 99, 235, 0.08);
+  --success: #12a150;
+  --danger: #e5484d;
+  --card-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+  --glass-shadow: 0 16px 40px -8px rgba(16, 24, 40, 0.18);
+  --radius: 14px;
+  padding-top: 28px;
+  background: var(--bg-base);
+}
+
+.studio .mesh {
+  display: none;
+}
+
+.studio .glass-g1,
+.studio .glass-g2 {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.studio main {
+  max-width: 1280px;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+.studio .topbar {
+  height: auto;
+  align-items: flex-start;
+  margin-bottom: 24px;
+  padding: 0;
+}
+.studio .topbar h2 {
+  font-size: 26px;
+  line-height: 32px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+.st-eyebrow {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--tertiary);
+  letter-spacing: 0.02em;
+}
+.st-subtitle {
+  margin-top: 6px;
+  max-width: 560px;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--secondary);
+}
+
+/* ── Buttons & controls ─────────────────────────────────────────────────── */
+.st-btn {
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--solid);
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s var(--ease), border-color 0.15s var(--ease), box-shadow 0.15s var(--ease);
+}
+.st-btn:hover:not(:disabled) {
+  background: var(--muted);
+}
+.st-btn:focus-visible,
+.st-link:focus-visible,
+.st-seg button:focus-visible,
+.st-icon-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.st-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.st-btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+.st-btn-primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 88%, #000);
+}
+.st-btn-sm {
+  height: 34px;
+  padding: 0 12px;
+  font-size: 13px;
+  border-radius: 9px;
+}
+.st-btn-danger {
+  color: var(--danger);
+}
+
+.st-link {
+  height: 40px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--secondary);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.st-link:hover {
+  color: var(--text);
+  background: var(--muted);
+}
+.st-link .icon {
+  width: 17px;
+  height: 17px;
+}
+
+.st-icon-btn {
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--tertiary);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: background 0.15s var(--ease), color 0.15s var(--ease);
+}
+.st-icon-btn:hover {
+  background: var(--muted);
+  color: var(--text);
+}
+
+.st-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.st-toolbar-end {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.st-toolbar-end .st-btn-primary {
+  margin-left: 8px;
+}
+
+.st-seg {
+  height: 40px;
+  padding: 3px;
+  display: inline-flex;
+  gap: 2px;
+  border-radius: 10px;
+  background: var(--muted);
+}
+.st-seg button {
+  padding: 0 14px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--secondary);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.st-seg button:hover {
+  color: var(--text);
+}
+.st-seg button.active {
+  background: var(--solid);
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.08), 0 0 0 1px rgba(16, 24, 40, 0.03);
+}
+.st-seg .st-count {
+  font-size: 12px;
+  color: var(--tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.st-search {
+  height: 40px;
+  width: 240px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--solid);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--tertiary);
+  transition: border-color 0.15s var(--ease), box-shadow 0.15s var(--ease);
+}
+.st-search:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.st-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 14px;
+}
+.st-search .icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+/* Small menus opened from "⋯" */
+.st-menu-wrap {
+  position: relative;
+}
+.st-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 20;
+  min-width: 184px;
+  padding: 6px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--solid);
+  box-shadow: var(--glass-shadow);
+}
+.st-menu.up {
+  top: auto;
+  bottom: calc(100% + 6px);
+}
+.st-menu button {
+  width: 100%;
+  height: 36px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.st-menu button .icon {
+  width: 15px;
+  height: 15px;
+  color: var(--tertiary);
+}
+.st-menu button:hover {
+  background: var(--muted);
+}
+.st-menu hr {
+  margin: 4px 2px;
+  border: 0;
+  border-top: 1px solid var(--border);
+}
+.st-menu .danger,
+.st-menu .danger .icon {
+  color: var(--danger);
+}
+
+.st-alert {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  font-size: 14px;
+  border: 1px solid;
+}
+.st-alert.error {
+  color: #b42318;
+  background: #fef3f2;
+  border-color: #fecdca;
+}
+.st-alert.ok {
+  color: #067647;
+  background: #ecfdf3;
+  border-color: #abefc6;
+}
+.st-alert > :last-child:not(span) {
+  margin-left: auto;
+}
+
+.st-empty {
+  padding: 56px 24px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  background: var(--solid);
+  text-align: center;
+}
+.st-empty .st-empty-icon {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 14px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.st-empty h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+}
+.st-empty p {
+  margin: 6px auto 18px;
+  max-width: 420px;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--secondary);
+}
+.st-empty .st-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.st-skeleton {
+  border-radius: var(--radius);
+  background: linear-gradient(90deg, var(--muted) 0%, var(--solid) 50%, var(--muted) 100%);
+  background-size: 200% 100%;
+  animation: st-shimmer 1.4s linear infinite;
+}
+@keyframes st-shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+.st-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--tertiary);
+  flex-shrink: 0;
+}
+.st-dot.on {
+  background: var(--success);
+}
+.st-dot.err {
+  background: var(--danger);
+}
+
+/* ── Scenes: visual tiles, each tinted with the scene's own hue ─────────── */
+.st-scene-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(272px, 1fr));
+  gap: 16px;
+}
+.st-scene {
+  --hue: var(--accent);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 236px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--solid);
+  box-shadow: var(--card-shadow);
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color 0.2s var(--ease), box-shadow 0.2s var(--ease), transform 0.2s var(--ease);
+}
+.st-scene:hover {
+  border-color: color-mix(in srgb, var(--hue) 35%, var(--border));
+  box-shadow: 0 10px 24px -12px color-mix(in srgb, var(--hue) 45%, transparent);
+  transform: translateY(-2px);
+}
+.st-scene:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.st-scene-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.st-scene-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  color: var(--hue);
+  background: color-mix(in srgb, var(--hue) 12%, transparent);
+}
+.st-scene h3 {
+  font-size: 16px;
+  line-height: 22px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.st-scene-desc {
+  margin-top: 2px;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.st-scene-devices {
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+}
+.st-scene-devices li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--text);
+}
+.st-scene-devices li .icon {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  color: var(--tertiary);
+}
+.st-scene-devices li span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.st-scene-devices li em {
+  margin-left: auto;
+  padding-left: 8px;
+  flex-shrink: 0;
+  font-style: normal;
+  font-size: 12px;
+  color: var(--tertiary);
+  max-width: 45%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.st-scene-devices li em.st-color-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-variant-numeric: tabular-nums;
+  color: var(--secondary);
+}
+.st-color-value i {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-text) 18%, transparent);
+}
+.st-scene-devices .more {
+  color: var(--tertiary);
+  font-size: 12px;
+}
+.st-scene footer {
+  margin-top: auto;
+  padding-top: 16px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.st-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: auto;
+  font-size: 12px;
+  color: var(--tertiary);
+}
+.st-run {
+  height: 34px;
+  padding: 0 14px 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--hue) 12%, transparent);
+  color: var(--hue);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s var(--ease), color 0.15s var(--ease);
+}
+.st-run:hover:not(:disabled) {
+  background: var(--hue);
+  color: #fff;
+}
+.st-run:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.st-run.done {
+  background: var(--success);
+  color: #fff;
+}
+.st-run .icon {
+  width: 14px;
+  height: 14px;
+}
+.st-spin {
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+.st-scene.is-off .st-scene-icon {
+  color: var(--tertiary);
+  background: var(--muted);
+}
+.st-scene.is-off h3,
+.st-scene.is-off .st-scene-devices li {
+  color: var(--secondary);
+}
+.st-scene-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 3px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--hue) 15%, transparent);
+}
+.st-scene-progress i {
+  display: block;
+  height: 100%;
+  background: var(--hue);
+  animation: progress-indet 1.2s infinite ease-in-out;
+}
+.st-scene-new {
+  min-height: 236px;
+  border: 1.5px dashed color-mix(in srgb, var(--tertiary) 45%, transparent);
+  border-radius: 16px;
+  background: transparent;
+  color: var(--secondary);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.15s var(--ease), color 0.15s var(--ease), background 0.15s var(--ease);
+}
+.st-scene-new span {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: var(--muted);
+}
+.st-scene-new:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* ── Automation: one list grouped by trigger type ───────────────────────── */
+.st-group + .st-group {
+  margin-top: 28px;
+}
+.st-group-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 4px 10px;
+}
+.st-group-head h3 {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.st-group-head small {
+  font-size: 12px;
+  color: var(--tertiary);
+}
+.st-group-head p {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--tertiary);
+}
+.st-list {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--solid);
+  box-shadow: var(--card-shadow);
+}
+.st-rule {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 12px 14px 16px;
+  cursor: pointer;
+  transition: background 0.15s var(--ease);
+}
+.st-rule + .st-rule {
+  border-top: 1px solid var(--border);
+}
+.st-rule:first-child {
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+.st-rule:last-child {
+  border-radius: 0 0 var(--radius) var(--radius);
+}
+.st-rule:only-child {
+  border-radius: var(--radius);
+}
+.st-rule:hover {
+  background: color-mix(in srgb, var(--muted) 60%, transparent);
+}
+.st-rule:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.st-rule-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  display: grid;
+  place-items: center;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.st-rule-icon .icon {
+  width: 19px;
+  height: 19px;
+}
+.st-rule.is-off .st-rule-icon {
+  background: var(--muted);
+  color: var(--tertiary);
+}
+.st-rule-main {
+  min-width: 0;
+}
+.st-rule-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.st-rule-title h4 {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.st-rule.is-off .st-rule-title h4 {
+  color: var(--secondary);
+}
+.st-tag {
+  flex-shrink: 0;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+  background: var(--muted);
+  color: var(--secondary);
+}
+.st-tag.warn {
+  background: #fffaeb;
+  color: #b54708;
+}
+.st-tag.err {
+  background: #fef3f2;
+  color: #b42318;
+}
+.st-flow {
+  margin-top: 3px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--secondary);
+}
+.st-flow span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.st-flow span:first-child {
+  flex-shrink: 1;
+}
+.st-flow .icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  color: var(--tertiary);
+  transform: rotate(-90deg);
+}
+.st-flow b {
+  font-weight: 500;
+  color: var(--text);
+}
+.st-rule-side {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.st-rule-meta {
+  margin-right: 12px;
+  font-size: 12px;
+  color: var(--tertiary);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.st-rule-side .toggle {
+  margin: 0 6px;
+}
+.st-rule-skeleton {
+  height: 68px;
+  border-radius: 0;
+}
+.st-rule-skeleton + .st-rule-skeleton {
+  border-top: 1px solid var(--border);
+}
+
+/* ── Recommendations: model panel + insight list ────────────────────────── */
+.st-model {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 20px;
+  align-items: center;
+  padding: 20px 22px;
+  margin-bottom: 28px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--solid);
+  box-shadow: var(--card-shadow);
+}
+.st-model-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+.st-model-badge {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: var(--accent);
+  box-shadow: 0 6px 16px -6px color-mix(in srgb, var(--accent) 60%, transparent);
+}
+.st-model-head h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+.st-model-head p {
+  margin-top: 2px;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--secondary);
+}
+.st-model-actions {
+  display: flex;
+  gap: 8px;
+}
+.st-metrics {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+}
+.st-metrics div {
+  padding: 0 16px;
+}
+.st-metrics div:first-child {
+  padding-left: 0;
+}
+.st-metrics div + div {
+  border-left: 1px solid var(--border);
+}
+.st-metrics dt {
+  font-size: 12px;
+  color: var(--tertiary);
+}
+.st-metrics dd {
+  margin-top: 2px;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.st-metrics dd small {
+  margin-left: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--tertiary);
+}
+.st-note {
+  grid-column: 1 / -1;
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 19px;
+  color: #93370d;
+  background: #fffaeb;
+}
+
+.st-tabs {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+.st-tabs button {
+  position: relative;
+  padding: 0 0 12px;
+  border: 0;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--secondary);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.st-tabs button:hover {
+  color: var(--text);
+}
+.st-tabs button.active {
+  color: var(--text);
+  font-weight: 600;
+}
+.st-tabs button.active::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+.st-tabs .st-count {
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 18px;
+  background: var(--muted);
+  color: var(--secondary);
+}
+.st-tabs button.active .st-count {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.st-insights {
+  display: grid;
+  gap: 12px;
+}
+.st-insight {
+  display: grid;
+  grid-template-columns: 116px minmax(0, 1fr) auto;
+  gap: 20px;
+  align-items: center;
+  padding: 18px 20px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--solid);
+  box-shadow: var(--card-shadow);
+  transition: border-color 0.2s var(--ease);
+}
+.st-insight:hover {
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--border));
+}
+.st-when {
+  padding-right: 20px;
+  border-right: 1px solid var(--border);
+}
+.st-when strong {
+  display: block;
+  font-size: 26px;
+  line-height: 30px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.st-when small {
+  font-size: 12px;
+  color: var(--tertiary);
+}
+.st-insight-body {
+  min-width: 0;
+}
+.st-insight-body h4 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+.st-insight-body p {
+  margin-top: 4px;
+  font-size: 13px;
+  line-height: 19px;
+  color: var(--secondary);
+}
+.st-confidence {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--tertiary);
+}
+.st-confidence .st-bar {
+  display: block;
+  width: 120px;
+  height: 4px;
+  border-radius: 4px;
+  background: var(--muted);
+  overflow: hidden;
+}
+.st-confidence .st-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: var(--accent);
+}
+.st-confidence b {
+  font-weight: 600;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.st-insight-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.st-history .st-rule {
+  grid-template-columns: minmax(0, 1fr) auto;
+  cursor: default;
+}
+
+/* Rule editor drawer: dim the page behind it and pin it to the viewport. */
+.scene-panel-backdrop.active {
+  position: fixed;
+  inset: 0;
+  z-index: 39;
+  background: rgba(15, 23, 42, 0.28);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.scene-panel-backdrop.active + .scene-panel {
+  position: fixed;
+  z-index: 40;
+}
+
+/* ── Guardian rule editor (centered dialog) ─────────────────────────────── */
+.gd-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(15, 23, 42, 0.36);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  animation: gd-fade 0.15s var(--ease);
+}
+.gd-modal {
+  width: 100%;
+  max-width: 560px;
+  max-height: calc(100dvh - 32px);
+  display: flex;
+  flex-direction: column;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--solid);
+  box-shadow: 0 24px 64px -16px rgba(16, 24, 40, 0.35);
+  overflow: hidden;
+  animation: gd-pop 0.18s var(--ease);
+}
+@keyframes gd-fade {
+  from { opacity: 0; }
+}
+@keyframes gd-pop {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+}
+.gd-head {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 20px 20px 18px 24px;
+  border-bottom: 1px solid var(--border);
+}
+.gd-badge {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.gd-head h2 {
+  font-size: 17px;
+  line-height: 24px;
+  font-weight: 600;
+  color: var(--text);
+}
+.gd-head p {
+  font-size: 13px;
+  color: var(--secondary);
+}
+.gd-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 24px 8px;
+  display: grid;
+  gap: 22px;
+}
+.gd-field {
+  display: grid;
+  gap: 8px;
+}
+.gd-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.gd-label-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+.gd-value {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+.gd-input {
+  height: 42px;
+  width: 100%;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--solid);
+  color: var(--text);
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.15s var(--ease), box-shadow 0.15s var(--ease);
+}
+select.gd-input {
+  cursor: pointer;
+}
+.gd-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.gd-hint {
+  font-size: 12px;
+  line-height: 17px;
+  color: var(--tertiary);
+}
+.gd-hint.error {
+  color: var(--danger);
+}
+.gd-seg {
+  display: flex;
+  width: 100%;
+}
+.gd-seg button {
+  flex: 1;
+  justify-content: center;
+}
+.gd-chips {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(44px, 1fr));
+  gap: 6px;
+}
+.gd-chips button {
+  height: 36px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--solid);
+  color: var(--secondary);
+  font-size: 13px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: all 0.15s var(--ease);
+}
+.gd-chips button:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+  color: var(--text);
+}
+.gd-chips button.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+.gd-chips button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.gd-range {
+  width: 100%;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.gd-switch-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: var(--muted);
+}
+.gd-switch-row > div {
+  flex: 1;
+}
+.gd-switch-row strong {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+.gd-switch-row p {
+  margin-top: 2px;
+  font-size: 12px;
+  line-height: 17px;
+  color: var(--secondary);
+}
+.gd-switch-row .toggle {
+  flex-shrink: 0;
+}
+.gd-foot {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 24px;
+  border-top: 1px solid var(--border);
+  background: color-mix(in srgb, var(--muted) 50%, var(--solid));
+}
+.gd-foot p {
+  flex: 1;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--secondary);
+}
+.gd-foot b {
+  font-weight: 600;
+  color: var(--text);
+}
+.gd-foot > div {
+  display: flex;
+  gap: 8px;
+}
+
+/* ── Responsive ─────────────────────────────────────────────────────────── */
+@media (max-width: 1100px) {
+  .st-toolbar-end {
+    margin-left: 0;
+    width: 100%;
+  }
+  .st-toolbar-end .st-btn-primary {
+    margin-left: auto;
+  }
+  .st-insight {
+    grid-template-columns: 84px minmax(0, 1fr);
+  }
+  .st-insight-actions {
+    grid-column: 2;
+  }
+}
+
+@media (max-width: 639px) {
+  .app-shell.studio {
+    padding-top: 16px;
+  }
+  .studio .topbar h2 {
+    font-size: 22px;
+    line-height: 28px;
+  }
+  .st-subtitle {
+    display: none;
+  }
+  .st-seg,
+  .st-search {
+    width: 100%;
+  }
+  .st-seg button {
+    flex: 1;
+    justify-content: center;
+    padding: 0 8px;
+  }
+  .st-toolbar-end {
+    gap: 0;
+  }
+  .st-link span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .st-group-head p {
+    display: none;
+  }
+  .st-flow {
+    flex-wrap: wrap;
+    row-gap: 0;
+  }
+  .st-flow span {
+    white-space: normal;
+  }
+  .st-scene-grid {
+    grid-template-columns: 1fr;
+  }
+  .st-scene,
+  .st-scene-new {
+    min-height: 0;
+  }
+  .st-scene-new {
+    padding: 20px;
+  }
+  .st-rule {
+    grid-template-columns: 36px minmax(0, 1fr) auto;
+    gap: 12px;
+    padding: 12px;
+  }
+  .st-rule-meta,
+  .st-rule-side .st-icon-btn.test {
+    display: none;
+  }
+  .st-model {
+    grid-template-columns: 1fr;
+    padding: 16px;
+  }
+  .st-model-actions .st-btn {
+    flex: 1;
+  }
+  .st-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    row-gap: 12px;
+  }
+  .st-metrics div:nth-child(3) {
+    border-left: 0;
+    padding-left: 0;
+  }
+  .st-insight {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    padding: 16px;
+  }
+  .st-when {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 0 0 12px;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .st-insight-actions {
+    grid-column: 1;
+  }
+  .st-insight-actions .st-btn-primary {
+    flex: 1;
+  }
+  .gd-overlay {
+    place-items: end stretch;
+    padding: 0;
+  }
+  .gd-modal {
+    max-width: none;
+    max-height: 92dvh;
+    border-radius: 20px 20px 0 0;
+  }
+  .gd-head,
+  .gd-body,
+  .gd-foot {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .gd-foot {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .gd-foot > div .st-btn {
+    flex: 1;
+  }
+}
+
+/* ── Owner theme: Scene, Automation, Recommendation only (not Guardian) ─── */
+/* "Xanh trời tươi": pale sky page, white cards, one bright sky accent (deeper shade on buttons for white text). */
+.app-shell.studio.st-theme {
+  --bg-base: #f4fbff;
+  --border: #d9eefa;
+  --muted: #eef8fd;
+  --text: #1f3a4f;
+  --secondary: #46647a;
+  --tertiary: #6b8597;
+  --accent: #1fa2e0;
+  --accent-bright: #38b6ef;
+  --accent-soft: #e3f5fd;
+  --success: #22a77a;
+  --danger: #e05a4c;
+  --card: #ffffff;
+  --card-shadow: 0 1px 2px rgba(31, 162, 224, 0.06), 0 6px 18px rgba(31, 162, 224, 0.1);
+  --glass-shadow: 0 30px 60px rgba(31, 58, 79, 0.18);
+  --radius: 18px;
+  background: var(--bg-base);
+}
+.st-theme .toggle.active {
+  background: var(--accent-bright);
+}
+.st-theme .topbar h2 {
+  font-size: 28px;
+  line-height: 34px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+.st-theme .st-btn {
+  font-weight: 700;
+}
+.st-theme .st-btn-primary {
+  box-shadow: 0 6px 16px -6px rgba(31, 162, 224, 0.55);
+}
+.st-theme .st-btn-primary:hover:not(:disabled) {
+  background: #168dc6;
+  border-color: #168dc6;
+}
+.st-theme .st-search {
+  border-color: var(--border);
+}
+.st-theme .st-seg {
+  background: #e6f4fc;
+}
+.st-theme .st-seg button.active {
+  background: var(--accent);
+  color: #fff;
+}
+.st-theme .st-seg button.active .st-count {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+/* Cards share one white surface with a sky-tinted border and shadow. */
+.st-theme .st-scene,
+.st-theme .st-rule,
+.st-theme .st-rule + .st-rule,
+.st-theme .st-model,
+.st-theme .st-insight {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--card-shadow);
+}
+.st-theme .st-scene:hover,
+.st-theme .st-rule:hover,
+.st-theme .st-insight:hover {
+  background: var(--card);
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+}
+
+/* Scene cards: one hue for all kinds; the icon shape tells them apart. */
+.st-theme .st-scene {
+  /* --hue comes from the scene kind (ScenePage SCENE_HUES) */
+  padding: 20px;
+}
+.st-theme .st-scene h3 {
+  font-size: 17px;
+  font-weight: 700;
+}
+.st-theme .st-scene-icon {
+  background: var(--accent-soft);
+}
+.st-theme .st-scene-devices li {
+  padding: 7px 10px;
+  border-radius: 10px;
+  background: var(--bg-base);
+}
+.st-theme .st-run {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.st-theme .st-run:hover:not(:disabled) {
+  color: #fff;
+}
+.st-theme .st-run:hover:not(:disabled) {
+  background: var(--accent);
+}
+.st-theme .st-scene.is-off {
+  background: #fbfdfe;
+}
+.st-theme .st-scene-new {
+  border-color: var(--border);
+  background: #ffffff;
+}
+
+/* Rules: separate cards, sentence wraps instead of being cut. */
+.st-theme .st-list {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  display: grid;
+  gap: 10px;
+}
+.st-theme .st-rule,
+.st-theme .st-rule + .st-rule {
+  padding: 16px 14px 16px 18px;
+}
+.st-theme .st-rule.is-off {
+  background: #fbfdfe;
+}
+.st-theme .st-rule-icon {
+  background: var(--accent-soft);
+}
+.st-theme .st-rule-title h4 {
+  font-size: 15px;
+  font-weight: 700;
+}
+.st-theme .st-flow {
+  margin-top: 6px;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  font-size: 13.5px;
+  line-height: 20px;
+}
+.st-theme .st-flow span {
+  white-space: normal;
+}
+.st-theme .st-flow b {
+  font-weight: 600;
+  color: var(--accent);
+}
+.st-theme .st-group-head h3 {
+  font-size: 15px;
+  font-weight: 700;
+}
+.st-theme .st-rule-skeleton {
+  border-radius: var(--radius);
+}
+
+/* Recommendations */
+.st-theme .st-model-head h3 {
+  font-size: 16px;
+  font-weight: 700;
+}
+.st-theme .st-when {
+  padding: 10px 14px;
+  border-right: 0;
+  border-radius: 14px;
+  background: var(--accent-soft);
+  text-align: center;
+}
+.st-theme .st-when strong {
+  color: var(--accent);
+  font-weight: 700;
+}
+.st-theme .st-insight-body h4 {
+  font-size: 16px;
+  font-weight: 700;
+}
+.st-theme .st-insight-body p {
+  font-size: 14px;
+  line-height: 20px;
+}
+.st-theme .st-confidence .st-bar {
+  width: 80px;
+  height: 6px;
+  background: var(--muted);
+}
+.st-theme .st-confidence b {
+  color: var(--accent);
+}
+.st-theme .st-tag:not(.warn):not(.err) {
+  background: var(--accent-soft);
+}
+.st-tech {
+  grid-column: 1 / -1;
+  font-size: 13px;
+  color: var(--tertiary);
+}
+.st-tech summary {
+  width: fit-content;
+  cursor: pointer;
+  font-weight: 600;
+}
+.st-tech summary:hover {
+  color: var(--text);
+}
+.st-tech[open] {
+  display: grid;
+  gap: 14px;
+  padding-top: 4px;
+}
+.st-tech .st-btn {
+  justify-self: start;
+}
+@media (max-width: 720px) {
+  .st-theme .st-when {
+    text-align: left;
+  }
+}
+/* Run history: "Hôm nay 09:04" / "28/10 09:04" on one line. */
+.st-theme .scene-run button {
+  grid-template-columns: 32px 108px 1fr auto;
+}
+.st-theme .scene-run strong {
+  white-space: nowrap;
+}
+/* Mid widths: the sentence already says what the rule does, so drop the counts to give it room. */
+@media (max-width: 1024px) {
+  .st-theme .st-rule-meta {
+    display: none;
+  }
+}
+
+/* Guardian page uses the older scenario-card / scene-filter classes; align them with the theme. */
+.st-theme .scenario-card {
+  border-radius: var(--radius);
+}
+.st-theme .scenario-card.on {
+  border-color: var(--border);
+}
+.st-theme .scenario-card:hover {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border)) !important;
+  box-shadow: 0 1px 2px rgba(31, 162, 224, 0.08), 0 12px 26px rgba(31, 162, 224, 0.14) !important;
+}
+.st-theme .scene-filter {
+  background: #e6f4fc;
+}
+.st-theme .scene-filter button.active {
+  box-shadow: 0 4px 12px -4px rgba(31, 162, 224, 0.55);
+}
+/* dashboard.css locks .scenario-bottom at 42px; the guardian footer wraps to two rows and spilled out of the card. */
+.st-theme .rule-card .scenario-bottom {
+  height: auto;
+  min-height: 42px;
+}
+
+/* ── "Pro" layout: Scene, Automation, Recommendation only (.st-pro; Guardian is not included) ── */
+/* Spacing scale: 8 / 16 / 24 / 32 / 48. Fixed type scale: 40 title, 18 section, 16 card, 14 body, 12 label. */
+.app-shell.studio.st-pro {
+  --radius: 14px;
+  --card-shadow: 0 1px 2px rgba(31, 58, 79, 0.04);
+  --hover-shadow: 0 2px 4px rgba(31, 58, 79, 0.04), 0 12px 28px -8px rgba(31, 162, 224, 0.22);
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  font-family: "Be Vietnam Pro", var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+.st-pro main {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Typography */
+.st-pro .topbar {
+  margin-bottom: 32px;
+}
+.st-pro .topbar h2 {
+  font-size: 40px;
+  line-height: 48px;
+  font-weight: 800;
+  letter-spacing: -0.035em;
+}
+.st-pro .st-eyebrow {
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.st-pro .st-subtitle {
+  margin-top: 8px;
+  max-width: 620px;
+  font-size: 16px;
+  line-height: 24px;
+}
+.st-pro .st-group-head h3,
+.st-pro .st-model-head h3 {
+  font-size: 18px;
+  line-height: 24px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.st-pro .st-scene h3,
+.st-pro .st-rule-title h4,
+.st-pro .st-insight-body h4 {
+  font-size: 16px;
+  line-height: 22px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.st-pro .st-flow,
+.st-pro .st-insight-body p {
+  font-size: 14px;
+  line-height: 22px;
+}
+
+/* Spacing between sections */
+.st-pro .st-toolbar {
+  margin-bottom: 32px;
+  gap: 16px;
+}
+.st-pro .st-group + .st-group {
+  margin-top: 48px;
+}
+.st-pro .st-group-head {
+  margin-bottom: 16px;
+}
+.st-pro .st-scene-grid {
+  gap: 24px;
+}
+.st-pro .st-list,
+.st-pro .st-insights {
+  gap: 16px;
+}
+.st-pro .st-model {
+  margin-bottom: 48px;
+  padding: 24px;
+}
+.st-pro .st-tabs {
+  margin-bottom: 24px;
+}
+.st-pro .st-alert {
+  margin-bottom: 24px;
+}
+
+/* Cards: moderate radius, hairline border, shadow only on hover */
+.st-pro .st-scene,
+.st-pro .st-rule,
+.st-pro .st-rule + .st-rule,
+.st-pro .st-model,
+.st-pro .st-insight,
+.st-pro .st-scene-new {
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  box-shadow: var(--card-shadow);
+  transition: transform 0.25s var(--ease), box-shadow 0.25s var(--ease), border-color 0.2s ease, background-color 0.2s ease;
+}
+.st-pro .st-scene { padding: 24px; }
+.st-pro .st-rule,
+.st-pro .st-rule + .st-rule { padding: 16px 16px 16px 24px; }
+.st-pro .st-insight { padding: 24px; }
+.st-pro .st-scene:hover,
+.st-pro .st-rule:hover,
+.st-pro .st-insight:hover,
+.st-pro .st-scene-new:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--hover-shadow);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+}
+.st-pro .st-scene-icon,
+.st-pro .st-rule-icon {
+  border-radius: 12px;
+}
+
+/* Single accent: CTA and "on" states only */
+.st-pro .st-btn {
+  border-radius: 10px;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.15s var(--ease), box-shadow 0.2s ease;
+}
+.st-pro .st-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+.st-pro .st-btn-primary {
+  box-shadow: 0 4px 12px -4px rgba(31, 162, 224, 0.5);
+}
+.st-pro .st-seg button,
+.st-pro .st-link,
+.st-pro .st-icon-btn,
+.st-pro .st-run,
+.st-pro .toggle,
+.st-pro .toggle span {
+  transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.25s var(--ease);
+}
+.st-pro .st-search:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+/* Motion: cards rise in on load and as they scroll into view */
+@keyframes st-rise {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
+}
+.st-pro .topbar,
+.st-pro .st-toolbar,
+.st-pro .st-model {
+  animation: st-rise 0.45s var(--ease) backwards;
+}
+.st-pro .st-toolbar { animation-delay: 0.05s; }
+.st-pro .st-scene,
+.st-pro .st-scene-new,
+.st-pro .st-rule,
+.st-pro .st-insight {
+  animation: st-rise 0.5s var(--ease) backwards;
+}
+.st-pro .st-scene-grid > :nth-child(2),
+.st-pro .st-list > :nth-child(2),
+.st-pro .st-insights > :nth-child(2) { animation-delay: 0.05s; }
+.st-pro .st-scene-grid > :nth-child(3),
+.st-pro .st-list > :nth-child(3),
+.st-pro .st-insights > :nth-child(3) { animation-delay: 0.1s; }
+.st-pro .st-scene-grid > :nth-child(n + 4),
+.st-pro .st-list > :nth-child(n + 4),
+.st-pro .st-insights > :nth-child(n + 4) { animation-delay: 0.15s; }
+/* Browsers with scroll-driven animations reveal cards as they enter the viewport instead. */
+@supports (animation-timeline: view()) {
+  .st-pro .st-scene,
+  .st-pro .st-scene-new,
+  .st-pro .st-rule,
+  .st-pro .st-insight {
+    animation-delay: 0s !important;
+    animation-timeline: view();
+    animation-range: entry 0% entry 40%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .st-pro *,
+  .st-pro *::before,
+  .st-pro *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* Responsive: desktop-first, collapse to a single column on phones */
+@media (max-width: 1100px) {
+  .st-pro .topbar h2 {
+    font-size: 34px;
+    line-height: 40px;
+  }
+}
+@media (max-width: 639px) {
+  .st-pro .topbar {
+    margin-bottom: 24px;
+  }
+  .st-pro .topbar h2 {
+    font-size: 28px;
+    line-height: 34px;
+  }
+  .st-pro .st-toolbar {
+    margin-bottom: 24px;
+    gap: 8px;
+  }
+  .st-pro .st-scene-grid,
+  .st-pro .st-list,
+  .st-pro .st-insights {
+    gap: 12px;
+  }
+  .st-pro .st-group + .st-group,
+  .st-pro .st-model {
+    margin-top: 32px;
+  }
+  .st-pro .st-model {
+    margin-top: 0;
+    margin-bottom: 32px;
+    padding: 16px;
+  }
+  .st-pro .st-scene,
+  .st-pro .st-insight {
+    padding: 16px;
+  }
+  .st-pro .st-rule,
+  .st-pro .st-rule + .st-rule {
+    padding: 14px 12px 14px 16px;
+  }
+}
+
+/* ── Deeper surfaces: pale page, richer sky cards, white inner rows, darker text (all .st-theme pages) ── */
+.app-shell.studio.st-theme {
+  --card: #d9edfa;
+  --border: #b3d9f0;
+  --muted: #e4f2fb;
+  --text: #12304a;
+  --secondary: #33536b;
+  --tertiary: #4f6d83;
+  --accent: #0b7ab8; /* deep enough to read as text on the tinted cards */
+  --accent-bright: #1fa2e0;
+  --accent-soft: #ffffff; /* icon tiles and chips sit white on the tinted card */
+}
+.st-theme .st-btn-primary:hover:not(:disabled) {
+  background: #096a9f;
+  border-color: #096a9f;
+}
+.st-theme .st-seg,
+.st-theme .scene-filter {
+  background: var(--card);
+}
+.st-theme .st-scene.is-off,
+.st-theme .st-rule.is-off {
+  background: #e9f4fb;
+}
+.st-theme .st-scene-devices li,
+.st-theme .st-when,
+.st-theme .st-tag:not(.warn):not(.err) {
+  background: #ffffff;
+}
+.st-theme .st-run {
+  background: var(--accent);
+  color: #fff;
+}
+.st-theme .st-run:hover:not(:disabled) {
+  background: #096a9f;
+}
+.st-theme .st-confidence .st-bar {
+  background: #ffffff;
+}
+.st-theme .st-scene-new {
+  background: transparent;
+  border-style: dashed;
+  border-color: var(--border);
+}
+.st-theme .st-empty,
+.st-theme .scenario-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+}
+.st-theme .st-tabs button.active .st-count {
+  background: var(--card);
+}
+/* dashboard.css paints guardian cards white with a stronger selector. */
+.app-shell.studio.st-theme .scenario-card {
+  background: var(--card) !important;
+}
+
+/* Resting shadow on every card (st-pro had reduced it to a hairline); hover lifts further. */
+.app-shell.studio.st-theme,
+.app-shell.studio.st-theme.st-pro {
+  --card-shadow: 0 1px 2px rgba(18, 48, 74, 0.08), 0 8px 20px -6px rgba(11, 122, 184, 0.28);
+  --hover-shadow: 0 2px 4px rgba(18, 48, 74, 0.1), 0 18px 34px -10px rgba(11, 122, 184, 0.42);
+}
+.st-theme .st-empty,
+.app-shell.studio.st-theme .scenario-card {
+  box-shadow: var(--card-shadow);
+}
+.st-theme .st-scene.is-off,
+.st-theme .st-rule.is-off {
+  box-shadow: 0 1px 2px rgba(18, 48, 74, 0.06), 0 4px 10px -6px rgba(11, 122, 184, 0.18);
+}
+/* The dashed "new" tile is an empty slot, not a card: no resting shadow. */
+.st-theme .st-scene-new:not(:hover) {
+  box-shadow: none;
+}
+
+/* ── Reversed: pale page, white cards, strong border + shadow; inner rows tinted ── */
+.app-shell.studio.st-theme,
+.app-shell.studio.st-theme.st-pro {
+  --card: #ffffff;
+  --border: #5fa9d6;
+  --accent-soft: #e3f3fc;
+  --card-shadow: 0 1px 2px rgba(18, 48, 74, 0.1), 0 10px 24px -8px rgba(11, 122, 184, 0.35);
+}
+.st-theme .st-scene,
+.st-theme .st-rule,
+.st-theme .st-rule + .st-rule,
+.st-theme .st-model,
+.st-theme .st-insight,
+.st-theme .st-empty,
+.app-shell.studio.st-theme .scenario-card {
+  border-width: 1.5px;
+}
+.st-theme .st-seg,
+.st-theme .scene-filter {
+  background: #e3f3fc;
+}
+.st-theme .st-scene.is-off,
+.st-theme .st-rule.is-off {
+  background: #f6fafd;
+  border-color: #9ccbe8;
+}
+.st-theme .st-scene-devices li,
+.st-theme .st-when,
+.st-theme .st-tag:not(.warn):not(.err),
+.st-theme .st-confidence .st-bar,
+.st-theme .st-tabs button.active .st-count {
+  background: #edf6fc;
+}
+
+/* ── Stronger frame: 2px deep-sky border, softly tinted card, white bordered inner boxes, darker text ── */
+.app-shell.studio.st-theme,
+.app-shell.studio.st-theme.st-pro {
+  --card: #ecf6fd;
+  --border: #3f97cc;
+  --inner-border: #a3d0ec;
+  --text: #0d2a44;
+  --secondary: #26475f;
+  --tertiary: #41627a;
+  --accent-soft: #ffffff;
+}
+.st-theme .st-scene,
+.st-theme .st-rule,
+.st-theme .st-rule + .st-rule,
+.st-theme .st-model,
+.st-theme .st-insight,
+.st-theme .st-empty,
+.app-shell.studio.st-theme .scenario-card {
+  border-width: 2px;
+}
+.st-theme .st-scene.is-off,
+.st-theme .st-rule.is-off {
+  background: #f4f9fd;
+  border-color: #8fc3e4;
+}
+/* Inner boxes: white with a thin sky outline so they read as fields on the tinted card. */
+.st-theme .st-scene-devices li,
+.st-theme .st-scene-icon,
+.st-theme .st-rule-icon,
+.st-theme .st-when,
+.st-theme .st-tag:not(.warn):not(.err),
+.st-theme .st-empty-icon {
+  background: #ffffff;
+  border: 1px solid var(--inner-border);
+}
+.st-theme .st-scene-icon,
+.st-theme .st-rule-icon,
+.st-theme .st-empty-icon {
+  color: var(--accent);
+}
+.st-theme .st-scene-devices li span {
+  color: var(--text);
+  font-weight: 600;
+}
+.st-theme .st-scene-devices li em,
+.st-theme .st-scene-desc,
+.st-theme .st-rule-meta {
+  color: var(--secondary);
+}
+.st-theme .st-search,
+.st-theme .st-seg,
+.st-theme .scene-filter {
+  border: 1.5px solid var(--inner-border);
+}
+.st-theme .st-seg,
+.st-theme .scene-filter {
+  background: #ffffff;
+}
+.st-theme .st-confidence .st-bar {
+  background: #ffffff;
+  outline: 1px solid var(--inner-border);
+}
+
+/* ── Harmonised (current): one calm blue-and-white set for pages AND their drawers/sheets/dialogs.
+   Everything inside reads these tokens, so this block is the single place to retune the look. ── */
+.app-shell.studio.st-theme,
+.app-shell.studio.st-theme.st-pro {
+  --bg-base: #f2f7fc;
+  --card: #ffffff;
+  --g1: #ffffff;
+  --g2: #ffffff;
+  --solid: #ffffff;
+  --border: #c3d9ee;
+  --inner-border: #dbe8f4;
+  --muted: #f0f6fc;
+  --text: #0f2742;
+  --secondary: #3b556e;
+  --tertiary: #5c758c;
+  --accent: #1769d6;
+  --accent-hover: #1257b5;
+  --accent-bright: #2f86ee;
+  --accent-soft: #e7f1fd;
+  --card-shadow: 0 1px 2px rgba(15, 39, 66, 0.05), 0 6px 16px -8px rgba(23, 105, 214, 0.2);
+  --hover-shadow: 0 2px 4px rgba(15, 39, 66, 0.06), 0 14px 28px -10px rgba(23, 105, 214, 0.32);
+  --glass-shadow: 0 24px 56px -12px rgba(15, 39, 66, 0.28);
+  background: var(--bg-base);
+}
+.st-theme .st-scene,
+.st-theme .st-rule,
+.st-theme .st-rule + .st-rule,
+.st-theme .st-model,
+.st-theme .st-insight,
+.st-theme .st-empty,
+.app-shell.studio.st-theme .scenario-card {
+  border-width: 1.5px;
+}
+.st-theme .st-scene.is-off,
+.st-theme .st-rule.is-off {
+  background: #f8fbfe;
+  border-color: var(--inner-border);
+  box-shadow: none;
+}
+/* Inner boxes: soft tint, no outline — the card border is the only frame. */
+.st-theme .st-scene-devices li,
+.st-theme .st-when,
+.st-theme .st-tag:not(.warn):not(.err) {
+  background: var(--muted);
+  border: 0;
+}
+.st-theme .st-scene-icon,
+.st-theme .st-rule-icon,
+.st-theme .st-empty-icon,
+.st-theme .st-tabs button.active .st-count {
+  background: var(--accent-soft);
+  border: 0;
+}
+.st-theme .st-confidence .st-bar {
+  background: var(--accent-soft);
+  outline: 0;
+}
+.st-theme .st-search,
+.st-theme .st-seg,
+.st-theme .scene-filter {
+  background: #ffffff;
+  border: 1px solid var(--border);
+}
+.st-theme .st-btn-primary,
+.st-theme .scene-filter button.active {
+  box-shadow: 0 4px 12px -4px rgba(23, 105, 214, 0.5);
+}
+.st-theme .st-btn-primary:hover:not(:disabled),
+.st-theme .st-run:hover:not(:disabled) {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+.st-theme .scenario-card:hover {
+  box-shadow: var(--hover-shadow) !important;
+}
+
+/* Drawers, editors, picker sheets and dialogs opened from these pages. */
+.st-theme .scene-overlay,
+.st-theme .scene-panel-backdrop.active {
+  background: rgba(15, 39, 66, 0.32);
+}
+.st-theme .scene-panel-header,
+.st-theme .scene-editor-header,
+.st-theme .sub-sheet-header {
+  border-bottom-color: var(--inner-border);
+}
+.st-theme .scene-panel-header strong,
+.st-theme .sub-sheet-header strong {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.st-theme .scene-panel-header small {
+  font-size: 12px;
+}
+.st-theme .delete-dialog {
+  border-radius: 18px;
+}
+.st-theme :is(.scene-panel, .scene-editor-panel, .sub-sheet-layer, .delete-dialog) :is(input, select, textarea):focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+@media (min-width: 640px) {
+  .st-theme .scene-panel,
+  .st-theme .scene-editor-panel {
+    border-radius: 20px 0 0 20px;
+  }
+}
+
+/* ── Blue & white (current): white cards on a pale blue page; one blue carries every accent.
+   The inner pieces (icon tile, rows, chips, run button) are tints of that same blue. ── */
+.app-shell.studio.st-theme,
+.app-shell.studio.st-theme.st-pro {
+  --bg-base: #f3f8fe;
+  --border: #d2e2f5;
+  --inner-border: #e3edf9;
+  --muted: #f1f6fd;
+  --text: #0f2a4a;
+  --secondary: #3a5372;
+  --tertiary: #62799a;
+  --accent: #1a6fdc;
+  --accent-hover: #1459b8;
+  --accent-bright: #3d93f0;
+  --accent-soft: #e6f0fd;
+  --card-shadow: 0 1px 2px rgba(15, 42, 74, 0.04), 0 6px 16px -10px rgba(26, 111, 220, 0.28);
+  --hover-shadow: 0 2px 4px rgba(15, 42, 74, 0.05), 0 16px 30px -14px rgba(26, 111, 220, 0.45);
+  background: var(--bg-base);
+}
+.st-theme .st-btn-primary,
+.st-theme .scene-filter button.active {
+  box-shadow: 0 4px 12px -4px rgba(26, 111, 220, 0.5);
+}
+.st-theme .st-scene,
+.st-theme .st-rule,
+.st-theme .st-rule + .st-rule,
+.st-theme .st-model,
+.st-theme .st-insight,
+.st-theme .st-empty,
+.app-shell.studio.st-theme .scenario-card {
+  border-width: 1px;
+}
+/* Every card uses the page blue; this beats the per-kind inline scene hue. */
+.st-theme .st-scene,
+.st-theme .st-rule,
+.st-theme .st-insight {
+  --hue: var(--accent) !important;
+}
+.st-theme .st-scene:hover,
+.st-theme .st-rule:hover,
+.st-theme .st-insight:hover {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  box-shadow: var(--hover-shadow);
+}
+/* Solid blue pieces: icon tiles, run button, confidence fill, model badge. */
+.st-theme .st-scene-icon,
+.st-theme .st-rule-icon,
+.st-theme .st-model-badge,
+.st-theme .st-run,
+.st-theme .st-confidence .st-bar i {
+  color: #fff;
+  background: linear-gradient(140deg, var(--accent-bright), var(--accent));
+}
+.st-theme .st-scene-icon,
+.st-theme .st-rule-icon,
+.st-theme .st-model-badge {
+  box-shadow: 0 6px 14px -6px rgba(26, 111, 220, 0.6);
+}
+.st-theme .st-run:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+.st-theme .st-run.done {
+  background: var(--success);
+}
+/* Soft blue pieces: device rows, time box, chips, confidence track. */
+.st-theme .st-scene-devices li {
+  background: var(--muted);
+}
+.st-theme .st-when,
+.st-theme .st-tag:not(.warn):not(.err),
+.st-theme .st-confidence .st-bar {
+  background: var(--accent-soft);
+}
+.st-theme .st-scene-devices li .icon,
+.st-theme .st-when strong,
+.st-theme .st-flow b,
+.st-theme .st-confidence b,
+.st-theme .st-tag:not(.warn):not(.err) {
+  color: var(--accent);
+}
+/* Switched-off items go grey-blue so blue always means "active". */
+.st-theme .st-scene.is-off,
+.st-theme .st-rule.is-off {
+  --hue: var(--tertiary) !important;
+}
+.st-theme .st-scene.is-off .st-scene-icon,
+.st-theme .st-rule.is-off .st-rule-icon {
+  color: var(--tertiary);
+  background: var(--muted);
+  box-shadow: none;
+}
+.st-theme .st-scene.is-off .st-scene-devices li .icon {
+  color: var(--tertiary);
+}
+.st-theme .st-scene.is-off .st-run {
+  background: var(--tertiary);
+}

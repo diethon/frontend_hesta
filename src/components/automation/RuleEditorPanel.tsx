@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import type {
   AutomationRule,
   AutomationRuleInput,
@@ -8,7 +8,7 @@ import type {
 } from '../../types/automation';
 import type { SceneResponse } from '../../types/scene';
 import type { Schedule } from '../../types/schedule';
-import { Icon, type IconName } from '../home/HomeIcons';
+import { Icon, type IconName } from '../ui/LucideIcon';
 import { TemplateGrid, type AutomationTemplate } from './TemplateGrid';
 import { SummarySentence } from './SummarySentence';
 import { PickerField } from './PickerField';
@@ -21,10 +21,19 @@ import { DevicePickerSheet } from '../scene/DevicePickerSheet';
 import { SceneScheduleSection, formatRepeatDays } from '../scene/SceneScheduleSection';
 import { ConfirmModal } from '../ui/ConfirmModal';
 import { createAutomationRule, updateAutomationRule, deleteAutomationRule } from '../../services/automationApi';
-import { saveSchedule } from '../../services/scheduleApi';
 import { notify } from '../ui/notify';
 import { RuleHistoryPanel } from './RuleHistoryPanel';
 import { RuleTestSheet } from './RuleTestSheet';
+import { eventLabel } from './ruleLabels';
+import {
+  moveItem,
+  removeAt,
+  ruleToDraft,
+  templateToDraft,
+  validateRuleDraft,
+  type LogicalOp,
+  type TriggerType,
+} from './ruleDraft';
 
 export interface RuleEditorPanelProps {
   rule?: AutomationRule | null; // null = create mode, AutomationRule = edit mode, undefined = closed
@@ -68,12 +77,12 @@ export const RuleEditorPanel: React.FC<RuleEditorPanelProps> = ({
   const [description, setDescription] = useState('');
   const [descExpanded, setDescExpanded] = useState(false);
   const [enabled, setEnabled] = useState(true);
-  const [triggerType, setTriggerType] = useState<'SENSOR' | 'EVENT' | 'SCHEDULE'>('SENSOR');
+  const [triggerType, setTriggerType] = useState<TriggerType>('SENSOR');
 
   // Conditions (for SENSOR or EVENT)
   const [conditions, setConditions] = useState<RuleConditionInput[]>([]);
   const [expandedCondIndex, setExpandedCondIndex] = useState<number | null>(0);
-  const [globalLogicalOp, setGlobalLogicalOp] = useState<'AND' | 'OR'>('AND');
+  const [globalLogicalOp, setGlobalLogicalOp] = useState<LogicalOp>('AND');
   const [hasLegacyMixedOp, setHasLegacyMixedOp] = useState(false);
 
   // Actions
@@ -88,11 +97,9 @@ export const RuleEditorPanel: React.FC<RuleEditorPanelProps> = ({
   const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [confirmOverwriteOpOpen, setConfirmOverwriteOpOpen] = useState(false);
-  const [pendingLogicalOp, setPendingLogicalOp] = useState<'AND' | 'OR'>('AND');
+  const [pendingLogicalOp, setPendingLogicalOp] = useState<LogicalOp>('AND');
 
-  // Saving states & partial-failure banner
   const [saving, setSaving] = useState(false);
-  const [scheduleSaveError, setScheduleSaveError] = useState<string | null>(null);
 
   // Sub-sheet states
   const [devicePickerMode, setDevicePickerMode] = useState<
@@ -108,50 +115,22 @@ export const RuleEditorPanel: React.FC<RuleEditorPanelProps> = ({
     if (!isOpen) return;
 
     if (rule && rule.id) {
+      const draft = ruleToDraft(rule);
       setCurrentRuleId(rule.id);
       setShowTemplateGrid(false);
       setName(rule.name || '');
       setDescription(rule.description || '');
       setDescExpanded(Boolean(rule.description));
       setEnabled(rule.enabled ?? true);
-      setTriggerType(rule.triggerType || 'SENSOR');
-
-      // Check conditions
-      const conds = (rule.conditions || []).map((c, idx) => ({
-        deviceId: c.deviceId,
-        attribute: c.attribute,
-        operator: c.operator,
-        expectedValue: c.expectedValue,
-        logicalOperator: c.logicalOperator || 'AND',
-        order: idx,
-      }));
-      setConditions(conds);
-      setExpandedCondIndex(conds.length > 0 ? 0 : null);
-
-      // Check legacy mixed operators
-      if (conds.length >= 2) {
-        const ops = new Set(conds.map((c) => c.logicalOperator));
-        if (ops.size > 1) {
-          setHasLegacyMixedOp(true);
-        } else {
-          setHasLegacyMixedOp(false);
-          setGlobalLogicalOp((conds[0]?.logicalOperator as 'AND' | 'OR') || 'AND');
-        }
-      }
-
-      // Actions
-      const acts = (rule.actions || []).map((a, idx) => ({
-        deviceId: a.deviceId,
-        sceneId: a.sceneId,
-        action: a.action,
-        parameters: a.parameters || {},
-        order: idx,
-      }));
-      setActions(acts);
-      setExpandedActIndex(acts.length > 0 ? 0 : null);
-
+      setTriggerType(draft.triggerType);
+      setConditions(draft.conditions);
+      setExpandedCondIndex(draft.conditions.length > 0 ? 0 : null);
+      setHasLegacyMixedOp(draft.mixedOps);
+      setGlobalLogicalOp(draft.logicalOp);
+      setActions(draft.actions);
+      setDraftSchedules([]);
+      setExpandedActIndex(draft.actions.length > 0 ? 0 : null);
       setIsDirty(false);
-      setScheduleSaveError(null);
     } else {
       // Create mode
       setCurrentRuleId(null);
@@ -169,7 +148,6 @@ export const RuleEditorPanel: React.FC<RuleEditorPanelProps> = ({
       setHasLegacyMixedOp(false);
       setGlobalLogicalOp('AND');
       setIsDirty(false);
-      setScheduleSaveError(null);
     }
   }, [rule, isOpen]);
 
@@ -202,71 +180,15 @@ export const RuleEditorPanel: React.FC<RuleEditorPanelProps> = ({
 
   // ── Template selection ──
   const handleSelectTemplate = (tmpl: AutomationTemplate) => {
+    const draft = templateToDraft(tmpl);
     setShowTemplateGrid(false);
     markDirty();
-
-    if (tmpl.id === 'blank') {
-      setName('');
-      setTriggerType('SENSOR');
-      setConditions([]);
-      setActions([]);
-      return;
-    }
-
-    setName(tmpl.name);
-    setTriggerType(tmpl.triggerType);
-
-    if (tmpl.triggerType === 'SENSOR') {
-      setConditions([
-        {
-          attribute: 'motion',
-          operator: 'EQ',
-          expectedValue: true,
-          logicalOperator: 'AND',
-          order: 0,
-        },
-      ]);
-      setActions([
-        {
-          action: 'TURN_ON',
-          parameters: {},
-          order: 0,
-        },
-      ]);
-      setExpandedCondIndex(0);
-      setExpandedActIndex(0);
-    } else if (tmpl.triggerType === 'EVENT') {
-      const eventCode = tmpl.sampleCondition?.expected || (tmpl.id === 'door-ac' ? 'DOOR_OPENED' : 'GAS_LEAK_DETECTED');
-      const actCode = tmpl.sampleAction?.action || (tmpl.id === 'door-ac' ? 'TURN_OFF' : 'TURN_ON');
-      setConditions([
-        {
-          attribute: 'eventType',
-          operator: 'EQ',
-          expectedValue: eventCode,
-          logicalOperator: 'AND',
-          order: 0,
-        },
-      ]);
-      setActions([
-        {
-          action: actCode,
-          parameters: {},
-          order: 0,
-        },
-      ]);
-      setExpandedCondIndex(0);
-      setExpandedActIndex(0);
-    } else if (tmpl.triggerType === 'SCHEDULE') {
-      setConditions([]);
-      setActions([
-        {
-          action: 'TURN_ON',
-          parameters: {},
-          order: 0,
-        },
-      ]);
-      setExpandedActIndex(0);
-    }
+    setName(tmpl.id === 'blank' ? '' : tmpl.name);
+    setTriggerType(draft.triggerType);
+    setConditions(draft.conditions);
+    setActions(draft.actions);
+    setExpandedCondIndex(draft.conditions.length > 0 ? 0 : null);
+    setExpandedActIndex(draft.actions.length > 0 ? 0 : null);
   };
 
   // ── Derived Icon ──
@@ -289,25 +211,18 @@ export const RuleEditorPanel: React.FC<RuleEditorPanelProps> = ({
   }, [currentRuleId, triggerType, enabled]);
 
   // ── Validation Reason ──
-  const validationError = useMemo(() => {
-    if (!name.trim()) return 'Nhập tên quy tắc (tối đa 40 ký tự)';
-    if (triggerType === 'SENSOR') {
-      if (conditions.length === 0) return 'Thêm ít nhất 1 điều kiện cho cảm biến';
-      const incomplete = conditions.find((c) => !c.deviceId);
-      if (incomplete) return 'Chọn cảm biến nguồn cho điều kiện';
-    }
-    if (triggerType === 'EVENT') {
-      const first = conditions[0];
-      if (!first || !first.expectedValue) return 'Chọn sự kiện kích hoạt';
-    }
-    if (actions.length === 0) return 'Thêm ít nhất 1 hành động thực thi';
-    const incompleteAction = actions.find((a) => {
-      if (a.action === 'EXECUTE_SCENE') return !a.sceneId;
-      return !a.deviceId;
-    });
-    if (incompleteAction) return 'Chọn thiết bị hoặc kịch bản cho hành động';
-    return null;
-  }, [name, triggerType, conditions, actions]);
+  const validationError = useMemo(
+    () => validateRuleDraft(name, triggerType, conditions, actions, draftSchedules.filter((s) => s.active).length),
+    [name, triggerType, conditions, actions, draftSchedules],
+  );
+
+  // Saved times are loaded only when the stored rule is SCHEDULE; every change stays a draft until "Lưu".
+  const scheduleTargetId = currentRuleId && rule?.triggerType === 'SCHEDULE' ? currentRuleId : undefined;
+  // Stable so the schedule section does not refetch on every render.
+  const handleSchedulesChange = useCallback((next: Schedule[], edited: boolean) => {
+    setDraftSchedules(next);
+    if (edited) setIsDirty(true);
+  }, []);
 
   const isValid = validationError === null;
 
@@ -342,9 +257,7 @@ export const RuleEditorPanel: React.FC<RuleEditorPanelProps> = ({
 
   const handleDeleteCondition = (index: number) => {
     markDirty();
-    setConditions((prev) =>
-      prev.filter((_, i) => i !== index).map((c, i) => ({ ...c, order: i }))
-    );
+    setConditions((prev) => removeAt(prev, index));
     if (expandedCondIndex === index) setExpandedCondIndex(null);
   };
 
@@ -361,7 +274,7 @@ export const RuleEditorPanel: React.FC<RuleEditorPanelProps> = ({
   };
 
   // Switch Logical Operator (AND/OR)
-  const handleSwitchLogicalOp = (op: 'AND' | 'OR') => {
+  const handleSwitchLogicalOp = (op: LogicalOp) => {
     if (hasLegacyMixedOp) {
       setPendingLogicalOp(op);
       setConfirmOverwriteOpOpen(true);
@@ -412,9 +325,7 @@ export const RuleEditorPanel: React.FC<RuleEditorPanelProps> = ({
 
   const handleDeleteAction = (index: number) => {
     markDirty();
-    setActions((prev) =>
-      prev.filter((_, i) => i !== index).map((a, i) => ({ ...a, order: i }))
-    );
+    setActions((prev) => removeAt(prev, index));
     if (expandedActIndex === index) setExpandedActIndex(null);
   };
 
@@ -434,10 +345,7 @@ export const RuleEditorPanel: React.FC<RuleEditorPanelProps> = ({
     const targetIdx = direction === 'up' ? index - 1 : index + 1;
     if (targetIdx < 0 || targetIdx >= actions.length) return;
     markDirty();
-    const copy = [...actions];
-    const [moved] = copy.splice(index, 1);
-    copy.splice(targetIdx, 0, moved);
-    setActions(copy.map((a, i) => ({ ...a, order: i })));
+    setActions(moveItem(actions, index, targetIdx));
     setExpandedActIndex(targetIdx);
   };
 
@@ -445,7 +353,6 @@ export const RuleEditorPanel: React.FC<RuleEditorPanelProps> = ({
   const handleSaveRule = async () => {
     if (!isValid || saving) return;
     setSaving(true);
-    setScheduleSaveError(null);
 
     const payload: AutomationRuleInput = {
       name: name.trim(),
@@ -454,45 +361,23 @@ export const RuleEditorPanel: React.FC<RuleEditorPanelProps> = ({
       enabled,
       conditions: triggerType === 'SCHEDULE' ? [] : conditions,
       actions,
+      // The full list of times goes with the rule and is saved in one transaction; cancel simply drops the draft.
+      schedules: triggerType === 'SCHEDULE'
+        ? draftSchedules.map((s) => ({
+          id: s.id.startsWith('temp_') ? undefined : s.id,
+          scheduledTime: s.scheduledTime,
+          repeatDays: s.repeatDays || [],
+          active: s.active,
+        }))
+        : undefined,
     };
 
     try {
-      let savedRuleId = currentRuleId;
-
       if (!currentRuleId) {
-        // Create mode
         const created = await createAutomationRule(homeId, payload);
-        savedRuleId = created.id;
         setCurrentRuleId(created.id);
       } else {
-        // Edit mode
         await updateAutomationRule(homeId, currentRuleId, payload);
-      }
-
-      // If SCHEDULE rule, save schedules
-      if (triggerType === 'SCHEDULE' && savedRuleId) {
-        if (draftSchedules.length > 0) {
-          try {
-            for (const s of draftSchedules) {
-              if (s.id && s.id.startsWith('temp_')) {
-                await saveSchedule(homeId, 'automation-rules', savedRuleId, {
-                  scheduledTime: s.scheduledTime,
-                  repeatDays: s.repeatDays || [],
-                  active: s.active,
-                });
-              }
-            }
-          } catch (schedErr) {
-            console.error('Schedule save error:', schedErr);
-            setScheduleSaveError(
-              'Quy tắc đã được tạo nhưng chưa lưu được lịch hẹn giờ.'
-            );
-            notify.error('Không thể lưu lịch hẹn giờ');
-            setSaving(false);
-            onSaved();
-            return;
-          }
-        }
       }
 
       notify.success(currentRuleId ? 'Đã cập nhật quy tắc' : 'Đã tạo quy tắc thành công');
@@ -502,28 +387,6 @@ export const RuleEditorPanel: React.FC<RuleEditorPanelProps> = ({
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Không thể lưu quy tắc';
       notify.error(msg);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  // Retry Schedule Save in partial failure
-  const handleRetryScheduleSave = async () => {
-    if (!currentRuleId || !homeId) return;
-    setSaving(true);
-    try {
-      for (const s of draftSchedules) {
-        await saveSchedule(homeId, 'automation-rules', currentRuleId, {
-          scheduledTime: s.scheduledTime,
-          repeatDays: s.repeatDays || [],
-          active: s.active,
-        });
-      }
-      setScheduleSaveError(null);
-      notify.success('Đã lưu lịch thành công');
-      onSaved();
-    } catch {
-      notify.error('Lưu lịch thất bại · Vui lòng thử lại');
     } finally {
       setSaving(false);
     }
@@ -556,7 +419,7 @@ export const RuleEditorPanel: React.FC<RuleEditorPanelProps> = ({
         aria-labelledby="rule-editor-title"
       >
         {/* ── Sticky Header ── */}
-        <header className="scene-panel-header shrink-0 flex items-center justify-between p-4 border-b border-[var(--border)]">
+        <header className="shrink-0 flex items-center justify-between p-4 border-b border-[var(--border)]">
           <div className="flex items-center gap-3 min-w-0 pr-2">
             <button
               type="button"
@@ -588,7 +451,7 @@ export const RuleEditorPanel: React.FC<RuleEditorPanelProps> = ({
                       if (e.key === 'Enter') setIsEditingName(false);
                     }}
                     placeholder="Tên quy tắc"
-                    className="text-sm font-bold text-[var(--text)] bg-transparent border-b border-[var(--accent)] focus:outline-none max-w-[200px]"
+                    className="text-sm font-bold text-[var(--text)] bg-transparent border-b border-[var(--accent)] focus:outline-none max-w-[180px]"
                   />
                 ) : (
                   <button
@@ -598,7 +461,7 @@ export const RuleEditorPanel: React.FC<RuleEditorPanelProps> = ({
                   >
                     <strong
                       id="rule-editor-title"
-                      className="text-sm font-bold text-[var(--text)] truncate max-w-[200px]"
+                      className="text-sm font-bold text-[var(--text)] truncate max-w-[180px]"
                     >
                       {name || <span className="text-[var(--tertiary)] italic">Tên quy tắc</span>}
                     </strong>
@@ -617,7 +480,7 @@ export const RuleEditorPanel: React.FC<RuleEditorPanelProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 shrink-0 ml-2">
             {/* Toggle Kích hoạt */}
             <button
               type="button"
@@ -625,7 +488,7 @@ export const RuleEditorPanel: React.FC<RuleEditorPanelProps> = ({
                 setEnabled((prev) => !prev);
                 markDirty();
               }}
-              className={`device-toggle-pill scale-85 cursor-pointer ${enabled ? 'active' : ''}`}
+              className={`toggle scale-85 cursor-pointer ${enabled ? 'active' : ''}`}
               title={enabled ? 'Đang bật · Nhấn để tắt' : 'Đang tắt · Nhấn để bật'}
               aria-label="Kích hoạt quy tắc"
             >
@@ -723,24 +586,6 @@ export const RuleEditorPanel: React.FC<RuleEditorPanelProps> = ({
             />
           ) : (
             <>
-          {/* Partial-failure banner for SCHEDULE */}
-          {scheduleSaveError && (
-            <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between text-xs text-amber-700">
-              <div className="flex items-center gap-2 min-w-0 pr-2">
-                <Icon name="alert" size={16} className="shrink-0 text-amber-600" />
-                <span className="truncate">{scheduleSaveError}</span>
-              </div>
-              <button
-                type="button"
-                onClick={handleRetryScheduleSave}
-                disabled={saving}
-                className="px-3 py-1 rounded-xl bg-amber-600 text-white font-bold hover:bg-amber-700 transition-colors shrink-0 cursor-pointer disabled:opacity-50"
-              >
-                {saving ? 'Đang lưu...' : 'Thử lưu lịch'}
-              </button>
-            </div>
-          )}
-
           {/* Create Mode: Step 0 TemplateGrid */}
           {showTemplateGrid && !currentRuleId ? (
             <div className="space-y-4">
@@ -958,7 +803,7 @@ export const RuleEditorPanel: React.FC<RuleEditorPanelProps> = ({
                       className="w-full py-2.5 rounded-2xl border border-dashed border-[var(--border)] text-xs font-bold text-[var(--accent)] hover:bg-[var(--accent-soft)] transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                     >
                       <Icon name="plus" size={14} />
-                      <span>+ Thêm điều kiện cảm biến</span>
+                      <span>Thêm điều kiện cảm biến</span>
                     </button>
                   </div>
                 )}
@@ -972,11 +817,13 @@ export const RuleEditorPanel: React.FC<RuleEditorPanelProps> = ({
                       </label>
                       <PickerField
                         label={
-                          String(conditions[0]?.expectedValue || '') || 'Chọn sự kiện'
+                          conditions[0]?.expectedValue
+                            ? eventLabel(String(conditions[0].expectedValue))
+                            : 'Chọn sự kiện'
                         }
                         caption={
                           conditions[0]?.expectedValue
-                            ? 'Sự kiện hệ thống được theo dõi'
+                            ? `Mã sự kiện: ${String(conditions[0].expectedValue)}`
                             : 'Nhấn để chọn sự kiện kích hoạt'
                         }
                         icon="zap"
@@ -1036,12 +883,10 @@ export const RuleEditorPanel: React.FC<RuleEditorPanelProps> = ({
                   <div className="space-y-3">
                     <SceneScheduleSection
                       homeId={homeId}
-                      targetId={currentRuleId || undefined}
+                      targetId={scheduleTargetId}
                       targetKind="automation-rules"
-                      onSchedulesChange={(scheds) => {
-                        setDraftSchedules(scheds);
-                        markDirty();
-                      }}
+                      onSchedulesChange={handleSchedulesChange}
+                      draft
                     />
                   </div>
                 )}
@@ -1055,7 +900,7 @@ export const RuleEditorPanel: React.FC<RuleEditorPanelProps> = ({
                       3. Thì làm gì (Hành động {actions.length})
                     </span>
                     <span className="text-[10px] text-[var(--tertiary)] block">
-                      Chạy lần lượt từ trên xuống
+                      Cùng thiết bị chạy theo thứ tự từ trên xuống
                     </span>
                   </div>
                 </div>
@@ -1160,93 +1005,92 @@ export const RuleEditorPanel: React.FC<RuleEditorPanelProps> = ({
             )}
           </div>
         </footer>
-      </aside>
+        {/* ── Sub-Sheet: DevicePickerSheet ── */}
+        {devicePickerMode.open && (
+          <DevicePickerSheet
+            devices={devices}
+            filterMode={
+              devicePickerMode.target === 'condition'
+                ? 'sensors-only'
+                : devicePickerMode.target === 'eventSource'
+                ? 'all'
+                : 'actionable-only'
+            }
+            title={
+              devicePickerMode.target === 'condition'
+                ? 'Chọn cảm biến nguồn'
+                : devicePickerMode.target === 'eventSource'
+                ? 'Chọn thiết bị phát sinh sự kiện'
+                : 'Chọn thiết bị điều khiển'
+            }
+            onSelect={(dev) => {
+              markDirty();
+              if (devicePickerMode.target === 'condition' && devicePickerMode.index !== undefined) {
+                const idx = devicePickerMode.index;
+                handleUpdateCondition(idx, {
+                  ...conditions[idx],
+                  deviceId: dev.id,
+                });
+              } else if (devicePickerMode.target === 'action' && devicePickerMode.index !== undefined) {
+                const idx = devicePickerMode.index;
+                handleUpdateAction(idx, {
+                  ...actions[idx],
+                  deviceId: dev.id,
+                });
+              } else if (devicePickerMode.target === 'eventSource') {
+                setConditions((prev) => [
+                  {
+                    ...prev[0],
+                    deviceId: dev.id,
+                  },
+                ]);
+              }
+              setDevicePickerMode({ open: false });
+            }}
+            onClose={() => setDevicePickerMode({ open: false })}
+          />
+        )}
 
-      {/* ── Sub-Sheet: DevicePickerSheet ── */}
-      {devicePickerMode.open && (
-        <DevicePickerSheet
-          devices={devices}
-          filterMode={
-            devicePickerMode.target === 'condition'
-              ? 'sensors-only'
-              : devicePickerMode.target === 'eventSource'
-              ? 'all'
-              : 'actionable-only'
-          }
-          title={
-            devicePickerMode.target === 'condition'
-              ? 'Chọn cảm biến nguồn'
-              : devicePickerMode.target === 'eventSource'
-              ? 'Chọn thiết bị phát sinh sự kiện'
-              : 'Chọn thiết bị điều khiển'
-          }
-          onSelect={(dev) => {
-            markDirty();
-            if (devicePickerMode.target === 'condition' && devicePickerMode.index !== undefined) {
-              const idx = devicePickerMode.index;
-              handleUpdateCondition(idx, {
-                ...conditions[idx],
-                deviceId: dev.id,
-              });
-            } else if (devicePickerMode.target === 'action' && devicePickerMode.index !== undefined) {
-              const idx = devicePickerMode.index;
-              handleUpdateAction(idx, {
-                ...actions[idx],
-                deviceId: dev.id,
-              });
-            } else if (devicePickerMode.target === 'eventSource') {
+        {/* ── Sub-Sheet: EventPickerSheet ── */}
+        {eventPickerOpen && (
+          <EventPickerSheet
+            selectedEvent={String(conditions[0]?.expectedValue || '')}
+            onSelect={(code) => {
+              markDirty();
               setConditions((prev) => [
                 {
-                  ...prev[0],
-                  deviceId: dev.id,
+                  attribute: 'eventType',
+                  operator: 'EQ',
+                  expectedValue: code,
+                  logicalOperator: 'AND',
+                  order: 0,
+                  deviceId: prev[0]?.deviceId,
                 },
               ]);
-            }
-            setDevicePickerMode({ open: false });
-          }}
-          onClose={() => setDevicePickerMode({ open: false })}
-        />
-      )}
+              setEventPickerOpen(false);
+            }}
+            onClose={() => setEventPickerOpen(false)}
+          />
+        )}
 
-      {/* ── Sub-Sheet: EventPickerSheet ── */}
-      {eventPickerOpen && (
-        <EventPickerSheet
-          selectedEvent={String(conditions[0]?.expectedValue || '')}
-          onSelect={(code) => {
-            markDirty();
-            setConditions((prev) => [
-              {
-                attribute: 'eventType',
-                operator: 'EQ',
-                expectedValue: code,
-                logicalOperator: 'AND',
-                order: 0,
-                deviceId: prev[0]?.deviceId,
-              },
-            ]);
-            setEventPickerOpen(false);
-          }}
-          onClose={() => setEventPickerOpen(false)}
-        />
-      )}
-
-      {/* ── Sub-Sheet: ScenePickerSheet ── */}
-      {scenePickerIndex !== null && (
-        <ScenePickerSheet
-          scenes={scenes}
-          selectedSceneId={actions[scenePickerIndex]?.sceneId}
-          onSelect={(sc) => {
-            markDirty();
-            handleUpdateAction(scenePickerIndex, {
-              ...actions[scenePickerIndex],
-              action: 'EXECUTE_SCENE',
-              sceneId: sc.id,
-            });
-            setScenePickerIndex(null);
-          }}
-          onClose={() => setScenePickerIndex(null)}
-        />
-      )}
+        {/* ── Sub-Sheet: ScenePickerSheet ── */}
+        {scenePickerIndex !== null && (
+          <ScenePickerSheet
+            scenes={scenes}
+            selectedSceneId={actions[scenePickerIndex]?.sceneId}
+            onSelect={(sc) => {
+              markDirty();
+              handleUpdateAction(scenePickerIndex, {
+                ...actions[scenePickerIndex],
+                action: 'EXECUTE_SCENE',
+                sceneId: sc.id,
+              });
+              setScenePickerIndex(null);
+            }}
+            onClose={() => setScenePickerIndex(null)}
+          />
+        )}
+      </aside>
 
       {/* ── Sub-Sheet: RuleTestSheet ── */}
       {testSheetOpen && rule && (

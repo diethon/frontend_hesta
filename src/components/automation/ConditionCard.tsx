@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import type { DeviceSummary, RuleConditionInput } from '../../types/automation';
-import { Icon } from '../home/HomeIcons';
+import { Icon } from '../ui/LucideIcon';
 import { PickerField } from './PickerField';
 import { StepperInput } from './StepperInput';
+import { describeCondition } from './ruleLabels';
 
 export interface ConditionCardProps {
   condition: RuleConditionInput & { id?: string; deviceName?: string };
@@ -25,35 +26,19 @@ const COMMON_ATTRIBUTES = [
   { key: 'state', label: 'Trạng thái', unit: '', kind: 'boolean' },
 ];
 
+// Only the three comparisons non-technical users need; older rules saved with GTE/LTE/NE still display via ruleLabels.
 const OPERATORS = [
-  { code: 'EQ', symbol: '=', label: 'Bằng' },
-  { code: 'NE', symbol: '≠', label: 'Khác' },
   { code: 'GT', symbol: '>', label: 'Lớn hơn' },
-  { code: 'GTE', symbol: '≥', label: 'Lớn hơn hoặc bằng' },
   { code: 'LT', symbol: '<', label: 'Nhỏ hơn' },
-  { code: 'LTE', symbol: '≤', label: 'Nhỏ hơn hoặc bằng' },
+  { code: 'EQ', symbol: '=', label: 'Bằng' },
 ] as const;
 
 export function formatConditionHuman(
   cond: RuleConditionInput,
   dev?: DeviceSummary
 ): string {
-  const attrObj = COMMON_ATTRIBUTES.find(
-    (a) => a.key.toLowerCase() === (cond.attribute || '').toLowerCase()
-  );
-  const attrName = attrObj?.label || cond.attribute || 'Chỉ số';
-  const opObj = OPERATORS.find((o) => o.code === cond.operator);
-  const opSymbol = opObj?.symbol || '=';
-
-  let valStr = String(cond.expectedValue ?? '');
-  if (valStr === 'true') valStr = 'Có';
-  else if (valStr === 'false') valStr = 'Không';
-  if (attrObj?.unit && !isNaN(Number(cond.expectedValue))) {
-    valStr += attrObj.unit;
-  }
-
-  const devName = dev?.name || 'Cảm biến';
-  return `${devName} · ${attrName} ${opSymbol} ${valStr}`;
+  const text = describeCondition(cond.attribute, cond.operator, cond.expectedValue, dev?.name || 'cảm biến');
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 export const ConditionCard: React.FC<ConditionCardProps> = ({
@@ -302,7 +287,7 @@ export const ConditionCard: React.FC<ConditionCardProps> = ({
             <label className="text-[11px] font-bold text-[var(--secondary)] uppercase tracking-wider block">
               Điều kiện so sánh
             </label>
-            <div className="grid grid-cols-6 gap-1">
+            <div className="grid grid-cols-3 gap-1.5">
               {OPERATORS.map((op) => {
                 const isSelected = condition.operator === op.code;
                 return (
@@ -310,15 +295,15 @@ export const ConditionCard: React.FC<ConditionCardProps> = ({
                     key={op.code}
                     type="button"
                     onClick={() => onChange({ ...condition, operator: op.code })}
-                    className={`py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 ${
+                    className={`min-h-10 px-2 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer flex items-center justify-center gap-1.5 text-center ${
                       isSelected
                         ? 'bg-[var(--accent-soft)] text-[var(--accent)] border-[var(--accent)] font-extrabold'
                         : 'bg-[var(--solid)] hover:bg-[var(--muted)] text-[var(--secondary)] border-[var(--border)]'
                     }`}
-                    title={op.label}
+                    aria-pressed={isSelected}
                   >
-                    <span className="text-sm leading-none">{op.symbol}</span>
-                    <span className="text-[9px] font-medium leading-none opacity-80">{op.code}</span>
+                    <span className="text-sm leading-none opacity-70" aria-hidden="true">{op.symbol}</span>
+                    <span className="leading-tight">{op.label}</span>
                   </button>
                 );
               })}

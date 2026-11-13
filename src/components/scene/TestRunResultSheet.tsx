@@ -1,6 +1,6 @@
 import React from 'react';
 import type { DeviceSummary } from '../../types/automation';
-import { Icon, type IconName } from '../home/HomeIcons';
+import { Icon, type IconName } from '../ui/LucideIcon';
 import { getFigmaIconForDevice } from './ScenePage';
 
 export interface TestRunActionResult {

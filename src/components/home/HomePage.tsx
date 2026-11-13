@@ -7,7 +7,6 @@ import type { SceneResponse } from "../../types/scene";
 import type { EnergySummary, EnergyAnalyticsResponse, DeviceEnergyBreakdown } from "../../types/energy";
 import { ProfileModal } from "../profile/ProfileModal";
 import { MemberManagement } from "./MemberManagement";
-import { SceneManagement } from "./SceneManagement";
 import { RoomManagementModal } from "../device/RoomManagementModal";
 import { HomeHeroLiveCamera } from "./HomeHeroLiveCamera";
 import { HomeRoomsWidget } from "./HomeRoomsWidget";
@@ -101,7 +100,7 @@ export const HomePage: React.FC<HomePageProps> = ({
   const [energyAnalytics, setEnergyAnalytics] = useState<EnergyAnalyticsResponse | null>(null);
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [isRoomModalOpen, setIsRoomModalOpen] = useState(false);
-  const [activeTabSection, setActiveTabSection] = useState<'dashboard' | 'scenes' | 'members'>('dashboard');
+  const [activeTabSection, setActiveTabSection] = useState<'dashboard' | 'members'>('dashboard');
 
   const fetchHomes = useCallback(async () => {
     try {
@@ -392,13 +391,7 @@ export const HomePage: React.FC<HomePageProps> = ({
       {/* Modern Figma Floating Navigation Rail */}
       <DashboardNavRail
         homeId={userHome?.homeId}
-        activeItem={
-          activeTabSection === 'dashboard'
-            ? 'overview'
-            : activeTabSection === 'scenes'
-              ? 'scenes'
-              : 'members'
-        }
+        activeItem={activeTabSection === 'dashboard' ? 'overview' : 'members'}
         user={user}
         onOpenSettings={() => setIsProfileModalOpen(true)}
         onSelectOverview={() => {
@@ -444,7 +437,7 @@ export const HomePage: React.FC<HomePageProps> = ({
               <span>Quay lại Màn hình tổng quan</span>
             </button>
             <span className="text-xs font-semibold text-secondary">
-              {activeTabSection === 'scenes' ? 'Quản lý Kịch bản' : 'Thành viên gia đình'}
+              Thành viên gia đình
             </span>
           </div>
         )}
@@ -518,17 +511,6 @@ export const HomePage: React.FC<HomePageProps> = ({
               devices={devices}
             />
           </div>
-        )}
-
-        {/* ── Detailed Scene Management (Preserves existing functional logic) ── */}
-        {activeTabSection === 'scenes' && userHome && (
-          <section id="scenes-section" className="scroll-mt-24 space-y-4">
-            <SceneManagement
-              key={userHome.homeId}
-              homeId={userHome.homeId}
-              currentUserRole={userHome.role}
-            />
-          </section>
         )}
 
         {/* ── Detailed Member Management (Preserves existing functional logic) ── */}

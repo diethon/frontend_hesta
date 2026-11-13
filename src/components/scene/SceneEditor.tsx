@@ -8,13 +8,14 @@ import {
   buildSceneActionInput,
   sceneActionsToDraft,
 } from './sceneActions';
-import { Icon, type IconName } from '../home/HomeIcons';
+import { Icon, type IconName } from '../ui/LucideIcon';
 import { getFigmaIconForDevice, getFigmaIconForScene, SceneHistory } from './ScenePage';
 import { DevicePickerSheet, isDeviceControllable } from './DevicePickerSheet';
 import { SceneScheduleSection } from './SceneScheduleSection';
 import { TestRunResultSheet, type TestRunActionResult } from './TestRunResultSheet';
 import { createScene, updateScene, executeScene } from '../../services/sceneApi';
 import { notify } from '../ui/notify';
+import { buildSceneTemplate, type SceneTemplateKey } from './sceneTemplates';
 
 interface SceneEditorProps {
   scene?: SceneResponse | null;
@@ -191,65 +192,12 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
   };
 
   // Template select handlers
-  const handleSelectTemplate = (templateKey: 'morning' | 'night' | 'away' | 'home' | 'blank') => {
-    if (templateKey === 'blank') {
-      setName('Kịch bản mới');
-      setIcon('sparkles');
-      setDescription('');
-      setActions([]);
-      setTemplateStep(false);
-      return;
-    }
-
-    const ctrlDevs = devices.filter(isDeviceControllable);
-    const lightDev = ctrlDevs.find((d) => (d.deviceType || '').toUpperCase().includes('LIGHT') || (d.deviceType || '').toUpperCase().includes('LED'));
-    const acDev = ctrlDevs.find((d) => (d.deviceType || '').toUpperCase().includes('AC') || (d.deviceType || '').toUpperCase().includes('AIR'));
-    const gateDev = ctrlDevs.find((d) => (d.deviceType || '').toUpperCase().includes('GATE') || (d.deviceType || '').toUpperCase().includes('DOOR'));
-
-    if (templateKey === 'morning') {
-      setName('Chào buổi sáng');
-      setIcon('sun');
-      setDescription('Bật đèn, mở cổng đón ngày mới');
-      const sampleActs: DraftSceneAction[] = [];
-      if (lightDev) sampleActs.push({ deviceId: lightDev.id, action: 'TURN_ON', value: '' });
-      if (gateDev) sampleActs.push({ deviceId: gateDev.id, action: 'OPEN', value: '' });
-      if (sampleActs.length === 0 && ctrlDevs[0]) {
-        sampleActs.push({ deviceId: ctrlDevs[0].id, action: 'TURN_ON', value: '' });
-      }
-      setActions(sampleActs);
-    } else if (templateKey === 'night') {
-      setName('Chúc ngủ ngon');
-      setIcon('moon');
-      setDescription('Tắt đèn, khóa cửa và tiết kiệm điện');
-      const sampleActs: DraftSceneAction[] = [];
-      if (lightDev) sampleActs.push({ deviceId: lightDev.id, action: 'TURN_OFF', value: '' });
-      if (gateDev) sampleActs.push({ deviceId: gateDev.id, action: 'CLOSE', value: '' });
-      if (sampleActs.length === 0 && ctrlDevs[0]) {
-        sampleActs.push({ deviceId: ctrlDevs[0].id, action: 'TURN_OFF', value: '' });
-      }
-      setActions(sampleActs);
-    } else if (templateKey === 'away') {
-      setName('Rời khỏi nhà');
-      setIcon('door');
-      setDescription('Tắt toàn bộ thiết bị khi ra ngoài');
-      const sampleActs: DraftSceneAction[] = [];
-      ctrlDevs.slice(0, 3).forEach((d) => {
-        sampleActs.push({ deviceId: d.id, action: 'TURN_OFF', value: '' });
-      });
-      setActions(sampleActs);
-    } else if (templateKey === 'home') {
-      setName('Về đến nhà');
-      setIcon('home');
-      setDescription('Bật đèn và khởi động điều hòa');
-      const sampleActs: DraftSceneAction[] = [];
-      if (lightDev) sampleActs.push({ deviceId: lightDev.id, action: 'TURN_ON', value: '' });
-      if (acDev) sampleActs.push({ deviceId: acDev.id, action: 'TURN_ON', value: '' });
-      if (sampleActs.length === 0 && ctrlDevs[0]) {
-        sampleActs.push({ deviceId: ctrlDevs[0].id, action: 'TURN_ON', value: '' });
-      }
-      setActions(sampleActs);
-    }
-
+  const handleSelectTemplate = (templateKey: SceneTemplateKey) => {
+    const template = buildSceneTemplate(templateKey, devices);
+    setName(template.name);
+    setIcon(template.icon);
+    setDescription(template.description);
+    setActions(template.actions);
     setTemplateStep(false);
   };
 
@@ -260,7 +208,7 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
     const newIdx = actions.length;
 
     let defaultAction = 'TURN_ON';
-    let defaultValue = '';
+    const defaultValue = '';
     if (chosenDev) {
       const type = (chosenDev.deviceType || '').toUpperCase();
       if (type.includes('GATE') || type.includes('DOOR')) defaultAction = 'OPEN';
@@ -769,7 +717,7 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
                         onChange={(e) => setDescription(e.target.value.slice(0, 100))}
                         placeholder="Mô tả mục đích kịch bản..."
                         maxLength={100}
-                        autoFocus
+                        autoFocus={!description}
                       />
                       <div className="flex justify-between items-center text-[10px] text-[var(--tertiary)] px-1">
                         <button
@@ -802,7 +750,7 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
                 <div className="scene-section-title">
                   <div>
                     <strong>Hành động ({actions.length})</strong>
-                    <p>Chạy lần lượt từ trên xuống</p>
+                    <p>Cùng thiết bị chạy theo thứ tự từ trên xuống</p>
                   </div>
                   <button
                     type="button"
@@ -1396,7 +1344,13 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
               </section>
 
               {/* ──────────────── 3) LỊCH CHẠY ──────────────── */}
-              <section className="pt-2 border-t border-[var(--border)]">
+              <section className="pt-2 border-t border-[var(--border)] space-y-3">
+                <div className="scene-section-title">
+                  <div>
+                    <strong>Lịch chạy</strong>
+                    <p>Tự chạy kịch bản vào giờ cố định</p>
+                  </div>
+                </div>
                 <SceneScheduleSection
                   homeId={homeId}
                   sceneId={scene?.id}

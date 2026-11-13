@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Icon, type IconName } from '../home/HomeIcons';
+import { Icon, type IconName } from '../ui/LucideIcon';
 
 export interface SystemEventOption {
   code: string;
@@ -64,7 +64,7 @@ export const EventPickerSheet: React.FC<EventPickerSheetProps> = ({
       <div className="sub-sheet-body space-y-3">
         <input
           autoFocus
-          className="picker-search"
+          className="picker-search search"
           placeholder="Tìm theo tên sự kiện hoặc mô tả..."
           value={query}
           onChange={(e) => setQuery(e.target.value)}

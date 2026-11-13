@@ -8,7 +8,7 @@ import {
   createAutomationRule,
 } from '../../services/automationApi';
 import { getDevices, getScenes } from '../../services/sceneApi';
-import { getSchedules, saveSchedule } from '../../services/scheduleApi';
+import { getSchedules } from '../../services/scheduleApi';
 import type {
   AutomationRule,
   AutomationRuleInput,
@@ -17,7 +17,7 @@ import type {
 import type { SceneResponse } from '../../types/scene';
 import { DashboardNavRail } from '../home/DashboardNavRail';
 import { DashboardBottomNav } from '../home/DashboardBottomNav';
-import { Icon, IconButton } from '../home/HomeIcons';
+import { Icon } from '../ui/LucideIcon';
 import { AutomationTopBar } from './AutomationTopBar';
 import { AutomationEmpty } from './AutomationEmpty';
 import { RuleCard } from './RuleCard';
@@ -26,6 +26,12 @@ import { RuleTestSheet } from './RuleTestSheet';
 import { RuleHistoryPanel } from './RuleHistoryPanel';
 import { ConfirmModal } from '../ui/ConfirmModal';
 import { notify } from '../ui/notify';
+
+const TRIGGER_GROUPS = [
+  { id: 'SENSOR' as const, label: 'Cảm biến', hint: 'Chạy khi giá trị cảm biến khớp điều kiện' },
+  { id: 'EVENT' as const, label: 'Sự kiện', hint: 'Chạy khi thiết bị báo một sự kiện' },
+  { id: 'SCHEDULE' as const, label: 'Lịch', hint: 'Chạy vào giờ đã hẹn' },
+];
 
 export function AutomationRulePage() {
   const { homeId = '' } = useParams();
@@ -43,7 +49,6 @@ export function AutomationRulePage() {
   const [statusFilter, setStatusFilter] = useState<'Tất cả' | 'Đang bật' | 'Đang tắt'>('Tất cả');
   const [typeFilter, setTypeFilter] = useState<'ALL' | 'SENSOR' | 'EVENT' | 'SCHEDULE'>('ALL');
   const [query, setQuery] = useState('');
-  const [searchOpen, setSearchOpen] = useState(false);
 
   // Modals & Panels
   const [editorRule, setEditorRule] = useState<AutomationRule | null | undefined>(undefined); // undefined = closed
@@ -79,14 +84,6 @@ export function AutomationRulePage() {
 
   // Counts and statistics
   const activeCount = useMemo(() => rules.filter((r) => r.enabled).length, [rules]);
-  const totalConditions = useMemo(
-    () => rules.reduce((acc, r) => acc + (r.conditions?.length || 0), 0),
-    [rules],
-  );
-  const totalActions = useMemo(
-    () => rules.reduce((acc, r) => acc + (r.actions?.length || 0), 0),
-    [rules],
-  );
 
   // Filtered and searched rules
   const visibleRules = useMemo(() => {
@@ -122,7 +119,7 @@ export function AutomationRulePage() {
       setRules((prev) =>
         prev.map((r) => (r.id === ruleId ? { ...r, enabled: !nextEnabled } : r)),
       );
-      notify.error('Không thể đổi trạng thái quy tắc');
+      notify.error(err instanceof Error ? err.message : 'Không thể đổi trạng thái quy tắc');
     }
   };
 
@@ -150,30 +147,21 @@ export function AutomationRulePage() {
           order: i,
         })),
       };
-      const created = await createAutomationRule(homeId, input);
-
-      // If this is a SCHEDULE rule, also copy its schedules
-      if (rule.triggerType === 'SCHEDULE' && created?.id) {
-        try {
-          const existingSchedules = await getSchedules(homeId, 'automation-rules', rule.id);
-          if (Array.isArray(existingSchedules) && existingSchedules.length > 0) {
-            for (const sched of existingSchedules) {
-              await saveSchedule(homeId, 'automation-rules', created.id, {
-                scheduledTime: sched.scheduledTime,
-                repeatDays: sched.repeatDays || [],
-                active: false,
-              });
-            }
-          }
-        } catch (schedErr) {
-          console.warn('Could not copy schedules during duplicate:', schedErr);
-        }
+      if (rule.triggerType === 'SCHEDULE') {
+        // The copy is created disabled, but its times go with it: a SCHEDULE rule cannot exist without one.
+        const times = await getSchedules(homeId, 'automation-rules', rule.id);
+        input.schedules = (times || []).map((t) => ({
+          scheduledTime: t.scheduledTime,
+          repeatDays: t.repeatDays || [],
+          active: t.active,
+        }));
       }
+      await createAutomationRule(homeId, input);
 
       notify.success('Đã nhân bản quy tắc', `Đã tạo bản sao cho “${rule.name}”`);
       await loadData();
-    } catch {
-      notify.error('Không thể nhân bản quy tắc');
+    } catch (err) {
+      notify.error(err instanceof Error ? err.message : 'Không thể nhân bản quy tắc');
     }
   };
 
@@ -190,14 +178,36 @@ export function AutomationRulePage() {
     }
   };
 
-  return (
-    <div className="app-shell scenes-page">
-      {/* Decorative gradient meshes */}
-      <div className="mesh mesh-one" />
-      <div className="mesh mesh-two" />
-      <div className="mesh mesh-three" />
+  const ruleRow = (rule: AutomationRule) => (
+    <RuleCard
+      key={rule.id}
+      rule={rule}
+      devices={devices}
+      scenes={scenes}
+      onToggle={(nextEnabled) => handleToggleRule(rule.id, nextEnabled)}
+      onEdit={() => {
+        setScrollToTrigger(false);
+        setEditorRule(rule);
+      }}
+      onTest={() => setTestModalRule(rule)}
+      onHistory={() => setHistoryModalRule(rule)}
+      onSchedule={() => {
+        setScrollToTrigger(true);
+        setEditorRule(rule);
+      }}
+      onDuplicate={() => handleDuplicateRule(rule)}
+      onDelete={() => setRuleToDelete(rule)}
+    />
+  );
 
-      {/* Desktop/Tablet NavRail */}
+  // Rules grouped by what starts them; empty groups are hidden.
+  const groups = TRIGGER_GROUPS.map((group) => ({
+    ...group,
+    rules: visibleRules.filter((rule) => rule.triggerType === group.id),
+  })).filter((group) => group.rules.length > 0);
+
+  return (
+    <div className="app-shell scenes-page studio st-theme st-pro">
       <DashboardNavRail
         homeId={homeId}
         activeItem="automations"
@@ -208,138 +218,99 @@ export function AutomationRulePage() {
       />
 
       <main>
-        {/* TopBar */}
         <AutomationTopBar
-          totalCount={rules.length}
-          activeCount={activeCount}
+          caption={`${rules.length} quy tắc · ${activeCount} đang bật`}
+          title={<>Tự động hóa <span className="sr-only">Quy tắc tự động</span></>}
+          subtitle="Để ngôi nhà tự phản ứng với cảm biến, sự kiện của thiết bị hoặc giờ hẹn."
           userInitial={userInitial}
         />
 
-        {/* Action Row */}
-        <div className="scenes-actions">
-          {/* Left: Status segmented control + Trigger Type Filter */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="scene-filter">
-              {(['Tất cả', 'Đang bật', 'Đang tắt'] as const).map((item) => (
-                <button
-                  key={item}
-                  type="button"
-                  className={statusFilter === item ? 'active' : ''}
-                  onClick={() => setStatusFilter(item)}
-                >
-                  {item}
-                </button>
-              ))}
-            </div>
-
-            {/* Trigger Type Filter Pills */}
-            <div className="flex items-center gap-1 bg-[var(--solid)] p-1 rounded-full border border-[var(--border)]">
-              {[
-                { id: 'ALL', label: 'Tất cả loại' },
-                { id: 'SENSOR', label: 'Cảm biến' },
-                { id: 'EVENT', label: 'Sự kiện' },
-                { id: 'SCHEDULE', label: 'Lịch' },
-              ].map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => setTypeFilter(t.id as typeof typeFilter)}
-                  className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors cursor-pointer ${
-                    typeFilter === t.id
-                      ? 'bg-[var(--accent-soft)] text-[var(--accent)] font-bold'
-                      : 'text-[var(--secondary)] hover:text-[var(--text)]'
-                  }`}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
+        <div className="st-toolbar">
+          <div className="st-seg" role="tablist" aria-label="Lọc theo trạng thái">
+            {(['Tất cả', 'Đang bật', 'Đang tắt'] as const).map((item) => (
+              <button
+                key={item}
+                type="button"
+                role="tab"
+                aria-selected={statusFilter === item}
+                className={statusFilter === item ? 'active' : ''}
+                onClick={() => setStatusFilter(item)}
+              >
+                {item}
+              </button>
+            ))}
           </div>
 
-          {/* Right actions: search, ghost link to Kịch bản, ghost link to Gợi ý AI, + Tạo quy tắc */}
-          <div className="scene-actions-right">
-            {searchOpen && (
-              <input
-                autoFocus
-                className="inline-search"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Tìm quy tắc..."
-              />
-            )}
+          <div className="st-seg" role="tablist" aria-label="Lọc theo loại kích hoạt">
+            {[{ id: 'ALL' as const, label: 'Mọi loại' }, ...TRIGGER_GROUPS].map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                role="tab"
+                aria-selected={typeFilter === t.id}
+                className={typeFilter === t.id ? 'active' : ''}
+                onClick={() => setTypeFilter(t.id)}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
 
-            <IconButton
-              icon="search"
-              label="Tìm kiếm quy tắc"
-              onClick={() => setSearchOpen(!searchOpen)}
+          <label className="st-search">
+            <Icon name="search" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Tìm quy tắc"
+              aria-label="Tìm quy tắc"
             />
+          </label>
 
+          <div className="st-toolbar-end">
             <button
               type="button"
-              className="scene-ghost"
+              className="st-link"
               onClick={() => navigate(homeId ? `/homes/${homeId}/scenes` : '/home')}
             >
-              Kịch bản ({scenes.length})
+              <Icon name="sparkles" />
+              <span>Kịch bản</span>
             </button>
-
             <button
               type="button"
-              className="scene-ghost"
+              className="st-link"
               onClick={() => navigate(homeId ? `/homes/${homeId}/recommendations` : '/home')}
             >
-              <Icon name="sparkles" size={17} />
-              Gợi ý AI
+              <Icon name="zap" />
+              <span>Gợi ý AI</span>
             </button>
-
             <button
               type="button"
-              className="scene-ghost"
+              className="st-link"
               onClick={() => navigate(homeId ? `/homes/${homeId}/guardian` : '/home')}
             >
-              <Icon name="shield" size={17} />
-              Giám hộ con trẻ
+              <Icon name="shield" />
+              <span>Giám hộ</span>
             </button>
-
-            <button
-              type="button"
-              className="add-device"
-              onClick={() => setEditorRule(null)}
-            >
-              + Tạo quy tắc
+            <button type="button" className="st-btn st-btn-primary" onClick={() => setEditorRule(null)}>
+              <Icon name="plus" size={18} />
+              Tạo quy tắc
             </button>
           </div>
         </div>
 
-        {/* Summary Strip (Neutral StatChips) */}
-        <div className="scene-summary">
-          <span className="stat">{rules.length} quy tắc</span>
-          <span className="stat">{activeCount} đang bật</span>
-          <span className="stat">{totalConditions} điều kiện</span>
-          <span className="stat">{totalActions} hành động</span>
-        </div>
-
-        {/* API Error Notification */}
         {error && (
-          <div
-            role="alert"
-            className="mb-4 flex items-center justify-between p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold"
-          >
+          <div role="alert" className="st-alert error">
             <span>{error}</span>
-            <button
-              type="button"
-              onClick={() => void loadData()}
-              className="px-3 py-1 rounded-xl bg-white border border-rose-200 text-rose-700 font-bold hover:bg-rose-100 transition-colors cursor-pointer"
-            >
+            <button type="button" className="st-btn st-btn-sm" onClick={() => void loadData()}>
               Thử lại
             </button>
           </div>
         )}
 
-        {/* ── Content Grid ── */}
         {loading ? (
-          <div className="rules-grid">
-            {Array.from({ length: 6 }).map((_, idx) => (
-              <RuleCard key={idx} loading />
+          <div className="st-list" aria-busy="true">
+            {Array.from({ length: 4 }).map((_, idx) => (
+              <div key={idx} className="st-skeleton st-rule-skeleton" />
             ))}
           </div>
         ) : rules.length === 0 ? (
@@ -361,29 +332,16 @@ export function AutomationRulePage() {
             }}
           />
         ) : (
-          <div className="rules-grid">
-            {visibleRules.map((rule) => (
-              <RuleCard
-                key={rule.id}
-                rule={rule}
-                devices={devices}
-                scenes={scenes}
-                onToggle={(nextEnabled) => handleToggleRule(rule.id, nextEnabled)}
-                onEdit={() => {
-                  setScrollToTrigger(false);
-                  setEditorRule(rule);
-                }}
-                onTest={() => setTestModalRule(rule)}
-                onHistory={() => setHistoryModalRule(rule)}
-                onSchedule={() => {
-                  setScrollToTrigger(true);
-                  setEditorRule(rule);
-                }}
-                onDuplicate={() => handleDuplicateRule(rule)}
-                onDelete={() => setRuleToDelete(rule)}
-              />
-            ))}
-          </div>
+          groups.map((group) => (
+            <section className="st-group" key={group.id} aria-label={group.label}>
+              <header className="st-group-head">
+                <h3>{group.label}</h3>
+                <small>{group.rules.length}</small>
+                <p>{group.hint}</p>
+              </header>
+              <div className="st-list">{group.rules.map(ruleRow)}</div>
+            </section>
+          ))
         )}
       </main>
 

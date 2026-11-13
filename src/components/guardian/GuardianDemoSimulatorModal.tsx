@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Icon } from '../home/HomeIcons';
+import { Icon } from '../ui/LucideIcon';
 import type { ParentalGuardianRule, ParentalGuardianLog, SimulateEventType } from '../../types/guardian';
 import { simulateGuardianEvent, getGuardianLogs } from '../../services/guardianApi';
 import toast from 'react-hot-toast';
@@ -141,13 +141,14 @@ export const GuardianDemoSimulatorModal: React.FC<GuardianDemoSimulatorModalProp
           <div className="grid grid-cols-3 gap-3 p-3.5 rounded-2xl bg-[var(--solid)]/70 border border-[var(--border)] text-xs">
             <div>
               <span className="text-[11px] text-[var(--tertiary)] block">Trạng thái phụ huynh</span>
-              <span className={`font-bold text-xs mt-0.5 block ${currentRule.parentAway ? 'text-amber-600' : 'text-emerald-600'}`}>
-                {currentRule.parentAway ? '⚠️ Vắng nhà (Giám hộ BẬT)' : '🏡 Ở nhà (Tạm ngưng)'}
+              <span className={`font-bold text-xs mt-0.5 flex items-center gap-1 ${currentRule.parentAway ? 'text-amber-600' : 'text-emerald-600'}`}>
+                <Icon name={currentRule.parentAway ? 'alert' : 'home'} size={13} />
+                {currentRule.parentAway ? 'Vắng nhà (đang giám hộ)' : 'Ở nhà (tạm ngưng)'}
               </span>
             </div>
             <div>
               <span className="text-[11px] text-[var(--tertiary)] block">Trạng thái phiên</span>
-              <span className={`font-bold text-xs mt-0.5 block ${
+              <span className={`font-bold text-xs mt-0.5 flex items-center gap-1 ${
                 currentRule.status === 'LOCKED_OUT'
                   ? 'text-rose-600'
                   : currentRule.status === 'COUNTDOWN'
@@ -156,13 +157,17 @@ export const GuardianDemoSimulatorModal: React.FC<GuardianDemoSimulatorModalProp
                   ? 'text-amber-600'
                   : 'text-[var(--secondary)]'
               }`}>
+                <Icon
+                  name={currentRule.status === 'LOCKED_OUT' ? 'lock' : currentRule.status === 'WARNING' ? 'alert' : currentRule.status === 'COUNTDOWN' ? 'clock' : 'check'}
+                  size={13}
+                />
                 {currentRule.status === 'LOCKED_OUT'
-                  ? '🔒 ĐÃ KHÓA CƯỠNG CHẾ'
+                  ? 'Đã khóa thiết bị'
                   : currentRule.status === 'COUNTDOWN'
-                  ? '⏳ ĐANG ĐẾM NGƯỢC'
+                  ? 'Đang đếm ngược'
                   : currentRule.status === 'WARNING'
-                  ? '⚠️ SẮP HẾT GIỜ'
-                  : '⚪ SẴN SÀNG (IDLE)'}
+                  ? 'Sắp hết giờ'
+                  : 'Sẵn sàng'}
               </span>
             </div>
             <div>

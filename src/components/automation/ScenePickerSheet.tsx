@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import type { SceneResponse } from '../../types/scene';
-import { Icon, type IconName } from '../home/HomeIcons';
+import { Icon, type IconName } from '../ui/LucideIcon';
 import { getFigmaIconForScene } from '../scene/ScenePage';
 
 interface ScenePickerSheetProps {
@@ -38,16 +38,16 @@ export const ScenePickerSheet: React.FC<ScenePickerSheetProps> = ({
         </button>
       </header>
 
-      <div className="sub-sheet-body space-y-3">
+      <div className="sub-sheet-scroll">
         <input
           autoFocus
-          className="picker-search"
+          className="picker-search search"
           placeholder="Tìm kịch bản..."
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
 
-        <div className="space-y-1.5 pt-1">
+        <div className="space-y-2">
           {filtered.map((scene) => {
             const isSelected = scene.id === selectedSceneId;
             const iconName: IconName = getFigmaIconForScene(scene.name, scene.icon);

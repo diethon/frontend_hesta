@@ -2,11 +2,11 @@ import React, { useState, useMemo } from 'react';
 import type { AutomationRule, AutomationTestResult, DeviceSummary } from '../../types/automation';
 import type { SceneResponse } from '../../types/scene';
 import { testAutomationRule } from '../../services/automationApi';
-import { Icon } from '../home/HomeIcons';
+import { Icon } from '../ui/LucideIcon';
 import { PickerField } from './PickerField';
+import { actionLabels, attributeLabels, describeComparison, describeCondition, formatExpected } from './ruleLabels';
 import { DevicePickerSheet } from '../scene/DevicePickerSheet';
 import { StepperInput } from './StepperInput';
-import { Accordion } from './Accordion';
 
 interface RuleTestSheetProps {
   homeId: string;
@@ -44,10 +44,6 @@ export const RuleTestSheet: React.FC<RuleTestSheetProps> = ({
 
   const [simulatedData, setSimulatedData] = useState<Record<string, unknown>>(initialData);
 
-  // Raw JSON state & sync
-  const [jsonTextOverride, setJsonTextOverride] = useState<string | null>(null);
-  const [jsonError, setJsonError] = useState<string | null>(null);
-
   const eventType = useMemo(() => {
     if (rule.triggerType === 'EVENT') {
       const cond = rule.conditions.find((c) => c.attribute === 'eventType');
@@ -56,37 +52,6 @@ export const RuleTestSheet: React.FC<RuleTestSheetProps> = ({
     return 'SENSOR';
   }, [rule]);
 
-  // Derived or overridden JSON text
-  const jsonText = useMemo(() => {
-    if (jsonTextOverride !== null) return jsonTextOverride;
-    const payload = {
-      sourceDeviceId: sourceDeviceId || undefined,
-      eventType,
-      data: simulatedData,
-    };
-    return JSON.stringify(payload, null, 2);
-  }, [sourceDeviceId, eventType, simulatedData, jsonTextOverride]);
-
-  // Handler for manual JSON editing
-  const handleJsonChange = (val: string) => {
-    setJsonTextOverride(val);
-    try {
-      const parsed = JSON.parse(val);
-      if (typeof parsed !== 'object' || parsed === null) {
-        throw new Error('Payload phải là một đối tượng JSON');
-      }
-      setJsonError(null);
-      if ('sourceDeviceId' in parsed) {
-        setSourceDeviceId(parsed.sourceDeviceId || undefined);
-      }
-      if ('data' in parsed && typeof parsed.data === 'object' && parsed.data !== null) {
-        setSimulatedData(parsed.data as Record<string, unknown>);
-      }
-    } catch (err) {
-      setJsonError(err instanceof Error ? err.message : 'JSON không hợp lệ');
-    }
-  };
-
   // Test Execution State
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<AutomationTestResult | null>(null);
@@ -94,7 +59,7 @@ export const RuleTestSheet: React.FC<RuleTestSheetProps> = ({
   const [hasRun, setHasRun] = useState(false);
 
   const handleRunTest = async () => {
-    if (jsonError || testing) return;
+    if (testing) return;
     setTesting(true);
     setTestError(null);
 
@@ -120,27 +85,9 @@ export const RuleTestSheet: React.FC<RuleTestSheetProps> = ({
   const selectedDevice = devices.find((d) => d.id === sourceDeviceId);
 
   // Helper for human-readable action name
-  const formatActionName = (action: string, sceneId?: string): string => {
-    if (sceneId || action === 'EXECUTE_SCENE') return 'Chạy kịch bản';
-    if (action === 'TURN_ON') return 'Bật';
-    if (action === 'TURN_OFF') return 'Tắt';
-    if (action === 'TOGGLE') return 'Đảo trạng thái';
-    if (action === 'SET_BRIGHTNESS') return 'Đặt độ sáng';
-    if (action === 'SET_COLOR') return 'Đổi màu đèn';
-    if (action === 'SET_TEMPERATURE') return 'Đặt nhiệt độ';
-    if (action === 'SET_SPEED') return 'Đặt tốc độ';
-    return action;
-  };
+  const formatActionName = (action: string, sceneId?: string): string =>
+    sceneId ? 'Chạy kịch bản' : actionLabels[action] || 'Điều khiển';
 
-  // Operator symbols map
-  const operatorLabels: Record<string, string> = {
-    EQ: '=',
-    NE: '≠',
-    GT: '>',
-    GTE: '≥',
-    LT: '<',
-    LTE: '≤',
-  };
 
   return (
     <>
@@ -152,7 +99,8 @@ export const RuleTestSheet: React.FC<RuleTestSheetProps> = ({
         aria-label="Kiểm tra quy tắc"
       >
         {/* ── Sticky Header ── */}
-        <header className="scene-panel-header">
+        {/* Shared .scene-panel-header is a 44px/1fr grid meant for icon+title; this header needs title+chip. */}
+        <header className="scene-panel-header" style={{ display: 'flex', justifyContent: 'space-between' }}>
           <div className="flex items-center gap-2 min-w-0">
             <button
               type="button"
@@ -200,20 +148,10 @@ export const RuleTestSheet: React.FC<RuleTestSheetProps> = ({
                 />
               </div>
 
-              {/* Event Type read-only chip */}
-              <div className="flex items-center justify-between text-xs py-1">
-                <span className="text-[11px] font-semibold text-[var(--secondary)]">
-                  Loại bản tin:
-                </span>
-                <span className="px-2.5 py-0.5 rounded-xl text-xs font-mono font-bold bg-[var(--solid)] border border-[var(--border)] text-[var(--text)]">
-                  SENSOR
-                </span>
-              </div>
-
               {/* Attribute Simulators per Condition */}
               <div className="space-y-3 pt-1">
                 <span className="text-[11px] font-bold text-[var(--secondary)] uppercase tracking-wider block">
-                  Giá trị cảm biến mô phỏng
+                  Thử với giá trị giả định
                 </span>
 
                 {rule.conditions.map((cond, idx) => {
@@ -238,11 +176,11 @@ export const RuleTestSheet: React.FC<RuleTestSheetProps> = ({
                       className="p-3.5 rounded-2xl border border-[var(--border)] bg-[var(--solid)] space-y-2.5"
                     >
                       <div className="flex items-center justify-between text-xs">
-                        <span className="font-bold text-[var(--text)] uppercase tracking-wider text-[11px]">
-                          {attr}
+                        <span className="font-bold text-[var(--text)] text-xs first-letter:uppercase">
+                          {attributeLabels[attr] || attr}
                         </span>
-                        <span className="text-[11px] text-[var(--tertiary)] font-mono">
-                          Điều kiện: {operatorLabels[cond.operator] || cond.operator} {String(cond.expectedValue)}{unit}
+                        <span className="text-[11px] text-[var(--tertiary)]">
+                          Chạy khi {describeCondition(attr, cond.operator, cond.expectedValue, devices.find((d) => d.id === cond.deviceId)?.name)}
                         </span>
                       </div>
 
@@ -367,21 +305,6 @@ export const RuleTestSheet: React.FC<RuleTestSheetProps> = ({
             </div>
           )}
 
-          {/* Collapsed Accordion: JSON nâng cao */}
-          <Accordion title="Dữ liệu JSON (nâng cao)">
-            <div className="space-y-2 pt-1">
-              <textarea
-                value={jsonText}
-                onChange={(e) => handleJsonChange(e.target.value)}
-                rows={6}
-                className="w-full p-2.5 rounded-xl border border-[var(--border)] bg-[var(--solid)] font-mono text-xs text-[var(--text)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
-                placeholder="Payload JSON..."
-              />
-              {jsonError && (
-                <p className="text-xs text-rose-500 font-medium">{jsonError}</p>
-              )}
-            </div>
-          </Accordion>
 
           {/* ── Test Result Card (G1) ── */}
           {hasRun && (
@@ -403,7 +326,7 @@ export const RuleTestSheet: React.FC<RuleTestSheetProps> = ({
                       <Icon name="check" size={12} className="text-emerald-700" />
                     </span>
                     <span>
-                      Điều kiện khớp · Quy tắc sẽ chạy {testResult.proposedActions.length} hành động
+                      Với tình huống này, HESTA sẽ làm {testResult.proposedActions.length} việc:
                     </span>
                   </div>
 
@@ -442,7 +365,7 @@ export const RuleTestSheet: React.FC<RuleTestSheetProps> = ({
                           </div>
 
                           <span className="text-[10px] text-[var(--tertiary)] font-medium px-2 py-0.5 rounded-md bg-[var(--muted)] shrink-0">
-                            Chưa thực thi
+                            Chỉ thử, chưa chạy thật
                           </span>
                         </div>
                       );
@@ -456,13 +379,13 @@ export const RuleTestSheet: React.FC<RuleTestSheetProps> = ({
                     <span className="w-5 h-5 rounded-full bg-[var(--muted)] flex items-center justify-center">
                       <Icon name="alert" size={12} className="text-[var(--tertiary)]" />
                     </span>
-                    <span>Điều kiện không khớp · Quy tắc sẽ không chạy</span>
+                    <span>Với tình huống này, quy tắc sẽ không chạy</span>
                   </div>
 
                   {/* Echo user inputs next to conditions (readability only, no client pass/fail) */}
                   <div className="p-3 rounded-xl bg-[var(--muted)]/50 border border-[var(--border)] text-xs space-y-1.5">
                     <span className="text-[11px] font-bold text-[var(--secondary)] block">
-                      Đối chiếu dữ liệu:
+                      Vì sao:
                     </span>
                     {rule.conditions.map((cond, cIdx) => {
                       const entered = simulatedData[cond.attribute];
@@ -471,10 +394,10 @@ export const RuleTestSheet: React.FC<RuleTestSheetProps> = ({
                           key={cIdx}
                           className="flex items-center justify-between text-[11px] text-[var(--secondary)]"
                         >
-                          <span>{cond.attribute}:</span>
-                          <span className="font-mono">
-                            Bạn nhập: <strong className="text-[var(--text)]">{String(entered ?? 'Chưa nhập')}</strong> ·
-                            Điều kiện: {operatorLabels[cond.operator] || cond.operator} {String(cond.expectedValue)}
+                          <span>{attributeLabels[cond.attribute] || cond.attribute}:</span>
+                          <span>
+                            Bạn nhập <strong className="text-[var(--text)]">{entered === undefined ? 'chưa có' : formatExpected(entered)}</strong>
+                            {' · cần '}{describeComparison(cond.attribute, cond.operator, cond.expectedValue)}
                           </span>
                         </div>
                       );
@@ -499,7 +422,7 @@ export const RuleTestSheet: React.FC<RuleTestSheetProps> = ({
 
             <button
               type="button"
-              disabled={Boolean(jsonError) || testing}
+              disabled={testing}
               onClick={handleRunTest}
               className="flex-1 py-3 rounded-2xl text-xs font-bold bg-[var(--accent)] text-white hover:opacity-90 transition-opacity flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
             >
