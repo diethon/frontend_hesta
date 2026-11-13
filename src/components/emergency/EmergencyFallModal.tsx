@@ -16,8 +16,11 @@ import {
 } from '../../services/fallDetectionService';
 import { Client } from '@stomp/stompjs';
 import { getRealtimeWebSocketUrl } from '../../services/apiClient';
+import { useAppSelector } from '../../store/hooks';
+import { selectAccessToken } from '../../store/selectors';
 
 export const EmergencyFallModal: React.FC = () => {
+  const accessToken = useAppSelector(selectAccessToken);
   const [activeIncident, setActiveIncident] = useState<FallIncidentDTO | null>(null);
   const [countdown, setCountdown] = useState<number>(30);
   const [isMuted, setIsMuted] = useState<boolean>(false);
@@ -133,15 +136,16 @@ export const EmergencyFallModal: React.FC = () => {
 
   // --- STOMP WebSocket Subscription to Backend Spring Boot ---
   useEffect(() => {
+    // The backend only accepts authenticated sockets and delivers incidents to members of the affected home.
+    if (!accessToken) return;
     const wsUrl = getRealtimeWebSocketUrl();
-    const token = localStorage.getItem('accessToken');
     const client = new Client({
       brokerURL: wsUrl,
-      connectHeaders: token ? { Authorization: `Bearer ${token}` } : {},
+      connectHeaders: { Authorization: `Bearer ${accessToken}` },
       reconnectDelay: 5000,
       debug: () => undefined,
       onConnect: () => {
-        client.subscribe('/topic/emergency/fall', (msg) => {
+        client.subscribe('/user/topic/fall', (msg) => {
           try {
             const data = JSON.parse(msg.body) as FallIncidentDTO;
             if (data.state === 'FALSE_ALARM' || data.state === 'RESOLVED') {
@@ -169,7 +173,7 @@ export const EmergencyFallModal: React.FC = () => {
     return () => {
       void client.deactivate();
     };
-  }, [startSiren, stopSiren]);
+  }, [accessToken, startSiren, stopSiren]);
 
   // --- Local AI Edge Engine Polling (Dual-Link Failover) ---
   useEffect(() => {
