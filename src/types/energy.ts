@@ -38,3 +38,23 @@ export interface EnergyAnalyticsResponse {
   timeSeries: EnergyTimeSeriesPoint[];
   breakdown: DeviceEnergyBreakdown[];
 }
+
+export interface DemandResponseSettings {
+  homeId: string;
+  enabled: boolean;
+  peakThresholdWatts: number;
+  mode: 'AUTO_SHED' | 'ALERT_ONLY';
+  updatedAt?: string;
+}
+
+export interface DemandResponseEvaluationResult {
+  homeId: string;
+  totalCurrentWatts: number;
+  peakThresholdWatts: number;
+  excessWatts: number;
+  status: 'NORMAL' | 'WARNING_THRESHOLD' | 'PEAK_SHEDDING_EXECUTED';
+  sheddedDevices: string[];
+  wattsSaved: number;
+  message: string;
+  evaluatedAt: string;
+}

@@ -1,4 +1,6 @@
 @import "tailwindcss";
+@import "./components/home/dashboard.css";
+@import "./components/automation/studio.css";
 
 .hesta-toast {
   opacity: 1;
@@ -333,13 +335,6 @@ textarea.text-white,
 button.bg-slate-800.text-white,
 button.bg-slate-700.text-white {
   color: #4b6475;
-}
-
-button,
-input,
-select,
-textarea {
-  font: inherit;
 }
 
 button,

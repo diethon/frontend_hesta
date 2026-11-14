@@ -22,6 +22,7 @@ import {
   ToggleRight,
   Radio
 } from 'lucide-react';
+import { getFriendlyDeviceTypeName } from './DeviceStateVisualizer';
 import type { 
   DeviceResponse, 
   DeviceStateHistoryResponse, 
@@ -42,6 +43,7 @@ import {
   getDeviceUptime,
   getDeviceHealth
 } from '../../services/deviceApi';
+import { DeviceShadowSection } from './DeviceShadowSection';
 import { useOverrideCountdown } from './useOverrideCountdown';
 import { getDeviceEnergy } from '../../services/energyApi';
 import { notify } from '../ui/notify';
@@ -89,6 +91,7 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
   const [deviceEnergy, setDeviceEnergy] = useState<DeviceEnergyBreakdown | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [isExportingExcel, setIsExportingExcel] = useState(false);
+  const [visibleHistoryCount, setVisibleHistoryCount] = useState(50);
   const { isOverrideActive, formattedTime } = useOverrideCountdown(device?.manualOverrideUntil);
 
   const handleResumeAutomation = async () => {
@@ -109,6 +112,7 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
       setIsEditingName(false);
       setEditWattage(String(device.settings?.wattage || ''));
       setIsEditingWattage(false);
+      setVisibleHistoryCount(50);
       fetchHistory(device.id);
     }
   }, [isOpen, device]);
@@ -441,7 +445,7 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
               <div className="flex justify-between py-1 border-b border-line border-dashed">
                 <span className="text-muted">Loại:</span>
-                <span className="font-medium text-text">{device.deviceType}</span>
+                <span className="font-medium text-text">{getFriendlyDeviceTypeName(device.deviceType)}</span>
               </div>
               <div className="flex justify-between py-1 border-b border-line border-dashed">
                 <span className="text-muted">Phòng:</span>
@@ -522,6 +526,9 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
               )}
             </div>
           </div>
+
+          {/* Device Shadow [PHO-048] */}
+          <DeviceShadowSection deviceId={device.id} deviceType={device.deviceType} />
 
           {/* Energy Summary Widget */}
           {deviceEnergy && (
@@ -752,7 +759,7 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
               </div>
             ) : history.length > 0 ? (
               <div className="space-y-4 max-h-60 overflow-y-auto custom-scrollbar pr-2">
-                {history.map((record) => (
+                {history.slice(0, visibleHistoryCount).map((record) => (
                   <div key={record.id} className="relative pl-4 border-l-2 border-line pb-4 last:pb-0">
                     <div className="absolute -left-[5px] top-1 w-2 h-2 rounded-full bg-primary" />
                     <div className="flex items-center space-x-2 mb-1.5 flex-wrap">
@@ -774,6 +781,17 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
                     </div>
                   </div>
                 ))}
+                {history.length > visibleHistoryCount && (
+                  <div className="pt-2 text-center">
+                    <button
+                      type="button"
+                      onClick={() => setVisibleHistoryCount((c) => c + 50)}
+                      className="px-3 py-1 text-xs font-semibold rounded-lg border border-line bg-surface hover:bg-off-soft text-primary transition-colors cursor-pointer"
+                    >
+                      Xem thêm lịch sử ({history.length - visibleHistoryCount} mục khác)...
+                    </button>
+                  </div>
+                )}
               </div>
             ) : (
               <p className="text-sm text-muted text-center py-4">Chưa có lịch sử hoạt động</p>

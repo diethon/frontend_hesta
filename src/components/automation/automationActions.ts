@@ -17,7 +17,7 @@ export function buildActionInput(item: DraftAction, order: number, devices: Devi
   const rawValue = item.value.trim();
 
   if (rawAction === 'SET_STATE') {
-    let parameters: Record<string, unknown> = {};
+    let parameters: Record<string, unknown>;
     try {
       parameters = (typeof item.value === 'object' ? item.value : JSON.parse(rawValue)) as Record<string, unknown>;
     } catch {

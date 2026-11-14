@@ -1,13 +1,13 @@
 import type { DeviceSummary } from '../../types/automation';
 import type { SceneResponse, SceneActionResponse, SceneActionRequest, SceneActionType, UpdateSceneRequest, DeviceResponse } from '../../types/scene';
 import { actionOptions } from '../deviceActionOptions.ts';
-import { formatMultiActionSummary } from '../device/deviceMultiActionHelpers';
+import { formatMultiActionSummary } from '../device/deviceMultiActionHelpers.ts';
 
 export type AnyDevice = DeviceSummary | DeviceResponse;
 
 export interface DraftSceneAction { deviceId: string; action: string; value: string }
 
-import { normalizeDeviceCapabilities } from '../device/deviceHelpers';
+import { normalizeDeviceCapabilities } from '../device/deviceHelpers.ts';
 
 // Keep this list aligned with supported Scene actions.
 const sceneActionCodes = [

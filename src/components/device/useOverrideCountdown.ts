@@ -5,34 +5,50 @@ import { useState, useEffect, useCallback } from 'react';
  * Provides seconds remaining and formatted MM:SS string, ticking every second.
  */
 export const useOverrideCountdown = (overrideUntil?: string | null) => {
-  const calculateRemaining = useCallback((targetTime: string): number => {
+  const calculateRemaining = useCallback((targetTime?: string | null): number => {
+    if (!targetTime) return 0;
     const target = new Date(targetTime).getTime();
+    if (isNaN(target)) return 0;
     const now = Date.now();
     return Math.max(0, Math.floor((target - now) / 1000));
   }, []);
 
-  const [prevOverrideUntil, setPrevOverrideUntil] = useState(overrideUntil);
   const [remainingSeconds, setRemainingSeconds] = useState<number>(() =>
-    overrideUntil ? calculateRemaining(overrideUntil) : 0
+    calculateRemaining(overrideUntil)
   );
 
-  if (prevOverrideUntil !== overrideUntil) {
-    setPrevOverrideUntil(overrideUntil);
-    setRemainingSeconds(overrideUntil ? calculateRemaining(overrideUntil) : 0);
-  }
-
   useEffect(() => {
-    if (!overrideUntil) return;
+    const updateRemaining = () => {
+      const rem = calculateRemaining(overrideUntil);
+      setRemainingSeconds(rem);
+      return rem;
+    };
+
+    const initial = updateRemaining();
+    if (initial <= 0) return;
 
     const interval = setInterval(() => {
-      const remaining = calculateRemaining(overrideUntil);
-      setRemainingSeconds(remaining);
+      const remaining = updateRemaining();
       if (remaining <= 0) {
         clearInterval(interval);
       }
     }, 1000);
 
-    return () => clearInterval(interval);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        const remaining = updateRemaining();
+        if (remaining <= 0) {
+          clearInterval(interval);
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [overrideUntil, calculateRemaining]);
 
   const minutes = Math.floor(remainingSeconds / 60);

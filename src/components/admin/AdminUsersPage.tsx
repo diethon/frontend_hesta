@@ -219,11 +219,12 @@ export const AdminUsersPage: React.FC<AdminUsersPageProps> = ({
   );
 
   return (
-    <div className="app-shell relative overflow-x-hidden min-h-screen text-text">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-text relative overflow-x-hidden">
       {/* Sidebar: NO "Nhà của tôi" */}
       <AppSidebar
         activeItem="users"
         contextLabel="Quản trị nền tảng"
+        showSystemSummary={false}
         items={[
           { id: 'admin', label: 'Quản lý thiết bị & QR', icon: <AdminIcon />, onClick: () => navigate('/admin') },
           { id: 'users', label: 'Quản lý người dùng', icon: <PeopleIcon />, onClick: () => window.scrollTo({ top: 0, behavior: 'smooth' }) },

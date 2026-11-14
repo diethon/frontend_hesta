@@ -1,6 +1,6 @@
 import type { DeviceSummary } from '../../types/automation';
 import type { DeviceResponse } from '../../types/scene';
-import { getDeviceCapabilityMap } from './deviceHelpers';
+import { getDeviceCapabilityMap } from './deviceHelpers.ts';
 
 export type AnyDevice = DeviceSummary | DeviceResponse;
 

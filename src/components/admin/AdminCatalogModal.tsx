@@ -51,6 +51,7 @@ export const AdminCatalogModal: React.FC<AdminCatalogModalProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect */
     if (editingCatalog) {
       setFormData({
         name: editingCatalog.name,
@@ -74,6 +75,7 @@ export const AdminCatalogModal: React.FC<AdminCatalogModalProps> = ({
       });
     }
   }, [editingCatalog, isOpen]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   if (!isOpen) return null;
 
@@ -171,8 +173,8 @@ export const AdminCatalogModal: React.FC<AdminCatalogModalProps> = ({
 
   return (
     <>
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
-        <div className="relative w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-3xl border border-line bg-surface p-6 shadow-float transition-all sm:p-8">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0f172a]/55 p-4 backdrop-blur-md">
+        <div className="relative w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-3xl border border-[var(--border)] bg-[var(--solid)] p-6 shadow-2xl transition-all sm:p-8">
           {/* Hidden File Input */}
           <input
             type="file"
@@ -185,7 +187,7 @@ export const AdminCatalogModal: React.FC<AdminCatalogModalProps> = ({
           {/* Header */}
           <div className="mb-6 flex items-center justify-between border-b border-line pb-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center font-bold">
+              <div className="w-10 h-10 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center font-bold">
                 <Layers className="w-5 h-5" />
               </div>
               <div>
@@ -202,7 +204,7 @@ export const AdminCatalogModal: React.FC<AdminCatalogModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-full p-2 text-muted hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-text transition-colors cursor-pointer"
+              className="rounded-full p-2 text-muted hover:bg-[var(--g1)] hover:text-text transition-colors cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
@@ -285,15 +287,15 @@ export const AdminCatalogModal: React.FC<AdminCatalogModalProps> = ({
               </label>
 
               {formData.imageUrl ? (
-                <div className="relative rounded-2xl border border-line bg-slate-50 dark:bg-slate-900/40 p-3 overflow-hidden">
-                  <div className="relative h-44 w-full flex items-center justify-center overflow-hidden rounded-xl bg-slate-100 dark:bg-slate-800">
+                <div className="relative rounded-2xl border border-[var(--border)] bg-[var(--g1)] p-3 overflow-hidden">
+                  <div className="relative h-44 w-full flex items-center justify-center overflow-hidden rounded-xl bg-off-soft">
                     <img
                       src={formData.imageUrl}
                       alt="Product Preview"
                       className="max-h-full max-w-full object-contain"
                     />
                     {uploadingImage && (
-                      <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-xs flex flex-col items-center justify-center gap-2 text-white">
+                      <div className="absolute inset-0 bg-[#0f172a]/70 backdrop-blur-xs flex flex-col items-center justify-center gap-2 text-white">
                         <Loader2 className="w-6 h-6 animate-spin text-amber-400" />
                         <span className="text-xs font-semibold">Đang xử lý &amp; lưu ảnh...</span>
                       </div>
@@ -308,7 +310,7 @@ export const AdminCatalogModal: React.FC<AdminCatalogModalProps> = ({
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-line bg-surface hover:bg-surface-hover text-xs font-semibold text-text shadow-xs transition-colors cursor-pointer"
                         title="Cắt xén hoặc căn chỉnh lại vị trí ảnh"
                       >
-                        <Crop className="w-3.5 h-3.5 text-amber-500" />
+                        <Crop className="w-3.5 h-3.5 text-amber-600" />
                         <span>Cắt xén</span>
                       </button>
                       <button
@@ -347,11 +349,11 @@ export const AdminCatalogModal: React.FC<AdminCatalogModalProps> = ({
                       : 'border-line hover:border-amber-500/50 bg-surface/40 hover:bg-surface/80'
                   }`}
                 >
-                  <div className="w-12 h-12 mx-auto rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center mb-3">
+                  <div className="w-12 h-12 mx-auto rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center mb-3">
                     {uploadingImage ? (
-                      <Loader2 className="w-6 h-6 animate-spin text-amber-500" />
+                      <Loader2 className="w-6 h-6 animate-spin text-amber-600" />
                     ) : (
-                      <UploadCloud className="w-6 h-6 text-amber-500" />
+                      <UploadCloud className="w-6 h-6 text-amber-600" />
                     )}
                   </div>
                   <p className="text-sm font-bold text-text">
@@ -389,9 +391,9 @@ export const AdminCatalogModal: React.FC<AdminCatalogModalProps> = ({
               <button
                 type="submit"
                 disabled={loading || uploadingImage}
-                className="inline-flex items-center gap-2 rounded-xl bg-amber-500 px-6 py-2.5 text-sm font-bold text-slate-950 hover:bg-amber-400 transition-all shadow-soft cursor-pointer disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-xl bg-amber-600 hover:bg-amber-700 px-6 py-2.5 text-sm font-bold text-white transition-all shadow-sm cursor-pointer disabled:opacity-50"
               >
-                {loading && <Loader2 className="w-4 h-4 animate-spin text-slate-950" />}
+                {loading && <Loader2 className="w-4 h-4 animate-spin text-white" />}
                 <span>{editingCatalog ? 'Lưu Thay Đổi' : 'Tạo Dòng Sản Phẩm'}</span>
               </button>
             </div>
