@@ -17,45 +17,13 @@ import {
   Layers,
 } from 'lucide-react';
 import type { DeviceCatalog } from '../../types/deviceCatalog';
+import { getFriendlyDeviceTypeName } from './adminCatalogHelpers';
 
 export interface ProductCardProps {
   catalog: DeviceCatalog;
   onEdit: (catalog: DeviceCatalog) => void;
   onDelete: (catalog: DeviceCatalog) => void;
   onGenerateQr: (catalog: DeviceCatalog) => void;
-}
-
-export function getFriendlyDeviceTypeName(deviceType: string): string {
-  switch (deviceType) {
-    case 'LED_RGB':
-      return 'Đèn LED RGB';
-    case 'LIGHT':
-      return 'Công tắc / Đèn relay';
-    case 'SMART_PLUG':
-      return 'Ổ cắm đo điện';
-    case 'FAN':
-      return 'Quạt thông minh';
-    case 'WATER_PUMP':
-      return 'Máy bơm nước';
-    case 'GATE_MOTOR':
-      return 'Motor cổng tự động';
-    case 'AC_REMOTE':
-      return 'Điều khiển điều hòa';
-    case 'TEMP_HUMID_SENSOR':
-      return 'Cảm biến nhiệt ẩm';
-    case 'MOTION_SENSOR':
-      return 'Cảm biến chuyển động';
-    case 'SMOKE_SENSOR':
-      return 'Cảm biến báo khói';
-    case 'LUX_SENSOR':
-      return 'Cảm biến ánh sáng';
-    case 'IR_REMOTE':
-      return 'Điều khiển hồng ngoại';
-    case 'CAMERA_AI':
-      return 'Camera AI';
-    default:
-      return deviceType;
-  }
 }
 
 export function DeviceTypeFallbackIcon({ deviceType }: { deviceType: string }) {

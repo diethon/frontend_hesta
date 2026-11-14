@@ -14,6 +14,7 @@ import { UserAvatar } from '../ui/UserAvatar';
 import { ConfirmModal } from '../ui/ConfirmModal';
 import { notify } from '../ui/notify';
 import { getErrorMessage } from '../../utils/errors';
+import { DEVICE_TYPE_OPTIONS } from './adminCatalogHelpers';
 import {
   Search,
   Plus,
@@ -31,21 +32,6 @@ interface AdminDashboardProps {
   onLogout: () => void;
   onProfileUpdate: (user: UserResponse) => void;
 }
-
-const DEVICE_TYPE_OPTIONS = [
-  { value: 'ALL', label: 'Tất cả loại thiết bị' },
-  { value: 'LED_RGB', label: 'Đèn LED RGB' },
-  { value: 'LIGHT', label: 'Công tắc / Đèn relay' },
-  { value: 'SMART_PLUG', label: 'Ổ cắm đo điện' },
-  { value: 'FAN', label: 'Quạt thông minh' },
-  { value: 'WATER_PUMP', label: 'Máy bơm nước' },
-  { value: 'GATE_MOTOR', label: 'Motor cổng tự động' },
-  { value: 'AC_REMOTE', label: 'Điều khiển điều hòa' },
-  { value: 'TEMP_HUMID_SENSOR', label: 'Cảm biến nhiệt ẩm' },
-  { value: 'MOTION_SENSOR', label: 'Cảm biến chuyển động' },
-  { value: 'SMOKE_SENSOR', label: 'Cảm biến báo khói' },
-  { value: 'CAMERA_AI', label: 'Camera AI' },
-];
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout, onProfileUpdate }) => {
   const navigate = useNavigate();
@@ -106,9 +92,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout, 
     }
   }, [searchKeyword, selectedType]);
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     void loadData();
   }, [loadData]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const handleConfirmDelete = async () => {
     if (!deletingCatalog) return;
