@@ -23,7 +23,6 @@ import { ConfirmModal } from '../ui/ConfirmModal';
 import { createAutomationRule, updateAutomationRule, deleteAutomationRule } from '../../services/automationApi';
 import { notify } from '../ui/notify';
 import { RuleHistoryPanel } from './RuleHistoryPanel';
-import { RuleTestSheet } from './RuleTestSheet';
 import { eventLabel } from './ruleLabels';
 import {
   moveItem,
@@ -63,7 +62,6 @@ export const RuleEditorPanel: React.FC<RuleEditorPanelProps> = ({
   // ── Tab State [Thiết lập | Lịch sử] ──
   const [activeTab, setActiveTab] = useState<'setup' | 'history'>('setup');
   const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
-  const [testSheetOpen, setTestSheetOpen] = useState(false);
   const headerMenuRef = useRef<HTMLDivElement>(null);
   const triggerSectionRef = useRef<HTMLElement>(null);
 
@@ -966,25 +964,6 @@ export const RuleEditorPanel: React.FC<RuleEditorPanelProps> = ({
               Đóng
             </button>
 
-            {/* Secondary "Kiểm tra" button (hide for SCHEDULE rules) */}
-            {triggerType !== 'SCHEDULE' && (
-              <div className="flex-1 flex flex-col items-center">
-                <button
-                  type="button"
-                  disabled={!currentRuleId}
-                  onClick={() => setTestSheetOpen(true)}
-                  className="w-full py-3 rounded-2xl text-xs font-semibold text-[var(--text)] bg-[var(--muted)] hover:bg-[var(--border)] border border-[var(--border)] transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  Kiểm tra
-                </button>
-                {!currentRuleId ? (
-                  <span className="text-[10px] text-[var(--tertiary)] mt-1">Lưu quy tắc để kiểm tra</span>
-                ) : isDirty ? (
-                  <span className="text-[10px] text-[var(--tertiary)] mt-1">Kiểm tra dựa trên bản đã lưu</span>
-                ) : null}
-              </div>
-            )}
-
             {activeTab === 'setup' && (
               <button
                 type="button"
@@ -1091,17 +1070,6 @@ export const RuleEditorPanel: React.FC<RuleEditorPanelProps> = ({
           />
         )}
       </aside>
-
-      {/* ── Sub-Sheet: RuleTestSheet ── */}
-      {testSheetOpen && rule && (
-        <RuleTestSheet
-          homeId={homeId}
-          rule={rule}
-          devices={devices}
-          scenes={scenes}
-          onClose={() => setTestSheetOpen(false)}
-        />
-      )}
 
       {/* ── Confirm Modals ── */}
       {confirmCloseOpen && (

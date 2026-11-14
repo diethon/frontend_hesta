@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router';
-import { useAppSelector } from '../../store/hooks';
+import { useAppDispatch, useAppSelector } from '../../store/hooks';
+import { currentHomeChanged, currentHomeCleared } from '../../store/homeSlice';
 import {
   getAutomationRules,
   toggleAutomationRule,
@@ -22,10 +23,12 @@ import { AutomationTopBar } from './AutomationTopBar';
 import { AutomationEmpty } from './AutomationEmpty';
 import { RuleCard } from './RuleCard';
 import { RuleEditorPanel } from './RuleEditorPanel';
-import { RuleTestSheet } from './RuleTestSheet';
 import { RuleHistoryPanel } from './RuleHistoryPanel';
 import { ConfirmModal } from '../ui/ConfirmModal';
 import { notify } from '../ui/notify';
+import { useRealtimeRefetch } from '../../realtime/useRealtimeRefetch';
+
+const AUTOMATION_REFRESH_EVENTS = ['AUTOMATION_RULE_CHANGED', 'SCENE_CHANGED'] as const;
 
 const TRIGGER_GROUPS = [
   { id: 'SENSOR' as const, label: 'Cảm biến', hint: 'Chạy khi giá trị cảm biến khớp điều kiện' },
@@ -37,6 +40,14 @@ export function AutomationRulePage() {
   const { homeId = '' } = useParams();
   const navigate = useNavigate();
   const authUser = useAppSelector((state) => state.auth.user);
+  const dispatch = useAppDispatch();
+  // Subscribe the realtime socket to this home even when the page is opened directly.
+  useEffect(() => {
+    dispatch(currentHomeChanged(homeId || null));
+    return () => {
+      dispatch(currentHomeCleared());
+    };
+  }, [dispatch, homeId]);
   const userInitial = authUser?.fullName?.charAt(0) || authUser?.email?.charAt(0) || 'U';
 
   const [rules, setRules] = useState<AutomationRule[]>([]);
@@ -54,7 +65,6 @@ export function AutomationRulePage() {
   const [editorRule, setEditorRule] = useState<AutomationRule | null | undefined>(undefined); // undefined = closed
   const [scrollToTrigger, setScrollToTrigger] = useState(false);
   const [ruleToDelete, setRuleToDelete] = useState<AutomationRule | null>(null);
-  const [testModalRule, setTestModalRule] = useState<AutomationRule | null>(null);
   const [historyModalRule, setHistoryModalRule] = useState<AutomationRule | null>(null);
 
   // Load data
@@ -81,6 +91,9 @@ export function AutomationRulePage() {
   useEffect(() => {
     void loadData();
   }, [loadData]);
+
+  // Rules list scenes by name, so a scene edit refreshes this page too.
+  useRealtimeRefetch(AUTOMATION_REFRESH_EVENTS, homeId, () => void loadData());
 
   // Counts and statistics
   const activeCount = useMemo(() => rules.filter((r) => r.enabled).length, [rules]);
@@ -189,7 +202,6 @@ export function AutomationRulePage() {
         setScrollToTrigger(false);
         setEditorRule(rule);
       }}
-      onTest={() => setTestModalRule(rule)}
       onHistory={() => setHistoryModalRule(rule)}
       onSchedule={() => {
         setScrollToTrigger(true);
@@ -375,17 +387,6 @@ export function AutomationRulePage() {
           variant="danger"
           onConfirm={handleConfirmDelete}
           onCancel={() => setRuleToDelete(null)}
-        />
-      )}
-
-      {/* ── Rule Test Simulation Sheet ── */}
-      {testModalRule && (
-        <RuleTestSheet
-          homeId={homeId}
-          rule={testModalRule}
-          devices={devices}
-          scenes={scenes}
-          onClose={() => setTestModalRule(null)}
         />
       )}
 

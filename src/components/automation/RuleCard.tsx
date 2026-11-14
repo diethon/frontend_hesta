@@ -11,7 +11,6 @@ export interface RuleCardProps {
   lastRunFailed?: boolean;
   onToggle?: (enabled: boolean) => void;
   onEdit?: () => void;
-  onTest?: () => void;
   onHistory?: () => void;
   onSchedule?: () => void;
   onDuplicate?: () => void;
@@ -54,7 +53,6 @@ export const RuleCard: React.FC<RuleCardProps> = ({
   lastRunFailed = false,
   onToggle,
   onEdit,
-  onTest,
   onHistory,
   onSchedule,
   onDuplicate,
@@ -74,7 +72,6 @@ export const RuleCard: React.FC<RuleCardProps> = ({
 
   const isIncomplete = !rule.actions || rule.actions.length === 0;
   const isSchedule = rule.triggerType === 'SCHEDULE';
-  const canTest = !isSchedule && !!onTest;
 
   const menuItem = (label: string, icon: IconName, handler?: () => void, danger = false) => (
     <button
@@ -127,19 +124,6 @@ export const RuleCard: React.FC<RuleCardProps> = ({
           {isSchedule ? '' : `${rule.conditions.length} điều kiện · `}
           {rule.actions.length} hành động
         </span>
-        {/* Keeps the toggles of all rows aligned when a row has no test button. */}
-        {!canTest && <span className="st-icon-btn test" aria-hidden="true" style={{ visibility: 'hidden' }} />}
-        {canTest && (
-          <button
-            type="button"
-            className="st-icon-btn test"
-            onClick={onTest}
-            title="Kiểm tra quy tắc"
-            aria-label={`Kiểm tra quy tắc ${rule.name}`}
-          >
-            <Icon name="test" size={17} />
-          </button>
-        )}
         <button
           type="button"
           disabled={isIncomplete}
@@ -164,7 +148,6 @@ export const RuleCard: React.FC<RuleCardProps> = ({
           {menuOpen && (
             <div className="st-menu">
               {menuItem('Chỉnh sửa', 'pencil', onEdit)}
-              {canTest && menuItem('Kiểm tra', 'test', onTest)}
               {menuItem('Xem lịch sử', 'clock', onHistory)}
               {isSchedule && onSchedule && menuItem('Lịch chạy', 'clock', onSchedule)}
               {menuItem('Nhân bản', 'copy', onDuplicate)}

@@ -548,6 +548,7 @@ export const DevicePage: React.FC = () => {
       {
         currentState?: Record<string, unknown>;
         status?: DeviceResponse['status'];
+        lastSeen?: string | null;
       }
     >
   >(new Map());
@@ -572,6 +573,7 @@ export const DevicePage: React.FC = () => {
             ? { ...d.currentState, ...patch.currentState }
             : d.currentState,
           status: patch.status ?? d.status,
+          lastSeen: patch.lastSeen ?? d.lastSeen,
         };
       });
       return hasChanges ? next : prev;
@@ -587,6 +589,7 @@ export const DevicePage: React.FC = () => {
           ? { ...prev.raw.currentState, ...patch.currentState }
           : prev.raw.currentState,
         status: patch.status ?? prev.raw.status,
+        lastSeen: patch.lastSeen ?? prev.raw.lastSeen,
       };
       return mapDeviceToUI(updatedRaw, localPower, localBrightness);
     });
@@ -600,6 +603,7 @@ export const DevicePage: React.FC = () => {
         deviceId?: string;
         currentState?: Record<string, unknown>;
         status?: string;
+        lastSeen?: string | null;
       };
       const targetId = data.id || data.deviceId || event.deviceId;
       if (!targetId) return;
@@ -611,6 +615,7 @@ export const DevicePage: React.FC = () => {
           ...(data.currentState ?? {}),
         },
         status: (data.status as DeviceResponse['status']) ?? existing?.status,
+        lastSeen: data.lastSeen ?? existing?.lastSeen,
       });
 
       if (rafIdRef.current === null) {
