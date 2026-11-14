@@ -53,3 +53,4 @@ export function formatDateTimeFullVi(dateStr?: string | null): string {
         minute: '2-digit',
       });
 }
+

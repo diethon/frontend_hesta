@@ -14,6 +14,7 @@ import { NotificationBell } from '../notification/NotificationBell';
 import { ProfileModal } from '../profile/ProfileModal';
 import { UserAvatar } from '../ui/UserAvatar';
 import { ConfirmModal } from '../ui/ConfirmModal';
+import { AdminAvatarMenu } from './AdminAvatarMenu';
 import { AdminCreateUserModal } from './AdminCreateUserModal';
 import { AdminEditUserModal } from './AdminEditUserModal';
 import { AdminResetPasswordModal } from './AdminResetPasswordModal';
@@ -49,8 +50,6 @@ import {
   UserX,
   UserCheck,
   Users,
-  LogOut,
-  User,
   X,
 } from 'lucide-react';
 
@@ -87,11 +86,9 @@ export const AdminUsersPage: React.FC<AdminUsersPageProps> = ({
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
   const [providerDropdownOpen, setProviderDropdownOpen] = useState(false);
   const [sizeDropdownOpen, setSizeDropdownOpen] = useState(false);
-  const [isAvatarMenuOpen, setIsAvatarMenuOpen] = useState(false);
 
   const filterToolbarRef = useRef<HTMLDivElement>(null);
   const sizeDropdownRef = useRef<HTMLDivElement>(null);
-  const avatarMenuRef = useRef<HTMLDivElement>(null);
 
   // Hover state for registration chart
   const [hoveredTrend, setHoveredTrend] = useState<RegistrationTrendPoint | null>(null);
@@ -136,9 +133,6 @@ export const AdminUsersPage: React.FC<AdminUsersPageProps> = ({
       }
       if (sizeDropdownRef.current && !sizeDropdownRef.current.contains(target)) {
         setSizeDropdownOpen(false);
-      }
-      if (avatarMenuRef.current && !avatarMenuRef.current.contains(target)) {
-        setIsAvatarMenuOpen(false);
       }
     };
     document.addEventListener('mousedown', handleOutsideClick);
@@ -283,10 +277,6 @@ export const AdminUsersPage: React.FC<AdminUsersPageProps> = ({
   const currentProviderLabel =
     PROVIDER_OPTIONS.find((opt) => opt.value === providerFilter)?.label || 'Mọi nguồn đăng nhập';
 
-  const userInitial = user?.fullName
-    ? user.fullName.trim().split(' ').slice(-1)[0]?.charAt(0).toUpperCase() || 'A'
-    : 'A';
-
   // Navigation items for Admin shell
   const adminNavRailItems = [
     {
@@ -374,61 +364,11 @@ export const AdminUsersPage: React.FC<AdminUsersPageProps> = ({
 
             <NotificationBell />
 
-            {/* Avatar Menu Dropdown */}
-            <div className="relative" ref={avatarMenuRef}>
-              <button
-                type="button"
-                aria-label="Tài khoản quản trị"
-                aria-expanded={isAvatarMenuOpen}
-                onClick={() => setIsAvatarMenuOpen((prev) => !prev)}
-                className="avatar small flex items-center justify-center cursor-pointer overflow-hidden border border-line shadow-xs hover:border-primary transition-colors"
-                title={user.fullName || 'Tài khoản quản trị'}
-              >
-                {user.avatarUrl ? (
-                  <UserAvatar src={user.avatarUrl} name={user.fullName} size={36} />
-                ) : (
-                  <span className="text-xs font-bold text-white bg-primary w-full h-full flex items-center justify-center">
-                    {userInitial}
-                  </span>
-                )}
-              </button>
-
-              {isAvatarMenuOpen && (
-                <div
-                  role="menu"
-                  className="absolute right-0 top-full mt-2 w-48 rounded-2xl border border-line bg-surface p-1.5 shadow-float z-50 animate-in fade-in zoom-in-95 duration-150"
-                >
-                  <div className="px-3 py-2 border-b border-line/60">
-                    <p className="text-xs font-semibold text-text truncate">{user.fullName}</p>
-                    <p className="text-[11px] text-muted truncate">{user.email}</p>
-                  </div>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    onClick={() => {
-                      setIsAvatarMenuOpen(false);
-                      setIsProfileModalOpen(true);
-                    }}
-                    className="w-full text-left px-3 py-2 text-xs font-medium text-text hover:bg-surface-hover rounded-xl flex items-center gap-2 cursor-pointer transition-colors mt-1"
-                  >
-                    <User className="w-3.5 h-3.5 text-muted" />
-                    <span>Hồ sơ cá nhân</span>
-                  </button>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    onClick={() => {
-                      setIsAvatarMenuOpen(false);
-                      onLogout();
-                    }}
-                    className="w-full text-left px-3 py-2 text-xs font-medium text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-xl flex items-center gap-2 cursor-pointer transition-colors"
-                  >
-                    <LogOut className="w-3.5 h-3.5 text-rose-500" />
-                    <span>Đăng xuất</span>
-                  </button>
-                </div>
-              )}
-            </div>
+            <AdminAvatarMenu
+              user={user}
+              onOpenProfile={() => setIsProfileModalOpen(true)}
+              onLogout={onLogout}
+            />
           </div>
         </header>
 

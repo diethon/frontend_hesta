@@ -150,20 +150,20 @@ export const OtaCampaignManager: React.FC = () => {
   return (
     <div className="space-y-6 tabular-nums">
       {/* Banner Giới Thiệu Chức Năng Dễ Hiểu */}
-      <div className="glass-card glass-g2 p-6 rounded-3xl border border-[var(--border)] flex flex-wrap items-center justify-between gap-4">
+      <div className="rounded-3xl border border-line bg-surface shadow-xs p-6 flex flex-wrap items-center justify-between gap-4">
         <div className="space-y-1.5">
           <div className="flex items-center gap-2">
-            <span className="p-2 rounded-2xl bg-primary/15 text-primary">
+            <span className="p-2.5 rounded-2xl bg-primary/10 text-primary">
               <UploadCloud className="w-5 h-5" />
             </span>
             <h3 className="text-lg font-bold text-text">
-              Cập Nhật Phần Mềm Thiết Bị Từ Xa (Nâng Cấp Thông Minh)
+              Cập nhật phần mềm thiết bị từ xa (OTA)
             </h3>
           </div>
           <p className="text-xs text-muted max-w-2xl leading-relaxed">
             Tự động nâng cấp tính năng mới và sửa lỗi cho công tắc, cảm biến trong nhà qua Wi-Fi mà không cần tháo gỡ.
-            Chế độ <strong>Nâng cấp an toàn 3 đợt</strong> (Thử 10% &rarr; Mở rộng 50% &rarr; Hoàn tất 100%) kèm cơ chế
-            <strong> tự ngắt khẩn cấp</strong> nếu tỷ lệ lỗi phần cứng vượt mức an toàn, đảm bảo sinh hoạt gia đình không bị gián đoạn.
+            Chế độ <strong>nâng cấp an toàn 3 đợt</strong> (Thử 10% &rarr; Mở rộng 50% &rarr; Hoàn tất 100%) kèm cơ chế
+            <strong> tự ngắt khẩn cấp</strong> nếu tỷ lệ lỗi phần cứng vượt mức an toàn.
           </p>
         </div>
 
@@ -171,28 +171,28 @@ export const OtaCampaignManager: React.FC = () => {
           {packages.length === 0 && (
             <button
               onClick={handleSeedPackage}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-line text-xs font-semibold text-text hover:bg-sidebar transition-colors"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-line text-xs font-semibold text-text hover:bg-surface-hover transition-colors cursor-pointer"
             >
               <FileCode className="w-4 h-4 text-primary" />
-              Thêm Bản Vá Mẫu (v2.1.0)
+              <span>Thêm bản vá mẫu (v2.1.0)</span>
             </button>
           )}
 
           <button
             onClick={fetchData}
             disabled={isLoading}
-            className="p-2 rounded-xl border border-line text-xs font-semibold text-text hover:bg-sidebar transition-colors"
+            className="p-2 rounded-xl border border-line text-xs font-semibold text-text hover:bg-surface-hover transition-colors cursor-pointer"
             title="Làm mới dữ liệu"
           >
-            <RotateCw className={`w-4 h-4 text-muted ${isLoading ? 'animate-spin' : ''}`} />
+            <RotateCw className={`w-4 h-4 text-muted ${isLoading ? 'animate-spin text-primary' : ''}`} />
           </button>
 
           <button
             onClick={() => setIsModalOpen(true)}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primary-hover transition-all shadow-md"
+            className="flex items-center gap-1.5 px-4 py-2.5 rounded-full bg-primary text-white text-xs font-semibold hover:bg-primary-hover transition-colors shadow-2xs cursor-pointer active:scale-98"
           >
             <Plus className="w-4 h-4" />
-            Khởi Tạo Đợt Cập Nhật Mới
+            <span>Khởi tạo đợt cập nhật</span>
           </button>
         </div>
       </div>
@@ -201,15 +201,15 @@ export const OtaCampaignManager: React.FC = () => {
       <div className="space-y-4">
         <h4 className="text-sm font-bold text-text flex items-center gap-2">
           <Activity className="w-4 h-4 text-primary" />
-          Tiến Độ Các Đợt Cập Nhật ({campaigns.length})
+          <span>Tiến độ các đợt cập nhật ({campaigns.length})</span>
         </h4>
 
         {campaigns.length === 0 ? (
-          <div className="glass-card glass-g2 p-12 text-center rounded-3xl border border-[var(--border)]">
+          <div className="rounded-3xl border border-line bg-surface shadow-xs p-12 text-center">
             <Layers className="w-12 h-12 text-muted mx-auto mb-3 opacity-40" />
             <p className="text-sm font-semibold text-text">Chưa có đợt cập nhật nào đang diễn ra</p>
             <p className="text-xs text-muted mt-1 max-w-md mx-auto">
-              Bấm &quot;Khởi Tạo Đợt Cập Nhật Mới&quot; để gửi bản vá sửa lỗi hoặc tính năng mới đến các công tắc trong nhà một cách an toàn.
+              Bấm &quot;Khởi tạo đợt cập nhật&quot; để gửi bản vá sửa lỗi hoặc tính năng mới đến các công tắc trong nhà một cách an toàn.
             </p>
           </div>
         ) : (
@@ -233,13 +233,13 @@ export const OtaCampaignManager: React.FC = () => {
             return (
               <div
                 key={camp.id}
-                className="glass-card glass-g2 p-5 rounded-3xl border border-[var(--border)] hover:shadow-md transition-shadow"
+                className="rounded-3xl border border-line bg-surface shadow-xs p-5 hover:border-primary/40 transition-colors"
               >
                 <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
                   <div>
                     <div className="flex items-center gap-2">
                       <h5 className="text-base font-bold text-text">{camp.name}</h5>
-                      <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-primary/10 text-primary">
+                      <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-semibold bg-primary/10 text-primary">
                         {camp.version}
                       </span>
                       <span className="px-2.5 py-0.5 rounded-md text-[11px] font-semibold bg-sidebar text-muted flex items-center gap-1">
@@ -248,13 +248,13 @@ export const OtaCampaignManager: React.FC = () => {
                       </span>
                     </div>
                     <p className="text-[11px] text-muted mt-1">
-                      Bắt đầu lúc: {new Date(camp.createdAt || '').toLocaleString()}
+                      Bắt đầu lúc: {new Date(camp.createdAt || '').toLocaleString('vi-VN')}
                     </p>
                   </div>
 
                   <div className="flex items-center gap-2">
                     <span
-                      className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold border ${statusInfo.color}`}
+                      className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold border ${statusInfo.color}`}
                     >
                       {isCompleted && <CheckCircle className="w-3.5 h-3.5" />}
                       {isAborted && <AlertOctagon className="w-3.5 h-3.5" />}
@@ -264,9 +264,9 @@ export const OtaCampaignManager: React.FC = () => {
                     {!isCompleted && !isAborted && !isCancelled && (
                       <button
                         onClick={() => handleAbort(camp.id)}
-                        className="px-3 py-1 rounded-xl border border-red-500/30 text-red-500 hover:bg-red-500/10 text-xs font-semibold transition-colors"
+                        className="px-3 py-1 rounded-xl border border-rose-500/30 text-rose-500 hover:bg-rose-500/10 text-xs font-semibold transition-colors cursor-pointer"
                       >
-                        Dừng Khẩn Cấp
+                        Dừng khẩn cấp
                       </button>
                     )}
                   </div>
@@ -278,11 +278,11 @@ export const OtaCampaignManager: React.FC = () => {
                     <span>Tiến độ cập nhật các đợt:</span>
                     <strong className="text-text">{progressPercent}%</strong>
                   </div>
-                  <div className="w-full h-3 rounded-full bg-sidebar overflow-hidden relative">
+                  <div className="w-full h-2.5 rounded-full bg-sidebar overflow-hidden relative">
                     <div
                       className={`h-full transition-all duration-700 ${
                         isAborted
-                          ? 'bg-red-500'
+                          ? 'bg-rose-500'
                           : isCompleted
                           ? 'bg-emerald-500'
                           : 'bg-primary'
@@ -296,21 +296,21 @@ export const OtaCampaignManager: React.FC = () => {
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 border-t border-line text-xs">
                   <div>
                     <span className="text-muted block">Tổng thiết bị tham gia:</span>
-                    <strong className="text-text font-bold text-sm">{camp.totalNodes} Thiết bị</strong>
+                    <strong className="text-text font-bold text-sm">{camp.totalNodes} thiết bị</strong>
                   </div>
                   <div>
                     <span className="text-muted block">Cập nhật thành công:</span>
-                    <strong className="text-emerald-500 font-bold text-sm">{camp.successNodes} Thiết bị</strong>
+                    <strong className="text-emerald-500 font-bold text-sm">{camp.successNodes} thiết bị</strong>
                   </div>
                   <div>
                     <span className="text-muted block">Gặp sự cố / Lỗi:</span>
-                    <strong className="text-red-500 font-bold text-sm">{camp.failedNodes} Thiết bị</strong>
+                    <strong className="text-rose-500 font-bold text-sm">{camp.failedNodes} thiết bị</strong>
                   </div>
                   <div>
                     <span className="text-muted block">Tỷ lệ lỗi hiện tại:</span>
                     <strong
                       className={`font-bold text-sm ${
-                        failRate > camp.failureThresholdPercent ? 'text-red-500' : 'text-text'
+                        failRate > camp.failureThresholdPercent ? 'text-rose-500' : 'text-text'
                       }`}
                     >
                       {failRate}% (Tối đa {camp.failureThresholdPercent}%)
@@ -319,7 +319,7 @@ export const OtaCampaignManager: React.FC = () => {
                 </div>
 
                 {camp.abortReason && (
-                  <div className="mt-3 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 text-xs font-medium flex items-center gap-2">
+                  <div className="mt-3 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs font-medium flex items-center gap-2">
                     <ShieldAlert className="w-4 h-4 shrink-0" />
                     <span>Lý do dừng an toàn: {camp.abortReason}</span>
                   </div>
@@ -332,50 +332,63 @@ export const OtaCampaignManager: React.FC = () => {
 
       {/* Modal Khởi Tạo Đợt Cập Nhật */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0f172a]/55 backdrop-blur-md">
-          <div className="w-full max-w-lg rounded-3xl bg-[var(--solid)] border border-[var(--border)] p-6 shadow-2xl relative">
-            <button
-              onClick={() => setIsModalOpen(false)}
-              className="absolute top-4 right-4 p-1.5 rounded-xl text-muted hover:text-text hover:bg-sidebar transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            <h4 className="text-lg font-bold text-text mb-1">
-              Khởi Tạo Đợt Cập Nhật Phần Mềm Mới
-            </h4>
-            <p className="text-xs text-muted mb-4">
-              Hệ thống sẽ tự động gửi bản nâng cấp đến các công tắc thông minh theo đúng quy trình an toàn.
-            </p>
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
+          onClick={() => setIsModalOpen(false)}
+        >
+          <div
+            className="w-full max-w-lg rounded-3xl bg-surface border border-line p-6 sm:p-7 shadow-2xl relative text-text animate-in zoom-in-95 duration-200 space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-line/60 pb-3">
+              <div>
+                <h4 className="text-base font-bold text-text">
+                  Khởi tạo đợt cập nhật phần mềm mới
+                </h4>
+                <p className="text-xs text-muted mt-0.5">
+                  Gửi bản nâng cấp đến các công tắc thông minh theo đúng quy trình an toàn.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(false)}
+                className="p-1.5 rounded-xl text-muted hover:text-text hover:bg-surface-hover transition-colors cursor-pointer"
+                aria-label="Đóng"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
             <form onSubmit={handleCreateCampaign} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-text mb-1">
-                  Tên Đợt Cập Nhật (Gợi nhớ dễ hiểu)
+              <div className="space-y-1">
+                <label className="block text-xs font-semibold text-text">
+                  Tên đợt cập nhật
                 </label>
                 <input
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Ví dụ: Bản vá chống chập chờn công tắc đèn tầng 1"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-line bg-surface text-sm text-text focus:outline-none focus:border-primary"
+                  className="w-full min-h-[44px] px-3.5 py-2 rounded-2xl border border-line bg-sidebar text-xs sm:text-sm text-text focus:outline-none focus:border-primary"
                   required
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-text mb-1">
-                  Chọn Bản Vá Phần Mềm
+              <div className="space-y-1">
+                <label className="block text-xs font-semibold text-text">
+                  Chọn bản vá phần mềm
                 </label>
                 {packages.length === 0 ? (
-                  <p className="text-xs text-amber-600">
-                    Chưa có bản cập nhật nào. Hãy bấm nút &quot;Thêm Bản Vá Mẫu&quot; bên ngoài trước.
+                  <p className="text-xs text-rose-500">
+                    Chưa có bản cập nhật nào. Hãy bấm nút &quot;Thêm bản vá mẫu&quot; bên ngoài trước.
                   </p>
                 ) : (
                   <select
                     value={selectedPkgId}
                     onChange={(e) => setSelectedPkgId(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-line bg-surface text-sm text-text focus:outline-none focus:border-primary"
+                    className="w-full min-h-[44px] px-3.5 py-2 rounded-2xl border border-line bg-sidebar text-xs sm:text-sm text-text focus:outline-none focus:border-primary"
                     required
                   >
                     <option value="">-- Chọn bản cập nhật cho thiết bị --</option>
@@ -388,14 +401,14 @@ export const OtaCampaignManager: React.FC = () => {
                 )}
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-text mb-1">
-                  Phương Thức Cập Nhật
+              <div className="space-y-1">
+                <label className="block text-xs font-semibold text-text">
+                  Phương thức cập nhật
                 </label>
                 <select
                   value={strategy}
                   onChange={(e) => setStrategy(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-line bg-surface text-sm text-text focus:outline-none focus:border-primary"
+                  className="w-full min-h-[44px] px-3.5 py-2 rounded-2xl border border-line bg-sidebar text-xs sm:text-sm text-text focus:outline-none focus:border-primary"
                 >
                   <option value="CANARY">
                     Nâng cấp an toàn 3 đợt (Thử 10% → Mở rộng 50% → Hoàn tất 100%) [Khuyên dùng]
@@ -412,7 +425,7 @@ export const OtaCampaignManager: React.FC = () => {
               <div className="space-y-1.5 p-3.5 rounded-2xl bg-sidebar/50 border border-line">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-semibold text-text flex items-center gap-1.5">
-                    <ShieldAlert className="w-4 h-4 text-amber-600" />
+                    <ShieldAlert className="w-4 h-4 text-primary" />
                     Ngưỡng tự động dừng an toàn: <span className="text-primary font-bold">{threshold}% lỗi</span>
                   </label>
                   <span className="text-[11px] text-muted">Mặc định: 20%</span>
@@ -424,28 +437,28 @@ export const OtaCampaignManager: React.FC = () => {
                   step="5"
                   value={threshold}
                   onChange={(e) => setThreshold(Number(e.target.value))}
-                  className="w-full accent-primary"
+                  className="w-full accent-primary cursor-pointer"
                 />
                 <p className="text-[11px] text-muted">
                   Nếu tỷ lệ thiết bị nâng cấp thất bại vượt quá {threshold}%, hệ thống sẽ ngắt ngay đợt cập nhật để bảo vệ các thiết bị còn lại.
                 </p>
               </div>
 
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex justify-end gap-2.5 pt-3 border-t border-line/60">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 rounded-xl border border-line text-xs font-semibold text-muted hover:text-text hover:bg-sidebar transition-colors"
+                  className="min-h-[40px] px-5 rounded-full border border-line text-xs font-semibold text-muted hover:text-text hover:bg-surface-hover transition-colors cursor-pointer"
                 >
                   Hủy bỏ
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting || packages.length === 0}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primary-hover disabled:opacity-50 transition-all shadow-md"
+                  className="min-h-[40px] flex items-center gap-1.5 px-5 rounded-full bg-primary text-white text-xs font-semibold hover:bg-primary-hover disabled:opacity-50 transition-colors shadow-2xs cursor-pointer"
                 >
                   <Play className="w-3.5 h-3.5 fill-current" />
-                  Bắt Đầu Cập Nhật
+                  <span>Bắt đầu cập nhật</span>
                 </button>
               </div>
             </form>

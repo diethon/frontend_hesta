@@ -2,13 +2,15 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router';
 import type { UserResponse } from '../../types/auth';
 import { ProfileModal } from '../profile/ProfileModal';
-import { AdminIcon, AppSidebar, PeopleIcon } from '../ui/AppSidebar';
+import { DashboardNavRail } from '../home/DashboardNavRail';
+import { DashboardBottomNav } from '../home/DashboardBottomNav';
+import { NotificationBell } from '../notification/NotificationBell';
+import { AdminAvatarMenu } from './AdminAvatarMenu';
 import { NodeDiagnosticsWidget } from './NodeDiagnosticsWidget';
 import { MqttSnifferConsole } from './MqttSnifferConsole';
 import { DeadLetterQueueConsole } from './DeadLetterQueueConsole';
 import { OtaCampaignManager } from './OtaCampaignManager';
-import { AdminNavbar } from './AdminNavbar';
-import { Activity, Terminal, Cpu, ShieldAlert, UploadCloud } from 'lucide-react';
+import { Activity, Terminal, ShieldAlert, UploadCloud } from 'lucide-react';
 
 interface SystemDiagnosticsPageProps {
   user: UserResponse;
@@ -25,100 +27,169 @@ export const SystemDiagnosticsPage: React.FC<SystemDiagnosticsPageProps> = ({
   const [activeTab, setActiveTab] = useState<'NODES' | 'MQTT' | 'DLQ' | 'OTA'>('NODES');
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
+  const adminNavRailItems = [
+    {
+      id: 'admin',
+      icon: 'grid' as const,
+      label: 'Quản lý thiết bị & QR',
+      onClick: () => navigate('/admin'),
+      active: false,
+    },
+    {
+      id: 'users',
+      icon: 'users' as const,
+      label: 'Quản lý người dùng',
+      onClick: () => navigate('/admin/users'),
+      active: false,
+    },
+    {
+      id: 'diagnostics',
+      icon: 'activity' as const,
+      label: 'Chẩn đoán hạ tầng IoT',
+      onClick: () => window.scrollTo({ top: 0, behavior: 'smooth' }),
+      active: true,
+    },
+  ];
+
+  const adminBottomNavItems = [
+    {
+      id: 'admin',
+      icon: 'grid' as const,
+      label: 'Thiết bị & QR',
+      onClick: () => navigate('/admin'),
+      active: false,
+    },
+    {
+      id: 'users',
+      icon: 'users' as const,
+      label: 'Người dùng',
+      onClick: () => navigate('/admin/users'),
+      active: false,
+    },
+    {
+      id: 'diagnostics',
+      icon: 'activity' as const,
+      label: 'Hạ tầng',
+      onClick: () => window.scrollTo({ top: 0, behavior: 'smooth' }),
+      active: true,
+    },
+  ];
+
   return (
-    <div className="min-h-screen bg-[var(--canvas)] text-[var(--text)] relative overflow-x-hidden">
-      {/* Ambient Pastel Meshes for Unified HESTA Glassmorphism */}
+    <div className="app-shell admin-diagnostics-page min-h-screen bg-app text-text relative">
+      {/* Unified HESTA ambient background meshes */}
       <div className="mesh mesh-one pointer-events-none" />
       <div className="mesh mesh-two pointer-events-none" />
       <div className="mesh mesh-three pointer-events-none" />
 
-      <AppSidebar
+      {/* Shared NavRail with 3 admin destinations */}
+      <DashboardNavRail
         activeItem="diagnostics"
-        contextLabel="Quản trị nền tảng"
-        showSystemSummary={false}
-        items={[
-          { id: 'admin', label: 'Quản lý thiết bị & QR', icon: <AdminIcon />, onClick: () => navigate('/admin') },
-          { id: 'users', label: 'Quản lý người dùng', icon: <PeopleIcon />, onClick: () => navigate('/admin/users') },
-          { id: 'diagnostics', label: 'Chẩn đoán hạ tầng IoT', icon: <Activity className="w-5 h-5 text-primary" />, onClick: () => window.scrollTo({ top: 0, behavior: 'smooth' }) },
-        ]}
+        items={adminNavRailItems}
+        user={user}
+        onOpenProfile={() => setIsProfileModalOpen(true)}
+        hideSettings
+        brandTitle="HESTA Admin Center"
       />
 
-      <div className="lg:pl-64 relative z-10">
-        {/* Reusable Top Navbar */}
-        <AdminNavbar
-          title="Chẩn Đoán Kỹ Thuật & Hạ Tầng IoT"
-          subtitle="Theo dõi độ trễ MQTT RTT, Circuit Breaker, DLQ & Cập nhật OTA"
-          icon={<Cpu className="w-6 h-6 text-primary" />}
-          showBackButton={true}
-          user={user}
-          onLogout={onLogout}
-          onOpenProfile={() => setIsProfileModalOpen(true)}
-        />
+      <main id="main-content" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-6 pb-24 lg:pb-12">
+        <span className="sr-only">HESTA Admin Center</span>
 
-        {/* Main Content */}
-        <main id="main-content" className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8">
-          {/* Sub-Navigation Tabs */}
-          <div className="glass-card glass-g2 p-1.5 rounded-2xl border border-[var(--border)] flex flex-wrap items-center gap-1.5 shadow-xs">
-            <button
-              type="button"
-              onClick={() => setActiveTab('NODES')}
-              className={`inline-flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-bold rounded-xl transition cursor-pointer ${
-                activeTab === 'NODES'
-                  ? 'bg-[var(--accent)] text-white shadow-xs'
-                  : 'text-[var(--secondary)] hover:text-[var(--text)] hover:bg-[var(--g1)]'
-              }`}
-            >
-              <Activity className="w-4 h-4" />
-              <span>Giám Sát Node &amp; Mạch Bảo Vệ</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveTab('MQTT')}
-              className={`inline-flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-bold rounded-xl transition cursor-pointer ${
-                activeTab === 'MQTT'
-                  ? 'bg-[var(--accent)] text-white shadow-xs'
-                  : 'text-[var(--secondary)] hover:text-[var(--text)] hover:bg-[var(--g1)]'
-              }`}
-            >
-              <Terminal className="w-4 h-4" />
-              <span>Live MQTT Packet Sniffer</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveTab('DLQ')}
-              className={`inline-flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-bold rounded-xl transition cursor-pointer ${
-                activeTab === 'DLQ'
-                  ? 'bg-[var(--accent)] text-white shadow-xs'
-                  : 'text-[var(--secondary)] hover:text-[var(--text)] hover:bg-[var(--g1)]'
-              }`}
-            >
-              <ShieldAlert className={`w-4 h-4 ${activeTab === 'DLQ' ? 'text-white' : 'text-rose-500'}`} />
-              <span>Cứu Tín Hiệu Thiết Bị (DLQ)</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveTab('OTA')}
-              className={`inline-flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-bold rounded-xl transition cursor-pointer ${
-                activeTab === 'OTA'
-                  ? 'bg-[var(--accent)] text-white shadow-xs'
-                  : 'text-[var(--secondary)] hover:text-[var(--text)] hover:bg-[var(--g1)]'
-              }`}
-            >
-              <UploadCloud className={`w-4 h-4 ${activeTab === 'OTA' ? 'text-white' : 'text-indigo-500'}`} />
-              <span>Cập Nhật Phần Mềm Từ Xa (OTA)</span>
-            </button>
+        {/* TopBar */}
+        <header className="flex items-center justify-between gap-4 py-2 border-b border-line/60">
+          <div className="min-w-0">
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-text truncate">
+              Chẩn đoán hạ tầng IoT
+            </h1>
+            <p className="text-xs text-muted mt-0.5 truncate">
+              Độ trễ MQTT, mạch ngắt Circuit Breaker, hàng đợi DLQ &amp; cập nhật OTA
+            </p>
           </div>
 
-          {/* Active Tab Content */}
-          {activeTab === 'NODES' && <NodeDiagnosticsWidget />}
-          {activeTab === 'MQTT' && <MqttSnifferConsole />}
-          {activeTab === 'DLQ' && <DeadLetterQueueConsole />}
-          {activeTab === 'OTA' && <OtaCampaignManager />}
-        </main>
-      </div>
+          <div className="flex items-center gap-3 shrink-0">
+            <span className="hidden sm:inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border border-line bg-surface/80 text-muted">
+              Quản trị viên
+            </span>
+
+            <NotificationBell />
+
+            <AdminAvatarMenu
+              user={user}
+              onOpenProfile={() => setIsProfileModalOpen(true)}
+              onLogout={onLogout}
+            />
+          </div>
+        </header>
+
+        {/* Neutral single-line explanation */}
+        <p className="text-xs text-muted leading-relaxed">
+          Theo dõi tình trạng kết nối broker MQTT, mạch bảo vệ phần cứng, bắt gói tin trực tiếp và quản lý cập nhật firmware OTA.
+        </p>
+
+        {/* Sub-Navigation Tabs */}
+        <div className="p-1.5 rounded-2xl border border-line bg-surface/90 flex flex-wrap items-center gap-1.5 shadow-2xs">
+          <button
+            type="button"
+            onClick={() => setActiveTab('NODES')}
+            className={`inline-flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-semibold rounded-xl transition-all cursor-pointer ${
+              activeTab === 'NODES'
+                ? 'bg-primary text-white shadow-xs'
+                : 'text-muted hover:text-text hover:bg-surface-hover'
+            }`}
+          >
+            <Activity className="w-4 h-4" />
+            <span>Giám sát node &amp; mạch bảo vệ</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('MQTT')}
+            className={`inline-flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-semibold rounded-xl transition-all cursor-pointer ${
+              activeTab === 'MQTT'
+                ? 'bg-primary text-white shadow-xs'
+                : 'text-muted hover:text-text hover:bg-surface-hover'
+            }`}
+          >
+            <Terminal className="w-4 h-4" />
+            <span>Live MQTT packet sniffer</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('DLQ')}
+            className={`inline-flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-semibold rounded-xl transition-all cursor-pointer ${
+              activeTab === 'DLQ'
+                ? 'bg-primary text-white shadow-xs'
+                : 'text-muted hover:text-text hover:bg-surface-hover'
+            }`}
+          >
+            <ShieldAlert className={`w-4 h-4 ${activeTab === 'DLQ' ? 'text-white' : 'text-rose-500'}`} />
+            <span>Hàng đợi chết (DLQ)</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('OTA')}
+            className={`inline-flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-semibold rounded-xl transition-all cursor-pointer ${
+              activeTab === 'OTA'
+                ? 'bg-primary text-white shadow-xs'
+                : 'text-muted hover:text-text hover:bg-surface-hover'
+            }`}
+          >
+            <UploadCloud className={`w-4 h-4 ${activeTab === 'OTA' ? 'text-white' : 'text-primary'}`} />
+            <span>Cập nhật firmware từ xa (OTA)</span>
+          </button>
+        </div>
+
+        {/* Active Tab Content */}
+        {activeTab === 'NODES' && <NodeDiagnosticsWidget />}
+        {activeTab === 'MQTT' && <MqttSnifferConsole />}
+        {activeTab === 'DLQ' && <DeadLetterQueueConsole />}
+        {activeTab === 'OTA' && <OtaCampaignManager />}
+      </main>
+
+      {/* Mobile Bottom Navigation */}
+      <DashboardBottomNav activeItem="diagnostics" items={adminBottomNavItems} />
 
       {isProfileModalOpen && (
         <ProfileModal

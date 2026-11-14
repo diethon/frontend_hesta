@@ -10,7 +10,7 @@ import { ProductCard } from './ProductCard';
 import { DashboardNavRail } from '../home/DashboardNavRail';
 import { DashboardBottomNav } from '../home/DashboardBottomNav';
 import { NotificationBell } from '../notification/NotificationBell';
-import { UserAvatar } from '../ui/UserAvatar';
+import { AdminAvatarMenu } from './AdminAvatarMenu';
 import { ConfirmModal } from '../ui/ConfirmModal';
 import { notify } from '../ui/notify';
 import { getErrorMessage } from '../../utils/errors';
@@ -23,8 +23,6 @@ import {
   X,
   Layers,
   AlertCircle,
-  LogOut,
-  User as UserIcon,
 } from 'lucide-react';
 
 interface AdminDashboardProps {
@@ -36,8 +34,6 @@ interface AdminDashboardProps {
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout, onProfileUpdate }) => {
   const navigate = useNavigate();
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
-  const [isAvatarMenuOpen, setIsAvatarMenuOpen] = useState(false);
-  const avatarMenuRef = useRef<HTMLDivElement>(null);
 
   // Catalog & QR states
   const [catalogs, setCatalogs] = useState<DeviceCatalog[]>([]);
@@ -62,9 +58,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout, 
     const handleOutsideClick = (e: MouseEvent) => {
       if (typeDropdownRef.current && !typeDropdownRef.current.contains(e.target as Node)) {
         setTypeDropdownOpen(false);
-      }
-      if (avatarMenuRef.current && !avatarMenuRef.current.contains(e.target as Node)) {
-        setIsAvatarMenuOpen(false);
       }
     };
     document.addEventListener('mousedown', handleOutsideClick);
@@ -135,10 +128,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout, 
 
   const currentTypeLabel =
     DEVICE_TYPE_OPTIONS.find((opt) => opt.value === selectedType)?.label || 'Tất cả loại thiết bị';
-
-  const userInitial = user?.fullName
-    ? user.fullName.trim().split(' ').slice(-1)[0]?.charAt(0).toUpperCase() || 'A'
-    : 'A';
 
   // Navigation items for Admin shell
   const adminNavRailItems = [
@@ -226,61 +215,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout, 
 
             <NotificationBell />
 
-            {/* Avatar Menu Dropdown */}
-            <div className="relative" ref={avatarMenuRef}>
-              <button
-                type="button"
-                aria-label="Tài khoản quản trị"
-                aria-expanded={isAvatarMenuOpen}
-                onClick={() => setIsAvatarMenuOpen((prev) => !prev)}
-                className="avatar small flex items-center justify-center cursor-pointer overflow-hidden border border-line shadow-xs hover:border-primary transition-colors"
-                title={user.fullName || 'Tài khoản quản trị'}
-              >
-                {user.avatarUrl ? (
-                  <UserAvatar src={user.avatarUrl} name={user.fullName} size={36} />
-                ) : (
-                  <span className="font-semibold text-xs text-text">{userInitial}</span>
-                )}
-              </button>
-
-              {isAvatarMenuOpen && (
-                <div
-                  role="menu"
-                  className="absolute right-0 mt-2 z-40 w-52 rounded-2xl border border-line bg-surface p-1 shadow-float animate-in fade-in zoom-in-95 duration-150"
-                >
-                  <div className="px-3 py-2 border-b border-line mb-1">
-                    <p className="text-xs font-semibold text-text truncate">{user.fullName}</p>
-                    <p className="text-[11px] text-muted truncate">{user.email}</p>
-                  </div>
-
-                  <button
-                    type="button"
-                    role="menuitem"
-                    onClick={() => {
-                      setIsAvatarMenuOpen(false);
-                      setIsProfileModalOpen(true);
-                    }}
-                    className="w-full text-left px-3 py-2 text-xs font-medium text-text hover:bg-surface-hover rounded-xl flex items-center gap-2 cursor-pointer transition-colors"
-                  >
-                    <UserIcon className="w-3.5 h-3.5 text-muted" />
-                    <span>Hồ sơ &amp; bảo mật</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    role="menuitem"
-                    onClick={() => {
-                      setIsAvatarMenuOpen(false);
-                      onLogout();
-                    }}
-                    className="w-full text-left px-3 py-2 text-xs font-medium text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-xl flex items-center gap-2 cursor-pointer transition-colors"
-                  >
-                    <LogOut className="w-3.5 h-3.5 text-rose-500" />
-                    <span>Đăng xuất</span>
-                  </button>
-                </div>
-              )}
-            </div>
+            <AdminAvatarMenu
+              user={user}
+              onOpenProfile={() => setIsProfileModalOpen(true)}
+              onLogout={onLogout}
+            />
           </div>
         </header>
 
