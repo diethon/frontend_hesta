@@ -133,3 +133,31 @@ test('backend validation messages are surfaced to the UI', async () => {
     /Scene action value is invalid/,
   );
 });
+
+test('executeScene waits for the final result pushed over realtime, not the PENDING start', async () => {
+  const { realtimeEventDispatcher } = loadSource('src/realtime/realtimeEvents.ts');
+  const originalFetch = globalThis.fetch;
+  const fetched = [];
+  globalThis.fetch = async (url) => {
+    fetched.push(String(url));
+    return { status: 200, ok: true, json: async () => ({ code: 1000, result: { id: 'run-1', status: 'PENDING', resultDetail: [] } }) };
+  };
+  const event = (status) => ({
+    eventId: `e-${status}`, type: 'SCENE_EXECUTION_UPDATED', homeId: 'home-1',
+    data: { id: 'run-1', status, resultDetail: [] }, timestamp: new Date().toISOString(),
+  });
+  try {
+    let settled = false;
+    const run = sceneApi.executeScene('home-1', 'scene-1').then((result) => { settled = true; return result; });
+    await new Promise((tick) => setTimeout(tick, 0));
+    realtimeEventDispatcher.dispatch(event('PENDING'));
+    await new Promise((tick) => setTimeout(tick, 0));
+    assert.equal(settled, false);
+
+    realtimeEventDispatcher.dispatch(event('PARTIAL'));
+    assert.equal((await run).status, 'PARTIAL');
+    assert.ok(fetched[0].endsWith('/homes/home-1/scenes/scene-1/execute?async=true'));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

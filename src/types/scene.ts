@@ -53,9 +53,10 @@ export interface SceneExecutionResponse {
   id: string;
   sceneId: string;
   triggerSource: 'MANUAL' | 'SCHEDULE' | 'AUTOMATION';
-  status: 'SUCCESS' | 'PARTIAL' | 'FAILED' | 'SKIPPED';
+  /** PENDING while devices are still answering (async run). */
+  status: 'PENDING' | 'SUCCESS' | 'PARTIAL' | 'FAILED' | 'SKIPPED';
   startedAt: string;
-  completedAt: string;
+  completedAt?: string;
   resultDetail: Array<{ deviceId: string; action: string; success: boolean; status: string; message?: string }>;
 }
 
