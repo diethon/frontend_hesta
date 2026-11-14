@@ -18,8 +18,10 @@ import {
   ShieldAlert,
   ShieldCheck,
   Globe,
+  Shield,
 } from 'lucide-react';
 import { notify } from '../ui/notify';
+import { formatDateTimeFullVi } from './adminUsersHelpers';
 
 interface AdminUserDetailModalProps {
   isOpen: boolean;
@@ -45,47 +47,33 @@ export const AdminUserDetailModal: React.FC<AdminUserDetailModalProps> = ({
   if (!isOpen || !user) return null;
 
   const copyToClipboard = (text: string, field: string) => {
-    navigator.clipboard.writeText(text);
+    void navigator.clipboard.writeText(text);
     setCopiedField(field);
-    notify.success(`Đã sao chép ${field}!`, '');
+    notify.success(`Đã sao chép ${field}`, '');
     setTimeout(() => setCopiedField(null), 2000);
-  };
-
-  const formatDate = (dateStr?: string | null) => {
-    if (!dateStr) return 'Chưa có dữ liệu';
-    const d = new Date(dateStr);
-    return isNaN(d.getTime())
-      ? dateStr
-      : d.toLocaleString('vi-VN', {
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit',
-          hour: '2-digit',
-          minute: '2-digit',
-        });
   };
 
   const getStatusBadge = () => {
     switch (user.status) {
       case 'ACTIVE':
         return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
             <span className="h-2 w-2 rounded-full bg-emerald-500" />
-            Đang hoạt động (ACTIVE)
+            Đang hoạt động
           </span>
         );
       case 'LOCKED':
         return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-500/10 text-amber-600 border border-amber-500/20">
-            <Lock className="w-3.5 h-3.5 text-amber-500" />
-            Tạm khóa bảo vệ (LOCKED)
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
+            <Lock className="w-3.5 h-3.5 text-rose-500" />
+            Tạm khóa bảo vệ
           </span>
         );
       case 'DISABLED':
         return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-500/10 text-rose-600 border border-rose-500/20">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
             <AlertTriangle className="w-3.5 h-3.5 text-rose-500" />
-            Vô hiệu hóa (DISABLED)
+            Vô hiệu hóa
           </span>
         );
       default:
@@ -94,16 +82,20 @@ export const AdminUserDetailModal: React.FC<AdminUserDetailModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-fade-in">
+    <div
+      role="dialog"
+      aria-modal="true"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
+      onClick={onClose}
+    >
       <div
-        className="surface-card w-full max-w-2xl rounded-2xl border border-line bg-surface p-6 shadow-float transition-all max-h-[90vh] overflow-y-auto"
-        role="dialog"
-        aria-modal="true"
+        className="w-full max-w-2xl rounded-3xl border border-line bg-surface p-6 shadow-2xl text-text transition-all max-h-[90vh] overflow-y-auto custom-scrollbar animate-in zoom-in-95 duration-200 space-y-5"
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-line pb-4 mb-5">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-full overflow-hidden shrink-0 border border-line bg-sidebar flex items-center justify-center">
+        <div className="flex items-center justify-between border-b border-line/60 pb-4">
+          <div className="flex items-center gap-3.5 min-w-0">
+            <div className="w-12 h-12 rounded-2xl overflow-hidden shrink-0 border border-line bg-sidebar flex items-center justify-center">
               <UserAvatar
                 src={user.avatarUrl}
                 name={user.fullName}
@@ -111,63 +103,65 @@ export const AdminUserDetailModal: React.FC<AdminUserDetailModalProps> = ({
                 fallbackClassName="text-base font-bold text-white bg-primary"
               />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-lg font-bold text-text">{user.fullName}</h3>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-lg font-bold text-text truncate">{user.fullName}</h3>
                 <span
-                  className={`px-2 py-0.5 text-[11px] font-bold rounded-full border ${
+                  className={`inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-semibold rounded-full border ${
                     user.platformRole === 'ADMIN'
-                      ? 'border-amber-500/30 bg-amber-500/10 text-amber-600'
-                      : 'border-info/30 bg-info-soft text-primary-hover'
+                      ? 'border-primary/30 bg-primary/10 text-primary'
+                      : 'border-line bg-surface text-muted'
                   }`}
                 >
-                  {user.platformRole}
+                  {user.platformRole === 'ADMIN' && <Shield className="w-3 h-3 text-primary" />}
+                  <span>{user.platformRole === 'ADMIN' ? 'Quản trị viên' : 'Người dùng'}</span>
                 </span>
               </div>
-              <p className="text-xs text-muted font-mono">{user.id}</p>
+              <p className="text-xs text-muted font-mono truncate">{user.id}</p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-1.5 text-muted hover:bg-sidebar-hover hover:text-text transition-colors"
+            aria-label="Đóng chi tiết"
+            className="rounded-xl p-2 text-muted hover:bg-surface-hover hover:text-text transition-colors cursor-pointer shrink-0"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Content sections */}
-        <div className="space-y-5">
+        <div className="space-y-4">
           {/* Status & Privacy Banner */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-xl border border-line bg-sidebar/50">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-2xl border border-line bg-sidebar/50">
             <div>
-              <div className="text-xs text-muted mb-1 font-semibold uppercase tracking-wider">
+              <div className="text-xs text-muted mb-1.5 font-medium">
                 Trạng thái tài khoản
               </div>
               {getStatusBadge()}
             </div>
-            <div className="text-xs text-muted text-right sm:max-w-xs">
-              <span className="font-semibold text-text">Bảo vệ quyền riêng tư:</span> Quản trị viên chỉ quản lý tài khoản định danh, không thể xem mật khẩu hoặc dữ liệu phòng riêng tư.
+            <div className="text-xs text-muted text-left sm:text-right sm:max-w-xs leading-relaxed">
+              <span className="font-semibold text-text">Bảo vệ quyền riêng tư:</span> Quản trị viên chỉ quản lý tài khoản định danh, không thể xem mật khẩu hoặc dữ liệu cá nhân.
             </div>
           </div>
 
           {/* Grid details */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             {/* Email */}
-            <div className="p-3.5 rounded-xl border border-line bg-surface flex items-center justify-between group">
+            <div className="p-3.5 rounded-2xl border border-line bg-surface flex items-center justify-between group">
               <div className="flex items-center gap-3 min-w-0">
-                <div className="p-2 rounded-lg bg-primary/10 text-primary shrink-0">
+                <div className="p-2.5 rounded-xl bg-primary/10 text-primary shrink-0">
                   <Mail className="w-4 h-4" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-[11px] font-semibold text-muted uppercase tracking-wider">Email định danh</p>
-                  <p className="text-sm font-bold text-text truncate">{user.email}</p>
+                  <p className="text-xs text-muted">Email định danh</p>
+                  <p className="text-xs sm:text-sm font-semibold text-text truncate">{user.email}</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => copyToClipboard(user.email, 'Email')}
-                className="p-1.5 text-muted hover:text-text rounded-md hover:bg-sidebar transition shrink-0"
+                className="p-2 text-muted hover:text-text rounded-xl hover:bg-sidebar transition-colors shrink-0 cursor-pointer"
                 title="Sao chép email"
               >
                 {copiedField === 'Email' ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
@@ -175,14 +169,14 @@ export const AdminUserDetailModal: React.FC<AdminUserDetailModalProps> = ({
             </div>
 
             {/* Phone */}
-            <div className="p-3.5 rounded-xl border border-line bg-surface flex items-center justify-between group">
+            <div className="p-3.5 rounded-2xl border border-line bg-surface flex items-center justify-between group">
               <div className="flex items-center gap-3 min-w-0">
-                <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-600 shrink-0">
+                <div className="p-2.5 rounded-xl bg-primary/10 text-primary shrink-0">
                   <Phone className="w-4 h-4" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-[11px] font-semibold text-muted uppercase tracking-wider">Số điện thoại</p>
-                  <p className="text-sm font-bold text-text truncate">
+                  <p className="text-xs text-muted">Số điện thoại</p>
+                  <p className="text-xs sm:text-sm font-semibold text-text truncate">
                     {user.phoneNumber || <span className="text-muted font-normal italic">Chưa liên kết</span>}
                   </p>
                 </div>
@@ -191,7 +185,7 @@ export const AdminUserDetailModal: React.FC<AdminUserDetailModalProps> = ({
                 <button
                   type="button"
                   onClick={() => copyToClipboard(user.phoneNumber!, 'Số điện thoại')}
-                  className="p-1.5 text-muted hover:text-text rounded-md hover:bg-sidebar transition shrink-0"
+                  className="p-2 text-muted hover:text-text rounded-xl hover:bg-sidebar transition-colors shrink-0 cursor-pointer"
                   title="Sao chép số điện thoại"
                 >
                   {copiedField === 'Số điện thoại' ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
@@ -200,75 +194,75 @@ export const AdminUserDetailModal: React.FC<AdminUserDetailModalProps> = ({
             </div>
 
             {/* Auth Provider */}
-            <div className="p-3.5 rounded-xl border border-line bg-surface flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-blue-500/10 text-blue-600 shrink-0">
+            <div className="p-3.5 rounded-2xl border border-line bg-surface flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-primary/10 text-primary shrink-0">
                 <Globe className="w-4 h-4" />
               </div>
               <div>
-                <p className="text-[11px] font-semibold text-muted uppercase tracking-wider">Nguồn đăng nhập</p>
-                <p className="text-sm font-bold text-text">
-                  {user.provider === 'GOOGLE' ? 'Google OAuth 2.0' : 'Mật khẩu nội bộ (LOCAL)'}
+                <p className="text-xs text-muted">Nguồn đăng nhập</p>
+                <p className="text-xs sm:text-sm font-semibold text-text">
+                  {user.provider === 'GOOGLE' ? 'Google OAuth 2.0' : 'Mật khẩu nội bộ (Email)'}
                 </p>
               </div>
             </div>
 
             {/* Homes count */}
-            <div className="p-3.5 rounded-xl border border-line bg-surface flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-amber-500/10 text-amber-600 shrink-0">
+            <div className="p-3.5 rounded-2xl border border-line bg-surface flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-primary/10 text-primary shrink-0">
                 <Home className="w-4 h-4" />
               </div>
               <div>
-                <p className="text-[11px] font-semibold text-muted uppercase tracking-wider">Ngôi nhà tham gia</p>
-                <p className="text-sm font-bold text-text">{user.homeCount} không gian nhà</p>
+                <p className="text-xs text-muted">Ngôi nhà tham gia</p>
+                <p className="text-xs sm:text-sm font-semibold text-text">{user.homeCount} không gian nhà</p>
               </div>
             </div>
           </div>
 
           {/* Security & Access Logs */}
-          <div className="rounded-xl border border-line bg-surface p-4 space-y-3">
-            <h4 className="text-xs font-bold text-text uppercase tracking-wider flex items-center gap-2">
+          <div className="rounded-2xl border border-line bg-surface p-4 space-y-3">
+            <h4 className="text-xs font-bold text-text flex items-center gap-2">
               <ShieldCheck className="w-4 h-4 text-primary" />
-              Thông tin Bảo Mật &amp; Phiên Đăng Nhập
+              <span>Thông tin bảo mật &amp; phiên đăng nhập</span>
             </h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-              <div className="flex items-center justify-between p-2.5 rounded-lg bg-sidebar">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+              <div className="flex items-center justify-between p-2.5 rounded-xl bg-sidebar/60">
                 <span className="text-muted flex items-center gap-1.5">
                   <ShieldAlert className="w-3.5 h-3.5" /> Số lần đăng nhập sai:
                 </span>
-                <span className={`font-bold ${user.failedLoginAttempts > 0 ? 'text-amber-500' : 'text-text'}`}>
+                <span className={`font-semibold ${user.failedLoginAttempts > 0 ? 'text-rose-500' : 'text-text'}`}>
                   {user.failedLoginAttempts} / 5 lần
                 </span>
               </div>
 
-              <div className="flex items-center justify-between p-2.5 rounded-lg bg-sidebar">
+              <div className="flex items-center justify-between p-2.5 rounded-xl bg-sidebar/60">
                 <span className="text-muted flex items-center gap-1.5">
                   <Clock className="w-3.5 h-3.5" /> Hoạt động gần nhất:
                 </span>
-                <span className="font-semibold text-text">{formatDate(user.lastActiveAt)}</span>
+                <span className="font-semibold text-text">{formatDateTimeFullVi(user.lastActiveAt)}</span>
               </div>
 
-              <div className="flex items-center justify-between p-2.5 rounded-lg bg-sidebar">
+              <div className="flex items-center justify-between p-2.5 rounded-xl bg-sidebar/60">
                 <span className="text-muted flex items-center gap-1.5">
                   <Calendar className="w-3.5 h-3.5" /> Ngày tạo tài khoản:
                 </span>
-                <span className="font-semibold text-text">{formatDate(user.createdAt)}</span>
+                <span className="font-semibold text-text">{formatDateTimeFullVi(user.createdAt)}</span>
               </div>
 
-              <div className="flex items-center justify-between p-2.5 rounded-lg bg-sidebar">
+              <div className="flex items-center justify-between p-2.5 rounded-xl bg-sidebar/60">
                 <span className="text-muted flex items-center gap-1.5">
                   <Clock className="w-3.5 h-3.5" /> Cập nhật lần cuối:
                 </span>
-                <span className="font-semibold text-text">{formatDate(user.updatedAt)}</span>
+                <span className="font-semibold text-text">{formatDateTimeFullVi(user.updatedAt)}</span>
               </div>
             </div>
 
             {user.lockedUntil && (
-              <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs flex items-center justify-between">
-                <span>Khóa đến: <b>{formatDate(user.lockedUntil)}</b></span>
+              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs flex items-center justify-between gap-3">
+                <span>Khóa bảo vệ đến: <b>{formatDateTimeFullVi(user.lockedUntil)}</b></span>
                 <button
                   type="button"
                   onClick={() => onUnlock(user)}
-                  className="px-2.5 py-1 rounded-md bg-emerald-500 hover:bg-emerald-600 text-white font-bold transition"
+                  className="px-3 py-1.5 rounded-full bg-primary hover:bg-primary-hover text-white font-semibold transition-colors cursor-pointer"
                 >
                   Mở khóa ngay
                 </button>
@@ -282,19 +276,19 @@ export const AdminUserDetailModal: React.FC<AdminUserDetailModalProps> = ({
               <button
                 type="button"
                 onClick={() => onEdit(user)}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-line bg-sidebar hover:bg-sidebar-hover text-xs font-semibold text-text transition"
+                className="min-h-[40px] inline-flex items-center gap-1.5 px-4 rounded-full border border-line bg-surface hover:bg-surface-hover text-xs font-semibold text-text transition-colors cursor-pointer"
               >
                 <Edit3 className="w-3.5 h-3.5" />
-                Sửa thông tin
+                <span>Sửa thông tin</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => onResetPassword(user)}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-xs font-semibold text-amber-600 transition"
+                className="min-h-[40px] inline-flex items-center gap-1.5 px-4 rounded-full border border-line bg-surface hover:bg-surface-hover text-xs font-semibold text-text transition-colors cursor-pointer"
               >
-                <KeyRound className="w-3.5 h-3.5" />
-                Đặt lại mật khẩu
+                <KeyRound className="w-3.5 h-3.5 text-primary" />
+                <span>Đặt lại mật khẩu</span>
               </button>
             </div>
 
@@ -303,19 +297,19 @@ export const AdminUserDetailModal: React.FC<AdminUserDetailModalProps> = ({
                 <button
                   type="button"
                   onClick={() => onUnlock(user)}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold shadow-soft transition"
+                  className="min-h-[40px] inline-flex items-center gap-1.5 px-4 rounded-full bg-primary hover:bg-primary-hover text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
                 >
                   <Unlock className="w-3.5 h-3.5" />
-                  Mở khóa tài khoản
+                  <span>Mở khóa tài khoản</span>
                 </button>
               ) : user.status === 'ACTIVE' ? (
                 <button
                   type="button"
                   onClick={() => onToggleStatus(user, 'LOCKED')}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-xs font-semibold text-amber-600 transition"
+                  className="min-h-[40px] inline-flex items-center gap-1.5 px-4 rounded-full border border-line bg-surface hover:bg-surface-hover text-xs font-semibold text-muted hover:text-text transition-colors cursor-pointer"
                 >
                   <Lock className="w-3.5 h-3.5" />
-                  Tạm khóa tài khoản
+                  <span>Tạm khóa tài khoản</span>
                 </button>
               ) : null}
 
@@ -323,17 +317,17 @@ export const AdminUserDetailModal: React.FC<AdminUserDetailModalProps> = ({
                 <button
                   type="button"
                   onClick={() => onToggleStatus(user, 'ACTIVE')}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary hover:bg-primary-hover text-white text-xs font-bold shadow-soft transition"
+                  className="min-h-[40px] inline-flex items-center gap-1.5 px-4 rounded-full bg-primary hover:bg-primary-hover text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
                 >
-                  Kích hoạt lại
+                  <span>Kích hoạt lại</span>
                 </button>
               ) : (
                 <button
                   type="button"
                   onClick={() => onToggleStatus(user, 'DISABLED')}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 text-xs font-semibold text-rose-600 transition"
+                  className="min-h-[40px] inline-flex items-center gap-1.5 px-4 rounded-full border border-rose-500/20 bg-surface hover:bg-rose-50 dark:hover:bg-rose-950/20 text-xs font-semibold text-rose-600 dark:text-rose-400 transition-colors cursor-pointer"
                 >
-                  Vô hiệu hóa (Ban)
+                  <span>Vô hiệu hóa</span>
                 </button>
               )}
             </div>

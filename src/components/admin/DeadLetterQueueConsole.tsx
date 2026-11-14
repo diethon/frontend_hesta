@@ -24,6 +24,7 @@ import {
 } from '../../services/diagnosticsApi';
 import { notify } from '../ui/notify';
 import { getSortedFormattedJson } from '../device/DeviceStateVisualizer';
+import { ConfirmModal } from '../ui/ConfirmModal';
 
 export const DeadLetterQueueConsole: React.FC = () => {
   const [letters, setLetters] = useState<MqttDeadLetter[]>([]);
@@ -31,6 +32,8 @@ export const DeadLetterQueueConsole: React.FC = () => {
   const [replayingId, setReplayingId] = useState<string | null>(null);
   const [isReplayingAll, setIsReplayingAll] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [isClearModalOpen, setIsClearModalOpen] = useState(false);
+  const [isClearing, setIsClearing] = useState(false);
 
   const fetchLetters = async () => {
     setIsLoading(true);
@@ -82,14 +85,17 @@ export const DeadLetterQueueConsole: React.FC = () => {
     }
   };
 
-  const handleClear = async () => {
-    if (!window.confirm('Bạn có chắc muốn dọn sạch toàn bộ các tín hiệu đang lưu trong hộp thư này?')) return;
+  const handleConfirmClear = async () => {
+    setIsClearing(true);
     try {
       await clearDeadLetters();
       setLetters([]);
+      setIsClearModalOpen(false);
       notify.success('Đã dọn dẹp sạch sẽ hộp thư tín hiệu');
     } catch {
       notify.error('Lỗi khi dọn dẹp hộp thư');
+    } finally {
+      setIsClearing(false);
     }
   };
 
@@ -103,7 +109,7 @@ export const DeadLetterQueueConsole: React.FC = () => {
     if (reason.includes('RATE_LIMIT')) {
       return {
         label: 'Gửi dồn dập (Tạm giữ chống quá tải)',
-        color: 'bg-amber-500/10 text-amber-600 border-amber-500/20',
+        color: 'bg-primary/10 text-primary border-primary/20',
       };
     }
     if (reason.includes('MALFORMED') || reason.includes('JSON')) {
@@ -169,23 +175,23 @@ export const DeadLetterQueueConsole: React.FC = () => {
   return (
     <div className="space-y-6 tabular-nums">
       {/* Banner Giới Thiệu Chức Năng Dễ Hiểu */}
-      <div className="glass-card glass-g2 p-5 rounded-3xl border border-[var(--border)]">
-        <div className="flex items-start gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-primary/15 text-primary flex items-center justify-center shrink-0 mt-0.5">
+      <div className="rounded-3xl border border-line bg-surface shadow-xs p-5 sm:p-6">
+        <div className="flex items-start gap-3.5">
+          <div className="w-10 h-10 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shrink-0 mt-0.5">
             <Inbox className="w-5 h-5" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <h3 className="text-base font-bold text-text">
-                Trung Tâm Cứu Tín Hiệu Thiết Bị (Dead-Letter Queue)
+                Trung tâm cứu tín hiệu thiết bị (Dead-letter queue)
               </h3>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/10 text-primary">
-                Bảo Vệ Dữ Liệu Gia Đình
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-primary/10 text-primary">
+                Bảo vệ dữ liệu gia đình
               </span>
             </div>
-            <p className="text-xs text-muted mt-1 leading-relaxed">
+            <p className="text-xs text-muted mt-1 leading-relaxed max-w-3xl">
               Khi mạng gia đình chập chờn hoặc thiết bị gửi dữ liệu quá dồn dập, các tín hiệu (điện năng, nhiệt độ, bật/tắt)
-              sẽ được <strong>giữ lại an toàn tại đây thay vì bị đánh mất</strong>. Bạn có thể bấm <strong>&quot;Thử Gửi Lại&quot;</strong> để hệ thống cập nhật đúng tình trạng thiết bị.
+              sẽ được giữ lại an toàn tại đây thay vì bị đánh mất. Bạn có thể bấm <strong>&quot;Thử gửi lại&quot;</strong> để hệ thống cập nhật đúng tình trạng thiết bị.
             </p>
           </div>
         </div>
@@ -193,18 +199,18 @@ export const DeadLetterQueueConsole: React.FC = () => {
 
       {/* 4 Thẻ Trạng Thái Trực Quan */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="glass-card glass-g2 p-4 rounded-3xl border border-[var(--border)] flex items-center justify-between">
+        <div className="rounded-3xl border border-line bg-surface shadow-xs p-4 flex items-center justify-between">
           <div>
             <p className="text-xs text-muted font-medium">Tín hiệu chờ gửi lại</p>
-            <p className="text-2xl font-bold text-red-500 mt-1">{unhandledCount}</p>
+            <p className="text-2xl font-bold text-rose-500 mt-1">{unhandledCount}</p>
             <p className="text-[10px] text-muted mt-0.5">Cần nạp lại vào hệ thống</p>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-red-500/10 text-red-500 flex items-center justify-center">
+          <div className="w-10 h-10 rounded-xl bg-rose-500/10 text-rose-500 flex items-center justify-center">
             <ShieldAlert className="w-5 h-5" />
           </div>
         </div>
 
-        <div className="glass-card glass-g2 p-4 rounded-3xl border border-[var(--border)] flex items-center justify-between">
+        <div className="rounded-3xl border border-line bg-surface shadow-xs p-4 flex items-center justify-between">
           <div>
             <p className="text-xs text-muted font-medium">Đã gửi lại thành công</p>
             <p className="text-2xl font-bold text-emerald-500 mt-1">{replayedCount}</p>
@@ -215,10 +221,10 @@ export const DeadLetterQueueConsole: React.FC = () => {
           </div>
         </div>
 
-        <div className="glass-card glass-g2 p-4 rounded-3xl border border-[var(--border)] flex items-center justify-between">
+        <div className="rounded-3xl border border-line bg-surface shadow-xs p-4 flex items-center justify-between">
           <div>
             <p className="text-xs text-muted font-medium">Tốc độ tiếp nhận</p>
-            <p className="text-xl font-bold text-primary mt-1">An Toàn</p>
+            <p className="text-xl font-bold text-primary mt-1">An toàn</p>
             <p className="text-[10px] text-muted mt-0.5">Tối đa 50 tín hiệu/giây</p>
           </div>
           <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
@@ -226,26 +232,26 @@ export const DeadLetterQueueConsole: React.FC = () => {
           </div>
         </div>
 
-        <div className="glass-card glass-g2 p-4 rounded-3xl border border-[var(--border)] flex items-center justify-between">
+        <div className="rounded-3xl border border-line bg-surface shadow-xs p-4 flex items-center justify-between">
           <div>
             <p className="text-xs text-muted font-medium">Bộ nhớ lưu tạm</p>
             <p className="text-xl font-bold text-text mt-1">{letters.length} / 500</p>
             <p className="text-[10px] text-muted mt-0.5">Tự động xoay vòng an toàn</p>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center">
+          <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
             <Clock className="w-5 h-5" />
           </div>
         </div>
       </div>
 
       {/* Danh Sách Tín Hiệu */}
-      <div className="glass-card glass-g2 rounded-3xl border border-[var(--border)] overflow-hidden shadow-xs">
+      <div className="rounded-3xl border border-line bg-surface shadow-xs overflow-hidden">
         {/* Thanh Công Cụ */}
-        <div className="p-4 border-b border-line flex flex-wrap items-center justify-between gap-3 bg-surface/50">
+        <div className="p-4 border-b border-line flex flex-wrap items-center justify-between gap-3 bg-sidebar/50">
           <div className="flex items-center gap-2">
-            <span className={`flex h-2.5 w-2.5 rounded-full ${unhandledCount > 0 ? 'bg-red-500 animate-pulse' : 'bg-emerald-500'}`} />
+            <span className={`flex h-2.5 w-2.5 rounded-full ${unhandledCount > 0 ? 'bg-rose-500 animate-pulse' : 'bg-emerald-500'}`} />
             <h4 className="text-sm font-bold text-text">
-              Danh Sách Tín Hiệu Đang Chờ Xử Lý
+              Danh sách tín hiệu đang chờ xử lý
             </h4>
           </div>
 
@@ -253,30 +259,30 @@ export const DeadLetterQueueConsole: React.FC = () => {
             <button
               onClick={handleReplayAll}
               disabled={isReplayingAll || unhandledCount === 0}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary text-white text-xs font-semibold hover:bg-primary-hover disabled:opacity-50 transition-all shadow-sm"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary text-white text-xs font-semibold hover:bg-primary-hover disabled:opacity-50 transition-colors shadow-2xs cursor-pointer"
               title="Thử gửi lại tất cả các tín hiệu đang chờ"
             >
               <RotateCw className={`w-3.5 h-3.5 ${isReplayingAll ? 'animate-spin' : ''}`} />
-              Thử Gửi Lại Tất Cả ({unhandledCount})
+              <span>Thử gửi lại tất cả ({unhandledCount})</span>
             </button>
 
             <button
-              onClick={handleClear}
+              onClick={() => setIsClearModalOpen(true)}
               disabled={letters.length === 0}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-red-500/30 text-red-500 hover:bg-red-500/10 text-xs font-semibold disabled:opacity-50 transition-all"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-rose-500/30 text-rose-500 hover:bg-rose-500/10 text-xs font-semibold disabled:opacity-50 transition-colors cursor-pointer"
               title="Xóa sạch các tín hiệu không cần nữa"
             >
               <Trash2 className="w-3.5 h-3.5" />
-              Dọn Sạch
+              <span>Dọn sạch</span>
             </button>
 
             <button
               onClick={fetchLetters}
               disabled={isLoading}
-              className="p-1.5 rounded-xl border border-line text-muted hover:text-text hover:bg-sidebar transition-colors"
+              className="p-1.5 rounded-xl border border-line text-muted hover:text-text hover:bg-surface-hover transition-colors cursor-pointer"
               title="Làm mới danh sách"
             >
-              <RotateCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+              <RotateCw className={`w-4 h-4 ${isLoading ? 'animate-spin text-primary' : ''}`} />
             </button>
           </div>
         </div>
@@ -397,6 +403,18 @@ export const DeadLetterQueueConsole: React.FC = () => {
           </div>
         )}
       </div>
+
+      <ConfirmModal
+        isOpen={isClearModalOpen}
+        title="Dọn sạch hàng đợi tín hiệu"
+        description="Bạn có chắc chắn muốn dọn sạch toàn bộ các tín hiệu đang lưu trong hàng đợi này không? Hành động này không thể hoàn tác."
+        confirmText="Dọn sạch ngay"
+        cancelText="Hủy bỏ"
+        variant="danger"
+        loading={isClearing}
+        onConfirm={handleConfirmClear}
+        onCancel={() => setIsClearModalOpen(false)}
+      />
     </div>
   );
 };

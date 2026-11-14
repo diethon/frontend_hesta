@@ -3,8 +3,6 @@ import React, { useCallback, useEffect, useState, useRef, useMemo } from 'react'
 import { useNavigate, useParams, Navigate } from 'react-router';
 import {
   ArrowUpDown,
-  ChevronDown,
-  Check,
   Settings2,
   WifiOff,
   Lock,
@@ -13,10 +11,14 @@ import {
   AlertTriangle,
   Plus,
   Filter,
+  Power,
+  Thermometer,
 } from 'lucide-react';
-import { Icon, IconButton } from '../home/HomeIcons';
+import { Icon } from '../home/HomeIcons';
 import { DashboardNavRail } from '../home/DashboardNavRail';
 import { DashboardBottomNav } from '../home/DashboardBottomNav';
+import { AutomationTopBar } from '../automation/AutomationTopBar';
+import { DeviceFilterDropdown, DeviceMobileFilterModal } from './DeviceFilterDropdown';
 import { AddDeviceModal } from './AddDeviceModal';
 import { RoomManagementModal } from './RoomManagementModal';
 import { DeviceDetailModal } from './DeviceDetailModal';
@@ -35,8 +37,6 @@ import type { DeviceResponse } from '../../types/device';
 import type { RoomResponse } from '../../types/room';
 import type { DeviceEnergyBreakdown } from '../../types/energy';
 import { getErrorMessage, isDuplicateCommandError } from '../../utils/errors';
-import { NotificationBell } from '../notification/NotificationBell';
-import { VoiceAssistantButton } from '../ui/VoiceAssistant';
 import { currentHomeChanged, currentHomeCleared } from '../../store/homeSlice';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { notify } from '../ui/notify';
@@ -47,6 +47,7 @@ import {
   type UIMappedDevice,
   type DeviceSortOption,
   SORT_OPTIONS,
+  DEVICE_TYPE_FILTER_OPTIONS,
   mapDeviceToUI,
   formatLastSeenVi,
   getDeviceRatedWattage,
@@ -62,91 +63,82 @@ export { mapDeviceToUI } from './devicePageHelpers';
 // Subcomponents
 // ──────────────────────────────────────────────────────────────────────────
 
-function DevicesTopBar({
-  onlineCount,
-  activeCount,
-  searchQuery,
-  onSearchChange,
-  userInitial = 'M',
-}: {
-  onlineCount: number;
-  activeCount: number;
-  searchQuery: string;
-  onSearchChange: (q: string) => void;
-  userInitial?: string;
-}) {
-  const [searchOpen, setSearchOpen] = useState(false);
-
-  return (
-    <header className="topbar devices-topbar">
-      <div>
-        <span className="eyebrow">
-          {onlineCount} TRỰC TUYẾN · {activeCount} ĐANG BẬT
-        </span>
-        <h2>Thiết bị</h2>
-      </div>
-      <div className="top-actions">
-        {searchOpen && (
-          <input
-            autoFocus
-            className="inline-search"
-            value={searchQuery}
-            onChange={(event) => onSearchChange(event.target.value)}
-            placeholder="Tìm thiết bị"
-          />
-        )}
-        <IconButton
-          icon="search"
-          label="Tìm kiếm"
-          onClick={() => setSearchOpen(!searchOpen)}
-        />
-        <VoiceAssistantButton />
-        <NotificationBell />
-        <div className="avatar">{userInitial}</div>
-      </div>
-    </header>
-  );
-}
-
 function RoomFilterStrip({
   rooms,
   activeRoom,
   totalCount,
   roomCounts,
   onChange,
+  loading = false,
 }: {
   rooms: RoomResponse[];
   activeRoom: string;
   totalCount: number;
   roomCounts: Record<string, number>;
   onChange: (roomId: string) => void;
+  loading?: boolean;
 }) {
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
+        {[1, 2, 3, 4].map((i) => (
+          <div
+            key={i}
+            className="h-9 w-24 rounded-full bg-[var(--border)]/50 animate-pulse shrink-0"
+          />
+        ))}
+      </div>
+    );
+  }
+
   return (
-    <div className="device-room-strip">
-      <button
-        type="button"
-        className={`${activeRoom === 'ALL' ? 'active' : ''} ${
-          totalCount === 0 ? 'empty' : ''
-        }`}
-        onClick={() => onChange('ALL')}
+    <div className="relative flex-1 min-w-0">
+      <div
+        role="tablist"
+        aria-label="Lọc theo phòng"
+        className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 scroll-smooth"
+        style={{
+          maskImage: 'linear-gradient(to right, black calc(100% - 24px), transparent 100%)',
+          WebkitMaskImage: 'linear-gradient(to right, black calc(100% - 24px), transparent 100%)',
+        }}
       >
-        Tất cả phòng <span>({totalCount})</span>
-      </button>
-      {rooms.map((room) => {
-        const count = roomCounts[room.id] || 0;
-        return (
-          <button
-            key={room.id}
-            type="button"
-            className={`${activeRoom === room.id ? 'active' : ''} ${
-              count === 0 ? 'empty' : ''
-            }`}
-            onClick={() => onChange(room.id)}
-          >
-            {room.name} <span>({count})</span>
-          </button>
-        );
-      })}
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeRoom === 'ALL'}
+          onClick={() => onChange('ALL')}
+          className={`h-9 px-4 rounded-full text-xs font-medium shrink-0 inline-flex items-center gap-1.5 transition-colors cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
+            activeRoom === 'ALL'
+              ? 'bg-[var(--accent)] text-white shadow-xs'
+              : 'border border-[var(--border)] bg-[var(--surface)] text-[var(--secondary)] hover:text-[var(--text)] hover:bg-[var(--muted)]/50'
+          } ${totalCount === 0 ? 'opacity-60' : ''}`}
+        >
+          <span>Tất cả phòng</span>
+          <span className="tabular-nums">({totalCount})</span>
+        </button>
+        {rooms.map((room) => {
+          const count = roomCounts[room.id] || 0;
+          const isSelected = activeRoom === room.id;
+          return (
+            <button
+              key={room.id}
+              type="button"
+              role="tab"
+              aria-selected={isSelected}
+              onClick={() => onChange(room.id)}
+              title={room.name}
+              className={`h-9 px-4 rounded-full text-xs font-medium shrink-0 inline-flex items-center gap-1.5 transition-colors cursor-pointer max-w-[200px] select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
+                isSelected
+                  ? 'bg-[var(--accent)] text-white shadow-xs'
+                  : 'border border-[var(--border)] bg-[var(--surface)] text-[var(--secondary)] hover:text-[var(--text)] hover:bg-[var(--muted)]/50'
+              } ${count === 0 ? 'opacity-60' : ''}`}
+            >
+              <span className="truncate">{room.name}</span>
+              <span className="tabular-nums shrink-0">({count})</span>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -169,41 +161,53 @@ function QuickFilters({
   onTurnOffAllLights: () => void;
 }) {
   return (
-    <div className="quick-filters">
+    <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
       <button
         type="button"
-        className={`stat ${active === 'on' ? 'active' : ''}`}
+        className={`h-8 px-3 rounded-full text-xs font-medium inline-flex items-center gap-1.5 shrink-0 transition-colors cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
+          active === 'on'
+            ? 'bg-[var(--accent)] text-white shadow-xs'
+            : 'border border-[var(--border)] bg-transparent text-[var(--secondary)] hover:text-[var(--text)] hover:bg-[var(--muted)]/40'
+        }`}
         onClick={() => onChange(active === 'on' ? 'all' : 'on')}
       >
-        <Icon name="power" size={16} />
+        <Power className="w-3.5 h-3.5 shrink-0" />
         <span>Đang bật ({activeCount})</span>
       </button>
 
       <button
         type="button"
-        className={`stat ${active === 'offline' ? 'active' : ''}`}
+        className={`h-8 px-3 rounded-full text-xs font-medium inline-flex items-center gap-1.5 shrink-0 transition-colors cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
+          active === 'offline'
+            ? 'bg-[var(--accent)] text-white shadow-xs'
+            : 'border border-[var(--border)] bg-transparent text-[var(--secondary)] hover:text-[var(--text)] hover:bg-[var(--muted)]/40'
+        }`}
         onClick={() => onChange(active === 'offline' ? 'all' : 'offline')}
       >
-        <WifiOff size={15} className="shrink-0" />
+        <WifiOff className="w-3.5 h-3.5 shrink-0" />
         <span>Ngoại tuyến ({offlineCount})</span>
       </button>
 
       <button
         type="button"
-        className={`stat ${active === 'sensor' ? 'active' : ''}`}
+        className={`h-8 px-3 rounded-full text-xs font-medium inline-flex items-center gap-1.5 shrink-0 transition-colors cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
+          active === 'sensor'
+            ? 'bg-[var(--accent)] text-white shadow-xs'
+            : 'border border-[var(--border)] bg-transparent text-[var(--secondary)] hover:text-[var(--text)] hover:bg-[var(--muted)]/40'
+        }`}
         onClick={() => onChange(active === 'sensor' ? 'all' : 'sensor')}
       >
-        <Icon name="thermometer" size={16} />
+        <Thermometer className="w-3.5 h-3.5 shrink-0" />
         <span>Cảm biến ({sensorCount})</span>
       </button>
 
       {active === 'on' && lightsOnCount > 0 && (
         <button
           type="button"
-          className="lights-off-action"
+          className="h-8 px-3 rounded-full border border-[var(--border)] bg-[var(--surface)] text-[var(--secondary)] hover:text-[var(--text)] hover:bg-[var(--muted)]/50 text-xs font-medium inline-flex items-center gap-1.5 shrink-0 transition-colors cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
           onClick={onTurnOffAllLights}
         >
-          Tắt tất cả đèn ({lightsOnCount})
+          <span>Tắt tất cả đèn ({lightsOnCount})</span>
         </button>
       )}
     </div>
@@ -488,11 +492,10 @@ export const DevicePage: React.FC = () => {
     'all' | 'on' | 'offline' | 'sensor'
   >('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [searchOpen, setSearchOpen] = useState(false);
   const [typeFilter, setTypeFilter] = useState<string>('Tất cả');
   const [sort, setSort] = useState<DeviceSortOption>('Nhóm theo phòng');
-  const [sortOpen, setSortOpen] = useState(false);
-  const sortWrapRef = useRef<HTMLDivElement>(null);
-  const sortButtonRef = useRef<HTMLButtonElement>(null);
+  const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
 
   // Devices & local optimistic states
   const [devices, setDevices] = useState<DeviceResponse[]>(() => {
@@ -529,30 +532,6 @@ export const DevicePage: React.FC = () => {
     null
   );
 
-  // Outside click & Escape dismiss for Sort Popover
-  useEffect(() => {
-    if (!sortOpen) return;
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        sortWrapRef.current &&
-        !sortWrapRef.current.contains(event.target as Node)
-      ) {
-        setSortOpen(false);
-      }
-    };
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setSortOpen(false);
-        sortButtonRef.current?.focus();
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [sortOpen]);
 
   // Sync homeId in Redux
   useEffect(() => {
@@ -1035,17 +1014,20 @@ export const DevicePage: React.FC = () => {
         onSelectOverview={() => navigate('/home')}
       />
 
-      <main>
+      <main className="space-y-5">
         {/* Topbar */}
-        <DevicesTopBar
-          onlineCount={onlineCount}
-          activeCount={activeCount}
+        <AutomationTopBar
+          caption={`${onlineCount} trực tuyến · ${activeCount} đang bật`}
+          title="Thiết bị"
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
+          searchOpen={searchOpen}
+          onSearchToggle={() => setSearchOpen(!searchOpen)}
+          searchPlaceholder="Tìm thiết bị"
           userInitial={userInitial}
         />
 
-        {/* 1. Overview Strip (4 Glass Tiles) */}
+        {/* 1. Overview Strip (Compact G1 Container, 4 Cells) */}
         <DevicesOverviewStrip
           onlineCount={onlineCount}
           totalCount={uiDevices.length}
@@ -1054,50 +1036,64 @@ export const DevicePage: React.FC = () => {
           estimatedWattage={totalEstimatedWattage}
           todayKwh={energyData ? energyData.totalKwh : null}
           todayCostVnd={energyData ? energyData.estimatedCostVnd : null}
+          loading={loading && devices.length === 0}
           onNavigateToEnergy={
             homeId ? () => navigate(`/home/${homeId}/energy`) : undefined
           }
         />
 
-        {/* 1. Room Navigation & Primary Actions Row */}
-        <div className="devices-rooms-header-row">
-          <div className="devices-room-strip-wrapper">
+        {/* 2. Room Navigation & Primary Actions Row */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
             <RoomFilterStrip
               rooms={rooms}
               activeRoom={selectedRoomId}
               totalCount={uiDevices.length}
               roomCounts={roomCounts}
               onChange={setSelectedRoomId}
+              loading={loading && rooms.length === 0}
             />
-          </div>
-
-          <div className="devices-primary-actions">
+            {/* Mobile Quản lý phòng icon button */}
             <button
               type="button"
-              className="room-manage-btn"
+              className="sm:hidden h-9 w-9 shrink-0 inline-flex items-center justify-center rounded-full border border-[var(--border)] bg-transparent text-[var(--text)] hover:bg-[var(--muted)]/50 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+              onClick={() => setIsRoomModalOpen(true)}
+              title="Quản lý phòng"
+              aria-label="Quản lý phòng"
+            >
+              <Settings2 className="w-4 h-4 text-[var(--secondary)]" />
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Desktop Quản lý phòng ghost button */}
+            <button
+              type="button"
+              className="hidden sm:inline-flex h-9 px-3.5 rounded-full border border-[var(--border)] bg-transparent hover:bg-[var(--muted)]/50 text-xs font-medium text-[var(--text)] items-center gap-1.5 cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
               onClick={() => setIsRoomModalOpen(true)}
               title="Quản lý danh sách phòng"
               aria-label="Quản lý danh sách phòng"
             >
-              <Settings2 size={14} className="shrink-0" />
+              <Settings2 className="w-4 h-4 text-[var(--secondary)] shrink-0" />
               <span>Quản lý phòng</span>
             </button>
 
+            {/* Exactly ONE Primary Button on the screen */}
             <button
               type="button"
-              className="add-device-btn"
+              className="w-full sm:w-auto h-9 px-4 rounded-full bg-[var(--accent)] hover:opacity-95 text-white text-xs font-medium inline-flex items-center justify-center gap-1.5 cursor-pointer shadow-xs transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
               onClick={() => setIsAddModalOpen(true)}
               title="Thêm thiết bị mới"
               aria-label="Thêm thiết bị mới"
             >
-              <Plus size={15} className="shrink-0" />
+              <Plus className="w-4 h-4 shrink-0" />
               <span>Thêm thiết bị</span>
             </button>
           </div>
         </div>
 
-        {/* 2. Filters & Sort Toolbar */}
-        <div className="devices-filter-toolbar">
+        {/* 3. Filters & Sort Toolbar */}
+        <div className="flex items-center justify-between gap-3 flex-wrap sm:flex-nowrap">
           <QuickFilters
             active={quickFilter}
             activeCount={activeCount}
@@ -1108,82 +1104,51 @@ export const DevicePage: React.FC = () => {
             onTurnOffAllLights={handleTurnOffAllLights}
           />
 
-          <div className="devices-filter-controls">
-            <label className="type-filter-pill">
-              <Filter size={13} className="shrink-0 filter-icon" />
-              <span className="type-filter-label">Loại:</span>
-              <select
+          <div className="flex items-center gap-2 shrink-0 ml-auto">
+            {/* Desktop / Tablet: 2 Ghost Dropdowns */}
+            <div className="hidden sm:flex items-center gap-2">
+              <DeviceFilterDropdown
+                labelPrefix="Loại"
                 value={typeFilter}
-                onChange={(event) => setTypeFilter(event.target.value)}
-                aria-label="Lọc theo loại thiết bị"
-              >
-                <option>Tất cả</option>
-                <option>Đèn</option>
-                <option>Điều hòa</option>
-                <option>Cảm biến</option>
-                <option>Cổng</option>
-                <option>Công tắc</option>
-                <option>Camera</option>
-              </select>
-              <ChevronDown size={13} className="shrink-0 chevron-icon" />
-            </label>
-
-            <div className="sort-wrap" ref={sortWrapRef}>
-              <button
-                ref={sortButtonRef}
-                type="button"
-                className="sort-pill-button"
-                onClick={() => setSortOpen(!sortOpen)}
-                aria-haspopup="listbox"
-                aria-expanded={sortOpen}
-                aria-label={`Sắp xếp: ${sort}`}
-              >
-                <ArrowUpDown size={14} className="shrink-0" />
-                <span>
-                  Sắp xếp: <strong>{sort}</strong>
-                </span>
-                <ChevronDown
-                  size={14}
-                  className={`shrink-0 transition-transform ${
-                    sortOpen ? 'rotate-180' : ''
-                  }`}
-                />
-              </button>
-
-              {sortOpen && (
-                <div
-                  className="sort-popover glass-g2"
-                  role="listbox"
-                  aria-label="Tùy chọn sắp xếp"
-                >
-                  {SORT_OPTIONS.map((item) => {
-                    const isActive = sort === item;
-                    return (
-                      <button
-                        key={item}
-                        type="button"
-                        role="option"
-                        aria-selected={isActive}
-                        className={`sort-option ${isActive ? 'active' : ''}`}
-                        onClick={() => {
-                          setSort(item);
-                          setSortOpen(false);
-                        }}
-                      >
-                        <span>{item}</span>
-                        {isActive && (
-                          <Check size={14} className="shrink-0 text-accent" />
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
+                options={DEVICE_TYPE_FILTER_OPTIONS}
+                onChange={setTypeFilter}
+                icon={<Filter className="w-3.5 h-3.5 text-[var(--secondary)] shrink-0" />}
+              />
+              <DeviceFilterDropdown
+                labelPrefix="Sắp xếp"
+                value={sort}
+                options={SORT_OPTIONS}
+                onChange={setSort}
+                icon={<ArrowUpDown className="w-3.5 h-3.5 text-[var(--secondary)] shrink-0" />}
+              />
             </div>
+
+            {/* Mobile: Single "Bộ lọc" icon button */}
+            <button
+              type="button"
+              onClick={() => setMobileFilterOpen(true)}
+              className="sm:hidden h-8 px-3 rounded-lg border border-[var(--border)] bg-transparent hover:bg-[var(--muted)]/50 text-xs font-medium text-[var(--text)] inline-flex items-center gap-1.5 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+              aria-label="Bộ lọc và sắp xếp"
+            >
+              <Filter className="w-3.5 h-3.5 text-[var(--secondary)]" />
+              <span>Bộ lọc</span>
+            </button>
           </div>
         </div>
 
-        {/* Smart Device Groups Section */}
+        {/* Mobile Filter Modal */}
+        <DeviceMobileFilterModal
+          isOpen={mobileFilterOpen}
+          onClose={() => setMobileFilterOpen(false)}
+          typeFilter={typeFilter}
+          onTypeChange={setTypeFilter}
+          sort={sort}
+          onSortChange={setSort}
+          typeOptions={DEVICE_TYPE_FILTER_OPTIONS}
+          sortOptions={SORT_OPTIONS}
+        />
+
+        {/* 4. Smart Device Groups Section */}
         {homeId && (
           <section className="groups-section">
             <DeviceGroupSection

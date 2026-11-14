@@ -208,7 +208,7 @@ export const NodeDiagnosticsWidget: React.FC = () => {
         );
       default:
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-300">
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-primary/10 text-primary border border-primary/20">
             <AlertTriangle className="w-3.5 h-3.5" />
             HALF_OPEN (Thăm dò)
           </span>
@@ -221,9 +221,9 @@ export const NodeDiagnosticsWidget: React.FC = () => {
       {/* ── Summary Cards ── */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {/* Card 1: Broker Status */}
-        <div className="glass-card glass-g2 rounded-3xl border border-[var(--border)] group p-5 transition hover:-translate-y-0.5">
+        <div className="rounded-3xl border border-line bg-surface shadow-xs group p-5 transition hover:-translate-y-0.5">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-bold text-muted uppercase tracking-wider">MQTT Broker</span>
+            <span className="text-xs font-semibold text-muted">MQTT broker</span>
             <div className="w-9 h-9 bg-emerald-500/10 text-emerald-600 rounded-xl flex items-center justify-center">
               <Server className="w-5 h-5" />
             </div>
@@ -240,10 +240,10 @@ export const NodeDiagnosticsWidget: React.FC = () => {
         </div>
 
         {/* Card 2: Edge Nodes Online/Total */}
-        <div className="glass-card glass-g2 rounded-3xl border border-[var(--border)] group p-5 transition hover:-translate-y-0.5">
+        <div className="rounded-3xl border border-line bg-surface shadow-xs group p-5 transition hover:-translate-y-0.5">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-bold text-muted uppercase tracking-wider">ESP32 Edge Nodes</span>
-            <div className="w-9 h-9 bg-blue-500/10 text-blue-500 rounded-xl flex items-center justify-center">
+            <span className="text-xs font-semibold text-muted">ESP32 edge nodes</span>
+            <div className="w-9 h-9 bg-primary/10 text-primary rounded-xl flex items-center justify-center">
               <Radio className="w-5 h-5" />
             </div>
           </div>
@@ -259,9 +259,9 @@ export const NodeDiagnosticsWidget: React.FC = () => {
         </div>
 
         {/* Card 3: Circuit Breaker Quarantined */}
-        <div className="glass-card glass-g2 rounded-3xl border border-[var(--border)] group p-5 transition hover:-translate-y-0.5">
+        <div className="rounded-3xl border border-line bg-surface shadow-xs group p-5 transition hover:-translate-y-0.5">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-bold text-muted uppercase tracking-wider">Circuit Breakers</span>
+            <span className="text-xs font-semibold text-muted">Mạch bảo vệ ngắt</span>
             <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${
               (summary?.quarantinedNodes ?? 0) > 0 ? 'bg-rose-500/15 text-rose-500' : 'bg-emerald-500/10 text-emerald-600'
             }`}>
@@ -282,10 +282,10 @@ export const NodeDiagnosticsWidget: React.FC = () => {
         </div>
 
         {/* Card 4: Network Reliability & Latency Gauge Arc [PHO-036] */}
-        <div className="glass-card glass-g2 rounded-3xl border border-[var(--border)] group p-4 transition hover:-translate-y-0.5 flex flex-col justify-between">
+        <div className="rounded-3xl border border-line bg-surface shadow-xs group p-4 transition hover:-translate-y-0.5 flex flex-col justify-between">
           <div className="flex items-center justify-between mb-1">
-            <span className="text-xs font-bold text-muted uppercase tracking-wider">Độ Trễ RTT Gauge</span>
-            <div className="w-7 h-7 bg-amber-500/10 text-amber-600 rounded-lg flex items-center justify-center">
+            <span className="text-xs font-semibold text-muted">Độ trễ RTT gauge</span>
+            <div className="w-7 h-7 bg-primary/10 text-primary rounded-lg flex items-center justify-center">
               <Zap className="w-4 h-4" />
             </div>
           </div>
@@ -297,7 +297,7 @@ export const NodeDiagnosticsWidget: React.FC = () => {
       </div>
 
       {/* ── Detailed Edge Nodes Monitor Table ── */}
-      <div className="glass-card glass-g2 p-5 sm:p-6 rounded-3xl border border-[var(--border)] shadow-xs space-y-4">
+      <div className="rounded-3xl border border-line bg-surface shadow-xs p-5 sm:p-6 space-y-4">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
             <h2 className="text-base sm:text-lg font-bold text-text flex items-center gap-2">
@@ -312,25 +312,25 @@ export const NodeDiagnosticsWidget: React.FC = () => {
             type="button"
             onClick={fetchData}
             disabled={loading}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl border border-line bg-surface hover:bg-off-soft text-text transition-colors shadow-xs"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl border border-line bg-surface hover:bg-surface-hover text-text transition-colors shadow-2xs disabled:opacity-50 cursor-pointer"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-            Làm mới
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-primary' : ''}`} />
+            <span>Làm mới</span>
           </button>
         </div>
 
         {/* Table */}
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto custom-scrollbar">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
-              <tr className="border-b border-line text-muted uppercase text-[11px] font-bold bg-off-soft/40">
-                <th className="py-3 px-3">Node Code</th>
+              <tr className="border-b border-line text-muted uppercase text-[11px] font-semibold bg-sidebar/50">
+                <th className="py-3 px-3">Node code</th>
                 <th className="py-3 px-3">Nhà sở hữu</th>
                 <th className="py-3 px-3">Trạng thái kết nối</th>
-                <th className="py-3 px-3">Trạng thái Mạch (Circuit)</th>
+                <th className="py-3 px-3">Mạch bảo vệ (Circuit)</th>
                 <th className="py-3 px-3 text-center">Độ trễ RTT</th>
                 <th className="py-3 px-3 text-center">Lệnh thành công</th>
-                <th className="py-3 px-3 text-right">Thao tác Admin</th>
+                <th className="py-3 px-3 text-right">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line/60">
@@ -347,20 +347,20 @@ export const NodeDiagnosticsWidget: React.FC = () => {
                   const isTripping = trippingCode === node.nodeCode;
 
                   return (
-                    <tr key={node.nodeId} className={`hover:bg-off-soft/30 transition-colors ${node.status === 'OFFLINE' ? 'opacity-70 bg-[var(--g1)]/50' : ''}`}>
-                      <td className="py-3.5 px-3 font-mono font-bold text-text">
+                    <tr key={node.nodeId} className={`hover:bg-surface-hover/50 transition-colors ${node.status === 'OFFLINE' ? 'opacity-70 bg-sidebar/30' : ''}`}>
+                      <td className="py-3.5 px-3 font-mono font-semibold text-text">
                         {node.nodeCode}
                       </td>
                       <td className="py-3.5 px-3 text-muted">
-                        {node.homeName || 'N/A'}
+                        {node.homeName || '—'}
                       </td>
                       <td className="py-3.5 px-3">
                         <div className="flex flex-col">
                           <span className={`inline-flex items-center gap-1.5 font-semibold ${
-                            node.status === 'ONLINE' ? 'text-emerald-700' : 'text-[var(--secondary)]'
+                            node.status === 'ONLINE' ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted'
                           }`}>
                             <span className={`w-2 h-2 rounded-full ${
-                              node.status === 'ONLINE' ? 'bg-emerald-500 animate-pulse' : 'bg-[var(--tertiary)]'
+                              node.status === 'ONLINE' ? 'bg-emerald-500 animate-pulse' : 'bg-muted/40'
                             }`} />
                             {node.status}
                           </span>
@@ -374,12 +374,12 @@ export const NodeDiagnosticsWidget: React.FC = () => {
                       </td>
                       <td className="py-3.5 px-3 text-center">
                         <div className="inline-flex flex-col items-center">
-                          <span className={`font-mono font-semibold px-2 py-0.5 rounded text-[11px] ${
+                          <span className={`font-mono font-semibold px-2 py-0.5 rounded-lg text-[11px] border ${
                             node.averageLatencyMs < 50
-                              ? 'text-emerald-700 bg-emerald-50'
+                              ? 'text-emerald-600 bg-emerald-500/10 border-emerald-500/20'
                               : node.averageLatencyMs <= 100
-                              ? 'text-amber-700 bg-amber-50'
-                              : 'text-rose-700 bg-rose-50'
+                              ? 'text-primary bg-primary/10 border-primary/20'
+                              : 'text-rose-600 bg-rose-500/10 border-rose-500/20'
                           }`}>
                             {node.averageLatencyMs} ms
                           </span>
@@ -397,11 +397,11 @@ export const NodeDiagnosticsWidget: React.FC = () => {
                             type="button"
                             disabled={isPinging}
                             onClick={() => handlePing(node.nodeId, node.nodeCode)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-lg border border-line bg-surface hover:bg-primary hover:text-white text-text transition-colors shadow-xs disabled:opacity-50"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-xl border border-line bg-surface hover:bg-surface-hover text-text transition-colors shadow-2xs disabled:opacity-50 cursor-pointer"
                             title="Gửi gói tin ping kiểm tra kết nối MQTT thực tế"
                           >
-                            <Send className={`w-3 h-3 ${isPinging ? 'animate-pulse' : ''}`} />
-                            Ping
+                            <Send className={`w-3 h-3 ${isPinging ? 'animate-pulse text-primary' : ''}`} />
+                            <span>Ping</span>
                           </button>
 
                           {/* Nút Giả lập ngắt mạch (Trip) [PHO-037] */}
@@ -409,11 +409,11 @@ export const NodeDiagnosticsWidget: React.FC = () => {
                             type="button"
                             disabled={isTripping || node.circuitState === 'OPEN'}
                             onClick={() => handleTripCircuit(node.nodeId, node.nodeCode)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-lg border border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-600 hover:text-white transition-colors shadow-xs disabled:opacity-40"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-xl border border-line bg-surface hover:bg-surface-hover text-muted hover:text-text transition-colors shadow-2xs disabled:opacity-40 cursor-pointer"
                             title="Giả lập ngắt mạch khẩn cấp (Trip Circuit Breaker)"
                           >
-                            <ShieldAlert className={`w-3 h-3 ${isTripping ? 'animate-spin' : ''}`} />
-                            Trip
+                            <ShieldAlert className={`w-3 h-3 ${isTripping ? 'animate-spin text-rose-500' : ''}`} />
+                            <span>Trip</span>
                           </button>
 
                           {node.circuitState !== 'CLOSED' && (
@@ -421,11 +421,11 @@ export const NodeDiagnosticsWidget: React.FC = () => {
                               type="button"
                               disabled={isResetting}
                               onClick={() => handleResetCircuit(node.nodeId, node.nodeCode)}
-                              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-lg border border-rose-300 bg-rose-50 text-rose-700 hover:bg-rose-600 hover:text-white transition-colors shadow-xs disabled:opacity-50"
+                              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-xl border border-rose-500/20 bg-rose-500/10 text-rose-600 hover:bg-rose-500 hover:text-white transition-colors shadow-2xs disabled:opacity-50 cursor-pointer"
                               title="Khôi phục trạng thái mạch về CLOSED"
                             >
                               <RefreshCw className={`w-3 h-3 ${isResetting ? 'animate-spin' : ''}`} />
-                              Reset
+                              <span>Reset</span>
                             </button>
                           )}
                         </div>
