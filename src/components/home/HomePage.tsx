@@ -22,6 +22,11 @@ import { getMyHomes, createHome, updateHome } from "../../services/homeApi";
 import { getRooms } from "../../services/roomApi";
 import { getDevicesByHome, sendManualPowerCommand, homeDevicesKey } from "../../services/deviceApi";
 import { getScenes } from "../../services/sceneApi";
+import { realtimeEventDispatcher } from "../../realtime/realtimeEvents";
+import { useRealtimeRefetch } from "../../realtime/useRealtimeRefetch";
+import type { TwinDeviceSnapshotResponse } from "../../types/twin";
+
+const DASHBOARD_SCENE_EVENTS = ['SCENE_CHANGED'] as const;
 import { getHomeEnergyAnalytics, energyAnalyticsKey } from "../../services/energyApi";
 import { peekCache } from "../../services/queryCache";
 import {
@@ -187,6 +192,36 @@ export const HomePage: React.FC<HomePageProps> = ({
       active = false;
     };
   }, [userHome?.homeId, dashboardVersion]);
+
+  // Another member (or the device itself) changed a device: patch its card in place, no refetch.
+  useEffect(() => realtimeEventDispatcher.register<Partial<TwinDeviceSnapshotResponse>>('DEVICE_STATE_CHANGED', (event) => {
+    if (event.homeId !== userHome?.homeId) return;
+    const data = event.data;
+    const targetId = event.deviceId ?? data.deviceId;
+    if (!targetId) return;
+    const state = data.currentState && typeof data.currentState === 'object' && !Array.isArray(data.currentState)
+      ? (data.currentState as DeviceResponse['currentState'])
+      : null;
+    setDevices((prev) => {
+      let changed = false;
+      const next = prev.map((device) => {
+        if (device.id !== targetId) return device;
+        changed = true;
+        return {
+          ...device,
+          currentState: state ? { ...device.currentState, ...state } : device.currentState,
+          status: data.status ?? device.status,
+          lastSeen: data.lastSeen ?? device.lastSeen,
+        };
+      });
+      return changed ? next : prev;
+    });
+  }), [userHome?.homeId]);
+
+  useRealtimeRefetch(DASHBOARD_SCENE_EVENTS, userHome?.homeId, () => {
+    const homeId = userHome?.homeId;
+    if (homeId) void getScenes(homeId).then((data) => setScenes(data || [])).catch(() => undefined);
+  });
 
   // Deep links scroll and tab selection
   useEffect(() => {

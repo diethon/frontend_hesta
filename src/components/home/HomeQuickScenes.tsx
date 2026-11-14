@@ -46,8 +46,9 @@ export const HomeQuickScenes: React.FC<HomeQuickScenesProps> = ({
 
     setExecutingSceneId(scene.id);
     try {
-      await executeScene(homeId, scene.id);
-      notify.success(`Đã kích hoạt kịch bản "${scene.name}"`);
+      const res = await executeScene(homeId, scene.id);
+      if (res.status === 'SUCCESS') notify.success(`Đã kích hoạt kịch bản "${scene.name}"`);
+      else notify.warning(`Kịch bản "${scene.name}" chạy với một số lỗi`);
     } catch (err: unknown) {
       notify.error(getErrorMessage(err, `Lỗi khi kích hoạt "${scene.name}"`));
     } finally {
