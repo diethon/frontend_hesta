@@ -1844,203 +1844,107 @@ select.gd-input {
   }
 }
 
-/* ── Deeper surfaces: pale page, richer sky cards, white inner rows, darker text (all .st-theme pages) ── */
-.app-shell.studio.st-theme {
-  --card: #d9edfa;
-  --border: #b3d9f0;
-  --muted: #e4f2fb;
-  --text: #12304a;
-  --secondary: #33536b;
-  --tertiary: #4f6d83;
-  --accent: #0b7ab8; /* deep enough to read as text on the tinted cards */
-  --accent-bright: #1fa2e0;
-  --accent-soft: #ffffff; /* icon tiles and chips sit white on the tinted card */
-}
-.st-theme .st-btn-primary:hover:not(:disabled) {
-  background: #096a9f;
-  border-color: #096a9f;
-}
-.st-theme .st-seg,
-.st-theme .scene-filter {
-  background: var(--card);
-}
-.st-theme .st-scene.is-off,
-.st-theme .st-rule.is-off {
-  background: #e9f4fb;
-}
-.st-theme .st-scene-devices li,
-.st-theme .st-when,
-.st-theme .st-tag:not(.warn):not(.err) {
-  background: #ffffff;
-}
-.st-theme .st-run {
-  background: var(--accent);
-  color: #fff;
-}
-.st-theme .st-run:hover:not(:disabled) {
-  background: #096a9f;
-}
-.st-theme .st-confidence .st-bar {
-  background: #ffffff;
-}
-.st-theme .st-scene-new {
-  background: transparent;
-  border-style: dashed;
-  border-color: var(--border);
-}
-.st-theme .st-empty,
-.st-theme .scenario-card {
-  background: var(--card);
-  border: 1px solid var(--border);
-}
-.st-theme .st-tabs button.active .st-count {
-  background: var(--card);
-}
-/* dashboard.css paints guardian cards white with a stronger selector. */
-.app-shell.studio.st-theme .scenario-card {
-  background: var(--card) !important;
-}
 
-/* Resting shadow on every card (st-pro had reduced it to a hairline); hover lifts further. */
+/* ── "Đồng bộ trang chủ" (current, 2026-11-14): one look matching the Home page.
+   Light titles, round grey icon tiles, airy white cards; blue only on CTA, toggles and action links.
+   This is the single place to retune Scene/Automation/Recommendation (+ Guardian) and their drawers. ── */
 .app-shell.studio.st-theme,
 .app-shell.studio.st-theme.st-pro {
-  --card-shadow: 0 1px 2px rgba(18, 48, 74, 0.08), 0 8px 20px -6px rgba(11, 122, 184, 0.28);
-  --hover-shadow: 0 2px 4px rgba(18, 48, 74, 0.1), 0 18px 34px -10px rgba(11, 122, 184, 0.42);
-}
-.st-theme .st-empty,
-.app-shell.studio.st-theme .scenario-card {
-  box-shadow: var(--card-shadow);
-}
-.st-theme .st-scene.is-off,
-.st-theme .st-rule.is-off {
-  box-shadow: 0 1px 2px rgba(18, 48, 74, 0.06), 0 4px 10px -6px rgba(11, 122, 184, 0.18);
-}
-/* The dashed "new" tile is an empty slot, not a card: no resting shadow. */
-.st-theme .st-scene-new:not(:hover) {
-  box-shadow: none;
-}
-
-/* ── Reversed: pale page, white cards, strong border + shadow; inner rows tinted ── */
-.app-shell.studio.st-theme,
-.app-shell.studio.st-theme.st-pro {
-  --card: #ffffff;
-  --border: #5fa9d6;
-  --accent-soft: #e3f3fc;
-  --card-shadow: 0 1px 2px rgba(18, 48, 74, 0.1), 0 10px 24px -8px rgba(11, 122, 184, 0.35);
-}
-.st-theme .st-scene,
-.st-theme .st-rule,
-.st-theme .st-rule + .st-rule,
-.st-theme .st-model,
-.st-theme .st-insight,
-.st-theme .st-empty,
-.app-shell.studio.st-theme .scenario-card {
-  border-width: 1.5px;
-}
-.st-theme .st-seg,
-.st-theme .scene-filter {
-  background: #e3f3fc;
-}
-.st-theme .st-scene.is-off,
-.st-theme .st-rule.is-off {
-  background: #f6fafd;
-  border-color: #9ccbe8;
-}
-.st-theme .st-scene-devices li,
-.st-theme .st-when,
-.st-theme .st-tag:not(.warn):not(.err),
-.st-theme .st-confidence .st-bar,
-.st-theme .st-tabs button.active .st-count {
-  background: #edf6fc;
-}
-
-/* ── Stronger frame: 2px deep-sky border, softly tinted card, white bordered inner boxes, darker text ── */
-.app-shell.studio.st-theme,
-.app-shell.studio.st-theme.st-pro {
-  --card: #ecf6fd;
-  --border: #3f97cc;
-  --inner-border: #a3d0ec;
-  --text: #0d2a44;
-  --secondary: #26475f;
-  --tertiary: #41627a;
-  --accent-soft: #ffffff;
-}
-.st-theme .st-scene,
-.st-theme .st-rule,
-.st-theme .st-rule + .st-rule,
-.st-theme .st-model,
-.st-theme .st-insight,
-.st-theme .st-empty,
-.app-shell.studio.st-theme .scenario-card {
-  border-width: 2px;
-}
-.st-theme .st-scene.is-off,
-.st-theme .st-rule.is-off {
-  background: #f4f9fd;
-  border-color: #8fc3e4;
-}
-/* Inner boxes: white with a thin sky outline so they read as fields on the tinted card. */
-.st-theme .st-scene-devices li,
-.st-theme .st-scene-icon,
-.st-theme .st-rule-icon,
-.st-theme .st-when,
-.st-theme .st-tag:not(.warn):not(.err),
-.st-theme .st-empty-icon {
-  background: #ffffff;
-  border: 1px solid var(--inner-border);
-}
-.st-theme .st-scene-icon,
-.st-theme .st-rule-icon,
-.st-theme .st-empty-icon {
-  color: var(--accent);
-}
-.st-theme .st-scene-devices li span {
-  color: var(--text);
-  font-weight: 600;
-}
-.st-theme .st-scene-devices li em,
-.st-theme .st-scene-desc,
-.st-theme .st-rule-meta {
-  color: var(--secondary);
-}
-.st-theme .st-search,
-.st-theme .st-seg,
-.st-theme .scene-filter {
-  border: 1.5px solid var(--inner-border);
-}
-.st-theme .st-seg,
-.st-theme .scene-filter {
-  background: #ffffff;
-}
-.st-theme .st-confidence .st-bar {
-  background: #ffffff;
-  outline: 1px solid var(--inner-border);
-}
-
-/* ── Harmonised (current): one calm blue-and-white set for pages AND their drawers/sheets/dialogs.
-   Everything inside reads these tokens, so this block is the single place to retune the look. ── */
-.app-shell.studio.st-theme,
-.app-shell.studio.st-theme.st-pro {
-  --bg-base: #f2f7fc;
+  --bg-base: #f5f8fb;
   --card: #ffffff;
   --g1: #ffffff;
   --g2: #ffffff;
   --solid: #ffffff;
-  --border: #c3d9ee;
-  --inner-border: #dbe8f4;
-  --muted: #f0f6fc;
-  --text: #0f2742;
-  --secondary: #3b556e;
-  --tertiary: #5c758c;
-  --accent: #1769d6;
-  --accent-hover: #1257b5;
-  --accent-bright: #2f86ee;
-  --accent-soft: #e7f1fd;
-  --card-shadow: 0 1px 2px rgba(15, 39, 66, 0.05), 0 6px 16px -8px rgba(23, 105, 214, 0.2);
-  --hover-shadow: 0 2px 4px rgba(15, 39, 66, 0.06), 0 14px 28px -10px rgba(23, 105, 214, 0.32);
-  --glass-shadow: 0 24px 56px -12px rgba(15, 39, 66, 0.28);
+  --border: rgba(15, 40, 70, 0.08);
+  --inner-border: rgba(15, 40, 70, 0.06);
+  --muted: #f3f6f9;
+  --text: #1f2d3d;
+  --secondary: #5b6b7c;
+  --tertiary: #8a98a8;
+  --accent: #2563eb;
+  --accent-hover: #1d4fd0;
+  --accent-bright: #2563eb;
+  --accent-soft: #eef3fe;
+  --radius: 22px;
+  --card-shadow: 0 1px 2px rgba(15, 40, 70, 0.04), 0 8px 24px -12px rgba(15, 40, 70, 0.12);
+  --hover-shadow: 0 2px 4px rgba(15, 40, 70, 0.05), 0 16px 32px -14px rgba(15, 40, 70, 0.2);
+  --glass-shadow: 0 24px 56px -12px rgba(15, 40, 70, 0.24);
   background: var(--bg-base);
 }
+
+/* Header: Home-sized title, grey eyebrow. */
+.st-pro .topbar h2 {
+  font-size: 30px;
+  line-height: 38px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.st-pro .st-eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--tertiary);
+}
+.st-pro .st-subtitle {
+  font-size: 14px;
+  line-height: 22px;
+  color: var(--secondary);
+}
+.st-pro .topbar {
+  margin-bottom: 24px;
+}
+
+/* Toolbar: pill controls; search shrinks so the actions stay on the same row. */
+.st-pro .st-toolbar {
+  margin-bottom: 24px;
+  gap: 12px;
+}
+.st-theme .st-seg,
+.st-theme .scene-filter {
+  border-radius: 999px;
+  background: #ffffff;
+  border: 1px solid var(--border);
+}
+.st-theme .st-seg button {
+  border-radius: 999px;
+}
+.st-theme .st-seg button.active,
+.st-theme .scene-filter button.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+  box-shadow: none;
+}
+.st-theme .st-seg button.active .st-count {
+  color: var(--accent);
+}
+.st-theme .st-search {
+  flex: 1 1 160px;
+  max-width: 280px;
+  min-width: 0;
+  width: auto;
+  border-radius: 999px;
+  background: #ffffff;
+  border: 1px solid var(--border);
+}
+/* The input's default size would stop the search box from shrinking. */
+.st-theme .st-search input {
+  width: 100%;
+}
+.st-pro .st-btn {
+  border-radius: 999px;
+}
+.st-theme .st-btn-primary {
+  box-shadow: 0 6px 16px -8px rgba(37, 99, 235, 0.55);
+}
+.st-theme .st-btn-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+.st-theme .toggle.active {
+  background: var(--accent);
+}
+
+/* Cards: white, large radius, faint border, soft shadow. */
 .st-theme .st-scene,
 .st-theme .st-rule,
 .st-theme .st-rule + .st-rule,
@@ -2048,55 +1952,162 @@ select.gd-input {
 .st-theme .st-insight,
 .st-theme .st-empty,
 .app-shell.studio.st-theme .scenario-card {
-  border-width: 1.5px;
+  background: var(--card) !important;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--card-shadow);
 }
-.st-theme .st-scene.is-off,
-.st-theme .st-rule.is-off {
-  background: #f8fbfe;
-  border-color: var(--inner-border);
+.st-theme .st-scene:hover,
+.st-theme .st-rule:hover,
+.st-theme .st-insight:hover {
+  border-color: rgba(37, 99, 235, 0.22);
+  box-shadow: var(--hover-shadow);
+}
+.st-theme .scenario-card:hover {
+  border-color: rgba(37, 99, 235, 0.22) !important;
+  box-shadow: var(--hover-shadow) !important;
+}
+.st-theme .st-scene,
+.st-theme .st-rule,
+.st-theme .st-insight {
+  --hue: var(--accent) !important;
+}
+
+/* Scene cards size to their content; the "new" tile is a slim dashed slot. */
+.st-pro .st-scene-grid {
+  gap: 16px;
+  align-items: start;
+}
+.st-theme .st-scene {
+  min-height: 0;
+  padding: 20px;
+}
+.st-theme .st-scene h3 {
+  font-size: 15px;
+  font-weight: 600;
+}
+.st-theme .st-scene-desc {
+  color: var(--tertiary);
+}
+.st-theme .st-scene footer {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--inner-border);
+}
+.st-theme .st-scene-new {
+  min-height: 72px;
+  flex-direction: row;
+  border: 1.5px dashed rgba(15, 40, 70, 0.14);
+  border-radius: var(--radius);
+  background: transparent;
   box-shadow: none;
 }
-/* Inner boxes: soft tint, no outline — the card border is the only frame. */
+.st-theme .st-scene-new span {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+}
+
+/* Icon tiles: round, soft grey, dark icon (as on Home); off items fade. */
+.st-theme .st-scene-icon,
+.st-theme .st-rule-icon,
+.st-theme .st-empty-icon,
+.st-theme .st-model-badge {
+  border-radius: 50%;
+  border: 0;
+  background: var(--muted);
+  color: #334155;
+  box-shadow: none;
+}
+
+/* Inner rows/chips: flat grey tint, no outline. */
 .st-theme .st-scene-devices li,
 .st-theme .st-when,
 .st-theme .st-tag:not(.warn):not(.err) {
   background: var(--muted);
   border: 0;
 }
-.st-theme .st-scene-icon,
-.st-theme .st-rule-icon,
-.st-theme .st-empty-icon,
-.st-theme .st-tabs button.active .st-count {
-  background: var(--accent-soft);
-  border: 0;
+.st-theme .st-scene-devices li span {
+  color: var(--text);
+  font-weight: 500;
+}
+.st-theme .st-scene-devices li em,
+.st-theme .st-rule-meta {
+  color: var(--secondary);
+}
+.st-theme .st-scene-devices li .icon {
+  color: var(--tertiary);
+}
+.st-theme .st-tag:not(.warn):not(.err),
+.st-theme .st-when strong,
+.st-theme .st-flow b,
+.st-theme .st-confidence b {
+  color: var(--accent);
 }
 .st-theme .st-confidence .st-bar {
-  background: var(--accent-soft);
+  background: var(--muted);
   outline: 0;
 }
-.st-theme .st-search,
-.st-theme .st-seg,
-.st-theme .scene-filter {
-  background: #ffffff;
-  border: 1px solid var(--border);
+.st-theme .st-confidence .st-bar i {
+  background: var(--accent);
 }
-.st-theme .st-btn-primary,
-.st-theme .scene-filter button.active {
-  box-shadow: 0 4px 12px -4px rgba(23, 105, 214, 0.5);
+.st-theme .st-tabs button.active .st-count {
+  background: var(--accent-soft);
 }
-.st-theme .st-btn-primary:hover:not(:disabled),
+
+/* Run button: outline pill, fills blue on hover. */
+.st-theme .st-run {
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid #cfdcf7;
+  border-radius: 999px;
+}
 .st-theme .st-run:hover:not(:disabled) {
-  background: var(--accent-hover);
-  border-color: var(--accent-hover);
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
 }
-.st-theme .scenario-card:hover {
-  box-shadow: var(--hover-shadow) !important;
+.st-theme .st-run.done {
+  background: var(--success);
+  border-color: var(--success);
+  color: #fff;
+}
+
+/* Switched-off items: no shadow, muted text. */
+.st-theme .st-scene.is-off,
+.st-theme .st-rule.is-off {
+  --hue: var(--tertiary) !important;
+  background: #fbfcfd !important;
+  box-shadow: none;
+}
+.st-theme .st-scene.is-off h3,
+.st-theme .st-rule.is-off .st-rule-title h4 {
+  color: var(--secondary);
+}
+.st-theme .st-scene.is-off .st-scene-icon,
+.st-theme .st-rule.is-off .st-rule-icon {
+  color: var(--tertiary);
+}
+
+/* Automation groups: tighter section rhythm. */
+.st-pro .st-group + .st-group {
+  margin-top: 32px;
+}
+.st-pro .st-group-head h3,
+.st-pro .st-model-head h3,
+.st-pro .st-rule-title h4,
+.st-pro .st-insight-body h4 {
+  font-size: 16px;
+  font-weight: 600;
+}
+.st-pro .st-list {
+  gap: 10px;
 }
 
 /* Drawers, editors, picker sheets and dialogs opened from these pages. */
 .st-theme .scene-overlay,
 .st-theme .scene-panel-backdrop.active {
-  background: rgba(15, 39, 66, 0.32);
+  background: rgba(15, 40, 70, 0.3);
 }
 .st-theme .scene-panel-header,
 .st-theme .scene-editor-header,
@@ -2106,14 +2117,14 @@ select.gd-input {
 .st-theme .scene-panel-header strong,
 .st-theme .sub-sheet-header strong {
   font-size: 18px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: -0.01em;
 }
 .st-theme .scene-panel-header small {
   font-size: 12px;
 }
 .st-theme .delete-dialog {
-  border-radius: 18px;
+  border-radius: var(--radius);
 }
 .st-theme :is(.scene-panel, .scene-editor-panel, .sub-sheet-layer, .delete-dialog) :is(input, select, textarea):focus-visible {
   outline: none;
@@ -2123,104 +2134,22 @@ select.gd-input {
 @media (min-width: 640px) {
   .st-theme .scene-panel,
   .st-theme .scene-editor-panel {
-    border-radius: 20px 0 0 20px;
+    border-radius: 24px 0 0 24px;
   }
 }
-
-/* ── Blue & white (current): white cards on a pale blue page; one blue carries every accent.
-   The inner pieces (icon tile, rows, chips, run button) are tints of that same blue. ── */
-.app-shell.studio.st-theme,
-.app-shell.studio.st-theme.st-pro {
-  --bg-base: #f3f8fe;
-  --border: #d2e2f5;
-  --inner-border: #e3edf9;
-  --muted: #f1f6fd;
-  --text: #0f2a4a;
-  --secondary: #3a5372;
-  --tertiary: #62799a;
-  --accent: #1a6fdc;
-  --accent-hover: #1459b8;
-  --accent-bright: #3d93f0;
-  --accent-soft: #e6f0fd;
-  --card-shadow: 0 1px 2px rgba(15, 42, 74, 0.04), 0 6px 16px -10px rgba(26, 111, 220, 0.28);
-  --hover-shadow: 0 2px 4px rgba(15, 42, 74, 0.05), 0 16px 30px -14px rgba(26, 111, 220, 0.45);
-  background: var(--bg-base);
+@media (max-width: 1100px) {
+  .st-pro .topbar h2 {
+    font-size: 28px;
+    line-height: 34px;
+  }
 }
-.st-theme .st-btn-primary,
-.st-theme .scene-filter button.active {
-  box-shadow: 0 4px 12px -4px rgba(26, 111, 220, 0.5);
-}
-.st-theme .st-scene,
-.st-theme .st-rule,
-.st-theme .st-rule + .st-rule,
-.st-theme .st-model,
-.st-theme .st-insight,
-.st-theme .st-empty,
-.app-shell.studio.st-theme .scenario-card {
-  border-width: 1px;
-}
-/* Every card uses the page blue; this beats the per-kind inline scene hue. */
-.st-theme .st-scene,
-.st-theme .st-rule,
-.st-theme .st-insight {
-  --hue: var(--accent) !important;
-}
-.st-theme .st-scene:hover,
-.st-theme .st-rule:hover,
-.st-theme .st-insight:hover {
-  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
-  box-shadow: var(--hover-shadow);
-}
-/* Solid blue pieces: icon tiles, run button, confidence fill, model badge. */
-.st-theme .st-scene-icon,
-.st-theme .st-rule-icon,
-.st-theme .st-model-badge,
-.st-theme .st-run,
-.st-theme .st-confidence .st-bar i {
-  color: #fff;
-  background: linear-gradient(140deg, var(--accent-bright), var(--accent));
-}
-.st-theme .st-scene-icon,
-.st-theme .st-rule-icon,
-.st-theme .st-model-badge {
-  box-shadow: 0 6px 14px -6px rgba(26, 111, 220, 0.6);
-}
-.st-theme .st-run:hover:not(:disabled) {
-  background: var(--accent-hover);
-}
-.st-theme .st-run.done {
-  background: var(--success);
-}
-/* Soft blue pieces: device rows, time box, chips, confidence track. */
-.st-theme .st-scene-devices li {
-  background: var(--muted);
-}
-.st-theme .st-when,
-.st-theme .st-tag:not(.warn):not(.err),
-.st-theme .st-confidence .st-bar {
-  background: var(--accent-soft);
-}
-.st-theme .st-scene-devices li .icon,
-.st-theme .st-when strong,
-.st-theme .st-flow b,
-.st-theme .st-confidence b,
-.st-theme .st-tag:not(.warn):not(.err) {
-  color: var(--accent);
-}
-/* Switched-off items go grey-blue so blue always means "active". */
-.st-theme .st-scene.is-off,
-.st-theme .st-rule.is-off {
-  --hue: var(--tertiary) !important;
-}
-.st-theme .st-scene.is-off .st-scene-icon,
-.st-theme .st-rule.is-off .st-rule-icon {
-  color: var(--tertiary);
-  background: var(--muted);
-  box-shadow: none;
-}
-.st-theme .st-scene.is-off .st-scene-devices li .icon {
-  color: var(--tertiary);
-}
-.st-theme .st-scene.is-off .st-run {
-  background: var(--tertiary);
+@media (max-width: 639px) {
+  .st-pro .topbar h2 {
+    font-size: 24px;
+    line-height: 30px;
+  }
+  .st-theme .st-search {
+    flex: 1 1 100%;
+    max-width: none;
+  }
 }
