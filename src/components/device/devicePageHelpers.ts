@@ -30,6 +30,18 @@ export const SORT_OPTIONS = [
 
 export type DeviceSortOption = (typeof SORT_OPTIONS)[number];
 
+export const DEVICE_TYPE_FILTER_OPTIONS = [
+  'Tất cả',
+  'Đèn',
+  'Điều hòa',
+  'Cảm biến',
+  'Cổng',
+  'Công tắc',
+  'Camera',
+] as const;
+
+export type DeviceTypeFilterOption = (typeof DEVICE_TYPE_FILTER_OPTIONS)[number];
+
 export function mapDeviceToUI(
   d: DeviceResponse,
   localPower: Record<string, boolean>,
