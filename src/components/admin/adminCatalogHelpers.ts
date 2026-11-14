@@ -89,3 +89,4 @@ export function isCatalogFormDirty(
     (current.imageUrl || '') !== (initial.imageUrl || '')
   );
 }
+

@@ -250,7 +250,7 @@ export const AdminCatalogModal: React.FC<AdminCatalogModalProps> = ({
       >
         <div
           data-testid="admin-catalog-modal"
-          className="surface-card glass-g2 w-full max-w-[480px] max-h-[92vh] sm:max-h-[85vh] rounded-t-[28px] sm:rounded-3xl border border-line bg-surface flex flex-col shadow-2xl overflow-hidden animate-in slide-in-from-bottom-6 sm:zoom-in-95 duration-200"
+          className="surface-card w-full max-w-[480px] max-h-[92vh] sm:max-h-[85vh] rounded-t-[28px] sm:rounded-3xl border border-line bg-surface flex flex-col shadow-2xl overflow-hidden animate-in slide-in-from-bottom-6 sm:zoom-in-95 duration-200"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Hidden File Input */}
@@ -263,7 +263,7 @@ export const AdminCatalogModal: React.FC<AdminCatalogModalProps> = ({
           />
 
           {/* Sticky Header */}
-          <div className="sticky top-0 z-10 px-5 py-4 border-b border-line bg-surface/95 backdrop-blur-md flex items-center justify-between shrink-0">
+          <div className="sticky top-0 z-10 px-5 py-4 border-b border-line bg-surface flex items-center justify-between shrink-0">
             <div className="min-w-0 pr-3">
               <h2 id="catalog-dialog-title" className="text-base font-bold text-text truncate">
                 {editingCatalog ? 'Chỉnh sửa dòng sản phẩm' : 'Thêm dòng sản phẩm mới'}
@@ -285,7 +285,7 @@ export const AdminCatalogModal: React.FC<AdminCatalogModalProps> = ({
           </div>
 
           {/* Scrollable Form Content */}
-          <form id="catalog-form" onSubmit={handleSubmit} className="custom-scrollbar overflow-y-auto px-5 py-4 space-y-4 flex-1">
+          <form id="catalog-form" onSubmit={handleSubmit} className="custom-scrollbar overflow-y-auto px-5 py-4 space-y-4 flex-1 bg-surface">
             {/* Tên dòng sản phẩm */}
             <div>
               <label htmlFor="catalog-name" className="block text-xs font-medium text-text mb-1">
@@ -497,7 +497,7 @@ export const AdminCatalogModal: React.FC<AdminCatalogModalProps> = ({
           </form>
 
           {/* Sticky Footer */}
-          <div className="sticky bottom-0 z-10 px-5 py-3.5 border-t border-line bg-surface/95 backdrop-blur-md flex items-center justify-between gap-3 shrink-0">
+          <div className="sticky bottom-0 z-10 px-5 py-3.5 border-t border-line bg-surface flex items-center justify-between gap-3 shrink-0">
             <div className="min-w-0 flex-1">
               {validationHint && (
                 <span data-testid="validation-hint" className="text-[11px] text-muted truncate block">
