@@ -126,9 +126,3 @@ export interface AutomationExecution {
   completedAt?: string;
   resultDetail: Array<{ deviceId?: string; sceneId?: string; action: string; success: boolean; status: string }>;
 }
-
-export interface AutomationTestResult {
-  ruleId: string;
-  matched: boolean;
-  proposedActions: RuleActionInput[];
-}
