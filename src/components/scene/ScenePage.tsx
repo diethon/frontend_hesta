@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router';
-import { useAppSelector } from '../../store/hooks';
+import { useAppDispatch, useAppSelector } from '../../store/hooks';
+import { currentHomeChanged, currentHomeCleared } from '../../store/homeSlice';
 import {
   getScenes,
   createScene,
@@ -27,6 +28,16 @@ import { notify } from '../ui/notify';
 import { getErrorMessage } from '../../utils/errors';
 import { SceneEditor } from './SceneEditor';
 import { ConfirmModal } from '../ui/ConfirmModal';
+import { useRealtimeRefetch } from '../../realtime/useRealtimeRefetch';
+
+const SCENE_REFRESH_EVENTS = ['SCENE_CHANGED'] as const;
+
+/** A run counts as successful only once it finished; an empty or PENDING result is not a success. */
+function runSucceeded(run: SceneExecutionResponse): boolean {
+  if (run.status === 'SUCCESS') return true;
+  if (run.status === 'PENDING' || !run.resultDetail?.length) return false;
+  return run.resultDetail.every((r) => r.success);
+}
 
 // ──────────────────────────────────────────────────────────────────────────
 // Icon Mapping Helpers
@@ -175,7 +186,7 @@ function ScenarioCard({
             {(action.action === 'SET_RGB' || (action.action as string) === 'SET_COLOR') && typeof action.value === 'string' && /^#[0-9a-f]{3,8}$/i.test(action.value) ? (
               <em className="st-color-value" title={formatSceneAction(action)}>
                 <i style={{ background: action.value }} aria-hidden="true" />
-                {action.value.toUpperCase()}
+                Đổi màu
               </em>
             ) : (
               <em title={formatSceneAction(action)}>{formatSceneAction(action)}</em>
@@ -298,7 +309,7 @@ export function SceneHistory({
 
   const filtered = useMemo(() => {
     return executions.filter((ex) => {
-      const isSuccess = ex.status === 'SUCCESS' || ex.resultDetail?.every((r) => r.success);
+      const isSuccess = runSucceeded(ex);
       if (filter === 'Thành công') return isSuccess;
       if (filter === 'Có lỗi') return !isSuccess;
       return true;
@@ -355,7 +366,8 @@ export function SceneHistory({
         <>
           <h3>Lần chạy gần đây</h3>
           {filtered.map((ex) => {
-            const isSuccess = ex.status === 'SUCCESS' || ex.resultDetail?.every((r) => r.success);
+            const isSuccess = runSucceeded(ex);
+            const isRunning = ex.status === 'PENDING';
             const totalActions = ex.resultDetail?.length || scene.actions?.length || 1;
             const successActions = ex.resultDetail?.filter((r) => r.success).length || (isSuccess ? totalActions : 0);
             const isExp = expandedId === ex.id;
@@ -366,12 +378,12 @@ export function SceneHistory({
                   type="button"
                   onClick={() => setExpandedId(isExp ? null : ex.id)}
                 >
-                  <span className={isSuccess ? '' : 'error'}>
-                    <Icon name={isSuccess ? 'check' : 'alert'} size={14} />
+                  <span className={isSuccess || isRunning ? '' : 'error'}>
+                    <Icon name={isRunning ? 'clock' : isSuccess ? 'check' : 'alert'} size={14} />
                   </span>
                   <strong>{formatTime(ex.startedAt)}</strong>
                   <p>{formatTrigger(ex.triggerSource)}</p>
-                  <small>{`${successActions}/${totalActions} hành động`}</small>
+                  <small>{isRunning ? 'Đang chờ thiết bị phản hồi…' : `${successActions}/${totalActions} hành động`}</small>
                 </button>
 
                 {isExp && (
@@ -550,6 +562,7 @@ export function ScenePage() {
   const authUser = useAppSelector((state) => state.auth.user);
   const currentReduxHomeId = useAppSelector((state) => state.home?.currentHomeId);
   const homeId = routeHomeId || currentReduxHomeId || '';
+  const dispatch = useAppDispatch();
 
   const [scenes, setScenes] = useState<SceneResponse[]>([]);
   const [loading, setLoading] = useState(true);
@@ -603,11 +616,25 @@ export function ScenePage() {
     }
   }, [fetchScenes, homeId]);
 
-  // Handle sceneId param from URL if navigated directly
+  // Subscribe the realtime socket to this home even when the page is opened directly.
   useEffect(() => {
-    if (sceneId && scenes.length > 0) {
+    dispatch(currentHomeChanged(homeId || null));
+    return () => {
+      dispatch(currentHomeCleared());
+    };
+  }, [dispatch, homeId]);
+
+  // Another member edited, ran or scheduled a scene: refresh quietly (RealtimeLifecycle already dropped the cache).
+  useRealtimeRefetch(SCENE_REFRESH_EVENTS, homeId, () => void fetchScenes(true));
+
+  // Handle sceneId param from URL if navigated directly
+  // Open once per deep link: realtime refetches replace `scenes` and must not reopen a closed editor.
+  const openedDeepLinkRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (sceneId && scenes.length > 0 && openedDeepLinkRef.current !== sceneId) {
       const found = scenes.find((s) => s.id === sceneId);
       if (found) {
+        openedDeepLinkRef.current = sceneId;
         setSheet({ type: 'editor', scene: found });
       }
     }
@@ -647,7 +674,7 @@ export function ScenePage() {
     setRunningId(scene.id);
     try {
       const res = await executeScene(homeId, scene.id);
-      const isOk = res.status === 'SUCCESS' || res.resultDetail?.every((r) => r.success);
+      const isOk = runSucceeded(res);
       if (isOk) {
         setSuccessId(scene.id);
         setFailedIds((prev) => ({ ...prev, [scene.id]: false }));
