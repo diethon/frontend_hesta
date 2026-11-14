@@ -27,12 +27,12 @@ const DEVICE_TYPES = [
 ];
 
 export const AdminDeviceModal: React.FC<AdminDeviceModalProps> = ({ isOpen, onClose }) => {
-  const [formData, setFormData] = useState<AdminCreateDevicePayload>({
+  const [formData, setFormData] = useState<AdminCreateDevicePayload>(() => ({
     name: 'SYNA RGB Light',
     deviceType: 'LED_RGB',
     model: 'SYNA-RGB-001',
     serialNumber: `SYNA-RGB-001-${Math.floor(1000 + Math.random() * 9000)}`,
-  });
+  }));
 
   const [loading, setLoading] = useState(false);
   const [createdData, setCreatedData] = useState<AdminDeviceCreatedResponse | null>(null);
