@@ -1,5 +1,5 @@
 import React from 'react';
-import { Icon, type IconName } from '../home/HomeIcons';
+import { Icon, type IconName } from '../ui/LucideIcon';
 
 export interface PickerFieldProps {
   label?: string;

@@ -2,6 +2,7 @@ import type { DeviceCapabilityInfo, DeviceSummary, HomeCapabilitiesResponse } fr
 import { featureRequest } from "./featureApi";
 
 import { apiClient } from "./apiClient";
+import { realtimeEventDispatcher } from "../realtime/realtimeEvents";
 import type {
   CreateSceneRequest,
   SceneActionRequest,
@@ -43,6 +44,11 @@ export const getCachedDevices = (homeId: string): DeviceSummary[] | null => {
     return null;
   }
   return cached.data;
+};
+
+/** Device states changed elsewhere: drop only the device list the scene/automation editors read. */
+export const invalidateSceneDevicesCache = (homeId: string) => {
+  devicesCache.delete(homeId);
 };
 
 export const invalidateScenesCache = (homeId: string) => {
@@ -143,8 +149,55 @@ export const getScene = async (
   return scene;
 };
 
-export const executeScene = (homeId: string, sceneId: string) =>
-  featureRequest<SceneExecutionResponse>(`${scenePath(homeId)}/${sceneId}/execute`, { method: 'POST' });
+const RESULT_POLL_MS = 5000;
+const RESULT_DEADLINE_MS = 60000;
+
+/**
+ * Starts the scene and resolves with its FINAL result, i.e. after every device ACKed or timed out.
+ * The result is pushed over the realtime socket (SCENE_EXECUTION_UPDATED); polling the run history
+ * is only the safety net for a dropped socket.
+ */
+export const executeScene = (homeId: string, sceneId: string): Promise<SceneExecutionResponse> =>
+  new Promise((resolve, reject) => {
+    let executionId: string | null = null;
+    let settled = false;
+    const early = new Map<string, SceneExecutionResponse>(); // a fast run can finish before the POST returns
+    const done = (fn: () => void) => {
+      if (settled) return;
+      settled = true;
+      off();
+      clearInterval(poll);
+      clearTimeout(deadline);
+      fn();
+    };
+    const finish = (run: SceneExecutionResponse) => done(() => resolve(run));
+    const fail = (err: unknown) => done(() => reject(err));
+
+    const off = realtimeEventDispatcher.register<SceneExecutionResponse>('SCENE_EXECUTION_UPDATED', (event) => {
+      const run = event.data;
+      if (event.homeId !== homeId || run.status === 'PENDING') return;
+      if (executionId === null) early.set(run.id, run);
+      else if (run.id === executionId) finish(run);
+    });
+    const poll = setInterval(() => {
+      if (!executionId) return;
+      getSceneExecutions(homeId, sceneId)
+        .then((runs) => {
+          const run = runs.find((r) => r.id === executionId);
+          if (run && run.status !== 'PENDING') finish(run);
+        })
+        .catch(() => undefined); // the socket or the next poll may still deliver it
+    }, RESULT_POLL_MS);
+    const deadline = setTimeout(() => fail(new Error('Không nhận được phản hồi từ thiết bị')), RESULT_DEADLINE_MS);
+
+    featureRequest<SceneExecutionResponse>(`${scenePath(homeId)}/${sceneId}/execute?async=true`, { method: 'POST' })
+      .then((run) => {
+        executionId = run.id;
+        const result = run.status === 'PENDING' ? early.get(run.id) : run;
+        if (result) finish(result);
+      })
+      .catch(fail);
+  });
 
 export const getSceneExecutions = (homeId: string, sceneId: string) =>
   featureRequest<SceneExecutionResponse[]>(`${scenePath(homeId)}/${sceneId}/executions`);

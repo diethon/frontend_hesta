@@ -8,6 +8,7 @@ export const VOICE_SERVICE_URL = import.meta.env.VITE_VOICE_SERVICE_URL?.trim() 
 export interface VoiceCommandRequest {
   text: string;
   homeId: string;
+  userId?: string;
 }
 
 export interface SubCommandResult {
@@ -16,6 +17,8 @@ export interface SubCommandResult {
   action: string | null;
   room: string | null;
   deviceType: string | null;
+  errorCode?: string | null;
+  status?: string | null;
 }
 
 export interface VoiceCommandResponse {
@@ -25,6 +28,8 @@ export interface VoiceCommandResponse {
   action: string | null;
   room: string | null;
   deviceType: string | null;
+  errorCode?: string | null;
+  status?: string | null;
   totalDurationMs: number;
   stepDurations: Record<string, number>;
   audioUrl?: string | null;

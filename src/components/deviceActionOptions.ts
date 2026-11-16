@@ -34,6 +34,7 @@ const defaultActionsByDeviceType: Record<string, string[]> = {
   SMART_PLUG: ['TURN_ON', 'TURN_OFF', 'TOGGLE'],
   GATE: ['OPEN', 'CLOSE', 'STOP'],
   ROLLING_DOOR: ['OPEN', 'CLOSE', 'STOP'],
+  CURTAIN: ['OPEN', 'CLOSE', 'STOP', 'TURN_ON', 'TURN_OFF', 'TOGGLE'],
 };
 
 export function getDeviceActions(device?: DeviceSummary | any): ActionOption[] {
@@ -60,7 +61,7 @@ export function getDeviceActions(device?: DeviceSummary | any): ActionOption[] {
       if ((uKey === 'SPEED' || uKey === 'FAN') && !allowed.includes('SET_SPEED')) {
         allowed.push('SET_SPEED');
       }
-      if ((uKey === 'GATE' || uKey === 'DOOR') && !allowed.includes('OPEN')) {
+      if ((uKey === 'GATE' || uKey === 'DOOR' || uKey === 'CURTAIN') && !allowed.includes('OPEN')) {
         allowed.push('OPEN', 'CLOSE', 'STOP');
       }
     }

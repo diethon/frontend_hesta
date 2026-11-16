@@ -136,6 +136,27 @@ test('parses the shared backend event contract and rejects malformed payloads', 
   assert.throws(() => parseRealtimeEvent({ ...validEvent, data: null }), /data/);
 });
 
+test('accepts scene and automation change events from the backend contract', () => {
+  for (const type of ['SCENE_CHANGED', 'AUTOMATION_RULE_CHANGED']) {
+    const event = { ...validEvent, type, deviceId: null, data: { entity: 'Scene' } };
+    assert.deepEqual(parseRealtimeEvent(JSON.stringify(event)), event);
+  }
+});
+
+test('realtime events drop the cached copies that other pages would otherwise show', async () => {
+  const { cachedFetch, peekCache } = loadSource('src/services/queryCache.ts');
+  const { homeDevicesKey } = loadSource('src/services/deviceApi.ts');
+  const { invalidateCachesFor } = loadSource('src/realtime/realtimeCacheSync.ts');
+  await cachedFetch(homeDevicesKey('home-1'), async () => [{ id: 'device-1' }], { ttlMs: 60_000 });
+  assert.ok(peekCache(homeDevicesKey('home-1')));
+
+  invalidateCachesFor({ ...validEvent, type: 'NOTIFICATION_CREATED' });
+  assert.ok(peekCache(homeDevicesKey('home-1')), 'unrelated events keep the cache');
+
+  invalidateCachesFor(validEvent);
+  assert.equal(peekCache(homeDevicesKey('home-1')), undefined);
+});
+
 test('derives the exact home-scoped destination', () => {
   assert.equal(homeEventsDestination('home-1'), '/topic/homes/home-1/events');
   assert.throws(() => homeEventsDestination('home/escape'), /valid homeId/);

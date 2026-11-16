@@ -9,6 +9,7 @@ import {
 } from '../store/realtimeSlice';
 import { realtimeClient } from './realtimeClient';
 import { realtimeEventDispatcher } from './realtimeEvents';
+import { invalidateCachesFor } from './realtimeCacheSync';
 
 export function RealtimeLifecycle() {
   const dispatch = useAppDispatch();
@@ -20,6 +21,7 @@ export function RealtimeLifecycle() {
       onStatusChange: (status) => dispatch(connectionStatusChanged(status)),
       onHomeSubscriptionChange: (homeId) => dispatch(homeSubscriptionChanged(homeId)),
       onEvent: (event) => {
+        invalidateCachesFor(event);
         dispatch(realtimeEventReceived(event));
         realtimeEventDispatcher.dispatch(event);
       },

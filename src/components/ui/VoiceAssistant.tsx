@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { useAppSelector } from '../../store/hooks';
 import { selectCurrentHomeId, selectCurrentUser } from '../../store/selectors';
 import { processVoiceCommand, checkVoiceServiceHealth, getTtsAudioUrl, VOICE_SERVICE_URL } from '../../services/voiceApi';
-import type { VoiceCommandResponse } from '../../services/voiceApi';
+import type { VoiceCommandResponse, SubCommandResult } from '../../services/voiceApi';
 
 /* ── Trạng thái voice ── */
 type VoiceState = 'idle' | 'listening' | 'processing' | 'success' | 'error';
@@ -18,6 +18,9 @@ interface VoiceResult {
   message: string;
   transcript: string;
   durationMs: number;
+  errorCode?: string | null;
+  status?: string | null;
+  subCommands?: SubCommandResult[];
 }
 
 /* ── MicIcon ── */
@@ -343,6 +346,7 @@ export const VoiceAssistantButton: React.FC = () => {
         const resp: VoiceCommandResponse = await processVoiceCommand({
           text: cleanText,
           homeId: currentHomeId || '',
+          userId: user?.id,
         });
 
         const voiceResult: VoiceResult = {
@@ -350,6 +354,9 @@ export const VoiceAssistantButton: React.FC = () => {
           message: resp.message,
           transcript: resp.transcript || cleanText,
           durationMs: resp.totalDurationMs,
+          errorCode: resp.errorCode,
+          status: resp.status,
+          subCommands: resp.subCommands,
         };
 
         setResult(voiceResult);
@@ -373,6 +380,8 @@ export const VoiceAssistantButton: React.FC = () => {
           message: err.message || 'Lỗi kết nối voice service',
           transcript: cleanText,
           durationMs: 0,
+          errorCode: 'CONNECTION_ERROR',
+          status: 'ERROR',
         };
         setResult(voiceResult);
         setVoiceState('error');
@@ -383,7 +392,7 @@ export const VoiceAssistantButton: React.FC = () => {
         }
       }
     },
-    [currentHomeId, speakResponse],
+    [currentHomeId, user?.id, speakResponse],
   );
 
   /* ── Bắt đầu nghe giọng nói ── */
@@ -677,13 +686,48 @@ export const VoiceAssistantButton: React.FC = () => {
                     className={`rounded-2xl px-4 py-3 border transition-all ${
                       result.success
                         ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
-                        : 'bg-rose-50 border-rose-200 text-rose-700'
+                        : result.errorCode === 'DEVICE_OFFLINE'
+                          ? 'bg-amber-50 border-amber-200 text-amber-800'
+                          : result.errorCode === 'ACCESS_DENIED' || result.errorCode === 'UNAUTHORIZED'
+                            ? 'bg-purple-50 border-purple-200 text-purple-800'
+                            : 'bg-rose-50 border-rose-200 text-rose-700'
                     }`}
                   >
                     <div className="flex items-start gap-2.5 justify-between">
                       <div className="flex items-start gap-2.5 min-w-0 flex-1">
-                        <span className="mt-0.5 text-base shrink-0">{result.success ? '✅' : '⚠️'}</span>
+                        <span className="mt-0.5 text-base shrink-0">
+                          {result.success
+                            ? '✅'
+                            : result.errorCode === 'DEVICE_OFFLINE'
+                              ? '🔌'
+                              : result.errorCode === 'ACCESS_DENIED' || result.errorCode === 'UNAUTHORIZED'
+                                ? '🔒'
+                                : '⚠️'}
+                        </span>
                         <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <span
+                              className={`text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md ${
+                                result.success
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : result.errorCode === 'DEVICE_OFFLINE'
+                                    ? 'bg-amber-100 text-amber-800'
+                                    : result.errorCode === 'ACCESS_DENIED' || result.errorCode === 'UNAUTHORIZED'
+                                      ? 'bg-purple-100 text-purple-800'
+                                      : 'bg-rose-100 text-rose-800'
+                              }`}
+                            >
+                              {result.success
+                                ? 'Thành công'
+                                : result.errorCode === 'DEVICE_OFFLINE'
+                                  ? 'Chưa kết nối / Ngoại tuyến'
+                                  : result.errorCode === 'ACCESS_DENIED' || result.errorCode === 'UNAUTHORIZED'
+                                    ? 'Không có quyền'
+                                    : result.errorCode === 'GATEWAY_DISCONNECTED'
+                                      ? 'Lỗi Gateway MQTT'
+                                      : 'Thất bại'}
+                            </span>
+                          </div>
                           <p className="text-sm font-medium leading-relaxed">{result.message}</p>
                           {result.durationMs > 0 && (
                             <p className="mt-1 text-xs opacity-75 font-mono">
@@ -707,6 +751,38 @@ export const VoiceAssistantButton: React.FC = () => {
                         <VolumeIcon className="h-4 w-4" />
                       </button>
                     </div>
+
+                    {/* Sub-commands visual breakdown (for compound commands) */}
+                    {result.subCommands && result.subCommands.length > 1 && (
+                      <div className="mt-3 pt-2.5 border-t border-black/5 dark:border-white/5 space-y-1.5">
+                        <p className="text-[11px] font-semibold opacity-75">Chi tiết từng thiết bị:</p>
+                        {result.subCommands.map((sub, idx) => (
+                          <div
+                            key={idx}
+                            className={`flex items-center justify-between text-xs px-2.5 py-1.5 rounded-lg border ${
+                              sub.success
+                                ? 'bg-emerald-100/60 border-emerald-200/80 text-emerald-900'
+                                : sub.errorCode === 'DEVICE_OFFLINE'
+                                  ? 'bg-amber-100/60 border-amber-200/80 text-amber-900'
+                                  : sub.errorCode === 'ACCESS_DENIED' || sub.errorCode === 'UNAUTHORIZED'
+                                    ? 'bg-purple-100/60 border-purple-200/80 text-purple-900'
+                                    : 'bg-rose-100/60 border-rose-200/80 text-rose-900'
+                            }`}
+                          >
+                            <span className="font-medium truncate mr-2">{sub.message}</span>
+                            <span className="text-[10px] font-bold shrink-0 uppercase tracking-wider">
+                              {sub.success
+                                ? 'OK'
+                                : sub.errorCode === 'DEVICE_OFFLINE'
+                                  ? 'Offline'
+                                  : sub.errorCode === 'ACCESS_DENIED' || sub.errorCode === 'UNAUTHORIZED'
+                                    ? 'Không có quyền'
+                                    : 'Lỗi'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
 

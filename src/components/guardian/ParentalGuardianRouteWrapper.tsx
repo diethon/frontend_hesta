@@ -10,11 +10,7 @@ export function ParentalGuardianRouteWrapper() {
   const authUser = useAppSelector((state) => state.auth.user);
 
   return (
-    <div className="app-shell scenes-page">
-      {/* 3 Glowing Pastel Meshes matching HESTA's design */}
-      <div className="mesh mesh-one" />
-      <div className="mesh mesh-two" />
-      <div className="mesh mesh-three" />
+    <div className="app-shell scenes-page studio st-theme">
 
       {/* Desktop/Tablet NavRail */}
       <DashboardNavRail

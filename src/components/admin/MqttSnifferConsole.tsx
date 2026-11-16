@@ -43,6 +43,7 @@ export const MqttSnifferConsole: React.FC = () => {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchPackets();
   }, []);
 
@@ -90,13 +91,13 @@ export const MqttSnifferConsole: React.FC = () => {
   });
 
   return (
-    <div className="surface-card p-5 sm:p-6 rounded-2xl border border-line shadow-xs space-y-4">
+    <div className="rounded-3xl border border-line bg-surface shadow-xs p-5 sm:p-6 space-y-4 tabular-nums">
       {/* ── Console Header ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-line pb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-line/60 pb-4">
         <div>
           <h2 className="text-base sm:text-lg font-bold text-text flex items-center gap-2">
-            <Terminal className="w-5 h-5 text-amber-500" />
-            Live MQTT Packet Sniffer &amp; Telemetry Console
+            <Terminal className="w-5 h-5 text-primary" />
+            <span>Live MQTT packet sniffer &amp; telemetry console</span>
           </h2>
           <p className="text-xs text-muted mt-0.5">
             Giám sát luồng gói tin INBOUND/OUTBOUND thời gian thực giữa Cloud Core và ESP32 Gateway Nodes.
@@ -108,44 +109,44 @@ export const MqttSnifferConsole: React.FC = () => {
           <button
             type="button"
             onClick={() => setIsPaused(!isPaused)}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl border transition shadow-xs ${
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl border transition-colors shadow-2xs cursor-pointer ${
               isPaused
-                ? 'bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100'
-                : 'bg-surface text-text border-line hover:bg-off-soft'
+                ? 'bg-rose-500/10 text-rose-600 border-rose-500/20 hover:bg-rose-500/20'
+                : 'bg-surface text-text border-line hover:bg-surface-hover'
             }`}
             title={isPaused ? 'Tiếp tục bắt gói tin' : 'Tạm dừng bắt gói tin'}
           >
-            {isPaused ? <Play className="w-3.5 h-3.5 text-emerald-600 fill-emerald-600" /> : <Pause className="w-3.5 h-3.5 text-amber-600" />}
-            {isPaused ? 'Tiếp tục' : 'Tạm dừng'}
+            {isPaused ? <Play className="w-3.5 h-3.5 text-emerald-600 fill-emerald-600" /> : <Pause className="w-3.5 h-3.5 text-primary" />}
+            <span>{isPaused ? 'Tiếp tục' : 'Tạm dừng'}</span>
           </button>
 
           <button
             type="button"
             onClick={() => setIsAutoScroll(!isAutoScroll)}
-            className={`inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-xl border transition shadow-xs ${
+            className={`inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-xl border transition-colors shadow-2xs cursor-pointer ${
               isAutoScroll
                 ? 'bg-primary/10 text-primary border-primary/30'
                 : 'bg-surface text-muted border-line hover:text-text'
             }`}
             title="Tự động cuộn xuống dưới khi có gói tin mới"
           >
-            Auto-scroll: {isAutoScroll ? 'BẬT' : 'TẮT'}
+            <span>Auto-scroll: {isAutoScroll ? 'BẬT' : 'TẮT'}</span>
           </button>
 
           <button
             type="button"
             onClick={fetchPackets}
             disabled={loading}
-            className="p-1.5 text-muted hover:text-text rounded-xl border border-line bg-surface hover:bg-off-soft transition"
+            className="p-2 text-muted hover:text-text rounded-xl border border-line bg-surface hover:bg-surface-hover transition-colors cursor-pointer"
             title="Làm mới thủ công"
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-primary' : ''}`} />
           </button>
 
           <button
             type="button"
             onClick={handleClear}
-            className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-xl border border-rose-200 transition"
+            className="p-2 text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-xl border border-rose-200 dark:border-rose-900/40 transition-colors cursor-pointer"
             title="Xóa danh sách gói tin trên màn hình"
           >
             <Trash2 className="w-4 h-4" />
@@ -156,13 +157,13 @@ export const MqttSnifferConsole: React.FC = () => {
       {/* ── Search & Filter Bar ── */}
       <div className="flex flex-col sm:flex-row items-center gap-3">
         <div className="relative flex-1 w-full">
-          <Search className="w-4 h-4 text-muted absolute left-3 top-1/2 -translate-y-1/2" />
+          <Search className="w-4 h-4 text-muted absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Lọc theo topic (vd: hesta/homes/+/devices) hoặc payload JSON..."
-            className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-line bg-surface text-text placeholder-muted focus:outline-none focus:border-primary"
+            className="w-full pl-10 pr-3.5 py-2 text-xs sm:text-sm rounded-xl border border-line bg-sidebar text-text placeholder-muted focus:outline-none focus:border-primary"
           />
         </div>
 
@@ -173,10 +174,10 @@ export const MqttSnifferConsole: React.FC = () => {
               key={dir}
               type="button"
               onClick={() => setDirectionFilter(dir)}
-              className={`px-2.5 py-1.5 text-xs font-bold rounded-lg border transition ${
+              className={`px-3 py-1.5 text-xs font-semibold rounded-xl border transition-colors cursor-pointer ${
                 directionFilter === dir
-                  ? 'bg-primary text-white border-primary shadow-xs'
-                  : 'bg-surface text-muted border-line hover:text-text hover:bg-off-soft'
+                  ? 'bg-primary text-white border-primary shadow-2xs'
+                  : 'bg-surface text-muted border border-line hover:text-text hover:bg-surface-hover'
               }`}
             >
               {dir === 'ALL' ? 'Tất cả' : dir === 'INBOUND' ? 'IN (Thu)' : 'OUT (Phát)'}
@@ -186,20 +187,20 @@ export const MqttSnifferConsole: React.FC = () => {
       </div>
 
       {/* ── Terminal Console Output Window ── */}
-      <div className="rounded-2xl border border-[#1e293b] bg-[#0b1320] text-slate-200 p-4 font-mono text-xs overflow-hidden shadow-inner">
-        <div className="flex items-center justify-between border-b border-[#1e293b] pb-2 mb-3 text-[11px] text-slate-400">
+      <div className="rounded-2xl border border-slate-800 bg-slate-950 text-slate-100 p-4 font-mono text-xs overflow-hidden shadow-inner">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-3 text-[11px] text-slate-400">
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
-            <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+            <span className="w-2.5 h-2.5 rounded-full bg-primary" />
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-            <span className="ml-2 font-bold text-slate-300">CONSOLE LOG ({filteredPackets.length} gói tin)</span>
+            <span className="ml-2 font-bold text-slate-200">CONSOLE LOG ({filteredPackets.length} gói tin)</span>
           </div>
-          <span className="text-[10px] text-slate-500">Bấm dòng để mở rộng JSON đầy đủ</span>
+          <span className="text-[10px] text-slate-400">Bấm dòng để mở rộng JSON đầy đủ</span>
         </div>
 
         <div className="max-h-96 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
           {filteredPackets.length === 0 ? (
-            <div className="py-12 text-center text-slate-500 italic">
+            <div className="py-12 text-center text-white/60 italic">
               {loading ? 'Đang lắng nghe gói tin MQTT...' : 'Không có gói tin nào phù hợp với bộ lọc.'}
             </div>
           ) : (
@@ -222,14 +223,14 @@ export const MqttSnifferConsole: React.FC = () => {
                   onClick={() => setExpandedId(isExpanded ? null : packetKey)}
                   className={`p-2.5 rounded-xl border transition-all cursor-pointer ${
                     isExpanded
-                      ? 'bg-[#111c2e] border-slate-600 shadow-md'
-                      : 'bg-[#111c2e] border-[#1e293b] hover:border-slate-600'
+                      ? 'bg-[#111c2e] border-cyan-500/40 shadow-md'
+                      : 'bg-[#111c2e] border-[#1e293b] hover:border-white/25'
                   }`}
                 >
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <div className="flex items-center gap-2 flex-wrap min-w-0">
                       {/* Timestamp */}
-                      <span className="text-slate-500 text-[11px]">
+                      <span className="text-white/60 text-[11px]">
                         [{formattedTime}]
                       </span>
 
@@ -237,8 +238,8 @@ export const MqttSnifferConsole: React.FC = () => {
                       <span
                         className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-extrabold ${
                           isInbound
-                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                            : 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
+                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                            : 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
                         }`}
                       >
                         {isInbound ? <ArrowDownLeft className="w-3 h-3" /> : <ArrowUpRight className="w-3 h-3" />}
@@ -246,12 +247,12 @@ export const MqttSnifferConsole: React.FC = () => {
                       </span>
 
                       {/* QoS badge */}
-                      <span className="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-[#070d18] text-slate-400 border border-[#1e293b]">
+                      <span className="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-[#070d18] text-white/75 border border-[#1e293b]">
                         QoS {pkt.qos ?? 0}
                       </span>
 
                       {/* Topic */}
-                      <span className="text-amber-400 font-bold break-all">
+                      <span className="text-sky-300 font-semibold break-all">
                         {pkt.topic}
                       </span>
                     </div>
@@ -260,7 +261,7 @@ export const MqttSnifferConsole: React.FC = () => {
                     <button
                       type="button"
                       onClick={(e) => handleCopyPayload(packetKey, pkt.payloadSummary, e)}
-                      className="inline-flex items-center gap-1 text-[11px] text-slate-400 hover:text-white px-2 py-0.5 rounded bg-[#070d18] hover:bg-slate-800 border border-[#1e293b] transition shrink-0 self-end sm:self-auto"
+                      className="inline-flex items-center gap-1 text-[11px] text-white/75 hover:text-white px-2 py-0.5 rounded bg-[#070d18] hover:bg-[#1e293b] border border-[#1e293b] transition shrink-0 self-end sm:self-auto"
                       title="Sao chép nội dung payload"
                     >
                       {copiedId === packetKey ? (

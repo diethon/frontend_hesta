@@ -48,6 +48,8 @@ export interface DeviceResponse {
   manualOverrideUntil?: string | null;
   manualOverrideActive?: boolean;
   lastSeen?: string;
+  createdAt?: string;
+  updatedAt?: string;
   settings?: Record<string, any>;
 }
 

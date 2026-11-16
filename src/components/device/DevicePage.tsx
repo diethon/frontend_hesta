@@ -1,215 +1,67 @@
+/* eslint-disable react-refresh/only-export-components */
 import React, { useCallback, useEffect, useState, useRef, useMemo } from 'react';
 import { useNavigate, useParams, Navigate } from 'react-router';
-import { Icon, IconButton, type IconName } from '../home/HomeIcons';
+import {
+  ArrowUpDown,
+  Settings2,
+  WifiOff,
+  Lock,
+  Clock,
+  Zap,
+  AlertTriangle,
+  Plus,
+  Filter,
+  Power,
+  Thermometer,
+} from 'lucide-react';
+import { Icon } from '../home/HomeIcons';
 import { DashboardNavRail } from '../home/DashboardNavRail';
 import { DashboardBottomNav } from '../home/DashboardBottomNav';
+import { AutomationTopBar } from '../automation/AutomationTopBar';
+import { DeviceFilterDropdown, DeviceMobileFilterModal } from './DeviceFilterDropdown';
 import { AddDeviceModal } from './AddDeviceModal';
 import { RoomManagementModal } from './RoomManagementModal';
-import { DeviceDetailModal, type FigmaDeviceType } from './DeviceDetailModal';
+import { DeviceDetailModal } from './DeviceDetailModal';
 import { DeviceGroupSection } from './DeviceGroupSection';
+import { DevicesOverviewStrip } from './DevicesOverviewStrip';
 import {
   getDevicesByHome,
   sendDeviceCommand,
   sendManualPowerCommand,
+  homeDevicesKey,
 } from '../../services/deviceApi';
 import { getRooms } from '../../services/roomApi';
+import { getHomeEnergyAnalytics, energyAnalyticsKey } from '../../services/energyApi';
+import { peekCache } from '../../services/queryCache';
 import type { DeviceResponse } from '../../types/device';
 import type { RoomResponse } from '../../types/room';
+import type { DeviceEnergyBreakdown } from '../../types/energy';
 import { getErrorMessage, isDuplicateCommandError } from '../../utils/errors';
-import { NotificationBell } from '../notification/NotificationBell';
-import { VoiceAssistantButton } from '../ui/VoiceAssistant';
 import { currentHomeChanged, currentHomeCleared } from '../../store/homeSlice';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { notify } from '../ui/notify';
 import { realtimeEventDispatcher } from '../../realtime/realtimeEvents';
 import type { RealtimeEvent } from '../../realtime/realtimeTypes';
 import { useOverrideCountdown } from './useOverrideCountdown';
+import {
+  type UIMappedDevice,
+  type DeviceSortOption,
+  SORT_OPTIONS,
+  DEVICE_TYPE_FILTER_OPTIONS,
+  mapDeviceToUI,
+  formatLastSeenVi,
+  getDeviceRatedWattage,
+  getDeviceTypeColorClass,
+} from './devicePageHelpers';
+import './devices-page.css';
 
-// ──────────────────────────────────────────────────────────────────────────
-// Device Mapping & Helper
-// ──────────────────────────────────────────────────────────────────────────
-
-export interface UIMappedDevice {
-  id: string;
-  name: string;
-  room: string;
-  roomId?: string;
-  type: FigmaDeviceType;
-  icon: IconName;
-  status: string;
-  value?: string;
-  on?: boolean;
-  offline?: boolean;
-  sensor?: boolean;
-  brightness?: number;
-  manualOverrideUntil?: string | null;
-  manualOverrideActive?: boolean;
-  raw?: DeviceResponse;
-}
-
-export function mapDeviceToUI(d: DeviceResponse, localPower: Record<string, boolean>, localBrightness: Record<string, number>): UIMappedDevice {
-  const isOffline = d.status === 'OFFLINE';
-  const isPowerOn =
-    localPower[d.id] !== undefined
-      ? localPower[d.id]
-      : d.currentState?.power === 'ON' || d.currentState?.power === true || d.currentState?.power === 'true';
-
-  let type: FigmaDeviceType = 'Công tắc';
-  let icon: IconName = 'automation';
-  let isSensor = false;
-  let valueStr: string | undefined;
-  let brightness = localBrightness[d.id] ?? (d.currentState?.brightness ? Number(d.currentState.brightness) : 80);
-
-  const typeUpper = (d.deviceType || '').toUpperCase();
-  const nameLower = (d.name || '').toLowerCase();
-
-  if (typeUpper.includes('LIGHT') || typeUpper.includes('LED')) {
-    type = 'Đèn';
-    icon = 'lamp';
-  } else if (
-    typeUpper.includes('AIR') ||
-    typeUpper.includes('CLIMATE') ||
-    typeUpper.includes('AC') ||
-    nameLower.includes('điều hòa') ||
-    nameLower.includes('casper')
-  ) {
-    type = 'Điều hòa';
-    icon = 'snowflake';
-    const temp = d.currentState?.temperature;
-    valueStr = temp !== undefined ? `${temp}°C` : undefined;
-  } else if (typeUpper.includes('GATE') || typeUpper.includes('ROLLING') || nameLower.includes('cổng')) {
-    type = 'Cổng';
-    icon = 'door';
-  } else if (typeUpper.includes('TEMP') || typeUpper.includes('HUMID')) {
-    type = 'Cảm biến';
-    icon = 'thermometer';
-    isSensor = true;
-    const temp = d.currentState?.temperature;
-    valueStr = temp !== undefined ? `${temp}°C` : undefined;
-  } else if (typeUpper.includes('LUX') || typeUpper.includes('SUN') || typeUpper.includes('LIGHT_SENSOR')) {
-    type = 'Cảm biến';
-    icon = 'sun';
-    isSensor = true;
-    const lux = d.currentState?.lux;
-    valueStr = lux !== undefined ? `${lux} lx` : (d.currentState?.LIGHT_SENSOR !== undefined ? (Number(d.currentState.LIGHT_SENSOR) === 1 ? 'Sáng' : 'Tối') : undefined);
-  } else if (typeUpper.includes('MOTION')) {
-    type = 'Cảm biến';
-    icon = 'activity';
-    isSensor = true;
-    valueStr = d.currentState?.motion ? 'Chuyển động' : 'Tĩnh';
-  } else if (typeUpper.includes('SMOKE')) {
-    type = 'Cảm biến';
-    icon = 'shield';
-    isSensor = true;
-    valueStr = d.currentState?.smoke ? 'Cảnh báo' : 'An toàn';
-  } else if (typeUpper.includes('CAMERA')) {
-    type = 'Camera';
-    icon = 'camera';
-  } else if (nameLower.includes('bơm')) {
-    type = 'Công tắc';
-    icon = 'droplet';
-  } else if (typeUpper.includes('LOCK') || nameLower.includes('khóa')) {
-    type = 'Công tắc';
-    icon = 'lock';
-  } else {
-    type = 'Công tắc';
-    icon = 'automation';
-  }
-
-  // Construct status text
-  let statusText = isOffline ? 'Ngoại tuyến' : isPowerOn ? 'Đang bật' : 'Tắt';
-  if (!isOffline) {
-    if (type === 'Đèn') {
-      statusText = isPowerOn ? `Đang bật · ${brightness}%` : 'Đã tắt';
-    } else if (type === 'Điều hòa') {
-      statusText = isPowerOn ? `Lạnh · Quạt tự động` : 'Đã tắt';
-    } else if (type === 'Cảm biến' && icon === 'thermometer') {
-      const hum = d.currentState?.humidity;
-      statusText = hum !== undefined ? `Độ ẩm ${hum}%` : (d.currentState?.temperature !== undefined ? `Nhiệt độ ${d.currentState.temperature}°C` : 'Chưa có dữ liệu');
-    } else if (type === 'Cảm biến' && icon === 'sun') {
-      if (d.currentState?.lux !== undefined) {
-        statusText = Number(d.currentState.lux) > 200 ? 'Trời sáng' : 'Trời tối';
-      } else if (d.currentState?.LIGHT_SENSOR !== undefined) {
-        statusText = Number(d.currentState.LIGHT_SENSOR) === 1 ? 'Trời sáng' : 'Trời tối';
-      } else {
-        statusText = 'Chưa có dữ liệu';
-      }
-    } else if (type === 'Cảm biến') {
-      statusText = 'Bình thường';
-    } else if (type === 'Cổng') {
-      statusText = isPowerOn ? 'Đang mở' : 'Đã dừng';
-    }
-  }
-
-  return {
-    id: d.id,
-    name: d.name,
-    room: d.roomName || 'Chưa phân phòng',
-    roomId: d.roomId || undefined,
-    type,
-    icon,
-    status: statusText,
-    value: valueStr,
-    on: isPowerOn,
-    offline: isOffline,
-    sensor: isSensor,
-    brightness,
-    manualOverrideUntil: d.manualOverrideUntil,
-    manualOverrideActive: d.manualOverrideActive ?? (d.manualOverrideUntil ? new Date(d.manualOverrideUntil).getTime() > Date.now() : false),
-    raw: d,
-  };
-}
-
+// Re-export interface and helper to maintain backwards compatibility
+export type { UIMappedDevice } from './devicePageHelpers';
+export { mapDeviceToUI } from './devicePageHelpers';
 
 // ──────────────────────────────────────────────────────────────────────────
 // Subcomponents
 // ──────────────────────────────────────────────────────────────────────────
-
-function DevicesTopBar({
-  onlineCount,
-  activeCount,
-  searchQuery,
-  onSearchChange,
-  userInitial = 'M',
-}: {
-  onlineCount: number;
-  activeCount: number;
-  searchQuery: string;
-  onSearchChange: (q: string) => void;
-  userInitial?: string;
-}) {
-  const [searchOpen, setSearchOpen] = useState(false);
-
-  return (
-    <header className="topbar devices-topbar">
-      <div>
-        <span className="eyebrow">
-          {onlineCount} TRỰC TUYẾN · {activeCount} ĐANG BẬT
-        </span>
-        <h2>Thiết bị</h2>
-      </div>
-      <div className="top-actions">
-        {searchOpen && (
-          <input
-            autoFocus
-            className="inline-search"
-            value={searchQuery}
-            onChange={(event) => onSearchChange(event.target.value)}
-            placeholder="Tìm thiết bị"
-          />
-        )}
-        <IconButton
-          icon="search"
-          label="Tìm kiếm"
-          onClick={() => setSearchOpen(!searchOpen)}
-        />
-        <VoiceAssistantButton />
-        <NotificationBell />
-        <div className="avatar">{userInitial}</div>
-      </div>
-    </header>
-  );
-}
 
 function RoomFilterStrip({
   rooms,
@@ -217,39 +69,76 @@ function RoomFilterStrip({
   totalCount,
   roomCounts,
   onChange,
+  loading = false,
 }: {
   rooms: RoomResponse[];
   activeRoom: string;
   totalCount: number;
   roomCounts: Record<string, number>;
   onChange: (roomId: string) => void;
+  loading?: boolean;
 }) {
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
+        {[1, 2, 3, 4].map((i) => (
+          <div
+            key={i}
+            className="h-9 w-24 rounded-full bg-[var(--border)]/50 animate-pulse shrink-0"
+          />
+        ))}
+      </div>
+    );
+  }
+
   return (
-    <div className="device-room-strip">
-      <button
-        type="button"
-        className={`${activeRoom === 'ALL' ? 'active' : ''} ${
-          totalCount === 0 ? 'empty' : ''
-        }`}
-        onClick={() => onChange('ALL')}
+    <div className="relative flex-1 min-w-0">
+      <div
+        role="tablist"
+        aria-label="Lọc theo phòng"
+        className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 scroll-smooth"
+        style={{
+          maskImage: 'linear-gradient(to right, black calc(100% - 24px), transparent 100%)',
+          WebkitMaskImage: 'linear-gradient(to right, black calc(100% - 24px), transparent 100%)',
+        }}
       >
-        Tất cả phòng <span>({totalCount})</span>
-      </button>
-      {rooms.map((room) => {
-        const count = roomCounts[room.id] || 0;
-        return (
-          <button
-            key={room.id}
-            type="button"
-            className={`${activeRoom === room.id ? 'active' : ''} ${
-              count === 0 ? 'empty' : ''
-            }`}
-            onClick={() => onChange(room.id)}
-          >
-            {room.name} <span>({count})</span>
-          </button>
-        );
-      })}
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeRoom === 'ALL'}
+          onClick={() => onChange('ALL')}
+          className={`h-9 px-4 rounded-full text-xs font-medium shrink-0 inline-flex items-center gap-1.5 transition-colors cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
+            activeRoom === 'ALL'
+              ? 'bg-[var(--accent)] text-white shadow-xs'
+              : 'border border-[var(--border)] bg-[var(--surface)] text-[var(--secondary)] hover:text-[var(--text)] hover:bg-[var(--muted)]/50'
+          } ${totalCount === 0 ? 'opacity-60' : ''}`}
+        >
+          <span>Tất cả phòng</span>
+          <span className="tabular-nums">({totalCount})</span>
+        </button>
+        {rooms.map((room) => {
+          const count = roomCounts[room.id] || 0;
+          const isSelected = activeRoom === room.id;
+          return (
+            <button
+              key={room.id}
+              type="button"
+              role="tab"
+              aria-selected={isSelected}
+              onClick={() => onChange(room.id)}
+              title={room.name}
+              className={`h-9 px-4 rounded-full text-xs font-medium shrink-0 inline-flex items-center gap-1.5 transition-colors cursor-pointer max-w-[200px] select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
+                isSelected
+                  ? 'bg-[var(--accent)] text-white shadow-xs'
+                  : 'border border-[var(--border)] bg-[var(--surface)] text-[var(--secondary)] hover:text-[var(--text)] hover:bg-[var(--muted)]/50'
+              } ${count === 0 ? 'opacity-60' : ''}`}
+            >
+              <span className="truncate">{room.name}</span>
+              <span className="tabular-nums shrink-0">({count})</span>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -271,53 +160,100 @@ function QuickFilters({
   onChange: (filter: 'all' | 'on' | 'offline' | 'sensor') => void;
   onTurnOffAllLights: () => void;
 }) {
-  const items: ['on' | 'offline' | 'sensor', string, IconName][] = [
-    ['on', `Đang bật (${activeCount})`, 'power'],
-    ['offline', `Ngoại tuyến (${offlineCount})`, 'camera'],
-    ['sensor', `Cảm biến (${sensorCount})`, 'thermometer'],
-  ];
-
   return (
-    <div className="quick-filters">
-      {items.map(([key, label, icon]) => (
-        <button
-          key={key}
-          type="button"
-          className={`stat ${active === key ? 'active' : ''}`}
-          onClick={() => onChange(active === key ? 'all' : key)}
-        >
-          <Icon name={icon} size={16} />
-          {label}
-        </button>
-      ))}
+    <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
+      <button
+        type="button"
+        className={`h-8 px-3 rounded-full text-xs font-medium inline-flex items-center gap-1.5 shrink-0 transition-colors cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
+          active === 'on'
+            ? 'bg-[var(--accent)] text-white shadow-xs'
+            : 'border border-[var(--border)] bg-transparent text-[var(--secondary)] hover:text-[var(--text)] hover:bg-[var(--muted)]/40'
+        }`}
+        onClick={() => onChange(active === 'on' ? 'all' : 'on')}
+      >
+        <Power className="w-3.5 h-3.5 shrink-0" />
+        <span>Đang bật ({activeCount})</span>
+      </button>
+
+      <button
+        type="button"
+        className={`h-8 px-3 rounded-full text-xs font-medium inline-flex items-center gap-1.5 shrink-0 transition-colors cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
+          active === 'offline'
+            ? 'bg-[var(--accent)] text-white shadow-xs'
+            : 'border border-[var(--border)] bg-transparent text-[var(--secondary)] hover:text-[var(--text)] hover:bg-[var(--muted)]/40'
+        }`}
+        onClick={() => onChange(active === 'offline' ? 'all' : 'offline')}
+      >
+        <WifiOff className="w-3.5 h-3.5 shrink-0" />
+        <span>Ngoại tuyến ({offlineCount})</span>
+      </button>
+
+      <button
+        type="button"
+        className={`h-8 px-3 rounded-full text-xs font-medium inline-flex items-center gap-1.5 shrink-0 transition-colors cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
+          active === 'sensor'
+            ? 'bg-[var(--accent)] text-white shadow-xs'
+            : 'border border-[var(--border)] bg-transparent text-[var(--secondary)] hover:text-[var(--text)] hover:bg-[var(--muted)]/40'
+        }`}
+        onClick={() => onChange(active === 'sensor' ? 'all' : 'sensor')}
+      >
+        <Thermometer className="w-3.5 h-3.5 shrink-0" />
+        <span>Cảm biến ({sensorCount})</span>
+      </button>
+
       {active === 'on' && lightsOnCount > 0 && (
         <button
           type="button"
-          className="lights-off-action"
+          className="h-8 px-3 rounded-full border border-[var(--border)] bg-[var(--surface)] text-[var(--secondary)] hover:text-[var(--text)] hover:bg-[var(--muted)]/50 text-xs font-medium inline-flex items-center gap-1.5 shrink-0 transition-colors cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
           onClick={onTurnOffAllLights}
         >
-          Tắt tất cả đèn ({lightsOnCount})
+          <span>Tắt tất cả đèn ({lightsOnCount})</span>
         </button>
       )}
     </div>
   );
 }
 
+const resolveGateLabel = (rawState?: unknown) => {
+  const s = String(rawState ?? '').toUpperCase();
+  if (s === 'OPEN' || s === 'OPENING') return 'Mở';
+  if (s === 'CLOSE' || s === 'CLOSED' || s === 'CLOSING') return 'Đóng';
+  return 'Dừng';
+};
+
 function DevicesDeviceCard({
   device,
   grouped,
+  kwhToday,
   onToggle,
   onOpen,
   onGateCommand,
 }: {
   device: UIMappedDevice;
   grouped: boolean;
+  kwhToday?: number;
   onToggle: () => void;
   onOpen: () => void;
   onGateCommand: (cmd: 'Mở' | 'Dừng' | 'Đóng') => void;
 }) {
-  const [gate, setGate] = useState('Dừng');
-  const { isOverrideActive, formattedTime } = useOverrideCountdown(device.manualOverrideUntil);
+  const rawGateState = device.raw?.currentState?.state;
+  const [prevRawGateState, setPrevRawGateState] = useState(rawGateState);
+  const [gate, setGate] = useState(() => resolveGateLabel(rawGateState));
+
+  if (rawGateState !== prevRawGateState) {
+    setPrevRawGateState(rawGateState);
+    setGate(resolveGateLabel(rawGateState));
+  }
+
+  const { isOverrideActive, formattedTime } = useOverrideCountdown(
+    device.manualOverrideUntil
+  );
+
+  const colorClass = getDeviceTypeColorClass(device.type);
+  const isPowerDevice =
+    !device.sensor && device.type !== 'Cảm biến' && device.type !== 'Camera';
+  const showKwh = isPowerDevice && !device.offline && (kwhToday ?? 0) > 0;
+  const lastSeenText = formatLastSeenVi(device.raw?.lastSeen || device.raw?.updatedAt);
 
   return (
     <article
@@ -325,24 +261,51 @@ function DevicesDeviceCard({
         device.offline ? 'offline' : ''
       }`}
       tabIndex={0}
+      role="button"
+      aria-label={`${device.name}, ${device.room}, ${device.status}`}
       onClick={onOpen}
-      onKeyDown={(event) => event.key === 'Enter' && onOpen()}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onOpen();
+        }
+      }}
     >
       <div className="device-top">
-        <span className="device-icon">
-          <Icon name={device.icon} />
-        </span>
+        <div className="icon-tile-wrap">
+          <span className={`device-icon type-${colorClass}`}>
+            <Icon name={device.icon} />
+            <span
+              className={`status-dot ${
+                device.raw?.status === 'UNKNOWN'
+                  ? 'unknown'
+                  : device.offline
+                  ? 'offline'
+                  : 'online'
+              }`}
+              title={
+                device.raw?.status === 'UNKNOWN'
+                  ? 'Không xác định'
+                  : device.offline
+                  ? 'Ngoại tuyến'
+                  : 'Trực tuyến'
+              }
+            />
+          </span>
+        </div>
+
         <div className="flex items-center gap-1.5">
           {isOverrideActive && (
             <span
-              className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 animate-pulse cursor-pointer shrink-0"
+              className="override-badge"
               title="Đang ưu tiên thủ công (Quy tắc tự động tạm dừng). Bấm để xem chi tiết"
               onClick={(e) => {
                 e.stopPropagation();
                 onOpen();
               }}
             >
-              🔒 {formattedTime}
+              <Lock size={10} className="shrink-0" />
+              <span>{formattedTime}</span>
             </span>
           )}
           {!device.offline && !device.sensor && device.type !== 'Cổng' ? (
@@ -384,20 +347,13 @@ function DevicesDeviceCard({
       </div>
 
       {device.type === 'Đèn' && device.on && (
-        <div className="brightness" aria-label={`Độ sáng ${device.brightness || 80}%`}>
+        <div
+          className="brightness"
+          aria-label={`Độ sáng ${device.brightness || 80}%`}
+        >
           <span style={{ width: `${device.brightness || 80}%` }} />
           <b>{device.brightness || 80}%</b>
         </div>
-      )}
-
-      {device.sensor && (
-        <svg
-          className="sparkline"
-          viewBox="0 0 120 22"
-          preserveAspectRatio="none"
-        >
-          <path d="M1 16 20 13 37 15 54 7 70 11 88 5 103 9 119 3" />
-        </svg>
       )}
 
       {device.type === 'Cổng' && (
@@ -419,7 +375,32 @@ function DevicesDeviceCard({
         </div>
       )}
 
-      {!grouped && <span className="room-label">{device.room}</span>}
+      <div className="device-card-footer">
+        <span className="footer-metric">
+          {showKwh ? (
+            <span className="footer-energy">
+              <Zap size={11} className="inline mr-1" />
+              {(kwhToday ?? 0).toFixed(2)} kWh hôm nay
+            </span>
+          ) : device.raw?.status === 'UNKNOWN' ? (
+            <span className="footer-time text-amber-600 dark:text-amber-400">
+              <AlertTriangle size={11} className="inline mr-1" />
+              Không xác định{lastSeenText && lastSeenText !== 'Chưa có dữ liệu' ? ` · ${lastSeenText}` : ''}
+            </span>
+          ) : device.offline ? (
+            <span className="footer-time text-offline">
+              <WifiOff size={11} className="inline mr-1" />
+              Ngoại tuyến{lastSeenText && lastSeenText !== 'Chưa có dữ liệu' ? ` · ${lastSeenText}` : ''}
+            </span>
+          ) : (
+            <span className="footer-time">
+              <Clock size={11} className="inline mr-1" />
+              Cập nhật {lastSeenText}
+            </span>
+          )}
+        </span>
+        {!grouped && <span className="room-label">{device.room}</span>}
+      </div>
     </article>
   );
 }
@@ -437,8 +418,14 @@ function EmptyState({
     mode === 'search'
       ? ['Không tìm thấy thiết bị', 'Thử từ khóa khác hoặc xóa bộ lọc tìm kiếm.']
       : mode === 'room'
-      ? ['Phòng này chưa có thiết bị', 'Các thiết bị mới được gán sẽ xuất hiện tại đây.']
-      : ['Ngôi nhà chưa có thiết bị', 'Kết nối thiết bị đầu tiên để bắt đầu quản lý.'];
+      ? [
+          'Phòng này chưa có thiết bị',
+          'Các thiết bị mới được gán sẽ xuất hiện tại đây.',
+        ]
+      : [
+          'Ngôi nhà chưa có thiết bị',
+          'Kết nối thiết bị đầu tiên để bắt đầu quản lý.',
+        ];
 
   return (
     <div className="devices-empty glass-g1">
@@ -446,7 +433,11 @@ function EmptyState({
       <strong>{copy[0]}</strong>
       <p>{copy[1]}</p>
       {mode === 'search' && onResetSearch && (
-        <button type="button" className="secondary-button" onClick={onResetSearch}>
+        <button
+          type="button"
+          className="secondary-button"
+          onClick={onResetSearch}
+        >
           Xóa tìm kiếm
         </button>
       )}
@@ -463,38 +454,84 @@ function EmptyState({
 // Main DevicePage Component
 // ──────────────────────────────────────────────────────────────────────────
 
+function getInitialDeviceEnergyData(homeId?: string): {
+  totalKwh: number;
+  estimatedCostVnd: number;
+  breakdown: Record<string, DeviceEnergyBreakdown>;
+} | null {
+  if (!homeId) return null;
+  const res = peekCache<import('../../types/energy').EnergyAnalyticsResponse>(energyAnalyticsKey(homeId, '24H'));
+  if (res && res.summary) {
+    const bMap: Record<string, DeviceEnergyBreakdown> = {};
+    if (Array.isArray(res.breakdown)) {
+      res.breakdown.forEach((item) => {
+        if (item.deviceId) {
+          bMap[item.deviceId] = item;
+        }
+      });
+    }
+    return {
+      totalKwh: res.summary.totalKwh ?? 0,
+      estimatedCostVnd: res.summary.estimatedCostVnd ?? 0,
+      breakdown: bMap,
+    };
+  }
+  return null;
+}
+
 export const DevicePage: React.FC = () => {
   const { homeId } = useParams<{ homeId: string }>();
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const currentUser = useAppSelector((state) => state.auth.user);
-  if (currentUser?.platformRole === 'ADMIN') {
-    return <Navigate to="/admin" replace />;
-  }
 
-  // Core state
+  // Core filter and view state
   const [rooms, setRooms] = useState<RoomResponse[]>([]);
   const [selectedRoomId, setSelectedRoomId] = useState<string>('ALL');
-  const [quickFilter, setQuickFilter] = useState<'all' | 'on' | 'offline' | 'sensor'>('all');
+  const [quickFilter, setQuickFilter] = useState<
+    'all' | 'on' | 'offline' | 'sensor'
+  >('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [searchOpen, setSearchOpen] = useState(false);
   const [typeFilter, setTypeFilter] = useState<string>('Tất cả');
-  const [sort, setSort] = useState<string>('Nhóm theo phòng');
-  const [sortOpen, setSortOpen] = useState(false);
+  const [sort, setSort] = useState<DeviceSortOption>('Nhóm theo phòng');
+  const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
 
-  const [devices, setDevices] = useState<DeviceResponse[]>([]);
-  const devicesRef = useRef(devices);
-  devicesRef.current = devices;
-
+  // Devices & local optimistic states
+  const [devices, setDevices] = useState<DeviceResponse[]>(() => {
+    if (homeId) {
+      const cached = peekCache<DeviceResponse[]>(homeDevicesKey(homeId));
+      if (cached) return cached;
+    }
+    return [];
+  });
   const [localPower, setLocalPower] = useState<Record<string, boolean>>({});
-  const [localBrightness, setLocalBrightness] = useState<Record<string, number>>({});
+  const [localBrightness, setLocalBrightness] = useState<
+    Record<string, number>
+  >({});
 
-  const [loading, setLoading] = useState(true);
+  // Energy analytics state
+  const [energyData, setEnergyData] = useState<{
+    totalKwh: number;
+    estimatedCostVnd: number;
+    breakdown: Record<string, DeviceEnergyBreakdown>;
+  } | null>(() => getInitialDeviceEnergyData(homeId));
+
+  const [loading, setLoading] = useState<boolean>(() => {
+    if (homeId) {
+      return !peekCache(homeDevicesKey(homeId));
+    }
+    return true;
+  });
   const [error, setError] = useState('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isRoomModalOpen, setIsRoomModalOpen] = useState(false);
 
   // Selected device for Detail modal/drawer
-  const [selectedDevice, setSelectedDevice] = useState<UIMappedDevice | null>(null);
+  const [selectedDevice, setSelectedDevice] = useState<UIMappedDevice | null>(
+    null
+  );
+
 
   // Sync homeId in Redux
   useEffect(() => {
@@ -505,7 +542,16 @@ export const DevicePage: React.FC = () => {
   }, [dispatch, homeId]);
 
   // Micro-batching realtime MQTT sync
-  const pendingUpdatesRef = useRef<Map<string, { currentState?: Record<string, unknown>; status?: DeviceResponse['status'] }>>(new Map());
+  const pendingUpdatesRef = useRef<
+    Map<
+      string,
+      {
+        currentState?: Record<string, unknown>;
+        status?: DeviceResponse['status'];
+        lastSeen?: string | null;
+      }
+    >
+  >(new Map());
   const rafIdRef = useRef<number | null>(null);
 
   const flushDeviceUpdates = useCallback(() => {
@@ -523,8 +569,11 @@ export const DevicePage: React.FC = () => {
         hasChanges = true;
         return {
           ...d,
-          currentState: patch.currentState ? { ...d.currentState, ...patch.currentState } : d.currentState,
+          currentState: patch.currentState
+            ? { ...d.currentState, ...patch.currentState }
+            : d.currentState,
           status: patch.status ?? d.status,
+          lastSeen: patch.lastSeen ?? d.lastSeen,
         };
       });
       return hasChanges ? next : prev;
@@ -536,32 +585,45 @@ export const DevicePage: React.FC = () => {
       if (!patch || !prev.raw) return prev;
       const updatedRaw: DeviceResponse = {
         ...prev.raw,
-        currentState: patch.currentState ? { ...prev.raw.currentState, ...patch.currentState } : prev.raw.currentState,
+        currentState: patch.currentState
+          ? { ...prev.raw.currentState, ...patch.currentState }
+          : prev.raw.currentState,
         status: patch.status ?? prev.raw.status,
+        lastSeen: patch.lastSeen ?? prev.raw.lastSeen,
       };
       return mapDeviceToUI(updatedRaw, localPower, localBrightness);
     });
   }, [localPower, localBrightness]);
 
-  const handleDeviceStateChanged = useCallback((event: RealtimeEvent<any>) => {
-    if (!event || event.type !== 'DEVICE_STATE_CHANGED' || !event.data) return;
-    const data = event.data as { id?: string; deviceId?: string; currentState?: Record<string, unknown>; status?: string };
-    const targetId = data.id || data.deviceId || event.deviceId;
-    if (!targetId) return;
+  const handleDeviceStateChanged = useCallback(
+    (event: RealtimeEvent<unknown>) => {
+      if (!event || event.type !== 'DEVICE_STATE_CHANGED' || !event.data) return;
+      const data = event.data as {
+        id?: string;
+        deviceId?: string;
+        currentState?: Record<string, unknown>;
+        status?: string;
+        lastSeen?: string | null;
+      };
+      const targetId = data.id || data.deviceId || event.deviceId;
+      if (!targetId) return;
 
-    const existing = pendingUpdatesRef.current.get(targetId);
-    pendingUpdatesRef.current.set(targetId, {
-      currentState: {
-        ...(existing?.currentState ?? {}),
-        ...(data.currentState ?? {}),
-      },
-      status: (data.status as DeviceResponse['status']) ?? existing?.status,
-    });
+      const existing = pendingUpdatesRef.current.get(targetId);
+      pendingUpdatesRef.current.set(targetId, {
+        currentState: {
+          ...(existing?.currentState ?? {}),
+          ...(data.currentState ?? {}),
+        },
+        status: (data.status as DeviceResponse['status']) ?? existing?.status,
+        lastSeen: data.lastSeen ?? existing?.lastSeen,
+      });
 
-    if (rafIdRef.current === null) {
-      rafIdRef.current = requestAnimationFrame(flushDeviceUpdates);
-    }
-  }, [flushDeviceUpdates]);
+      if (rafIdRef.current === null) {
+        rafIdRef.current = requestAnimationFrame(flushDeviceUpdates);
+      }
+    },
+    [flushDeviceUpdates]
+  );
 
   useEffect(() => {
     return () => {
@@ -572,7 +634,10 @@ export const DevicePage: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    return realtimeEventDispatcher.register('DEVICE_STATE_CHANGED', handleDeviceStateChanged);
+    return realtimeEventDispatcher.register(
+      'DEVICE_STATE_CHANGED',
+      handleDeviceStateChanged
+    );
   }, [handleDeviceStateChanged]);
 
   // Fetch rooms and devices
@@ -586,24 +651,87 @@ export const DevicePage: React.FC = () => {
     }
   }, [homeId]);
 
-  const fetchDevices = useCallback(async (silent = false) => {
+  const fetchEnergy = useCallback(async () => {
     if (!homeId) return;
     try {
-      if (!silent) setLoading(true);
-      setError('');
-      const data = await getDevicesByHome(homeId);
-      setDevices(data || []);
-    } catch (err: unknown) {
-      setError(getErrorMessage(err, 'Lỗi tải danh sách thiết bị'));
-    } finally {
-      if (!silent) setLoading(false);
+      const res = await getHomeEnergyAnalytics(homeId, '24H');
+      if (res && res.summary) {
+        const bMap: Record<string, DeviceEnergyBreakdown> = {};
+        if (Array.isArray(res.breakdown)) {
+          res.breakdown.forEach((item) => {
+            if (item.deviceId) {
+              bMap[item.deviceId] = item;
+            }
+          });
+        }
+        setEnergyData({
+          totalKwh: res.summary.totalKwh ?? 0,
+          estimatedCostVnd: res.summary.estimatedCostVnd ?? 0,
+          breakdown: bMap,
+        });
+      }
+    } catch {
+      // Silent on error: hide energy numbers without toast
     }
   }, [homeId]);
 
+  const fetchDevices = useCallback(
+    async (silent = false) => {
+      if (!homeId) return;
+      try {
+        if (!silent) setLoading(true);
+        setError('');
+        const data = await getDevicesByHome(homeId);
+        setDevices(data || []);
+        void fetchEnergy();
+      } catch (err: unknown) {
+        setError(getErrorMessage(err, 'Lỗi tải danh sách thiết bị'));
+      } finally {
+        if (!silent) setLoading(false);
+      }
+    },
+    [homeId, fetchEnergy]
+  );
+
   useEffect(() => {
-    void fetchRooms();
-    void fetchDevices();
-  }, [fetchRooms, fetchDevices]);
+    let active = true;
+    const initData = async () => {
+      if (!homeId) return;
+      const cached = peekCache<DeviceResponse[]>(homeDevicesKey(homeId));
+      if (cached) {
+        setDevices(cached);
+        setLoading(false);
+      }
+      const initialEnergy = getInitialDeviceEnergyData(homeId);
+      if (initialEnergy) {
+        setEnergyData(initialEnergy);
+      }
+      try {
+        const [roomsData, devicesData] = await Promise.all([
+          getRooms(homeId).catch((err) => {
+            console.error('Lỗi tải danh sách phòng:', err);
+            return [];
+          }),
+          getDevicesByHome(homeId).catch((err) => {
+            if (active) setError(getErrorMessage(err, 'Lỗi tải danh sách thiết bị'));
+            return [];
+          }),
+        ]);
+        if (active) {
+          setRooms(roomsData || []);
+          setDevices(devicesData || []);
+          setLoading(false);
+          void fetchEnergy();
+        }
+      } catch {
+        if (active) setLoading(false);
+      }
+    };
+    void initData();
+    return () => {
+      active = false;
+    };
+  }, [homeId, fetchEnergy]);
 
   // Toggle power handler
   const handleTogglePower = async (deviceId: string) => {
@@ -619,7 +747,9 @@ export const DevicePage: React.FC = () => {
     const currentOn =
       localPower[deviceId] !== undefined
         ? localPower[deviceId]
-        : dev.currentState?.power === 'ON' || dev.currentState?.power === true || dev.currentState?.power === 'true';
+        : dev.currentState?.power === 'ON' ||
+          dev.currentState?.power === true ||
+          dev.currentState?.power === 'true';
 
     const nextOn = !currentOn;
     const action = nextOn ? 'TURN_ON' : 'TURN_OFF';
@@ -629,7 +759,6 @@ export const DevicePage: React.FC = () => {
     try {
       const result = await sendManualPowerCommand(deviceId, action);
       if (!result.command.success) {
-        // Rollback
         setLocalPower((prev) => ({ ...prev, [deviceId]: currentOn }));
         notify.error(result.command.message || 'Thiết bị không nhận lệnh');
       } else {
@@ -645,15 +774,17 @@ export const DevicePage: React.FC = () => {
 
   // Turn off all lights
   const handleTurnOffAllLights = async () => {
-
-
     const onLights = devices.filter((d) => {
-      const isLight = (d.deviceType || '').toUpperCase().includes('LIGHT') || (d.deviceType || '').toUpperCase().includes('LED');
+      const isLight =
+        (d.deviceType || '').toUpperCase().includes('LIGHT') ||
+        (d.deviceType || '').toUpperCase().includes('LED');
       if (!isLight) return false;
       const isPowerOn =
         localPower[d.id] !== undefined
           ? localPower[d.id]
-          : d.currentState?.power === 'ON' || d.currentState?.power === true || d.currentState?.power === 'true';
+          : d.currentState?.power === 'ON' ||
+            d.currentState?.power === true ||
+            d.currentState?.power === 'true';
       return isPowerOn;
     });
 
@@ -670,14 +801,19 @@ export const DevicePage: React.FC = () => {
     setLocalPower(nextPowerMap);
 
     await Promise.allSettled(
-      onLights.map((l) => sendManualPowerCommand(l.id, 'TURN_OFF').catch(console.warn))
+      onLights.map((l) =>
+        sendManualPowerCommand(l.id, 'TURN_OFF').catch(console.warn)
+      )
     );
     notify.success('Đã tắt toàn bộ đèn');
     void fetchDevices(true);
   };
 
   // Gate command
-  const handleGateCommand = async (deviceId: string, cmd: 'Mở' | 'Dừng' | 'Đóng') => {
+  const handleGateCommand = async (
+    deviceId: string,
+    cmd: 'Mở' | 'Dừng' | 'Đóng'
+  ) => {
     const dev = devices.find((d) => d.id === deviceId);
     if (!dev) return;
     const action = cmd === 'Mở' ? 'OPEN' : cmd === 'Đóng' ? 'CLOSE' : 'STOP';
@@ -690,7 +826,10 @@ export const DevicePage: React.FC = () => {
   };
 
   // Brightness change
-  const handleBrightnessChange = async (deviceId: string, brightness: number) => {
+  const handleBrightnessChange = async (
+    deviceId: string,
+    brightness: number
+  ) => {
     setLocalBrightness((prev) => ({ ...prev, [deviceId]: brightness }));
     const dev = devices.find((d) => d.id === deviceId);
     if (!dev) return;
@@ -702,7 +841,12 @@ export const DevicePage: React.FC = () => {
   };
 
   // Color change
-  const handleColorChange = async (deviceId: string, r: number, g: number, b: number) => {
+  const handleColorChange = async (
+    deviceId: string,
+    r: number,
+    g: number,
+    b: number
+  ) => {
     const brightness = localBrightness[deviceId] || 80;
     const dev = devices.find((d) => d.id === deviceId);
     if (!dev) return;
@@ -712,11 +856,6 @@ export const DevicePage: React.FC = () => {
       console.warn('Set color error:', e);
     }
   };
-
-  // Display rooms directly from BE
-  const displayRooms: RoomResponse[] = useMemo(() => {
-    return rooms;
-  }, [rooms]);
 
   // Map all devices to UI representation directly from BE
   const uiDevices: UIMappedDevice[] = useMemo(() => {
@@ -757,6 +896,17 @@ export const DevicePage: React.FC = () => {
     return uiDevices.filter((d) => d.type === 'Đèn' && d.on && !d.offline).length;
   }, [uiDevices]);
 
+  // Estimated load in Watts
+  const totalEstimatedWattage = useMemo(() => {
+    return uiDevices.reduce((sum, d) => {
+      if (d.offline || !d.on) return sum;
+      const bWattage =
+        energyData?.breakdown[d.id]?.wattage ??
+        energyData?.breakdown[d.id]?.ratedPowerWatts;
+      return sum + getDeviceRatedWattage(d, bWattage);
+    }, 0);
+  }, [uiDevices, energyData]);
+
   // Filtered devices
   const visibleDevices = useMemo(() => {
     return uiDevices.filter((device) => {
@@ -786,20 +936,68 @@ export const DevicePage: React.FC = () => {
     });
   }, [uiDevices, selectedRoomId, typeFilter, quickFilter, searchQuery]);
 
-  // Grouped devices
+  // Grouped and sorted devices
+  const isGrouped = sort.startsWith('Nhóm');
+
   const groups = useMemo(() => {
-    const map: Record<string, UIMappedDevice[]> = {};
-    visibleDevices.forEach((d) => {
-      const key = sort === 'Nhóm theo loại' ? d.type : d.room;
-      if (!map[key]) map[key] = [];
-      map[key].push(d);
-    });
-    return map;
+    if (sort === 'Nhóm theo phòng') {
+      const map: Record<string, UIMappedDevice[]> = {};
+      visibleDevices.forEach((d) => {
+        const key = d.room || 'Chưa phân phòng';
+        if (!map[key]) map[key] = [];
+        map[key].push(d);
+      });
+      return map;
+    }
+
+    if (sort === 'Nhóm theo loại') {
+      const map: Record<string, UIMappedDevice[]> = {};
+      visibleDevices.forEach((d) => {
+        const key = d.type || 'Khác';
+        if (!map[key]) map[key] = [];
+        map[key].push(d);
+      });
+      return map;
+    }
+
+    // Flat modes:
+    const list = [...visibleDevices];
+
+    if (sort === 'Tên A–Z') {
+      list.sort((a, b) => a.name.localeCompare(b.name, 'vi'));
+    } else if (sort === 'Trạng thái (đang bật trước)') {
+      list.sort((a, b) => {
+        const getRank = (d: UIMappedDevice) => {
+          if (d.offline) return 3;
+          if (d.on) return 1;
+          return 2;
+        };
+        const rankDiff = getRank(a) - getRank(b);
+        if (rankDiff !== 0) return rankDiff;
+        return a.name.localeCompare(b.name, 'vi');
+      });
+    } else if (sort === 'Gần đây nhất') {
+      list.sort((a, b) => {
+        const timeA = a.raw?.lastSeen ? new Date(a.raw.lastSeen).getTime() : -1;
+        const timeB = b.raw?.lastSeen ? new Date(b.raw.lastSeen).getTime() : -1;
+        if (timeA !== timeB) {
+          return timeB - timeA;
+        }
+        return a.name.localeCompare(b.name, 'vi');
+      });
+    }
+
+    return { 'Tất cả thiết bị': list };
   }, [visibleDevices, sort]);
 
   const userInitial = currentUser?.fullName
     ? currentUser.fullName.trim().split(' ').slice(-1)[0]?.charAt(0).toUpperCase() || 'M'
     : 'M';
+
+  // Admin routing check AFTER all hooks to adhere to Rules of Hooks
+  if (currentUser?.platformRole === 'ADMIN') {
+    return <Navigate to="/admin" replace />;
+  }
 
   return (
     <div className="app-shell devices-page">
@@ -816,95 +1014,141 @@ export const DevicePage: React.FC = () => {
         onSelectOverview={() => navigate('/home')}
       />
 
-      <main>
+      <main className="space-y-5">
         {/* Topbar */}
-        <DevicesTopBar
-          onlineCount={onlineCount}
-          activeCount={activeCount}
+        <AutomationTopBar
+          caption={`${onlineCount} trực tuyến · ${activeCount} đang bật`}
+          title="Thiết bị"
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
+          searchOpen={searchOpen}
+          onSearchToggle={() => setSearchOpen(!searchOpen)}
+          searchPlaceholder="Tìm thiết bị"
           userInitial={userInitial}
         />
 
-        {/* Actions Row */}
-        <div className="devices-actions">
-          <RoomFilterStrip
-            rooms={displayRooms}
-            activeRoom={selectedRoomId}
-            totalCount={uiDevices.length}
-            roomCounts={roomCounts}
-            onChange={setSelectedRoomId}
-          />
+        {/* 1. Overview Strip (Compact G1 Container, 4 Cells) */}
+        <DevicesOverviewStrip
+          onlineCount={onlineCount}
+          totalCount={uiDevices.length}
+          offlineCount={offlineCount}
+          activeCount={activeCount}
+          estimatedWattage={totalEstimatedWattage}
+          todayKwh={energyData ? energyData.totalKwh : null}
+          todayCostVnd={energyData ? energyData.estimatedCostVnd : null}
+          loading={loading && devices.length === 0}
+          onNavigateToEnergy={
+            homeId ? () => navigate(`/home/${homeId}/energy`) : undefined
+          }
+        />
 
-          <div className="devices-tools">
-            <div className="sort-wrap">
-              <IconButton
-                icon="automation"
-                label="Sắp xếp"
-                onClick={() => setSortOpen(!sortOpen)}
-              />
-              {sortOpen && (
-                <div className="sort-popover glass-g2">
-                  {[
-                    'Nhóm theo phòng',
-                    'Nhóm theo loại',
-                    'Tên A–Z',
-                    'Trạng thái (đang bật trước)',
-                    'Gần đây nhất',
-                  ].map((item) => (
-                    <button
-                      key={item}
-                      type="button"
-                      onClick={() => {
-                        setSort(item);
-                        setSortOpen(false);
-                      }}
-                    >
-                      {item}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <label className="type-filter">
-              Loại:{' '}
-              <select
-                value={typeFilter}
-                onChange={(event) => setTypeFilter(event.target.value)}
-              >
-                <option>Tất cả</option>
-                <option>Đèn</option>
-                <option>Điều hòa</option>
-                <option>Cảm biến</option>
-                <option>Cổng</option>
-                <option>Công tắc</option>
-                <option>Camera</option>
-              </select>
-            </label>
-
+        {/* 2. Room Navigation & Primary Actions Row */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <RoomFilterStrip
+              rooms={rooms}
+              activeRoom={selectedRoomId}
+              totalCount={uiDevices.length}
+              roomCounts={roomCounts}
+              onChange={setSelectedRoomId}
+              loading={loading && rooms.length === 0}
+            />
+            {/* Mobile Quản lý phòng icon button */}
             <button
               type="button"
-              className="add-device"
-              onClick={() => setIsAddModalOpen(true)}
+              className="sm:hidden h-9 w-9 shrink-0 inline-flex items-center justify-center rounded-full border border-[var(--border)] bg-transparent text-[var(--text)] hover:bg-[var(--muted)]/50 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+              onClick={() => setIsRoomModalOpen(true)}
+              title="Quản lý phòng"
+              aria-label="Quản lý phòng"
             >
-              + Thêm thiết bị
+              <Settings2 className="w-4 h-4 text-[var(--secondary)]" />
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Desktop Quản lý phòng ghost button */}
+            <button
+              type="button"
+              className="hidden sm:inline-flex h-9 px-3.5 rounded-full border border-[var(--border)] bg-transparent hover:bg-[var(--muted)]/50 text-xs font-medium text-[var(--text)] items-center gap-1.5 cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+              onClick={() => setIsRoomModalOpen(true)}
+              title="Quản lý danh sách phòng"
+              aria-label="Quản lý danh sách phòng"
+            >
+              <Settings2 className="w-4 h-4 text-[var(--secondary)] shrink-0" />
+              <span>Quản lý phòng</span>
+            </button>
+
+            {/* Exactly ONE Primary Button on the screen */}
+            <button
+              type="button"
+              className="w-full sm:w-auto h-9 px-4 rounded-full bg-[var(--accent)] hover:opacity-95 text-white text-xs font-medium inline-flex items-center justify-center gap-1.5 cursor-pointer shadow-xs transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+              onClick={() => setIsAddModalOpen(true)}
+              title="Thêm thiết bị mới"
+              aria-label="Thêm thiết bị mới"
+            >
+              <Plus className="w-4 h-4 shrink-0" />
+              <span>Thêm thiết bị</span>
             </button>
           </div>
         </div>
 
-        {/* Quick Filters */}
-        <QuickFilters
-          active={quickFilter}
-          activeCount={activeCount}
-          offlineCount={offlineCount}
-          sensorCount={sensorCount}
-          lightsOnCount={lightsOnCount}
-          onChange={setQuickFilter}
-          onTurnOffAllLights={handleTurnOffAllLights}
+        {/* 3. Filters & Sort Toolbar */}
+        <div className="flex items-center justify-between gap-3 flex-wrap sm:flex-nowrap">
+          <QuickFilters
+            active={quickFilter}
+            activeCount={activeCount}
+            offlineCount={offlineCount}
+            sensorCount={sensorCount}
+            lightsOnCount={lightsOnCount}
+            onChange={setQuickFilter}
+            onTurnOffAllLights={handleTurnOffAllLights}
+          />
+
+          <div className="flex items-center gap-2 shrink-0 ml-auto">
+            {/* Desktop / Tablet: 2 Ghost Dropdowns */}
+            <div className="hidden sm:flex items-center gap-2">
+              <DeviceFilterDropdown
+                labelPrefix="Loại"
+                value={typeFilter}
+                options={DEVICE_TYPE_FILTER_OPTIONS}
+                onChange={setTypeFilter}
+                icon={<Filter className="w-3.5 h-3.5 text-[var(--secondary)] shrink-0" />}
+              />
+              <DeviceFilterDropdown
+                labelPrefix="Sắp xếp"
+                value={sort}
+                options={SORT_OPTIONS}
+                onChange={setSort}
+                icon={<ArrowUpDown className="w-3.5 h-3.5 text-[var(--secondary)] shrink-0" />}
+              />
+            </div>
+
+            {/* Mobile: Single "Bộ lọc" icon button */}
+            <button
+              type="button"
+              onClick={() => setMobileFilterOpen(true)}
+              className="sm:hidden h-8 px-3 rounded-lg border border-[var(--border)] bg-transparent hover:bg-[var(--muted)]/50 text-xs font-medium text-[var(--text)] inline-flex items-center gap-1.5 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+              aria-label="Bộ lọc và sắp xếp"
+            >
+              <Filter className="w-3.5 h-3.5 text-[var(--secondary)]" />
+              <span>Bộ lọc</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Mobile Filter Modal */}
+        <DeviceMobileFilterModal
+          isOpen={mobileFilterOpen}
+          onClose={() => setMobileFilterOpen(false)}
+          typeFilter={typeFilter}
+          onTypeChange={setTypeFilter}
+          sort={sort}
+          onSortChange={setSort}
+          typeOptions={DEVICE_TYPE_FILTER_OPTIONS}
+          sortOptions={SORT_OPTIONS}
         />
 
-        {/* Smart Device Groups Section */}
+        {/* 4. Smart Device Groups Section */}
         {homeId && (
           <section className="groups-section">
             <DeviceGroupSection
@@ -959,14 +1203,21 @@ export const DevicePage: React.FC = () => {
               <div className="room-device-group" key={label}>
                 <div className="room-group-title">
                   <span>{label}</span>
-                  <small>{list.length} thiết bị</small>
+                  <small>
+                    {list.length} thiết bị ·{' '}
+                    {list.filter((d) => !d.offline && d.on).length} đang bật
+                  </small>
                 </div>
                 <div className="devices-grid">
                   {list.map((device) => (
                     <DevicesDeviceCard
                       key={device.id}
                       device={device}
-                      grouped={sort.startsWith('Nhóm')}
+                      grouped={isGrouped}
+                      kwhToday={
+                        energyData?.breakdown[device.id]?.kwh ??
+                        energyData?.breakdown[device.id]?.energyKwh
+                      }
                       onToggle={() => handleTogglePower(device.id)}
                       onOpen={() => setSelectedDevice(device)}
                       onGateCommand={(cmd) => handleGateCommand(device.id, cmd)}
@@ -993,10 +1244,19 @@ export const DevicePage: React.FC = () => {
           placement="side"
           onClose={() => setSelectedDevice(null)}
           onDeviceUpdated={(updated) => {
-            void fetchDevices(true);
-            if (updated) {
-              setSelectedDevice(mapDeviceToUI(updated, localPower, localBrightness));
+            if (updated?.id) {
+              setDevices((prev) =>
+                prev.map((d) =>
+                  d.id === updated.id
+                    ? { ...d, ...updated, settings: { ...(d.settings || {}), ...(updated.settings || {}) } }
+                    : d
+                )
+              );
+              setSelectedDevice(
+                mapDeviceToUI(updated, localPower, localBrightness)
+              );
             }
+            void fetchDevices(true);
           }}
           onDeviceRemoved={(removedId) => {
             setDevices((prev) => prev.filter((d) => d.id !== removedId));

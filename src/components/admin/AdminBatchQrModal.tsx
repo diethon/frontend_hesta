@@ -194,17 +194,17 @@ export const AdminBatchQrModal: React.FC<AdminBatchQrModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
-      <div className="relative w-full max-w-4xl max-h-[92vh] flex flex-col rounded-3xl border border-line bg-surface shadow-float transition-all overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0f172a]/55 p-4 backdrop-blur-md">
+      <div className="relative w-full max-w-4xl max-h-[92vh] flex flex-col rounded-3xl border border-[var(--border)] bg-[var(--solid)] shadow-2xl transition-all overflow-hidden">
         {/* Header */}
-        <div className="px-6 py-5 border-b border-line flex items-center justify-between bg-surface/90 backdrop-blur shrink-0">
+        <div className="px-6 py-5 border-b border-line flex items-center justify-between bg-[var(--solid)]/90 backdrop-blur shrink-0">
           <div className="flex items-center gap-3">
             {catalog.imageUrl ? (
               <div className="w-12 h-12 rounded-2xl overflow-hidden border border-line shrink-0">
                 <img src={catalog.imageUrl} alt={catalog.name} className="w-full h-full object-cover" />
               </div>
             ) : (
-              <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center shrink-0">
+              <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center shrink-0">
                 <QrCode className="w-6 h-6" />
               </div>
             )}
@@ -224,7 +224,7 @@ export const AdminBatchQrModal: React.FC<AdminBatchQrModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="rounded-full p-2 text-muted hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-text transition-colors"
+            className="rounded-full p-2 text-muted hover:bg-[var(--g1)] hover:text-text transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -235,7 +235,7 @@ export const AdminBatchQrModal: React.FC<AdminBatchQrModalProps> = ({
           {!result ? (
             /* Step 1: Input Quantity & Config */
             <form onSubmit={handleGenerate} className="space-y-6 max-w-xl mx-auto py-2">
-              <div className="surface-card p-5 rounded-2xl border border-line bg-surface/50 space-y-4">
+              <div className="p-5 rounded-2xl border border-[var(--border)] bg-[var(--g1)] space-y-4">
                 <label className="block text-xs font-semibold text-text uppercase tracking-wider">
                   Số lượng thiết bị / Mã QR cần tạo:
                 </label>
@@ -249,7 +249,7 @@ export const AdminBatchQrModal: React.FC<AdminBatchQrModalProps> = ({
                       onClick={() => setQuantity(num)}
                       className={`py-2.5 rounded-xl text-sm font-bold border transition-all cursor-pointer ${
                         quantity === num
-                          ? 'bg-amber-500 text-slate-900 border-amber-500 shadow-soft scale-[1.02]'
+                          ? 'bg-amber-600 text-white border-amber-600 shadow-sm scale-[1.02]'
                           : 'bg-surface border-line text-text hover:border-amber-500/50'
                       }`}
                     >
@@ -296,7 +296,7 @@ export const AdminBatchQrModal: React.FC<AdminBatchQrModalProps> = ({
                 <ul className="list-disc list-inside space-y-1 pl-1">
                   <li>Tự động tìm số sê-ri lớn nhất hiện có của model này.</li>
                   <li>Tạo liên tiếp <strong>{quantity}</strong> số sê-ri mới (VD: <code className="font-mono text-primary">{catalog.serialPrefix}0001</code>).</li>
-                  <li>Tạo bản ghi thiết bị ở trạng thái <span className="font-semibold text-amber-500">UNCLAIMED</span> (chờ khách kích hoạt).</li>
+                  <li>Tạo bản ghi thiết bị ở trạng thái <span className="font-semibold text-amber-600">UNCLAIMED</span> (chờ khách kích hoạt).</li>
                   <li>Mã hóa bảo mật Token 1 lần (Single-use SHA-256) dán vào mã QR.</li>
                 </ul>
               </div>
@@ -305,14 +305,14 @@ export const AdminBatchQrModal: React.FC<AdminBatchQrModalProps> = ({
                 <button
                   type="button"
                   onClick={onClose}
-                  className="rounded-xl px-5 py-2.5 text-sm font-medium text-muted hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                  className="rounded-xl px-5 py-2.5 text-sm font-medium text-muted hover:bg-[var(--g1)] transition-colors cursor-pointer"
                 >
                   Hủy
                 </button>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="inline-flex items-center gap-2 rounded-xl bg-amber-500 px-7 py-3 text-sm font-bold text-slate-900 shadow-float hover:bg-amber-400 disabled:opacity-50 transition-all cursor-pointer"
+                  className="inline-flex items-center gap-2 rounded-xl bg-amber-600 hover:bg-amber-700 px-7 py-3 text-sm font-bold text-white shadow-sm disabled:opacity-50 transition-all cursor-pointer"
                 >
                   <Sparkles className="w-4 h-4" />
                   <span>{loading ? 'Đang khởi tạo mã...' : `⚡ Tạo ${quantity} Mã QR Ngay`}</span>
@@ -331,14 +331,14 @@ export const AdminBatchQrModal: React.FC<AdminBatchQrModalProps> = ({
                 <div className="flex items-center gap-2">
                   <button
                     onClick={handlePrintAll}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 text-white px-4 py-2 text-xs font-bold hover:bg-slate-800 shadow-soft transition-all cursor-pointer"
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-[#0f172a] text-white px-4 py-2 text-xs font-bold hover:bg-[#1e293b] shadow-soft transition-all cursor-pointer"
                   >
                     <Printer className="w-4 h-4" />
                     <span>In Tất Cả Tem QR</span>
                   </button>
                   <button
                     onClick={handleDownloadAll}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-line bg-surface text-text px-4 py-2 text-xs font-bold hover:bg-slate-100 dark:hover:bg-slate-800 shadow-soft transition-all cursor-pointer"
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-line bg-surface text-text px-4 py-2 text-xs font-bold hover:bg-[var(--g1)] shadow-soft transition-all cursor-pointer"
                   >
                     <Download className="w-4 h-4" />
                     <span>Tải Tất Cả Ảnh</span>
@@ -353,13 +353,13 @@ export const AdminBatchQrModal: React.FC<AdminBatchQrModalProps> = ({
                   return (
                     <div
                       key={item.device.id}
-                      className="surface-card rounded-2xl border-2 border-line bg-white dark:bg-slate-900 p-4 text-center shadow-soft flex flex-col justify-between"
+                      className="rounded-2xl border-2 border-[var(--border)] bg-surface p-4 text-center shadow-soft flex flex-col justify-between"
                     >
                       <div>
                         {/* Sticker Header */}
                         <div className="flex items-center justify-between border-b border-line pb-2 mb-3">
                           <span className="text-[11px] font-black tracking-widest text-text">HESTA SMART</span>
-                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-muted">
+                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[var(--g1)] text-text font-bold">
                             #{idx + 1}
                           </span>
                         </div>
@@ -373,14 +373,14 @@ export const AdminBatchQrModal: React.FC<AdminBatchQrModalProps> = ({
                               className="w-40 h-40 rounded-xl border border-line bg-white p-1"
                             />
                           ) : (
-                            <div className="w-40 h-40 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800" />
+                            <div className="w-40 h-40 animate-pulse rounded-xl bg-[var(--g1)]" />
                           )}
                         </div>
 
                         {/* Device Info */}
                         <h4 className="text-sm font-bold text-text truncate px-2">{item.device.name}</h4>
                         <p className="text-xs text-muted font-medium mt-0.5">Model: {item.device.model}</p>
-                        <p className="text-xs font-mono font-bold text-amber-500 mt-0.5">
+                        <p className="text-xs font-mono font-bold text-amber-600 mt-0.5">
                           {item.device.serialNumber}
                         </p>
                         <p className="mt-2 text-[10px] font-bold text-amber-600 tracking-wider">
@@ -452,7 +452,7 @@ export const AdminBatchQrModal: React.FC<AdminBatchQrModalProps> = ({
                 <button
                   type="button"
                   onClick={onClose}
-                  className="rounded-xl bg-slate-100 dark:bg-slate-800 px-6 py-2.5 text-sm font-bold text-text hover:bg-slate-200 transition-colors cursor-pointer"
+                  className="rounded-xl bg-[var(--g1)] px-6 py-2.5 text-sm font-bold text-text hover:bg-[var(--muted)] transition-colors cursor-pointer"
                 >
                   Hoàn Tất &amp; Đóng
                 </button>

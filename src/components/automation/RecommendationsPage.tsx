@@ -1,16 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router';
-import {
-  Sparkles,
-  Brain,
-  Check,
-  X,
-  EyeOff,
-  RefreshCw,
-  AlertCircle,
-  ShieldCheck,
-  Clock
-} from 'lucide-react';
+import { useNavigate, useParams } from 'react-router';
 import {
   generateRecommendations,
   getRecommendations,
@@ -19,10 +8,19 @@ import {
   retrainModel
 } from '../../services/recommendationApi';
 import type { Recommendation, MlModelStatus } from '../../types/recommendation';
-import { HomeSidebar } from '../ui/HomeSidebar';
+import { useAppSelector } from '../../store/hooks';
+import { DashboardNavRail } from '../home/DashboardNavRail';
+import { DashboardBottomNav } from '../home/DashboardBottomNav';
+import { AutomationTopBar } from './AutomationTopBar';
+import { Icon } from '../ui/LucideIcon';
+import { formatRepeatDays } from '../scene/SceneScheduleSection';
+import { actionLabels } from './ruleLabels';
 
 export function RecommendationsPage() {
   const { homeId = '' } = useParams();
+  const navigate = useNavigate();
+  const authUser = useAppSelector((state) => state.auth.user);
+  const userInitial = authUser?.fullName?.charAt(0) || authUser?.email?.charAt(0) || 'U';
   const [items, setItems] = useState<Recommendation[]>([]);
   const [modelStatus, setModelStatus] = useState<MlModelStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -66,12 +64,12 @@ export function RecommendationsPage() {
       const created = await generateRecommendations(homeId, from.toISOString(), to.toISOString());
       await refreshRecs();
       if (created.length > 0) {
-        setSuccess(`Mô hình Machine Learning đã phát hiện và tạo ${created.length} đề xuất mới đạt ngưỡng tin cậy >= 80%.`);
+        setSuccess(`Đã tìm thấy ${created.length} thói quen mới của gia đình bạn.`);
       } else {
-        setSuccess('Không có hành vi nào đạt ngưỡng tin cậy >= 80% từ mô hình ML vào thời điểm này.');
+        setSuccess('Chưa thấy thói quen nào lặp lại đủ thường xuyên. Cứ dùng nhà như bình thường, HESTA sẽ tự nhận ra.');
       }
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Không thể phân tích hành vi người dùng.');
+      setError(caught instanceof Error ? caught.message : 'Chưa tìm được thói quen lúc này, bạn thử lại sau nhé.');
     } finally {
       setWorkingId(null);
     }
@@ -86,9 +84,9 @@ export function RecommendationsPage() {
       const newStatus = await retrainModel(homeId);
       setModelStatus(newStatus);
       if (newStatus.status === 'READY') {
-        setSuccess(`Huấn luyện lại mô hình thành công! Phiên bản: ${newStatus.version}, Độ chính xác: ${Math.round((newStatus.accuracy ?? 0) * 100)}%.`);
+        setSuccess(`Đã huấn luyện mô hình ${newStatus.version}: F1 bật/tắt ${Math.round((newStatus.f1Score ?? 0) * 100)}%.`);
       } else if (newStatus.status === 'COLD_START') {
-        setError('Chưa đủ dữ liệu hành vi thực tế (cần tối thiểu 20 mẫu) để huấn luyện lại.');
+        setError(String(newStatus.metrics?.reason ?? 'Chưa đủ dữ liệu thật để huấn luyện (cần 20 lần bật/tắt trong 7 ngày).'));
       }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Huấn luyện lại mô hình thất bại.');
@@ -99,7 +97,7 @@ export function RecommendationsPage() {
   };
 
   const resolve = async (item: Recommendation, action: 'approve' | 'reject' | 'dismiss') => {
-    if (action === 'approve' && !window.confirm(`Chấp nhận đề xuất và tạo quy tắc tự động hóa cho ${item.deviceName ?? 'thiết bị'}?`)) {
+    if (action === 'approve' && !window.confirm(`Tạo quy tắc tự động: ${actionText(item)} vào ${item.triggerCondition.time?.slice(0, 5) ?? 'giờ này'}?`)) {
       return;
     }
     setWorkingId(item.id);
@@ -109,11 +107,11 @@ export function RecommendationsPage() {
       await resolveRecommendation(homeId, item.id, action);
       await refreshRecs();
       if (action === 'approve') {
-        setSuccess('Đã chấp nhận đề xuất và tạo quy tắc tự động thành công!');
+        setSuccess('Đã tạo quy tắc tự động từ gợi ý này.');
       } else if (action === 'reject') {
-        setSuccess('Đã từ chối đề xuất. Phản hồi đã được ghi nhận để cải thiện mô hình AI.');
+        setSuccess('Đã bỏ qua gợi ý này. HESTA sẽ ghi nhớ để gợi ý đúng ý bạn hơn.');
       } else {
-        setSuccess('Đã tạm thời bỏ qua đề xuất.');
+        setSuccess('Đã để gợi ý này lại sau.');
       }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Không thể xử lý đề xuất.');
@@ -128,349 +126,266 @@ export function RecommendationsPage() {
   );
   const historyItems = items.filter((item) => item.status !== 'PENDING');
 
+  const threshold = Math.round((modelStatus?.confidenceThreshold ?? 0.8) * 100);
+  const isReady = modelStatus?.status === 'READY';
+  const isColdStart = modelStatus?.status === 'COLD_START';
+  const learnedActions = modelStatus?.metrics?.user_actions;
+  const learnedDays = modelStatus?.metrics?.train_days;
+  const modelDescription = isReady
+    ? learnedActions && learnedDays
+      ? `HESTA đã học từ ${String(learnedActions)} lần bạn bật/tắt thiết bị trong ${String(learnedDays)} ngày qua.`
+      : 'HESTA đã hiểu thói quen của gia đình bạn và sẵn sàng gợi ý.'
+    : isColdStart
+    ? 'HESTA vẫn đang làm quen với ngôi nhà. Hãy dùng thêm vài ngày để gợi ý chính xác hơn.'
+    : loading
+    ? 'Đang chuẩn bị…'
+    : 'Tính năng gợi ý đang tạm nghỉ. Bạn vẫn dùng mọi thứ khác bình thường.';
+  // ML reasons end with stats ("(lệch ±12 phút). Độ tin cậy 82% …"); keep only the plain sentence.
+  const plainExplanation = (text?: string) => {
+    if (!text) return '';
+    const cut = text.search(/\s*\(lệch|[.,]?\s*(với )?độ tin cậy/i);
+    const head = (cut > 0 ? text.slice(0, cut) : text).trim().replace(/^AI phát hiện bạn/, 'Bạn');
+    return /[.!?]$/.test(head) ? head : `${head}.`;
+  };
+  const confidenceLabel = (value: number) =>
+    value >= 0.9 ? 'Rất chắc chắn' : value >= 0.75 ? 'Khá chắc chắn' : 'Có thể';
+  const actionText = (item: Recommendation) =>
+    `${actionLabels[item.proposedAction.action] || item.proposedAction.action} ${item.deviceName ?? 'thiết bị'}`;
+
   return (
-    <div className="app-shell relative min-h-screen text-text">
-      <HomeSidebar activeItem="automations" homeId={homeId} />
-      <main className="min-w-0 flex-1 p-4 text-text sm:p-6 lg:pl-64">
-        <div className="mx-auto max-w-5xl space-y-6">
-          {/* Header */}
-          <header className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-4">
+    <div className="app-shell scenes-page studio st-theme st-pro">
+      <DashboardNavRail
+        homeId={homeId}
+        activeItem="automations"
+        user={authUser ?? undefined}
+        onSelectOverview={() => navigate('/home')}
+        onOpenSettings={() => {}}
+        onOpenProfile={() => {}}
+      />
+      <main>
+        <AutomationTopBar
+          caption="Gợi ý thông minh"
+          title="Gợi ý cho bạn"
+          subtitle="HESTA để ý những việc bạn hay làm vào cùng một giờ và gợi ý tự động hóa chúng giúp bạn."
+          userInitial={userInitial}
+        />
+
+        {error && (
+          <div role="alert" className="st-alert error">
+            <Icon name="alert" size={18} />
+            <span>{error}</span>
+          </div>
+        )}
+        {success && (
+          <div role="status" className="st-alert ok">
+            <Icon name="check" size={18} />
+            <span>{success}</span>
+          </div>
+        )}
+
+        <section className="st-model" aria-label="HESTA đang học thói quen">
+          <div className="st-model-head">
+            <span className="st-model-badge">
+              <Icon name="sparkles" />
+            </span>
             <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-2xl font-bold">Gợi ý hành vi thông minh (AI/ML)</h1>
-                <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
-                  Random Forest
-                </span>
-              </div>
-              <p className="text-sm text-muted mt-1">
-                Hệ thống Machine Learning phân tích chuỗi thao tác thực tế và chỉ hiển thị gợi ý khi độ tin cậy đạt từ 80% trở lên.
-              </p>
+              <h3>
+                {isReady || isColdStart || loading ? 'HESTA đang học thói quen của bạn' : 'Gợi ý thông minh'}
+                <i className={`st-dot ${isReady ? 'on' : isColdStart || loading ? '' : 'err'}`} />
+              </h3>
+              <p>{modelDescription}</p>
             </div>
-            <div className="flex items-center gap-2">
-              <Link
-                to={`/homes/${homeId}/automation-rules`}
-                className="rounded-xl bg-sidebar px-4 py-2.5 text-xs font-semibold text-text shadow-xs hover:bg-sidebar-hover transition-colors"
-              >
-                Về danh sách quy tắc
-              </Link>
-            </div>
-          </header>
+          </div>
 
-          {/* Feedback Alerts */}
-          {error && (
-            <div role="alert" className="flex items-center gap-3 rounded-xl bg-error-soft p-4 text-sm text-red-600">
-              <AlertCircle size={18} className="shrink-0" />
-              <span>{error}</span>
-            </div>
-          )}
-          {success && (
-            <div role="status" className="flex items-center gap-3 rounded-xl bg-success-soft p-4 text-sm text-emerald-600">
-              <ShieldCheck size={18} className="shrink-0" />
-              <span>{success}</span>
-            </div>
-          )}
+          <div className="st-model-actions">
+            <button
+              type="button"
+              className="st-btn st-btn-primary"
+              disabled={workingId !== null}
+              onClick={() => void generate()}
+            >
+              <Icon name="sparkles" size={16} />
+              {workingId === 'generate' ? 'Đang tìm…' : 'Tìm thói quen mới'}
+            </button>
+          </div>
 
-          {/* Model Status Card */}
-          <div className="surface-card rounded-2xl p-5 border border-line shadow-xs space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                  <Brain size={20} />
+          {/* Technical details stay available for admins/demo but collapsed by default. */}
+          <details className="st-tech">
+            <summary>Chi tiết kỹ thuật</summary>
+            {isReady && modelStatus && (
+              <dl className="st-metrics">
+                <div>
+                  <dt>F1 bật/tắt</dt>
+                  <dd>
+                    {Math.round((modelStatus.f1Score ?? 0) * 100)}%
+                    <small>luật đơn giản {Math.round((modelStatus.baselineF1 ?? 0) * 100)}%</small>
+                  </dd>
                 </div>
                 <div>
-                  <h2 className="text-base font-semibold">Trạng thái Mô hình Machine Learning</h2>
-                  <p className="text-xs text-muted">
-                    {modelStatus?.status === 'READY'
-                      ? 'Mô hình học máy đang hoạt động và sẵn sàng suy luận thói quen người dùng.'
-                      : modelStatus?.status === 'COLD_START'
-                      ? 'Hệ thống đang tích lũy dữ liệu hành vi người dùng (Cold-Start).'
-                      : 'Đang kết nối tới dịch vụ Machine Learning...'}
-                  </p>
+                  <dt>Ngưỡng hiển thị</dt>
+                  <dd>≥ {threshold}%</dd>
                 </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  disabled={workingId !== null || modelLoading}
-                  onClick={() => void handleRetrain()}
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-line bg-surface hover:bg-sidebar px-3.5 py-2 text-xs font-semibold text-text transition-all disabled:opacity-50"
-                  title="Huấn luyện lại mô hình với dữ liệu mới"
-                >
-                  <RefreshCw size={13} className={modelLoading ? 'animate-spin' : ''} />
-                  <span>{modelLoading ? 'Đang huấn luyện...' : 'Huấn luyện lại'}</span>
-                </button>
-
-                <button
-                  type="button"
-                  disabled={workingId !== null || modelStatus?.status === 'COLD_START'}
-                  onClick={() => void generate()}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-primary hover:bg-primary/90 px-4 py-2 text-xs font-semibold text-white transition-all disabled:opacity-50 shadow-xs"
-                >
-                  <Sparkles size={13} />
-                  <span>{workingId === 'generate' ? 'Đang phân tích...' : 'Phân tích & Dự đoán ML'}</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Model Metrics Grid */}
-            {modelStatus?.status === 'READY' && (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 border-t border-line text-xs">
-                <div className="p-2.5 rounded-lg bg-surface border border-line/60">
-                  <span className="text-muted block">Phiên bản mô hình</span>
-                  <span className="font-semibold text-text">{modelStatus.version}</span>
+                <div>
+                  <dt>Dữ liệu học</dt>
+                  <dd>
+                    {String(learnedActions ?? '—')}
+                    <small>thao tác · {String(learnedDays ?? '—')} ngày</small>
+                  </dd>
                 </div>
-                <div className="p-2.5 rounded-lg bg-surface border border-line/60">
-                  <span className="text-muted block">Độ chính xác (Accuracy)</span>
-                  <span className="font-semibold text-emerald-600">
-                    {modelStatus.accuracy ? `${Math.round(modelStatus.accuracy * 100)}%` : 'N/A'}
-                  </span>
-                  {modelStatus.baselineAccuracy && (
-                    <span className="text-[10px] text-muted ml-1">
-                      (vs Baseline {Math.round(modelStatus.baselineAccuracy * 100)}%)
-                    </span>
-                  )}
+                <div>
+                  <dt>Phiên bản</dt>
+                  <dd>{modelStatus.version}</dd>
                 </div>
-                <div className="p-2.5 rounded-lg bg-surface border border-line/60">
-                  <span className="text-muted block">Ngưỡng hiển thị</span>
-                  <span className="font-semibold text-amber-500">
-                    ≥ {Math.round((modelStatus.confidenceThreshold ?? 0.8) * 100)}%
-                  </span>
-                </div>
-                <div className="p-2.5 rounded-lg bg-surface border border-line/60">
-                  <span className="text-muted block">Số mẫu dữ liệu</span>
-                  <span className="font-semibold text-text">
-                    {modelStatus.trainSamples ?? 0} train / {modelStatus.testSamples ?? 0} test
-                  </span>
-                </div>
-              </div>
+              </dl>
             )}
-
-            {modelStatus?.status === 'COLD_START' && (
-              <div className="rounded-xl bg-amber-500/10 p-3.5 text-xs text-amber-600 border border-amber-500/20">
-                <strong>Chưa đủ dữ liệu huấn luyện: </strong>
-                Mô hình chỉ được kích hoạt khi thu thập đủ tối thiểu 20 sự kiện điều khiển thiết bị thực tế từ người dùng.
-                Không sử dụng dữ liệu giả để đảm bảo tính an toàn cho thiết bị trong gia đình.
-              </div>
-            )}
-          </div>
-
-          {/* Navigation Tabs */}
-          <div className="flex border-b border-line gap-4 text-sm font-semibold">
             <button
               type="button"
-              onClick={() => setActiveTab('pending')}
-              className={`pb-2.5 border-b-2 transition-colors ${
-                activeTab === 'pending'
-                  ? 'border-primary text-primary'
-                  : 'border-transparent text-muted hover:text-text'
-              }`}
+              className="st-btn st-btn-sm"
+              disabled={workingId !== null || modelLoading}
+              onClick={() => void handleRetrain()}
             >
-              Gợi ý hợp lệ ({pendingItems.length})
+              <Icon name="refresh" size={15} className={`icon ${modelLoading ? 'animate-spin' : ''}`} />
+              {modelLoading ? 'Đang huấn luyện…' : 'Huấn luyện lại mô hình'}
             </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('history')}
-              className={`pb-2.5 border-b-2 transition-colors ${
-                activeTab === 'history'
-                  ? 'border-primary text-primary'
-                  : 'border-transparent text-muted hover:text-text'
-              }`}
-            >
-              Lịch sử phản hồi ({historyItems.length})
-            </button>
-          </div>
+          </details>
+        </section>
 
-          {/* Content Area */}
-          {loading ? (
-            <div className="surface-card p-8 text-center text-muted">
-              <RefreshCw size={24} className="mx-auto mb-2 animate-spin text-primary" />
-              <p>Đang tải danh sách gợi ý và kiểm tra độ tin cậy mô hình...</p>
-            </div>
-          ) : activeTab === 'pending' ? (
-            pendingItems.length > 0 ? (
-              <div className="grid gap-4 md:grid-cols-2">
-                {pendingItems.map((item) => (
-                  <article
-                    key={item.id}
-                    className="surface-card rounded-2xl border border-line p-5 space-y-4 shadow-xs hover:border-primary/40 transition-colors"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h2 className="text-base font-bold text-text">
-                            {item.deviceName ?? 'Thiết bị'}
-                          </h2>
-                          <span
-                            className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
-                              item.proposedAction.action === 'TURN_ON'
-                                ? 'bg-emerald-500/10 text-emerald-600'
-                                : 'bg-red-500/10 text-red-600'
-                            }`}
-                          >
-                            {item.proposedAction.action === 'TURN_ON' ? 'Bật' : 'Tắt'}
-                          </span>
-                        </div>
-                        <span className="text-xs text-muted">ID: {item.deviceId?.slice(0, 8)}...</span>
-                      </div>
-
-                      <div className="flex flex-col items-end gap-1">
-                        <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
-                          {item.engineType === 'ML' ? 'Machine Learning' : 'Quy tắc'}
-                        </span>
-                        <span className="text-[11px] font-semibold text-emerald-600">
-                          Độ tin cậy: {Math.round(item.confidence * 100)}%
-                        </span>
-                      </div>
-                    </div>
-
-                    <p className="text-xs text-text/80 bg-sidebar/50 p-3 rounded-xl border border-line/60">
-                      {item.explanation}
-                    </p>
-
-                    <dl className="grid grid-cols-2 gap-2 text-xs">
-                      <div>
-                        <dt className="text-muted">Kích hoạt dự kiến</dt>
-                        <dd className="font-medium text-text flex items-center gap-1 mt-0.5">
-                          <Clock size={12} className="text-primary" />
-                          Hằng ngày lúc {item.triggerCondition.time?.slice(0, 5) ?? '00:00'}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-muted">Hành động đề xuất</dt>
-                        <dd className="font-medium text-text mt-0.5">
-                          {item.proposedAction.action}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-muted">Mô hình suy luận</dt>
-                        <dd className="font-medium text-text mt-0.5">
-                          {item.modelVersion ?? 'rf-v1.0.0'}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-muted">Trạng thái xác thực</dt>
-                        <dd className="font-medium text-emerald-600 flex items-center gap-1 mt-0.5">
-                          <ShieldCheck size={12} />
-                          Đạt ngưỡng (≥ 80%)
-                        </dd>
-                      </div>
-                    </dl>
-
-                    {/* Action buttons: Chấp nhận, Từ chối, Bỏ qua */}
-                    <div className="pt-2 border-t border-line flex items-center gap-2">
-                      <button
-                        type="button"
-                        disabled={workingId !== null}
-                        onClick={() => void resolve(item, 'approve')}
-                        className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary hover:bg-primary/90 px-3 py-2 text-xs font-semibold text-white transition-all disabled:opacity-50"
-                      >
-                        <Check size={14} />
-                        <span>Chấp nhận</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        disabled={workingId !== null}
-                        onClick={() => void resolve(item, 'reject')}
-                        className="inline-flex items-center justify-center gap-1 rounded-xl bg-error-soft hover:bg-red-500/20 px-3 py-2 text-xs font-semibold text-red-600 transition-all disabled:opacity-50"
-                        title="Từ chối đề xuất này"
-                      >
-                        <X size={14} />
-                        <span>Từ chối</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        disabled={workingId !== null}
-                        onClick={() => void resolve(item, 'dismiss')}
-                        className="inline-flex items-center justify-center gap-1 rounded-xl bg-sidebar hover:bg-sidebar-hover px-3 py-2 text-xs font-semibold text-muted hover:text-text transition-all disabled:opacity-50"
-                        title="Tạm thời bỏ qua"
-                      >
-                        <EyeOff size={14} />
-                        <span>Bỏ qua</span>
-                      </button>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            ) : (
-              <div className="surface-card rounded-2xl p-8 text-center border border-line space-y-3">
-                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-sidebar text-muted">
-                  <Sparkles size={24} />
-                </div>
-                <h3 className="text-base font-semibold">Chưa có đề xuất nào đạt ngưỡng hiển thị</h3>
-                <p className="text-xs text-muted max-w-md mx-auto">
-                  Hệ thống Machine Learning áp dụng cơ chế kiểm soát nghiêm ngặt: chỉ hiển thị gợi ý khi mô hình đạt độ tin cậy từ 80% trở lên và hành động hợp lệ với trạng thái thiết bị.
-                </p>
-                {modelStatus?.status === 'READY' && (
-                  <button
-                    type="button"
-                    disabled={workingId !== null}
-                    onClick={() => void generate()}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-white hover:bg-primary/90 transition-all disabled:opacity-50 mt-2"
-                  >
-                    <Sparkles size={13} />
-                    <span>Phân tích & Dự đoán ngay</span>
-                  </button>
-                )}
-              </div>
-            )
-          ) : (
-            /* History Tab */
-            historyItems.length > 0 ? (
-              <div className="space-y-3">
-                {historyItems.map((item) => (
-                  <article
-                    key={item.id}
-                    className="surface-card rounded-xl border border-line p-4 flex flex-wrap items-center justify-between gap-3 text-xs"
-                  >
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold text-text text-sm">
-                          {item.deviceName ?? 'Thiết bị'} · {item.proposedAction.action}
-                        </span>
-                        <span
-                          className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                            item.status === 'ACCEPTED' || item.status === 'APPROVED'
-                              ? 'bg-emerald-500/10 text-emerald-600'
-                              : item.status === 'REJECTED'
-                              ? 'bg-red-500/10 text-red-600'
-                              : 'bg-muted/10 text-muted'
-                          }`}
-                        >
-                          {item.status === 'ACCEPTED' || item.status === 'APPROVED'
-                            ? 'Đã chấp nhận'
-                            : item.status === 'REJECTED'
-                            ? 'Đã từ chối'
-                            : 'Đã bỏ qua'}
-                        </span>
-                        <span className="text-[10px] text-muted">
-                          [{item.engineType ?? 'ML'}]
-                        </span>
-                      </div>
-                      <p className="text-muted">{item.explanation}</p>
-                    </div>
-
-                    <div className="text-right text-[11px] text-muted shrink-0">
-                      <div>Độ tin cậy: {Math.round(item.confidence * 100)}%</div>
-                      <div>
-                        {item.resolvedAt
-                          ? `Xử lý lúc: ${new Date(item.resolvedAt).toLocaleString('vi-VN')}`
-                          : `Tạo lúc: ${new Date(item.createdAt).toLocaleString('vi-VN')}`}
-                      </div>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            ) : (
-              <div className="surface-card rounded-xl p-8 text-center text-muted text-xs">
-                Chưa có lịch sử phản hồi đề xuất nào.
-              </div>
-            )
-          )}
+        <div className="st-tabs" role="tablist">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'pending'}
+            className={activeTab === 'pending' ? 'active' : ''}
+            onClick={() => setActiveTab('pending')}
+          >
+            Gợi ý mới <span className="st-count">{pendingItems.length}</span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'history'}
+            className={activeTab === 'history' ? 'active' : ''}
+            onClick={() => setActiveTab('history')}
+          >
+            Đã xem <span className="st-count">{historyItems.length}</span>
+          </button>
         </div>
+
+        {loading ? (
+          <div className="st-insights" aria-busy="true">
+            {[0, 1].map((i) => (
+              <div key={i} className="st-skeleton" style={{ height: 112 }} />
+            ))}
+          </div>
+        ) : activeTab === 'pending' ? (
+          pendingItems.length > 0 ? (
+            <div className="st-insights">
+              {pendingItems.map((item) => (
+                <article key={item.id} className="st-insight">
+                  <div className="st-when">
+                    <strong>{item.triggerCondition.time?.slice(0, 5) ?? '--:--'}</strong>
+                    <small>{formatRepeatDays(item.triggerCondition.repeatDays || [])}</small>
+                  </div>
+
+                  <div className="st-insight-body">
+                    <h4>
+                      {actionText(item)}
+                      {item.roomName && <span className="st-tag">{item.roomName}</span>}
+                    </h4>
+                    <p>{plainExplanation(item.explanation)}</p>
+                    <div className="st-confidence" title={`${Math.round(item.confidence * 100)}%`}>
+                      <span className="st-bar">
+                        <i style={{ width: `${Math.round(item.confidence * 100)}%` }} />
+                      </span>
+                      <b>{confidenceLabel(item.confidence)}</b>
+                    </div>
+                  </div>
+
+                  <div className="st-insight-actions">
+                    <button
+                      type="button"
+                      className="st-icon-btn"
+                      disabled={workingId !== null}
+                      onClick={() => void resolve(item, 'dismiss')}
+                      title="Để sau"
+                      aria-label="Để sau"
+                    >
+                      <Icon name="clock" size={17} />
+                    </button>
+                    <button
+                      type="button"
+                      className="st-btn st-btn-sm"
+                      disabled={workingId !== null}
+                      onClick={() => void resolve(item, 'reject')}
+                    >
+                      Không cần
+                    </button>
+                    <button
+                      type="button"
+                      className="st-btn st-btn-sm st-btn-primary"
+                      disabled={workingId !== null}
+                      onClick={() => void resolve(item, 'approve')}
+                    >
+                      <Icon name="check" size={15} />
+                      Tạo quy tắc
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <div className="st-empty">
+              <div className="st-empty-icon">
+                <Icon name="sparkles" />
+              </div>
+              <h3>Chưa có gợi ý nào</h3>
+              <p>Khi bạn làm một việc vào cùng một giờ nhiều ngày liền, HESTA sẽ gợi ý tự động hóa nó tại đây.</p>
+              {!loading && (
+                <button
+                  type="button"
+                  className="st-btn st-btn-primary"
+                  disabled={workingId !== null}
+                  onClick={() => void generate()}
+                >
+                  <Icon name="sparkles" size={16} />
+                  Tìm thói quen ngay
+                </button>
+              )}
+            </div>
+          )
+        ) : historyItems.length > 0 ? (
+          <div className="st-list st-history">
+            {historyItems.map((item) => {
+              const accepted = item.status === 'ACCEPTED' || item.status === 'APPROVED';
+              const rejected = item.status === 'REJECTED';
+              return (
+                <div key={item.id} className="st-rule">
+                  <div className="st-rule-main">
+                    <div className="st-rule-title">
+                      <h4 title={actionText(item)}>{actionText(item)}</h4>
+                      <span className={`st-tag ${rejected ? 'err' : ''}`}>
+                        {accepted ? 'Đã tạo quy tắc' : rejected ? 'Không cần' : 'Để sau'}
+                      </span>
+                    </div>
+                    <div className="st-flow">
+                      <span>{plainExplanation(item.explanation)}</span>
+                    </div>
+                  </div>
+                  <span className="st-rule-meta">
+                    {new Date(item.resolvedAt ?? item.createdAt).toLocaleDateString('vi-VN')}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="st-empty">
+            <h3>Chưa có phản hồi nào</h3>
+            <p>Những gợi ý bạn đã tạo quy tắc, bỏ qua hoặc để sau sẽ hiện ở đây.</p>
+          </div>
+        )}
       </main>
+      <DashboardBottomNav activeItem="more" homeId={homeId} />
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import type { DeviceSummary, RuleActionInput } from '../../types/automation';
 import type { SceneResponse } from '../../types/scene';
-import { Icon, type IconName } from '../home/HomeIcons';
+import { Icon, type IconName } from '../ui/LucideIcon';
 import { PickerField } from './PickerField';
 import { StepperInput } from './StepperInput';
 import { getDeviceActions, type ActionOption } from '../deviceActionOptions';
@@ -303,7 +303,7 @@ export const ActionStepCard: React.FC<ActionStepCardProps> = ({
               <label className="text-[11px] font-bold text-[var(--secondary)] uppercase tracking-wider block">
                 Lệnh điều khiển
               </label>
-              <div className="flex flex-wrap gap-1.5">
+              <div className="command-chips-row">
                 {deviceActions.map((opt) => {
                   const isSelected = action.action === opt.code;
                   return (
@@ -311,11 +311,7 @@ export const ActionStepCard: React.FC<ActionStepCardProps> = ({
                       key={opt.code}
                       type="button"
                       onClick={() => handleActionCodeChange(opt.code)}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                        isSelected
-                          ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-xs'
-                          : 'bg-[var(--solid)] hover:bg-[var(--muted)] text-[var(--text)] border-[var(--border)]'
-                      }`}
+                      className={`command-chip ${isSelected ? 'active' : ''}`}
                     >
                       {opt.label}
                     </button>
@@ -461,15 +457,15 @@ export const ActionStepCard: React.FC<ActionStepCardProps> = ({
             </div>
           )}
 
-          {/* Collapsed Accordion for Raw Parameters JSON */}
-          {!isSceneStep && (
+          {/* Raw JSON only where no form exists (SET_STATE); hidden otherwise to keep the card non-technical. */}
+          {action.action === 'SET_STATE' && (
             <div className="pt-1 border-t border-[var(--border)]">
               <button
                 type="button"
                 onClick={() => setJsonAccordionOpen((p) => !p)}
                 className="w-full flex items-center justify-between text-left py-1 text-[11px] font-semibold text-[var(--tertiary)] hover:text-[var(--text)] transition-colors cursor-pointer"
               >
-                <span>Tham số nâng cao (JSON)</span>
+                <span>Cài đặt nâng cao</span>
                 <Icon name={jsonAccordionOpen ? 'chevronUp' : 'chevronDown'} size={14} />
               </button>
 

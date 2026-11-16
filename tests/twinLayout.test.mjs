@@ -30,8 +30,8 @@ function loadSource(path) {
     if (name.endsWith('.css')) return {};
     if (!name.startsWith('.')) return require(name);
     const base = resolve(dirname(filename), name);
-    const dependencyPath = ['.ts', '.tsx'].map((extension) => base + extension).find(existsSync);
-    assert.ok(dependencyPath, `Cannot resolve ${name} from ${path}`);
+    const dependencyPath = existsSync(base) ? base : ['.ts', '.tsx'].map((extension) => base + extension).find(existsSync);
+    assert.ok(dependencyPath, `Cannot resolve ${name} from ${filename}`);
     return loadSource(dependencyPath);
   };
   runInThisContext(`(function(require, module, exports) { ${outputText}\n})`, { filename })(sourceRequire, module, module.exports);

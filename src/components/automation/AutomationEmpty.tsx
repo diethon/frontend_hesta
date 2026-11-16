@@ -1,4 +1,5 @@
 import React from 'react';
+import { Icon } from '../ui/LucideIcon';
 
 export interface AutomationEmptyProps {
   mode: 'empty' | 'search' | 'filter';
@@ -7,64 +8,55 @@ export interface AutomationEmptyProps {
   onSelectTemplateName?: (name: string) => void;
 }
 
+const STARTERS = ['Bật đèn khi có chuyển động', 'Tắt điều hòa khi mở cổng', 'Bật đèn lúc 18:00'];
+
 export const AutomationEmpty: React.FC<AutomationEmptyProps> = ({
   mode,
   onCreate,
   onResetSearch,
   onSelectTemplateName,
 }) => {
-  if (mode === 'search') {
+  if (mode !== 'empty') {
     return (
-      <div className="scenes-empty">
-        <strong>Không tìm thấy quy tắc</strong>
-        <p>Thử từ khóa khác hoặc xóa bộ lọc tìm kiếm.</p>
+      <div className="st-empty">
+        <div className="st-empty-icon">
+          <Icon name="search" />
+        </div>
+        <h3>{mode === 'search' ? 'Không tìm thấy quy tắc' : 'Chưa có quy tắc phù hợp'}</h3>
+        <p>
+          {mode === 'search'
+            ? 'Thử từ khóa khác hoặc xóa bộ lọc tìm kiếm.'
+            : 'Thử đổi bộ lọc trạng thái hoặc loại kích hoạt.'}
+        </p>
         {onResetSearch && (
-          <button
-            type="button"
-            className="px-4 py-2 rounded-full border border-[var(--border)] bg-[var(--g1)] text-xs font-semibold text-[var(--secondary)] hover:text-[var(--text)] transition-colors cursor-pointer mt-2"
-            onClick={onResetSearch}
-          >
-            Xóa tìm kiếm
+          <button type="button" className="st-btn" onClick={onResetSearch}>
+            Xóa bộ lọc
           </button>
         )}
       </div>
     );
   }
 
-  if (mode === 'filter') {
-    return (
-      <div className="scenes-empty">
-        <strong>Chưa có quy tắc phù hợp</strong>
-        <p>Thử đổi bộ lọc trạng thái (Đang bật / Đang tắt) hoặc loại kích hoạt.</p>
-      </div>
-    );
-  }
-
   return (
-    <div className="scenes-empty">
-      <strong>Chưa có quy tắc nào</strong>
-      <p>Quy tắc giúp nhà tự phản ứng với cảm biến, sự kiện hoặc giờ hẹn</p>
-      <div>
-        {[
-          'Bật đèn khi có chuyển động',
-          'Tắt điều hòa khi mở cổng',
-          'Bật đèn lúc 18:00',
-        ].map((item) => (
-          <button
-            key={item}
-            type="button"
-            onClick={() => onSelectTemplateName?.(item)}
-          >
+    <div className="st-empty">
+      <div className="st-empty-icon">
+        <Icon name="automation" />
+      </div>
+      <h3>Chưa có quy tắc nào</h3>
+      <p>Quy tắc giúp ngôi nhà tự phản ứng với cảm biến, sự kiện hoặc giờ hẹn.</p>
+      <div className="st-chips">
+        {STARTERS.map((item) => (
+          <button key={item} type="button" className="st-btn st-btn-sm" onClick={() => onSelectTemplateName?.(item)}>
             {item}
           </button>
         ))}
       </div>
       {onCreate && (
-        <button type="button" className="add-device mt-2 cursor-pointer" onClick={onCreate}>
-          + Tạo quy tắc
+        <button type="button" className="st-btn st-btn-primary" onClick={onCreate}>
+          <Icon name="plus" size={18} />
+          Tạo quy tắc
         </button>
       )}
     </div>
   );
 };
-

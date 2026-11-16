@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import type { AutomationRule, AutomationExecution, DeviceSummary } from '../../types/automation';
 import type { SceneResponse } from '../../types/scene';
 import { getAutomationExecutions } from '../../services/automationApi';
-import { Icon } from '../home/HomeIcons';
+import { Icon } from '../ui/LucideIcon';
 
 interface RuleHistoryPanelProps {
   homeId: string;

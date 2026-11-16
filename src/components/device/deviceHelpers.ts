@@ -9,6 +9,7 @@ export const KNOWN_NON_AC_TYPES = new Set([
   'SMOKE_SENSOR',
   'GATE',
   'ROLLING_DOOR',
+  'CURTAIN',
   'CAMERA_AI',
   'LUX_SENSOR',
   'FAN',
@@ -88,7 +89,7 @@ export const isControllable = (device: DeviceResponse): boolean => {
  */
 export const isWideCard = (device: DeviceResponse): boolean => {
   const type = resolveEffectiveType(device);
-  return ['AIR_CONDITIONER', 'GATE', 'ROLLING_DOOR', 'CAMERA_AI'].includes(type);
+  return ['AIR_CONDITIONER', 'GATE', 'ROLLING_DOOR', 'CAMERA_AI', 'CURTAIN'].includes(type);
 };
 
 /**

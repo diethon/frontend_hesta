@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { getSchedules, saveSchedule, deleteSchedule } from '../../services/scheduleApi';
 import type { Schedule, ScheduleInput } from '../../types/schedule';
-import { Icon } from '../home/HomeIcons';
+import { Icon } from '../ui/LucideIcon';
 import { notify } from '../ui/notify';
 
 interface SceneScheduleSectionProps {
@@ -10,7 +10,10 @@ interface SceneScheduleSectionProps {
   targetId?: string; // Explicit target ID
   targetKind?: 'scenes' | 'automation-rules'; // Default: 'scenes'
   onScheduleCountChange?: (count: number) => void;
-  onSchedulesChange?: (schedules: Schedule[]) => void;
+  /** `edited` is false when the list was just loaded from the server. */
+  onSchedulesChange?: (schedules: Schedule[], edited: boolean) => void;
+  /** Load the saved times but keep every change local; the parent saves them (or drops them on cancel). */
+  draft?: boolean;
 }
 
 const DAY_LABELS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
@@ -34,8 +37,11 @@ export const SceneScheduleSection: React.FC<SceneScheduleSectionProps> = ({
   targetKind = 'scenes',
   onScheduleCountChange,
   onSchedulesChange,
+  draft = false,
 }) => {
   const effectiveTargetId = targetId || sceneId;
+  // Changes go to the server right away only when there is a saved target and the parent did not ask for a draft.
+  const live = Boolean(effectiveTargetId) && !draft;
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [loading, setLoading] = useState(false);
   const [adding, setAdding] = useState(false);
@@ -56,7 +62,7 @@ export const SceneScheduleSection: React.FC<SceneScheduleSectionProps> = ({
       const list = data || [];
       setSchedules(list);
       onScheduleCountChange?.(list.length);
-      onSchedulesChange?.(list);
+      onSchedulesChange?.(list, false);
     } catch {
       // Fallback empty
       setSchedules([]);
@@ -135,8 +141,8 @@ export const SceneScheduleSection: React.FC<SceneScheduleSectionProps> = ({
       active: true,
     };
 
-    if (!effectiveTargetId) {
-      // In-memory mode for draft before creation
+    if (!live) {
+      // In-memory mode: draft before creation, or a draft the parent saves
       const draftSch: Schedule = {
         id: editingId || `temp_${Date.now()}`,
         scheduledTime: timeString,
@@ -148,17 +154,17 @@ export const SceneScheduleSection: React.FC<SceneScheduleSectionProps> = ({
           ? prev.map((s) => (s.id === editingId ? draftSch : s))
           : [...prev, draftSch];
         onScheduleCountChange?.(next.length);
-        onSchedulesChange?.(next);
+        onSchedulesChange?.(next, true);
         return next;
       });
       handleCloseForm();
-      notify.success('Đã lưu lịch tự động');
+      if (!draft) notify.success('Đã lưu lịch tự động');
       return;
     }
 
     setSaving(true);
     try {
-      await saveSchedule(homeId, targetKind, effectiveTargetId, payload, editingId || undefined);
+      await saveSchedule(homeId, targetKind, effectiveTargetId!, payload, editingId || undefined);
       await fetchSchedules();
       handleCloseForm();
       notify.success('Đã lưu lịch tự động');
@@ -176,16 +182,16 @@ export const SceneScheduleSection: React.FC<SceneScheduleSectionProps> = ({
     // Optimistic
     setSchedules((prev) => {
       const next = prev.map((s) => (s.id === sch.id ? { ...s, active: nextState } : s));
-      onSchedulesChange?.(next);
+      onSchedulesChange?.(next, true);
       return next;
     });
 
-    if (effectiveTargetId && !sch.id.startsWith('temp_')) {
+    if (live && !sch.id.startsWith('temp_')) {
       try {
         await saveSchedule(
           homeId,
           targetKind,
-          effectiveTargetId,
+          effectiveTargetId!,
           {
             scheduledTime: sch.scheduledTime,
             repeatDays: sch.repeatDays,
@@ -193,14 +199,14 @@ export const SceneScheduleSection: React.FC<SceneScheduleSectionProps> = ({
           },
           sch.id
         );
-      } catch {
+      } catch (err) {
         // Revert
         setSchedules((prev) => {
           const reverted = prev.map((s) => (s.id === sch.id ? { ...s, active: sch.active } : s));
-          onSchedulesChange?.(reverted);
+          onSchedulesChange?.(reverted, true);
           return reverted;
         });
-        notify.error('Không thể cập nhật trạng thái lịch');
+        notify.error(err instanceof Error ? err.message : 'Không thể cập nhật trạng thái lịch');
       }
     }
   };
@@ -212,17 +218,17 @@ export const SceneScheduleSection: React.FC<SceneScheduleSectionProps> = ({
     setSchedules((prev) => {
       const next = prev.filter((s) => s.id !== sch.id);
       onScheduleCountChange?.(next.length);
-      onSchedulesChange?.(next);
+      onSchedulesChange?.(next, true);
       return next;
     });
 
-    if (effectiveTargetId && !sch.id.startsWith('temp_')) {
+    if (live && !sch.id.startsWith('temp_')) {
       try {
-        await deleteSchedule(homeId, targetKind, effectiveTargetId, sch.id);
+        await deleteSchedule(homeId, targetKind, effectiveTargetId!, sch.id);
         notify.success('Đã xóa lịch chạy');
-      } catch {
+      } catch (err) {
         void fetchSchedules();
-        notify.error('Không thể xóa lịch chạy');
+        notify.error(err instanceof Error ? err.message : 'Không thể xóa lịch chạy');
       }
     }
   };
@@ -258,7 +264,7 @@ export const SceneScheduleSection: React.FC<SceneScheduleSectionProps> = ({
                   <button
                     type="button"
                     onClick={() => handleToggleSchedule(sch)}
-                    className={`device-toggle-pill scale-80 cursor-pointer ${sch.active ? 'active' : ''}`}
+                    className={`toggle scale-80 cursor-pointer ${sch.active ? 'active' : ''}`}
                     aria-label={sch.active ? 'Tắt lịch' : 'Bật lịch'}
                   >
                     <span />
@@ -285,10 +291,6 @@ export const SceneScheduleSection: React.FC<SceneScheduleSectionProps> = ({
               </div>
             );
           })}
-        </div>
-      ) : !adding ? (
-        <div className="p-4 rounded-2xl border border-dashed border-[var(--border)] text-center text-xs text-[var(--tertiary)]">
-          Chưa thiết lập lịch chạy tự động.
         </div>
       ) : null}
 
@@ -411,7 +413,7 @@ export const SceneScheduleSection: React.FC<SceneScheduleSectionProps> = ({
           className="w-full py-2.5 rounded-2xl border border-dashed border-[var(--border)] text-xs font-bold text-[var(--accent)] hover:bg-[var(--accent-soft)] transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
         >
           <Icon name="plus" size={14} />
-          <span>+ Thêm giờ chạy</span>
+          <span>Thêm giờ chạy</span>
         </button>
       )}
     </div>

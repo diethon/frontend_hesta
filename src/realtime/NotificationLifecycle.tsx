@@ -29,17 +29,19 @@ export function NotificationLifecycle() {
     });
   }), [dispatch, reduxStore]);
 
+  const userId = user?.id;
+  // Depend on the id, not the user object: profile refreshes replace the object and refetched notifications each time.
   useEffect(() => {
-    if (!accessToken || !user) {
+    if (!accessToken || !userId) {
       notify.dismissAll();
       dispatch(notificationsCleared());
       return;
     }
 
-    const scope = { userId: user.id, homeId: currentHomeId };
+    const scope = { userId, homeId: currentHomeId };
     dispatch(notificationScopeChanged(scope));
     void dispatch(loadNotifications(scope));
-  }, [accessToken, currentHomeId, dispatch, user]);
+  }, [accessToken, currentHomeId, dispatch, userId]);
 
   return null;
 }

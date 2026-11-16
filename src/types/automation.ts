@@ -1,3 +1,5 @@
+import type { RuleScheduleInput } from './schedule';
+
 export interface DeviceSummary {
   id: string;
   homeId: string;
@@ -108,6 +110,8 @@ export interface AutomationRuleInput {
   enabled: boolean;
   conditions: RuleConditionInput[];
   actions: RuleActionInput[];
+  /** All times of a SCHEDULE rule, saved in the same request (at least one must be active). Omit to keep the saved ones. */
+  schedules?: RuleScheduleInput[];
 }
 
 export interface AutomationExecution {
@@ -121,10 +125,4 @@ export interface AutomationExecution {
   startedAt?: string;
   completedAt?: string;
   resultDetail: Array<{ deviceId?: string; sceneId?: string; action: string; success: boolean; status: string }>;
-}
-
-export interface AutomationTestResult {
-  ruleId: string;
-  matched: boolean;
-  proposedActions: RuleActionInput[];
 }

@@ -3,11 +3,20 @@ import { useNavigate } from 'react-router';
 import { Icon, type IconName } from './HomeIcons';
 import { notify } from '../ui/notify';
 
-interface DashboardBottomNavProps {
+export interface DashboardBottomNavCustomItem {
+  id: string;
+  icon: IconName;
+  label: string;
+  onClick: () => void;
+  active?: boolean;
+}
+
+export interface DashboardBottomNavProps {
   homeId?: string;
-  activeItem?: 'overview' | 'devices' | 'scenes' | 'energy' | 'more';
+  activeItem?: 'overview' | 'devices' | 'scenes' | 'energy' | 'more' | string;
   onSelectOverview?: () => void;
   onOpenMore?: () => void;
+  items?: DashboardBottomNavCustomItem[];
 }
 
 interface BottomNavItem {
@@ -29,6 +38,7 @@ export const DashboardBottomNav: React.FC<DashboardBottomNavProps> = ({
   activeItem = 'overview',
   onSelectOverview,
   onOpenMore,
+  items: customItems,
 }) => {
   const navigate = useNavigate();
 
@@ -72,19 +82,36 @@ export const DashboardBottomNav: React.FC<DashboardBottomNavProps> = ({
 
   return (
     <nav className="bottom-nav glass-g2" aria-label="Điều hướng di động">
-      {items.map((item) => (
-        <button
-          key={item.id}
-          type="button"
-          className={activeItem === item.id ? 'active' : ''}
-          onClick={() => handleClick(item)}
-        >
-          <span>
-            <Icon name={item.icon} size={20} />
-          </span>
-          <small>{item.label}</small>
-        </button>
-      ))}
+      {customItems
+        ? customItems.map((item) => {
+            const isActive = item.active ?? (activeItem === item.id);
+            return (
+              <button
+                key={item.id}
+                type="button"
+                className={isActive ? 'active' : ''}
+                onClick={item.onClick}
+              >
+                <span>
+                  <Icon name={item.icon} size={20} />
+                </span>
+                <small>{item.label}</small>
+              </button>
+            );
+          })
+        : items.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              className={activeItem === item.id ? 'active' : ''}
+              onClick={() => handleClick(item)}
+            >
+              <span>
+                <Icon name={item.icon} size={20} />
+              </span>
+              <small>{item.label}</small>
+            </button>
+          ))}
     </nav>
   );
 };

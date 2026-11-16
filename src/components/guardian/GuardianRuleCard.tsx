@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Icon } from '../home/HomeIcons';
+import { Icon } from '../ui/LucideIcon';
 import type { ParentalGuardianRule } from '../../types/guardian';
 
 interface GuardianRuleCardProps {
@@ -192,8 +192,9 @@ export const GuardianRuleCard: React.FC<GuardianRuleCardProps> = ({
         </div>
         <div>
           <span className="text-[10px] uppercase font-bold text-[var(--tertiary)] block">Phụ huynh</span>
-          <span className={`font-bold ${rule.parentAway ? 'text-amber-600' : 'text-emerald-600'}`}>
-            {rule.parentAway ? '⚠️ Vắng nhà' : '🏡 Ở nhà'}
+          <span className={`font-bold inline-flex items-center gap-1 ${rule.parentAway ? 'text-amber-600' : 'text-emerald-600'}`}>
+            <Icon name={rule.parentAway ? 'alert' : 'home'} size={13} />
+            {rule.parentAway ? 'Vắng nhà' : 'Ở nhà'}
           </span>
         </div>
       </div>

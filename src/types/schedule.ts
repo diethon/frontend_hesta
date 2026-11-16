@@ -7,3 +7,6 @@ export interface Schedule {
 }
 
 export type ScheduleInput = Pick<Schedule, 'scheduledTime' | 'repeatDays' | 'active'>;
+
+/** A time inside a rule's full schedule list: with `id` it updates that saved time, without it creates one. */
+export type RuleScheduleInput = ScheduleInput & { id?: string };

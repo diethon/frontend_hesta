@@ -8,13 +8,13 @@ import {
   buildSceneActionInput,
   sceneActionsToDraft,
 } from './sceneActions';
-import { Icon, type IconName } from '../home/HomeIcons';
+import { Icon, type IconName } from '../ui/LucideIcon';
 import { getFigmaIconForDevice, getFigmaIconForScene, SceneHistory } from './ScenePage';
 import { DevicePickerSheet, isDeviceControllable } from './DevicePickerSheet';
 import { SceneScheduleSection } from './SceneScheduleSection';
-import { TestRunResultSheet, type TestRunActionResult } from './TestRunResultSheet';
-import { createScene, updateScene, executeScene } from '../../services/sceneApi';
+import { createScene, updateScene } from '../../services/sceneApi';
 import { notify } from '../ui/notify';
+import { buildSceneTemplate, type SceneTemplateKey } from './sceneTemplates';
 
 interface SceneEditorProps {
   scene?: SceneResponse | null;
@@ -137,8 +137,6 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
 
   // Sub-sheets
   const [pickingDeviceForIndex, setPickingDeviceForIndex] = useState<number | null>(null);
-  const [testRunResults, setTestRunResults] = useState<TestRunActionResult[] | null>(null);
-  const [testingRun, setTestingRun] = useState(false);
 
   // Dialogs
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
@@ -191,65 +189,12 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
   };
 
   // Template select handlers
-  const handleSelectTemplate = (templateKey: 'morning' | 'night' | 'away' | 'home' | 'blank') => {
-    if (templateKey === 'blank') {
-      setName('Kịch bản mới');
-      setIcon('sparkles');
-      setDescription('');
-      setActions([]);
-      setTemplateStep(false);
-      return;
-    }
-
-    const ctrlDevs = devices.filter(isDeviceControllable);
-    const lightDev = ctrlDevs.find((d) => (d.deviceType || '').toUpperCase().includes('LIGHT') || (d.deviceType || '').toUpperCase().includes('LED'));
-    const acDev = ctrlDevs.find((d) => (d.deviceType || '').toUpperCase().includes('AC') || (d.deviceType || '').toUpperCase().includes('AIR'));
-    const gateDev = ctrlDevs.find((d) => (d.deviceType || '').toUpperCase().includes('GATE') || (d.deviceType || '').toUpperCase().includes('DOOR'));
-
-    if (templateKey === 'morning') {
-      setName('Chào buổi sáng');
-      setIcon('sun');
-      setDescription('Bật đèn, mở cổng đón ngày mới');
-      const sampleActs: DraftSceneAction[] = [];
-      if (lightDev) sampleActs.push({ deviceId: lightDev.id, action: 'TURN_ON', value: '' });
-      if (gateDev) sampleActs.push({ deviceId: gateDev.id, action: 'OPEN', value: '' });
-      if (sampleActs.length === 0 && ctrlDevs[0]) {
-        sampleActs.push({ deviceId: ctrlDevs[0].id, action: 'TURN_ON', value: '' });
-      }
-      setActions(sampleActs);
-    } else if (templateKey === 'night') {
-      setName('Chúc ngủ ngon');
-      setIcon('moon');
-      setDescription('Tắt đèn, khóa cửa và tiết kiệm điện');
-      const sampleActs: DraftSceneAction[] = [];
-      if (lightDev) sampleActs.push({ deviceId: lightDev.id, action: 'TURN_OFF', value: '' });
-      if (gateDev) sampleActs.push({ deviceId: gateDev.id, action: 'CLOSE', value: '' });
-      if (sampleActs.length === 0 && ctrlDevs[0]) {
-        sampleActs.push({ deviceId: ctrlDevs[0].id, action: 'TURN_OFF', value: '' });
-      }
-      setActions(sampleActs);
-    } else if (templateKey === 'away') {
-      setName('Rời khỏi nhà');
-      setIcon('door');
-      setDescription('Tắt toàn bộ thiết bị khi ra ngoài');
-      const sampleActs: DraftSceneAction[] = [];
-      ctrlDevs.slice(0, 3).forEach((d) => {
-        sampleActs.push({ deviceId: d.id, action: 'TURN_OFF', value: '' });
-      });
-      setActions(sampleActs);
-    } else if (templateKey === 'home') {
-      setName('Về đến nhà');
-      setIcon('home');
-      setDescription('Bật đèn và khởi động điều hòa');
-      const sampleActs: DraftSceneAction[] = [];
-      if (lightDev) sampleActs.push({ deviceId: lightDev.id, action: 'TURN_ON', value: '' });
-      if (acDev) sampleActs.push({ deviceId: acDev.id, action: 'TURN_ON', value: '' });
-      if (sampleActs.length === 0 && ctrlDevs[0]) {
-        sampleActs.push({ deviceId: ctrlDevs[0].id, action: 'TURN_ON', value: '' });
-      }
-      setActions(sampleActs);
-    }
-
+  const handleSelectTemplate = (templateKey: SceneTemplateKey) => {
+    const template = buildSceneTemplate(templateKey, devices);
+    setName(template.name);
+    setIcon(template.icon);
+    setDescription(template.description);
+    setActions(template.actions);
     setTemplateStep(false);
   };
 
@@ -260,7 +205,7 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
     const newIdx = actions.length;
 
     let defaultAction = 'TURN_ON';
-    let defaultValue = '';
+    const defaultValue = '';
     if (chosenDev) {
       const type = (chosenDev.deviceType || '').toUpperCase();
       if (type.includes('GATE') || type.includes('DOOR')) defaultAction = 'OPEN';
@@ -309,83 +254,6 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
   const handleDeleteStep = (idx: number) => {
     setActions((prev) => prev.filter((_, i) => i !== idx));
     setStepMenuIndex(null);
-  };
-
-  // Test Run Trigger
-  const handleTestRun = async () => {
-    if (actions.length === 0) {
-      notify.info('Thêm ít nhất 1 hành động để chạy thử');
-      return;
-    }
-
-    setTestingRun(true);
-    if (isEdit && scene?.id) {
-      try {
-        const res = await executeScene(homeId, scene.id);
-        const mappedResults: TestRunActionResult[] = (res.resultDetail || []).map((r) => {
-          const dev = devices.find((d) => d.id === r.deviceId);
-          return {
-            deviceId: r.deviceId,
-            deviceName: dev?.name || 'Thiết bị',
-            action: r.action,
-            success: r.success,
-            message: r.message,
-          };
-        });
-
-        if (mappedResults.length === 0) {
-          // If result detail was empty, map directly from actions
-          setTestRunResults(
-            actions.map((a) => {
-              const dev = devices.find((d) => d.id === a.deviceId);
-              return {
-                deviceId: a.deviceId,
-                deviceName: dev?.name || 'Thiết bị',
-                action: a.action,
-                success: true,
-              };
-            })
-          );
-        } else {
-          setTestRunResults(mappedResults);
-        }
-      } catch (err: unknown) {
-        // Fallback simulated execution results
-        setTestRunResults(
-          actions.map((a) => {
-            const dev = devices.find((d) => d.id === a.deviceId);
-            const isOnline = dev ? dev.online !== false && dev.status !== 'OFFLINE' : false;
-            return {
-              deviceId: a.deviceId,
-              deviceName: dev?.name || 'Thiết bị',
-              action: a.action,
-              success: isOnline,
-              message: isOnline ? undefined : 'Thiết bị ngoại tuyến',
-            };
-          })
-        );
-      } finally {
-        setTestingRun(false);
-      }
-    } else {
-      // In-memory test run simulation for new scene
-      setTimeout(() => {
-        setTestRunResults(
-          actions.map((a) => {
-            const dev = devices.find((d) => d.id === a.deviceId);
-            const isOnline = dev ? dev.online !== false && dev.status !== 'OFFLINE' : true;
-            return {
-              deviceId: a.deviceId,
-              deviceName: dev?.name || 'Thiết bị',
-              action: a.action,
-              success: isOnline,
-              message: isOnline ? undefined : 'Thiết bị ngoại tuyến',
-            };
-          })
-        );
-        setTestingRun(false);
-      }, 700);
-    }
   };
 
   // Save Scene
@@ -542,15 +410,6 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
                       type="button"
                       onClick={() => {
                         setShowMoreMenu(false);
-                        void handleTestRun();
-                      }}
-                    >
-                      Chạy thử
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowMoreMenu(false);
                         setActiveTab('history');
                       }}
                     >
@@ -612,7 +471,6 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
               <SceneHistory
                 scene={scene}
                 homeId={homeId}
-                onRerun={() => void handleTestRun()}
               />
             ) : (
               <div className="p-8 text-center text-xs text-[var(--tertiary)]">
@@ -769,7 +627,7 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
                         onChange={(e) => setDescription(e.target.value.slice(0, 100))}
                         placeholder="Mô tả mục đích kịch bản..."
                         maxLength={100}
-                        autoFocus
+                        autoFocus={!description}
                       />
                       <div className="flex justify-between items-center text-[10px] text-[var(--tertiary)] px-1">
                         <button
@@ -802,7 +660,7 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
                 <div className="scene-section-title">
                   <div>
                     <strong>Hành động ({actions.length})</strong>
-                    <p>Chạy lần lượt từ trên xuống</p>
+                    <p>Cùng thiết bị chạy theo thứ tự từ trên xuống</p>
                   </div>
                   <button
                     type="button"
@@ -1396,7 +1254,13 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
               </section>
 
               {/* ──────────────── 3) LỊCH CHẠY ──────────────── */}
-              <section className="pt-2 border-t border-[var(--border)]">
+              <section className="pt-2 border-t border-[var(--border)] space-y-3">
+                <div className="scene-section-title">
+                  <div>
+                    <strong>Lịch chạy</strong>
+                    <p>Tự chạy kịch bản vào giờ cố định</p>
+                  </div>
+                </div>
                 <SceneScheduleSection
                   homeId={homeId}
                   sceneId={scene?.id}
@@ -1410,15 +1274,6 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
         {!templateStep && activeTab === 'setup' && (
           <footer className="scene-editor-footer">
             <div className="scene-editor-footer-buttons">
-              <button
-                type="button"
-                className="scene-ghost h-10 px-4 text-xs font-semibold"
-                disabled={testingRun || actions.length === 0}
-                onClick={() => void handleTestRun()}
-              >
-                {testingRun ? 'Đang chạy thử…' : 'Chạy thử'}
-              </button>
-
               <button
                 type="button"
                 className="add-device h-10 px-5 text-xs font-semibold"
@@ -1470,16 +1325,6 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
           />
         )}
 
-        {/* ── IN-PANEL SHEET: TestRunResultSheet ── */}
-        {testRunResults !== null && (
-          <TestRunResultSheet
-            results={testRunResults}
-            devices={devices}
-            running={testingRun}
-            onRerun={() => void handleTestRun()}
-            onClose={() => setTestRunResults(null)}
-          />
-        )}
       </aside>
 
       {/* ── UNSAVED CHANGES CONFIRMATION DIALOG ── */}

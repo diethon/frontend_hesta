@@ -56,7 +56,8 @@ export type IconName =
   | "arrowDown"
   | "alert"
   | "flame"
-  | "gate";
+  | "gate"
+  | "play";
 
 export const iconPaths: Record<IconName, React.ReactNode> = {
   car: (
@@ -306,6 +307,7 @@ export const iconPaths: Record<IconName, React.ReactNode> = {
     </>
   ),
   plus: <path d="M12 5v14M5 12h14" />,
+  play: <path d="M7 4.5v15l12-7.5z" />,
   more: (
     <>
       <circle cx="5" cy="12" r="1" />

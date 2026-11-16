@@ -300,21 +300,3 @@ export function getDeviceTypeIcon(deviceType?: string): LucideIcon {
   if (t.includes('LOCK') || t.includes('SECURITY')) return Shield;
   return Zap;
 }
-
-export function getActionIcon(actionType?: string, deviceName?: string): LucideIcon {
-  const a = (actionType ?? '').toUpperCase();
-  const n = (deviceName ?? '').toUpperCase();
-  if (a === 'SET_TEMPERATURE' || n.includes('ĐIỀU HÒA') || n.includes('LẠNH') || n.includes('AC')) return Thermometer;
-  if (a === 'SET_BRIGHTNESS' || n.includes('ĐÈN') || n.includes('LIGHT') || n.includes('LED')) return Lightbulb;
-  if (a === 'SET_SPEED' || n.includes('QUẠT') || n.includes('FAN')) return Fan;
-  if (n.includes('CẮM') || n.includes('SOCKET') || n.includes('PLUG') || n.includes('CÔNG TẮC')) return Power;
-  if (n.includes('KHÓA') || n.includes('CỬA') || n.includes('DOOR') || n.includes('LOCK')) return Shield;
-  if (a === 'TURN_ON' || a === 'TURN_OFF') {
-    if (n.includes('ĐÈN')) return Lightbulb;
-    if (n.includes('QUẠT')) return Fan;
-    if (n.includes('ĐIỀU HÒA') || n.includes('LẠNH')) return Thermometer;
-    return Power;
-  }
-  return Zap;
-}
-

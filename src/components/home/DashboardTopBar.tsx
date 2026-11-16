@@ -21,6 +21,11 @@ interface DashboardTopBarProps {
   onOpenProfile: () => void;
   onLogout: () => void;
   onSearchClick?: () => void;
+  avgTemp?: number | null;
+  avgHum?: number | null;
+  totalDevices?: number;
+  onlineDevices?: number;
+  activePowerWatts?: number;
 }
 
 export const DashboardTopBar: React.FC<DashboardTopBarProps> = ({
@@ -33,6 +38,10 @@ export const DashboardTopBar: React.FC<DashboardTopBarProps> = ({
   onOpenProfile,
   onLogout,
   onSearchClick,
+  avgTemp,
+  avgHum,
+  totalDevices,
+  onlineDevices,
 }) => {
   const [isAvatarMenuOpen, setIsAvatarMenuOpen] = useState(false);
   const [isHomeMenuOpen, setIsHomeMenuOpen] = useState(false);
@@ -109,7 +118,7 @@ export const DashboardTopBar: React.FC<DashboardTopBarProps> = ({
               <button
                 type="button"
                 onClick={() => setIsHomeMenuOpen(!isHomeMenuOpen)}
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/70 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700 backdrop-blur-md text-[11px] font-semibold text-slate-700 dark:text-slate-200 shadow-2xs hover:bg-white transition-all cursor-pointer"
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[var(--g1)] border border-[var(--border)] backdrop-blur-md text-[11px] font-semibold text-[var(--text)] shadow-2xs hover:bg-[var(--solid)] transition-all cursor-pointer"
                 title="Đổi không gian ngôi nhà"
               >
                 <Home className="w-3 h-3 text-primary" />
@@ -118,9 +127,9 @@ export const DashboardTopBar: React.FC<DashboardTopBarProps> = ({
               </button>
 
               {isHomeMenuOpen && (
-                <div className="absolute left-0 mt-1.5 w-60 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xl py-1.5 z-50 animate-in fade-in zoom-in-95 duration-150">
-                  <div className="px-3 py-1.5 border-b border-slate-100 dark:border-slate-800">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted">
+                <div className="absolute left-0 mt-1.5 w-60 rounded-2xl bg-[var(--solid)] border border-[var(--border)] shadow-xl py-1.5 z-50 animate-in fade-in zoom-in-95 duration-150">
+                  <div className="px-3 py-1.5 border-b border-[var(--border)]">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--secondary)]">
                       Danh sách ngôi nhà
                     </span>
                   </div>
@@ -132,7 +141,7 @@ export const DashboardTopBar: React.FC<DashboardTopBarProps> = ({
                         className={`flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs transition-colors cursor-pointer ${
                           currentHome?.homeId === h.homeId
                             ? 'bg-primary/10 text-primary font-bold'
-                            : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                            : 'text-[var(--text)] hover:bg-[var(--g1)]'
                         }`}
                         onClick={() => {
                           onSelectHome(h);
@@ -148,7 +157,7 @@ export const DashboardTopBar: React.FC<DashboardTopBarProps> = ({
                               setIsHomeMenuOpen(false);
                               onOpenRenameHome(h);
                             }}
-                            className="p-1 hover:text-primary"
+                            className="p-1 hover:text-primary text-[var(--secondary)]"
                             title="Đổi tên nhà"
                           >
                             <Pencil className="w-3 h-3" />
@@ -158,7 +167,7 @@ export const DashboardTopBar: React.FC<DashboardTopBarProps> = ({
                     ))}
                   </div>
 
-                  <div className="border-t border-slate-100 dark:border-slate-800 p-1">
+                  <div className="border-t border-[var(--border)] p-1">
                     <button
                       type="button"
                       onClick={() => {
@@ -175,6 +184,33 @@ export const DashboardTopBar: React.FC<DashboardTopBarProps> = ({
               )}
             </div>
           )}
+
+          {/* Topbar Status Pills */}
+          <div className="hidden sm:flex items-center gap-1.5">
+            <div
+              className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-[var(--g1)] border border-[var(--border)] text-[11px] font-medium text-[var(--text)] shadow-2xs"
+              title="Nhiệt độ trung bình"
+            >
+              <Icon name="thermometer" size={13} />
+              <span>{avgTemp != null ? `${avgTemp.toFixed(1)}°C` : '--°C'}</span>
+            </div>
+            <div
+              className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-[var(--g1)] border border-[var(--border)] text-[11px] font-medium text-[var(--text)] shadow-2xs"
+              title="Độ ẩm trung bình"
+            >
+              <Icon name="droplet" size={13} />
+              <span>{avgHum != null ? `${avgHum.toFixed(0)}%` : '--%'}</span>
+            </div>
+            {totalDevices !== undefined && totalDevices > 0 && (
+              <div
+                className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[var(--g1)] border border-[var(--border)] text-[11px] font-medium text-[var(--text)] shadow-2xs"
+                title="Trạng thái thiết bị"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                <span>{onlineDevices ?? 0}/{totalDevices} kết nối</span>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -200,12 +236,12 @@ export const DashboardTopBar: React.FC<DashboardTopBarProps> = ({
           </button>
 
           {isAvatarMenuOpen && (
-            <div className="absolute right-0 mt-2 w-56 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xl py-1.5 z-50 animate-in fade-in zoom-in-95 duration-150">
-              <div className="px-4 py-2 border-b border-slate-100 dark:border-slate-800">
-                <p className="truncate text-sm font-bold text-slate-800 dark:text-slate-100">
+            <div className="absolute right-0 mt-2 w-56 rounded-2xl bg-[var(--solid)] border border-[var(--border)] shadow-xl py-1.5 z-50 animate-in fade-in zoom-in-95 duration-150">
+              <div className="px-4 py-2 border-b border-[var(--border)]">
+                <p className="truncate text-sm font-bold text-[var(--text)]">
                   {user.fullName}
                 </p>
-                <p className="truncate text-xs text-muted">{user.email}</p>
+                <p className="truncate text-xs text-[var(--secondary)]">{user.email}</p>
               </div>
 
               <div className="p-1">
@@ -215,21 +251,21 @@ export const DashboardTopBar: React.FC<DashboardTopBarProps> = ({
                     setIsAvatarMenuOpen(false);
                     onOpenProfile();
                   }}
-                  className="w-full text-left px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors flex items-center gap-2 cursor-pointer"
+                  className="w-full text-left px-3 py-2 text-xs font-semibold text-[var(--text)] hover:bg-[var(--g1)] rounded-xl transition-colors flex items-center gap-2 cursor-pointer"
                 >
                   <Sparkles className="w-4 h-4 text-primary" />
                   <span>Hồ sơ & Bảo mật</span>
                 </button>
               </div>
 
-              <div className="border-t border-slate-100 dark:border-slate-800 p-1">
+              <div className="border-t border-[var(--border)] p-1">
                 <button
                   type="button"
                   onClick={() => {
                     setIsAvatarMenuOpen(false);
                     onLogout();
                   }}
-                  className="w-full text-left px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-xl transition-colors flex items-center gap-2 cursor-pointer"
+                  className="w-full text-left px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-500/10 rounded-xl transition-colors flex items-center gap-2 cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                   <span>Đăng xuất</span>

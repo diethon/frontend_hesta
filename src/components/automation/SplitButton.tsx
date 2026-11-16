@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Icon } from '../home/HomeIcons';
+import { Icon } from '../ui/LucideIcon';
 
 export interface SplitButtonProps {
   onAddDevice: () => void;
