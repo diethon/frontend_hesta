@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import { useThree } from '@react-three/fiber';
-import { AdaptiveDpr, Environment, Lightformer, OrbitControls, OrthographicCamera } from '@react-three/drei';
+import { AdaptiveDpr, Environment, Lightformer, OrbitControls, PerspectiveCamera } from '@react-three/drei';
 import { MOUSE, TOUCH } from 'three';
 import type { TwinHouseView, TwinHeatmapMode } from '../../../types/twinView';
 import type { TwinLayoutGeometry, TwinLayoutSelection } from '../../../types/twinLayout';
@@ -43,7 +43,7 @@ export function HouseScene({ house, drafting, activeFloor, mode, wallMode, marke
   const bounds = { centerX: (box.min.x + box.max.x) / 2, centerZ: (box.min.z + box.max.z) / 2, width: box.max.x - box.min.x, depth: box.max.z - box.min.z };
   return <>
     <color attach="background" args={[palette.infoSoft]} />
-    <OrthographicCamera makeDefault zoom={35} near={.05} far={1000} position={[20, 25, 30]} />
+    <PerspectiveCamera makeDefault fov={35} near={.05} far={1000} position={[25, 25, 25]} />
     <AdaptiveDpr />
     <OrbitControls makeDefault enablePan enableDamping dampingFactor={.12} minDistance={2} maxDistance={100} minPolarAngle={CAMERA_MIN_POLAR} maxPolarAngle={CAMERA_MAX_POLAR} rotateSpeed={compact ? .85 : 1} zoomSpeed={.8} mouseButtons={{ LEFT: tool === 'pan' ? MOUSE.PAN : MOUSE.ROTATE, MIDDLE: MOUSE.DOLLY, RIGHT: MOUSE.PAN }} touches={{ ONE: tool === 'pan' ? TOUCH.PAN : TOUCH.ROTATE, TWO: TOUCH.DOLLY_PAN }} onStart={()=>{regress();onCameraInteract();}} />
     <Environment resolution={128} frames={1} environmentIntensity={theme === 'NIGHT' ? .12 : .24}>

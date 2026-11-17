@@ -141,8 +141,28 @@ export function Twin3DView({ geometry, drafting, role, onEdit2D, rendererTheme, 
         <Twin3DErrorBoundary onError={setSceneError}><Twin3DCanvas geometry={geometry} drafting={drafting} activeFloor={resolvedFloor} mode={mode} wallMode={wallMode} markerMode={markerMode} selection={selection} fitRequest={fitRequest} cameraRequest={cameraRequest} focusRoomId={focusRoomId} focusNodeKey={focusNodeKey} compact={compact} palette={palette} theme={theme} heatmapMode={heatmapMode} tool={cameraTool} onSelect={selectInScene} onFocus={focusSelection} onReady={handleReady} onCameraInteract={handleCameraInteract} /></Twin3DErrorBoundary>
         <div className={`v2-scene-topline ${focusRoomId ? 'v2-room-detail' : ''}`}>
           {focusRoomId ? <button type="button" aria-label="Quay lại toàn cảnh" onClick={returnToOverview} className="v2-return-overview"><ArrowLeft size={18} aria-hidden="true" /><span>Quay lại toàn cảnh</span><kbd aria-hidden="true">Esc</kbd></button> : null}
-          <div className="v2-view-selector"><Box size={17} aria-hidden="true" /><strong>Không gian 3D</strong><span className="v2-view-separator" /><Layers2 size={15} aria-hidden="true" /><div className="v2-floor-tabs" role="group" aria-label="Chọn tầng nhanh">{[{ value: 'all' as const, label: 'Tổng thể' }, ...floors.map(floor => ({ value: floor, label: `Tầng ${floor}` }))].map(({ value, label }) => <button key={value} type="button" aria-pressed={value === (mode === 'single' ? resolvedFloor : 'all')} onClick={() => chooseFloor(value)}>{label}</button>)}</div></div>
+          <div className="v2-view-selector">
+            <Box size={17} aria-hidden="true" />
+            <strong>Không gian 3D</strong>
+            <span className="v2-view-separator" />
+            <div className="v2-floor-tabs" role="group" aria-label="Chọn góc nhìn">
+              <button type="button" aria-pressed={activeView === 'isometric'} onClick={() => changeCamera('isometric')}>Phối cảnh</button>
+              <button type="button" aria-pressed={activeView === 'front'} onClick={() => changeCamera('front')}>Mặt trước</button>
+              <button type="button" aria-pressed={activeView === 'top'} onClick={() => changeCamera('top')}>Từ trên</button>
+            </div>
+            <span className="v2-view-separator" />
+            <Layers2 size={15} aria-hidden="true" />
+            <div className="v2-floor-tabs" role="group" aria-label="Chọn tầng nhanh">{[{ value: 'all' as const, label: 'Tổng thể' }, ...floors.map(floor => ({ value: floor, label: `Tầng ${floor}` }))].map(({ value, label }) => <button key={value} type="button" aria-pressed={value === (mode === 'single' ? resolvedFloor : 'all')} onClick={() => chooseFloor(value)}>{label}</button>)}</div>
+          </div>
           {!focusRoomId ? <button type="button" className="v2-overview-button" onClick={returnToOverview}>Toàn cảnh<MoveUpRight size={14} /></button> : null}
+          <button type="button" aria-label={explorerCollapsed && controlsCollapsed ? 'Hiện đầy đủ bảng điều khiển' : 'Mở rộng tối đa không gian 3D'} className="v2-overview-button" onClick={() => {
+            const next = !(explorerCollapsed && controlsCollapsed);
+            setExplorerCollapsed(next);
+            setControlsCollapsed(next);
+          }}>
+            {explorerCollapsed && controlsCollapsed ? 'Thu gọn bảng' : 'Mở rộng xem'}
+            {explorerCollapsed && controlsCollapsed ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+          </button>
         </div>
         <div className="v2-scene-caption"><span>{homeName}</span><p>{focusRoomId ? `Cận cảnh · ${selectedRoomName ?? 'Phòng đang chọn'}` : mode === 'single' ? `Tầng ${resolvedFloor} · ${activeRooms.length} không gian` : mode === 'exploded' ? 'Khám phá không gian · Tách tầng' : 'Architectural dollhouse · Toàn cảnh ngôi nhà'}</p></div>
         <div className="v2-compass" aria-label="La bàn minh họa, không phải hướng đo thực tế"><span>N</span><Compass size={37} strokeWidth={1} /></div>

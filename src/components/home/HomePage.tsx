@@ -43,7 +43,6 @@ import { currentHomeChanged, currentHomeCleared } from "../../store/homeSlice";
 import { useAppDispatch } from "../../store/hooks";
 import { getErrorMessage } from "../../utils/errors";
 import { notify } from '../ui/notify';
-import { ArrowUpRight, Box, Layers3 } from 'lucide-react';
 
 interface HomePageProps {
   user: UserResponse;

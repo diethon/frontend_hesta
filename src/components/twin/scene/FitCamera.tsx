@@ -35,11 +35,11 @@ export function FitCamera({ request, cameraRequest, rooms, room, node }: { reque
     if (command && !zooming) Object.assign(end, cameraAngles(command, start.theta, start.phi));
     else if (model && !zooming) Object.assign(end, nodeFocusAngles(model, start.theta, start.phi));
     end.phi = Math.max(CAMERA_MIN_POLAR, Math.min(CAMERA_MAX_POLAR, end.phi));
-    const distance = camera instanceof PerspectiveCamera ? fitDistance(box, center, end.theta, end.phi, camera.fov, size.width / Math.max(1, size.height)) : Math.max(30, box.getSize(new Vector3()).length() * 2);
+    const distance = camera instanceof PerspectiveCamera ? fitDistance(box, center, end.theta, end.phi, camera.fov, size.width / Math.max(1, size.height)) * (node ? 1 : room ? .85 : .74) : Math.max(30, box.getSize(new Vector3()).length() * 2);
     const control = get().controls as OrbitControlsImpl;
     control.maxDistance = Math.max(24, distance * 3);
     end.radius = camera instanceof OrthographicCamera ? zooming || turning ? start.radius : distance : zooming ? Math.max(control.minDistance, Math.min(control.maxDistance, start.radius * (command === 'zoom-in' ? .8 : 1.25))) : turning ? start.radius : node ? Math.max(DEVICE_FOCUS_MIN_DISTANCE, distance) : distance;
-    const fitZoom = fitOrthographicZoom(box, center, end.theta, end.phi, size.width, size.height);
+    const fitZoom = fitOrthographicZoom(box, center, end.theta, end.phi, size.width, size.height) * (node ? 1 : room ? 1.15 : 1.28);
     control.minZoom = Math.max(.5, fitZoom / 5);
     control.maxZoom = Math.max(300, fitZoom * 5);
     const toZoom = camera instanceof OrthographicCamera ? zooming ? Math.max(control.minZoom, Math.min(control.maxZoom, camera.zoom * (command === 'zoom-in' ? 1.25 : .8))) : turning ? camera.zoom : fitZoom : camera.zoom;

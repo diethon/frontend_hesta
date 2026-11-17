@@ -26,7 +26,7 @@ function loadSource(path) {
   const sourceRequire = (name) => {
     if (!name.startsWith('.')) return require(name);
     const base = resolve(dirname(filename), name);
-    const dependency = ['.ts', '.tsx'].map((ext) => base + ext).find(existsSync);
+    const dependency = existsSync(base) ? base : ['.ts', '.tsx'].map((ext) => base + ext).find(existsSync);
     assert.ok(dependency, `Cannot resolve ${name} from ${path}`);
     return loadSource(dependency);
   };

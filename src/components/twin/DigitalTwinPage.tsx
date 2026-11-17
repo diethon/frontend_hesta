@@ -54,7 +54,6 @@ export function DigitalTwinPage() {
   const { homeId = '' } = useParams<{ homeId: string }>();
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
-  const [navigationOpen, setNavigationOpen] = useState(false);
   const currentUser = useAppSelector((state) => state.auth.user);
 
   useEffect(() => {
@@ -71,8 +70,32 @@ export function DigitalTwinPage() {
       dispatch(currentHomeCleared());
     };
   }, [dispatch, homeId]);
-  return <div className="app-shell">
-    <HomeSidebar activeItem="twin" homeId={homeId} showSystemSummary={false} compact={!navigationOpen} onToggleCompact={() => setNavigationOpen(value => !value)} />
-    <main id="main-content" className={`min-w-0 ${navigationOpen ? 'lg:pl-64' : 'lg:pl-20'}`}><DigitalTwinView homeId={homeId} navigationOpen={navigationOpen} onToggleNavigation={() => setNavigationOpen(value => !value)} /></main>
-  </div>;
+
+  return (
+    <div className="app-shell digital-twin-shell">
+      {/* 3 Pastel glowing meshes matching Figma design */}
+      <div className="mesh mesh-one" />
+      <div className="mesh mesh-two" />
+      <div className="mesh mesh-three" />
+
+      {/* Modern Unified NavRail sidebar */}
+      <DashboardNavRail
+        homeId={homeId}
+        activeItem="twin"
+        user={currentUser || undefined}
+        onSelectOverview={() => navigate('/home')}
+      />
+
+      <main id="main-content">
+        <DigitalTwinView homeId={homeId} />
+      </main>
+
+      {/* Mobile Bottom Navigation */}
+      <DashboardBottomNav
+        homeId={homeId}
+        activeItem="overview"
+        onSelectOverview={() => navigate('/home')}
+      />
+    </div>
+  );
 }
