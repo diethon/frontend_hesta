@@ -1,3 +1,4 @@
+import { confirmDialog } from '../ui/confirmDialog';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Plus,
@@ -129,7 +130,7 @@ export const DeviceGroupSection: React.FC<DeviceGroupSectionProps> = ({
   };
 
   const handleDeleteGroup = async (groupId: string, name: string) => {
-    if (!window.confirm(`Bạn có chắc muốn xóa nhóm "${name}"?`)) return;
+    if (!await confirmDialog({ title: `Xóa nhóm "${name}"?`, confirmText: 'Xóa nhóm', variant: 'danger' })) return;
     if (debounceTimersRef.current[groupId]) {
       clearTimeout(debounceTimersRef.current[groupId]);
       delete debounceTimersRef.current[groupId];

@@ -1,3 +1,4 @@
+import { confirmDialog } from '../ui/confirmDialog';
 import React, { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router';
 import {
@@ -58,9 +59,12 @@ export const SpotlightRecommendationBanner: React.FC<SpotlightRecommendationBann
     if (!homeId || !recommendation) return;
 
     if (action === 'approve') {
-      const confirmed = window.confirm(
-        `Áp dụng thói quen này và thiết lập lịch tự động cho ${recommendation.deviceName || 'thiết bị'}?`
-      );
+      const confirmed = await confirmDialog({
+        title: 'Áp dụng thói quen này?',
+        description: `HESTA sẽ thiết lập lịch tự động cho ${recommendation.deviceName || 'thiết bị'}.`,
+        confirmText: 'Áp dụng',
+        variant: 'primary',
+      });
       if (!confirmed) return;
     }
 

@@ -1,3 +1,4 @@
+import { confirmDialog } from '../ui/confirmDialog';
 import React, { useState, useEffect } from 'react';
 import {
   UploadCloud,
@@ -109,7 +110,7 @@ export const OtaCampaignManager: React.FC = () => {
   };
 
   const handleAbort = async (id: string) => {
-    if (!window.confirm('CẢNH BÁO AN TOÀN: Bạn có chắc chắn muốn ngắt dừng khẩn cấp đợt cập nhật này? Các thiết bị chưa cập nhật sẽ tiếp tục chạy phiên bản hiện tại.')) {
+    if (!await confirmDialog({ title: 'Dừng khẩn cấp đợt cập nhật?', description: 'Các thiết bị chưa cập nhật sẽ tiếp tục chạy phiên bản hiện tại.', confirmText: 'Dừng cập nhật', variant: 'danger' })) {
       return;
     }
     try {

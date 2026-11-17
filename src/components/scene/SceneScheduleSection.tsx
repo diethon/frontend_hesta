@@ -1,3 +1,4 @@
+import { confirmDialog } from '../ui/confirmDialog';
 import React, { useState, useEffect, useCallback } from 'react';
 import { getSchedules, saveSchedule, deleteSchedule } from '../../services/scheduleApi';
 import type { Schedule, ScheduleInput } from '../../types/schedule';
@@ -213,7 +214,7 @@ export const SceneScheduleSection: React.FC<SceneScheduleSectionProps> = ({
 
   // Delete schedule
   const handleDeleteSchedule = async (sch: Schedule) => {
-    if (!window.confirm(`Xóa lịch chạy ${sch.scheduledTime.slice(0, 5)}?`)) return;
+    if (!await confirmDialog({ title: `Xóa lịch chạy ${sch.scheduledTime.slice(0, 5)}?`, description: 'Kịch bản sẽ không còn tự chạy vào giờ này.', confirmText: 'Xóa lịch', variant: 'danger' })) return;
 
     setSchedules((prev) => {
       const next = prev.filter((s) => s.id !== sch.id);

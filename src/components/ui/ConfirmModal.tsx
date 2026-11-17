@@ -1,5 +1,6 @@
-import React from 'react';
-import { Trash2, AlertTriangle, Loader2 } from 'lucide-react';
+import React, { useEffect, useId, useRef, useState } from 'react';
+import { AlertTriangle, Info, Loader2, Trash2 } from 'lucide-react';
+import { subscribeConfirmDialog, type ConfirmRequest, type ConfirmVariant } from './confirmDialog';
 
 interface ConfirmModalProps {
   isOpen: boolean;
@@ -7,11 +8,17 @@ interface ConfirmModalProps {
   description: string;
   confirmText?: string;
   cancelText?: string;
-  variant?: 'danger' | 'warning' | 'primary';
+  variant?: ConfirmVariant;
   loading?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }
+
+const tones: Record<ConfirmVariant, { icon: React.ReactNode; badge: string; button: string }> = {
+  danger: { icon: <Trash2 size={22} aria-hidden="true" />, badge: 'bg-error-soft text-error', button: 'bg-error text-text hover:brightness-95' },
+  warning: { icon: <AlertTriangle size={22} aria-hidden="true" />, badge: 'bg-warning-soft text-text', button: 'bg-warning text-text hover:brightness-95' },
+  primary: { icon: <Info size={22} aria-hidden="true" />, badge: 'bg-info-soft text-primary-hover', button: 'bg-primary text-text hover:bg-primary-hover' },
+};
 
 export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   isOpen,
@@ -24,59 +31,79 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   onConfirm,
   onCancel,
 }) => {
+  const titleId = useId();
+  const descriptionId = useId();
+  const panel = useRef<HTMLDivElement>(null);
+  const cancelButton = useRef<HTMLButtonElement>(null);
+  const confirmButton = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const previous = document.activeElement as HTMLElement | null;
+    // Destructive actions start on "Hủy" so Enter never deletes by accident.
+    (variant === 'danger' ? cancelButton : confirmButton).current?.focus();
+    return () => previous?.focus?.();
+  }, [isOpen, variant]);
+
   if (!isOpen) return null;
+  const tone = tones[variant];
+
+  const onKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key === 'Escape' && !loading) { event.stopPropagation(); onCancel(); return; }
+    if (event.key !== 'Tab') return;
+    const focusable = [...(panel.current?.querySelectorAll<HTMLButtonElement>('button:not([disabled])') ?? [])];
+    if (!focusable.length) return;
+    const first = focusable[0], last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+  };
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
-      onClick={onCancel}
-    >
+    <div className="fixed inset-0 z-[100] flex items-end justify-center bg-text/25 p-4 backdrop-blur-sm sm:items-center" onClick={() => { if (!loading) onCancel(); }}>
       <div
-        className="surface-card w-full max-w-md p-6 rounded-3xl border border-line shadow-2xl space-y-5 animate-in zoom-in-95 duration-200 bg-surface text-text"
-        onClick={(e) => e.stopPropagation()}
+        ref={panel}
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={description ? descriptionId : undefined}
+        onKeyDown={onKeyDown}
+        onClick={(event) => event.stopPropagation()}
+        className="w-full max-w-md rounded-3xl border border-line bg-surface p-6 text-text shadow-float"
       >
         <div className="flex items-start gap-4">
-          <div
-            className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${
-              variant === 'danger'
-                ? 'bg-rose-500/15 text-rose-600 border border-rose-500/30'
-                : 'bg-amber-500/15 text-amber-600 border border-amber-500/30'
-            }`}
-          >
-            {variant === 'danger' ? <Trash2 size={22} /> : <AlertTriangle size={22} />}
-          </div>
-          <div className="space-y-1 min-w-0 flex-1">
-            <h3 className="text-base font-bold text-text leading-tight">{title}</h3>
-            <p className="text-xs text-muted leading-relaxed">{description}</p>
+          <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${tone.badge}`}>{tone.icon}</span>
+          <div className="min-w-0 flex-1 pt-1">
+            <h2 id={titleId} className="text-base font-semibold leading-snug text-text">{title}</h2>
+            {description ? <p id={descriptionId} className="mt-1.5 text-sm leading-relaxed text-muted">{description}</p> : null}
           </div>
         </div>
-
-        <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-line">
-          <button
-            type="button"
-            disabled={loading}
-            onClick={onCancel}
-            className="px-4 py-2 rounded-xl text-xs font-bold text-muted hover:text-text hover:bg-sidebar transition-colors disabled:opacity-50 cursor-pointer"
-          >
+        <div className="mt-6 grid grid-cols-2 gap-2 sm:flex sm:justify-end">
+          <button ref={cancelButton} type="button" disabled={loading} onClick={onCancel} className="min-h-11 rounded-xl border border-line bg-surface px-4 text-sm font-semibold text-text hover:bg-sidebar-hover disabled:opacity-50">
             {cancelText}
           </button>
-          <button
-            type="button"
-            disabled={loading}
-            onClick={onConfirm}
-            className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white shadow-xs transition-all active:scale-98 disabled:opacity-50 cursor-pointer ${
-              variant === 'danger'
-                ? 'bg-rose-600 hover:bg-rose-700 shadow-rose-600/20'
-                : 'bg-primary hover:bg-primary-hover shadow-primary/20'
-            }`}
-          >
-            {loading && <Loader2 size={13} className="animate-spin" />}
-            <span>{confirmText}</span>
+          <button ref={confirmButton} type="button" disabled={loading} onClick={onConfirm} className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold disabled:opacity-50 ${tone.button}`}>
+            {loading ? <Loader2 size={15} className="animate-spin" aria-hidden="true" /> : null}
+            {confirmText}
           </button>
         </div>
       </div>
     </div>
   );
 };
+
+/** Mount once near the app root; serves every confirmDialog() call. */
+export function ConfirmDialogHost() {
+  const [request, setRequest] = useState<ConfirmRequest | null>(null);
+  useEffect(() => subscribeConfirmDialog((next) => setRequest((previous) => { previous?.resolve(false); return next; })), []);
+  const close = (confirmed: boolean) => { request?.resolve(confirmed); setRequest(null); };
+  return <ConfirmModal
+    isOpen={!!request}
+    title={request?.title ?? ''}
+    description={request?.description ?? ''}
+    confirmText={request?.confirmText ?? 'Đồng ý'}
+    cancelText={request?.cancelText ?? 'Hủy'}
+    variant={request?.variant ?? 'primary'}
+    onConfirm={() => close(true)}
+    onCancel={() => close(false)}
+  />;
+}

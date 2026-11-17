@@ -1,3 +1,4 @@
+import { confirmDialog } from '../ui/confirmDialog';
 import React, { useState, useEffect } from 'react';
 import { getHomeMembers, updateMemberRole, removeMember, generateInvitation } from '../../services/homeApi';
 import type { HomeMember, InvitationResponse } from '../../services/homeApi';
@@ -56,7 +57,7 @@ export const MemberManagement: React.FC<MemberManagementProps> = ({ homeId, curr
   };
 
   const handleRemove = async (memberId: string) => {
-    if (!window.confirm('Bạn có chắc chắn muốn xóa thành viên này?')) return;
+    if (!await confirmDialog({ title: 'Xóa thành viên này?', description: 'Người này sẽ mất quyền truy cập ngôi nhà.', confirmText: 'Xóa thành viên', variant: 'danger' })) return;
     try {
       await removeMember(homeId, memberId);
       void fetchMembers();
