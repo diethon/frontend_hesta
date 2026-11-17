@@ -121,13 +121,15 @@ function Shower() {
   </group>
 }
 
-function TV({ board = false }: { board?: boolean }) {
+function TV({ board = false, screen = true }: { board?: boolean; screen?: boolean }) {
   return board ? <group>
     <group scale={[1.8, .55, 1]}><Cabinet drawers /></group>
+    {screen ? <>
     <Block position={[0, 1.09, -.13]} size={[1.45, .82, .055]} color={palette.dark} rounded />
     <Block position={[0, 1.09, -.098]} size={[1.37, .74, .005]} color={palette.screen} roughness={.22} />
     <Block position={[0, .565, -.1]} size={[.34, .02, .16]} color={palette.metal} />
     <Rod from={[0, .57, -.13]} to={[0, .72, -.13]} radius={.018} />
+    </> : null}
   </group> : <group>
     <Block position={[0, .5, 0]} size={[1.78, 1, .065]} color={palette.dark} rounded />
     <Block position={[0, .5, .036]} size={[1.69, .91, .005]} color={palette.screen} roughness={.22} />
@@ -157,7 +159,7 @@ function Car() {
   </group>
 }
 
-function Asset({ type }: { type: string }) {
+function Asset({ type, hideScreen = false }: { type: string; hideScreen?: boolean }) {
   switch (type) {
     case 'sofa': return <Sofa position={[0, 0, 0]} />
     case 'armchair': return <LoungeChair />
@@ -180,7 +182,7 @@ function Asset({ type }: { type: string }) {
     case 'bathtub': return <Bathtub />
     case 'shower': return <Shower />
     case 'wc': return <Toilet />
-    case 'tv_board': return <TV board />
+    case 'tv_board': return <TV board screen={!hideScreen} />
     case 'tv_wall': return <TV />
     case 'plant': return <Plant position={[0, 0, 0]} />
     case 'rug': return <Cloth position={[0, .02, 0]} width={1} depth={1} color={palette.fabric} />
@@ -197,7 +199,8 @@ function Asset({ type }: { type: string }) {
  * the editor; their props/taps/screens can extend above that height.
  * Caller owns pointer selection; this component owns item placement only.
  */
-export const V2Furniture = memo(function V2Furniture({ item }: { item: Furniture }) {
+/** `hideScreen`: the room has a real TV device, so the stand must not show a second, static TV. */
+export const V2Furniture = memo(function V2Furniture({ item, hideScreen = false }: { item: Furniture; hideScreen?: boolean }) {
   const fitted = useRef<Group>(null)
   const source = useRef<Group>(null)
   const invalidate = useThree(state => state.invalidate)
@@ -234,6 +237,6 @@ export const V2Furniture = memo(function V2Furniture({ item }: { item: Furniture
   }, [item.w, item.d, item.h, item.type, item.variant, invalidate])
   if (!hasV2Furniture(item.type)) return null
   return <group name={`v2-furniture:${item.id}`} position={[item.x, item.mount_y ?? builtinBase(item), item.z]} rotation={[0, -item.rotation * Math.PI / 180, 0]}>
-    <group ref={fitted}><group ref={source}><Asset type={item.type} /></group></group>
+    <group ref={fitted}><group ref={source}><Asset type={item.type} hideScreen={hideScreen} /></group></group>
   </group>
 })

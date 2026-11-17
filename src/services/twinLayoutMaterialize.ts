@@ -7,6 +7,29 @@ import { locateOnWalls, generateWalls } from '../components/twin/neonplan/geomet
 const kinds: Record<string, TwinSceneObject['kind']> = { table:'TABLE',coffee_table:'TABLE',sofa:'SOFA',armchair:'CHAIR',bed:'BED',nightstand:'CABINET',wardrobe:'WARDROBE',chair:'CHAIR',office_chair:'CHAIR',desk:'DESK',shelf:'CABINET',tv_board:'TV_STAND',kitchen:'KITCHEN_COUNTER',sink:'SINK',washbasin:'SINK',wc:'TOILET',shower:'SHOWER',bathtub:'BATHTUB',plant:'PLANT',fridge:'REFRIGERATOR',lamp_floor:'LAMP',car:'CABINET',stove:'KITCHEN_COUNTER',table_round:'TABLE',sideboard:'CABINET' };
 const variants = new Set(['armchair','coffee_table','nightstand','office_chair','shelf','washbasin']);
 
+const isIllustration = (id: string) => id.includes(':illustration:');
+
+/**
+ * Frozen illustration furniture keeps metre positions from the old room size. For rooms whose size
+ * or outline changed, drop those generated items so Save re-furnishes them for the new shape.
+ * Hand-placed objects are kept, and rooms the owner left without generated furniture stay as they are.
+ */
+export function refreshResizedFurniture(metadata: TwinDraftingMetadata, saved: TwinDraftingMetadata, geometry: TwinLayoutGeometry, savedGeometry: TwinLayoutGeometry): TwinDraftingMetadata {
+  const rooms = { ...metadata.rooms };
+  let changed = false;
+  for (const room of geometry.rooms) {
+    const before = savedGeometry.rooms.find((item) => item.roomId === room.roomId);
+    const current = roomDrafting(metadata, room.roomId);
+    if (!before || current.autoFurniture !== false || !current.objects?.some((item) => isIllustration(item.id))) continue;
+    const reshaped = before.width !== room.width || before.height !== room.height
+      || JSON.stringify(current.points) !== JSON.stringify(roomDrafting(saved, room.roomId).points);
+    if (!reshaped) continue;
+    rooms[room.roomId] = { ...current, autoFurniture: true, objects: current.objects.filter((item) => !isIllustration(item.id)) };
+    changed = true;
+  }
+  return changed ? { ...metadata, rooms } : metadata;
+}
+
 /** Freeze inferred furniture/openings into the same revisioned backend document on explicit Save. */
 export function materializeTwinArchitecture(homeId: string, geometry: TwinLayoutGeometry, metadata: TwinDraftingMetadata, names: Record<string,string>): TwinArchitecture {
   const result = architectureFromDrafting(metadata, geometry);

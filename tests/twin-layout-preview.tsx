@@ -109,6 +109,7 @@ const modelDevices = [
     { deviceId: 'named-table-lamp', name: 'Đèn bàn phòng ngủ', deviceType: 'LIGHT', roomId: 'bedroom' },
     { deviceId: 'named-fan', name: 'Quạt đứng', deviceType: 'FAN', roomId: 'bedroom' },
   ] : []),
+  ...(query.has('roller') ? [{ deviceId: 'roller', name: 'Cửa cuốn', deviceType: 'ROLLING_DOOR', roomId: 'kitchen' }] : []),
 ].map((d) => ({ ...d, icon: null, status: 'ONLINE' as const, currentState: { power: 'ON', open: false, position: 0, speed: 30, temperature: 23, fan: 'HIGH', swing: true }, lastSeen: '2026-09-18T08:00:00Z', healthStatus: 'ACTIVE' as const }));
 const demoSnapshot = multiFloor ? multiFloorSnapshot : extraModels ? { ...referenceSnapshot, rooms: referenceSnapshot.rooms.map((room) => ({ ...room, devices: [...room.devices, ...modelDevices.filter((d) => d.roomId === room.roomId)] })) } : referenceSnapshot;
 const demoLayout = multiFloor ? multiFloorLayout : extraModels ? { ...referenceLayout, nodes: [...referenceLayout.nodes, ...modelDevices.map((d, index) => ({ nodeType: 'DEVICE' as const, nodeId: d.deviceId, roomId: d.roomId, x: d.roomId === 'bedroom' ? .75 : .15 + index % 3 * .12, y: d.roomId === 'kitchen' ? .7 : .22 + index % 2 * .14 }))] } : referenceLayout;

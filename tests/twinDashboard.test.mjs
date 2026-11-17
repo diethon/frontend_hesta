@@ -101,6 +101,9 @@ test('real garage and garden rooms receive appropriate illustrative furnishings 
   assert.ok(garden.some(item => item.type === 'plant'));
   assert.ok([...garage, ...garden].every(item => item.type !== 'sofa' && item.type !== 'bed'));
   assert.equal(result.floor.rooms[0].floor_material, 'concrete');
+  const garageOpenings = result.floor.openings.filter(opening => opening.room_id === 'garage-id');
+  assert.ok(garageOpenings.some(opening => opening.type === 'door' && opening.sill === 0 && opening.width > 2), 'garage gets a floor-level vehicle opening for a roller door');
+  assert.ok(garageOpenings.every(opening => opening.type !== 'window'));
   const authored = adaptTwinArchitecture(floor, { rooms: { 'garden-id': { autoFurniture: false, objects: [] }, 'garage-id': { autoFurniture: false, objects: [] } } }, names);
   assert.equal(authored.floor.furniture.length, 0);
   assert.deepEqual(authored.floor.rooms[1].wall_heights, [2.6, 2.6, 2.6, 2.6]);

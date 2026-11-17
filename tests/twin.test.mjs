@@ -118,7 +118,7 @@ test('Twin commands prevent duplicates, wait for ACK and do not overwrite confir
   let acknowledge;
   apiClient.defaults.adapter = (config) => {
     requests.push(config);
-    return new Promise((resolve) => { acknowledge = () => resolve(response(config, { command: { success: true, status: 'SUCCESS' } })); });
+    return new Promise((resolve) => { acknowledge = () => resolve(response(config, { success: true, status: 'SUCCESS' })); });
   };
   const task = store.dispatch(executeTwinCommand({ homeId, deviceId, command: { action: 'TURN_ON' } }));
   await new Promise(setImmediate);
@@ -127,8 +127,8 @@ test('Twin commands prevent duplicates, wait for ACK and do not overwrite confir
   const duplicate = await store.dispatch(executeTwinCommand({ homeId, deviceId, command: { action: 'TURN_OFF' } }));
   assert.equal(duplicate.meta.condition, true);
   assert.equal(requests.length, 2); // initial snapshot + one command
-  assert.equal(requests[1].url, `/devices/${deviceId}/commands`);
-  assert.deepEqual(JSON.parse(requests[1].data), { action: 'TURN_ON' });
+  assert.equal(requests[1].url, `/devices/${deviceId}/command`);
+  assert.deepEqual(JSON.parse(requests[1].data), { action: 'TURN_ON', parameters: {} });
   emit(store, { ...deviceEvent, data: { ...deviceEvent.data, currentState: { power: 'OFF' }, lastSeen: later }, timestamp: later });
   const confirmed = store.getState().twin;
   acknowledge(); await task;
@@ -253,13 +253,16 @@ test('realtime accepts every current device type without rewriting it or mixing 
 test('device icons in twin distinguish the current sensor, plug, remote and camera types', () => {
   const { DeviceGlyph } = loadSource('src/components/twin/TwinVisualIcon.tsx');
   const icons = {
-    LIGHT: 'lightbulb', LED_RGB: 'lightbulb', SMART_PLUG: 'plug-zap', IR_REMOTE: 'radio',
-    TEMP_HUMID_SENSOR: 'thermometer', MOTION_SENSOR: 'activity', SMOKE_SENSOR: 'flame', CAMERA_AI: 'camera',
+    LIGHT: 'lamp-ceiling', LED_RGB: 'lightbulb', SMART_PLUG: 'plug', IR_REMOTE: 'radio', TV: 'tv', ROLLING_DOOR: 'warehouse',
+    TEMP_HUMID_SENSOR: 'thermometer', MOTION_SENSOR: 'activity', SMOKE_SENSOR: 'siren', CAMERA_AI: 'cctv',
   };
   for (const [deviceType, icon] of Object.entries(icons)) {
     const html = renderToString(React.createElement(DeviceGlyph, { deviceType }));
     assert.ok(html.includes(`lucide-${icon}`), deviceType);
   }
+  // The name refines generic bridges, the same way the 3D model is chosen.
+  assert.ok(renderToString(React.createElement(DeviceGlyph, { deviceType: 'IR_REMOTE', name: 'Điều hòa phòng khách' })).includes('lucide-air-vent'));
+  assert.ok(renderToString(React.createElement(DeviceGlyph, { deviceType: 'LIGHT', name: 'Đèn bàn phòng ngủ' })).includes('lucide-lamp-desk'));
 });
 
 test('backend snapshot normalizes rooms, devices and exact canonical sensor IDs; authenticated API uses code 1000', async () => {

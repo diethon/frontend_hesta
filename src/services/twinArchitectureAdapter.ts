@@ -131,10 +131,13 @@ export function adaptTwinArchitecture(view: TwinFloorView, metadata: TwinDraftin
     const candidates = walls.filter((wall) => wall.sources.some((s) => s.room_id === room.id) && Math.hypot(wall.b[0] - wall.a[0], wall.b[1] - wall.a[1]) > 1.4);
     const doorWall = candidates.find((wall) => !wall.exterior && !occupied.has(wall.id)) ?? candidates.find((wall) => !occupied.has(wall.id));
     const windowWall = [...candidates].reverse().find((wall) => wall.exterior && !occupied.has(wall.id) && wall !== doorWall);
-    for (const [wall, type] of [[doorWall, 'door'], [windowWall, 'window']] as const) {
+    // A garage's outside wall gets a floor-level vehicle opening (where a roller door binds) instead of a window.
+    const garage = twinRoomCategory(room.name) === 'garage';
+    for (const [wall, kind] of [[doorWall, 'door'], [windowWall, garage ? 'garage-door' : 'window']] as const) {
       if (!wall) continue;
       const src = wall.sources.find((s) => s.room_id === room.id)!;
-      const opening: Opening = { id: `${room.id}:illustration:${type}`, room_id: room.id, edge: src.edge, offset: (src.t0 + src.t1) / 2, width: Math.min(type === 'door' ? .9 : 3, src.t1 - src.t0 - .4), type, sill: type === 'door' ? 0 : .65, height: type === 'door' ? 2.1 : 1.4, hinge: 'left', swing: 'in', leaves: type === 'door' ? 1 : 2 };
+      const type = kind === 'window' ? 'window' : 'door';
+      const opening: Opening = { id: `${room.id}:illustration:${kind}`, room_id: room.id, edge: src.edge, offset: (src.t0 + src.t1) / 2, width: Math.min(kind === 'door' ? .9 : 3, src.t1 - src.t0 - .4), type, sill: type === 'door' ? 0 : .65, height: kind === 'door' ? 2.1 : kind === 'garage-door' ? 2.2 : 1.4, hinge: 'left', swing: 'in', leaves: kind === 'window' ? 2 : 1 };
       floor.openings.push(opening); occupied.add(wall.id);
     }
     // Keep stored point order: the MIT wall generator handles either winding.

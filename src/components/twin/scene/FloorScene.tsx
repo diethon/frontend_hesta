@@ -24,6 +24,7 @@ import { TwinCutawayContext } from './TwinCutawayContext';
 import { themeMaterial, themeIndex, type TwinRendererTheme } from './rendererTheme';
 import { useTwinResource } from '../hooks/useTwinResource';
 import { resolveDeviceAppearance } from '../devices/deviceAppearance';
+import { devicePlacement } from './devicePlacement';
 import { ApartmentFoundation } from '../interior/ApartmentFoundation';
 import { Block } from '../interior/ApartmentInterior';
 import { readApartmentPalette } from '../interior/apartmentPalette';
@@ -75,12 +76,30 @@ export const FloorScene = memo(function FloorScene({ floor, drafting, selection,
     const types = new Map<string, string>(JSON.parse(deviceTypes));
     for (const node of floor.nodes) {
       const type = types.get(node.nodeId);
-      if (!type || !['door', 'window', 'curtain'].includes(type)) continue;
-      const opening = built.openings.filter((info) => info.opening.room_id === node.roomId && info.opening.type === (type === 'door' ? 'door' : 'window') && !occupied.has(info.opening.id)).sort((a, b) => Math.hypot(a.start[0] + a.axis[0] * a.width / 2 - node.x, a.start[1] + a.axis[1] * a.width / 2 - node.z) - Math.hypot(b.start[0] + b.axis[0] * b.width / 2 - node.x, b.start[1] + b.axis[1] * b.width / 2 - node.z))[0];
+      if (!type || !['door', 'roller-door', 'window', 'curtain'].includes(type)) continue;
+      const opening = built.openings.filter((info) => info.opening.room_id === node.roomId && info.opening.type === (type === 'door' || type === 'roller-door' ? 'door' : 'window') && !occupied.has(info.opening.id)).sort((a, b) => (type === 'roller-door' ? b.width - a.width : 0) || Math.hypot(a.start[0] + a.axis[0] * a.width / 2 - node.x, a.start[1] + a.axis[1] * a.width / 2 - node.z) - Math.hypot(b.start[0] + b.axis[0] * b.width / 2 - node.x, b.start[1] + b.axis[1] * b.width / 2 - node.z))[0];
       if (opening) { result.set(node.nodeId, opening); occupied.add(opening.opening.id); }
     }
     return result;
   }, [built, floor.nodes, deviceTypes]);
+  // Wall position of the first real TV per room; that room's TV stand moves under it.
+  const tvRooms = useMemo(() => {
+    const kinds = new Map<string, string>(JSON.parse(deviceTypes));
+    const result = new Map<string, { x: number; z: number; rotation: number }>();
+    for (const node of floor.nodes) {
+      if (kinds.get(node.nodeId) !== 'tv' || !node.roomId || result.has(node.roomId)) continue;
+      const placement = devicePlacement(node, floor.rooms.find((room) => room.roomId === node.roomId), 'TV', drafting.nodeRotations?.[`DEVICE:${node.nodeId}`] ?? 0);
+      result.set(node.roomId, placement);
+    }
+    return result;
+  }, [floor.nodes, floor.rooms, deviceTypes, drafting.nodeRotations]);
+  const underTv = (item: typeof furniture[number]) => {
+    const tv = item.type === 'tv_board' ? tvRooms.get(architecture.furnitureRooms.get(item.id) ?? '') : undefined;
+    if (!tv) return item;
+    // The TV hangs .14 m off the wall facing the room; the stand's back goes against that wall.
+    const fromWall = Math.max(item.d / 2 + .02 - .14, 0);
+    return { ...item, x: tv.x + Math.sin(tv.rotation) * fromWall, z: tv.z + Math.cos(tv.rotation) * fromWall, rotation: -tv.rotation * 180 / Math.PI };
+  };
   const roomNodeGroups = useMemo(() => floor.rooms.map((room) => ({ room, architectureRoom: architecture.floor.rooms.find((item) => item.id === room.roomId), nodes: floor.nodes.filter((node) => node.roomId === room.roomId) })), [floor.rooms, floor.nodes, architecture.floor.rooms]);
   const unassignedNodes = useMemo(() => floor.nodes.filter((node) => !floor.rooms.some((room) => room.roomId === node.roomId)), [floor.rooms, floor.nodes]);
   const openings = useMemo(() => buildOpeningParts(built.openings.filter((info) => ![...openingBindings.values()].includes(info)), new Map(), architecture.floor.cut_height), [built, architecture, openingBindings]);
@@ -138,7 +157,7 @@ export const FloorScene = memo(function FloorScene({ floor, drafting, selection,
     <mesh geometry={openings.blinds} material={materials.blinds} raycast={() => undefined} />
     <mesh geometry={lamps} castShadow><meshStandardMaterial vertexColors roughness={.75} /></mesh>
     {rugs.map((rug) => <group key={rug.id} position={[rug.x, .02, rug.z]} rotation={[0, -rug.rotation * Math.PI / 180, 0]}><Block at={[0, 0, 0]} size={[rug.w, rug.h, rug.d]} radius={.1} color={interiorPalette.rug} /></group>)}
-    {furniture.map((item) => hasV2Furniture(item.type) ? <group key={item.id} name={`interior:${item.id}`} userData={{ interiorModel: item.type, roomId: architecture.furnitureRooms.get(item.id) }} onClick={event => { const id = architecture.furnitureRooms.get(item.id); if (event.delta > 3 || !id) return; event.stopPropagation(); onSelect({ kind: 'room', id }); }} onDoubleClick={event => { const id = architecture.furnitureRooms.get(item.id); if (!id) return; event.stopPropagation(); onFocus({ kind: 'room', id }); }}><V2Furniture item={item} /></group> : <InteriorFurniture key={item.id} item={item} palette={interiorPalette} roomId={architecture.furnitureRooms.get(item.id)} onSelect={(id) => onSelect({ kind: 'room', id })} onFocus={(id) => onFocus({ kind: 'room', id })} />)}
+    {furniture.map((item) => hasV2Furniture(item.type) ? <group key={item.id} name={`interior:${item.id}`} userData={{ interiorModel: item.type, roomId: architecture.furnitureRooms.get(item.id) }} onClick={event => { const id = architecture.furnitureRooms.get(item.id); if (event.delta > 3 || !id) return; event.stopPropagation(); onSelect({ kind: 'room', id }); }} onDoubleClick={event => { const id = architecture.furnitureRooms.get(item.id); if (!id) return; event.stopPropagation(); onFocus({ kind: 'room', id }); }}><V2Furniture item={underTv(item)} hideScreen={item.type === 'tv_board' && tvRooms.has(architecture.furnitureRooms.get(item.id) ?? '')} /></group> : <InteriorFurniture key={item.id} item={item} palette={interiorPalette} roomId={architecture.furnitureRooms.get(item.id)} onSelect={(id) => onSelect({ kind: 'room', id })} onFocus={(id) => onFocus({ kind: 'room', id })} />)}
     {roomNodeGroups.map(({ room, nodes, architectureRoom }) => <RoomMarkerCluster key={room.roomId} room={room} nodes={nodes} selection={selection} markerMode={markerMode} onFocus={onFocus}>
       {architectureRoom ? <RoomScene room={architectureRoom} selected={selection?.kind === 'room' && selection.id === room.roomId} showLabel={showLabels} palette={palette} heatmapMode={heatmapMode} onSelect={onSelect} onFocus={onFocus} /> : null}
       {nodes.map((node) => {
