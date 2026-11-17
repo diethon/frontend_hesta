@@ -1,10 +1,9 @@
 import { useRef } from 'react';
-import { useFrame, useThree } from '@react-three/fiber';
 import { RoundedBox } from '@react-three/drei';
 import { DoubleSide, Group } from 'three';
 import type { DeviceModelProps } from './models';
-import { boundedPercent, fanSpeed, lightColor } from './deviceVisualState';
-import { useReducedMotion } from '../useTwinMotion';
+import { boundedPercent, lightColor } from './deviceVisualState';
+import { useFanSpin } from './deviceMotion';
 import { LampEmitter } from './LampEmitter';
 
 export function CeilingLightModel(props: DeviceModelProps) {
@@ -30,9 +29,8 @@ export function LedStripModel({ device, palette }: DeviceModelProps) {
   return <group><mesh castShadow><boxGeometry args={[1.15, .055, .035]} /><meshStandardMaterial color={palette.metal} /></mesh><mesh position={[0, 0, .022]}><boxGeometry args={[1.1, .035, .015]} /><meshStandardMaterial color={device.powered ? color : palette.off} emissive={color} emissiveIntensity={device.powered ? brightness * 2 : 0} toneMapped={false} /></mesh>{device.powered && brightness > 0 ? <pointLight position={[0, 0, .2]} color={color} intensity={brightness * 9} distance={5} decay={2} /> : null}</group>;
 }
 export function StandingFanModel({ device, palette }: DeviceModelProps) {
-  const blades = useRef<Group>(null), reduced = useReducedMotion(), invalidate = useThree((state) => state.invalidate);
-  const speed = fanSpeed(device);
-  useFrame((_, delta) => { if (device.powered && !reduced && blades.current && speed > 0) { blades.current.rotation.z += Math.min(delta, .05) * (2 + speed / 8); invalidate(); } });
+  const blades = useRef<Group>(null);
+  useFanSpin(() => blades.current, device, 'z', (speed) => 2 + speed / 8);
   return <group>
     <mesh position={[0, .035, 0]} castShadow><cylinderGeometry args={[.25, .28, .07, 24]} /><meshStandardMaterial color={palette.surface} /></mesh>
     <mesh position={[0, .57, 0]} castShadow><cylinderGeometry args={[.025, .035, 1.1, 12]} /><meshStandardMaterial color={palette.metal} /></mesh>

@@ -1,5 +1,5 @@
 export type DeviceModelKind = 'ceiling-light' | 'pendant-light' | 'floor-lamp' | 'table-lamp' | 'wall-light' | 'led-strip'
-  | 'ceiling-fan' | 'standing-fan' | 'ac' | 'tv' | 'camera' | 'door' | 'window' | 'curtain' | 'plug' | 'remote'
+  | 'ceiling-fan' | 'standing-fan' | 'ac' | 'tv' | 'camera' | 'door' | 'roller-door' | 'window' | 'curtain' | 'plug' | 'remote'
   | 'climate-sensor' | 'motion-sensor' | 'smoke-sensor' | 'generic';
 export type DeviceMount = 'ceiling' | 'wall' | 'floor' | 'table' | 'opening';
 export interface DeviceAppearance { kind: DeviceModelKind; mount: DeviceMount; label: string; source: 'type' | 'name' | 'fallback' }
@@ -17,6 +17,7 @@ const appearances: Record<DeviceModelKind, Definition> = {
   tv: { kind: 'tv', mount: 'wall', label: 'TV' },
   camera: { kind: 'camera', mount: 'wall', label: 'Camera' },
   door: { kind: 'door', mount: 'opening', label: 'Cửa' },
+  'roller-door': { kind: 'roller-door', mount: 'opening', label: 'Cửa cuốn' },
   window: { kind: 'window', mount: 'opening', label: 'Cửa sổ' },
   curtain: { kind: 'curtain', mount: 'opening', label: 'Rèm' },
   plug: { kind: 'plug', mount: 'wall', label: 'Ổ cắm thông minh' },
@@ -38,10 +39,11 @@ const lightVariant = (name: string, fallback: DeviceModelKind): DeviceModelKind 
 };
 const fanVariant = (name: string): DeviceModelKind => /\b(quat dung|quat cay|quat ban|standing fan|pedestal fan|floor fan|desk fan)\b/.test(name) ? 'standing-fan' : 'ceiling-fan';
 const knownTypes: Record<string, DeviceModelKind> = {
-  AC: 'ac', AIR_CONDITIONER: 'ac', TV: 'tv', CAMERA: 'camera', CAMERA_AI: 'camera', DOOR: 'door', GATE: 'door', ROLLING_DOOR: 'door', LOCK: 'door',
+  AC: 'ac', AIR_CONDITIONER: 'ac', TV: 'tv', CAMERA: 'camera', CAMERA_AI: 'camera', DOOR: 'door', GATE: 'door', ROLLING_DOOR: 'roller-door', SHUTTER: 'roller-door', LOCK: 'door',
   WINDOW: 'window', CURTAIN: 'curtain', BLIND: 'curtain', TEMP_HUMID_SENSOR: 'climate-sensor', SENSOR: 'climate-sensor',
   MOTION_SENSOR: 'motion-sensor', SMOKE_SENSOR: 'smoke-sensor',
 };
+const isRollerName = (name: string) => /\b(cua cuon|roller door|roller shutter|rolling door|shutter)\b/.test(name);
 function fromName(name: string): DeviceModelKind | null {
   if (/\b(cam bien|sensor)\b/.test(name)) {
     if (/\b(khoi|smoke|gas)\b/.test(name)) return 'smoke-sensor';
@@ -55,6 +57,7 @@ function fromName(name: string): DeviceModelKind | null {
   if (/\b(tivi|ti vi|tv|television)\b/.test(name)) return 'tv';
   if (/\b(rem|curtain|blind)\b/.test(name)) return 'curtain';
   if (/\b(cua so|window)\b/.test(name)) return 'window';
+  if (isRollerName(name)) return 'roller-door';
   if (/\b(cua|cong|door|gate)\b/.test(name)) return 'door';
   return null;
 }
@@ -65,6 +68,8 @@ export function resolveDeviceAppearance(type: string, name = ''): DeviceAppearan
   const normalizedName = normalize(name);
   if (normalizedType === 'LIGHT' || normalizedType === 'LED_RGB') return { ...appearances[lightVariant(normalizedName, normalizedType === 'LED_RGB' ? 'led-strip' : 'ceiling-light')], source: 'type' };
   if (normalizedType === 'FAN') return { ...appearances[fanVariant(normalizedName)], source: 'type' };
+  // Door/gate types keep a type source but render as a roller shutter when the name says so.
+  if ((normalizedType === 'DOOR' || normalizedType === 'GATE') && isRollerName(normalizedName)) return { ...appearances['roller-door'], source: 'type' };
   if (knownTypes[normalizedType]) return { ...appearances[knownTypes[normalizedType]], source: 'type' };
   // IR bridges and smart plugs may be named after their connected appliance.
   const inferred = fromName(normalizedName);
