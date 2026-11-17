@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router';
+import { AlertCircle, ArrowRight, Eye, EyeOff, LockKeyhole, Mail } from 'lucide-react';
 import { loginUser, loginWithGoogle } from '../../services/authApi';
 import type { AuthResponse, LoginRequest } from '../../types/auth';
 import { getErrorMessage } from '../../utils/errors';
@@ -92,59 +93,63 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
     setError(errorMsg);
   };
 
+  const inputClass = 'w-full rounded-xl border border-line bg-surface py-3 pl-11 pr-4 text-sm text-text outline-none transition-colors placeholder:text-muted focus:border-primary focus:ring-2 focus:ring-primary/30';
+  const spinner = (
+    <svg aria-hidden={true} className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+    </svg>
+  );
+
   return (
     <AuthShell>
-      <div className="auth-surface gentle-rise relative z-10 mt-20 min-w-0 w-full max-w-md p-6 sm:mt-0 sm:p-8">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-tr from-cyan-500 to-blue-600 shadow-lg shadow-cyan-500/30 mb-3">
-            <svg aria-hidden={true} className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-            </svg>
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight text-text">Chào mừng trở lại</h1>
-          <p className="mt-1 text-sm text-muted">Đăng nhập để tiếp tục quản lý ngôi nhà của bạn</p>
+      <div className="auth-surface gentle-rise relative z-10 min-w-0 w-full max-w-md p-6 sm:p-9">
+        <div className="mb-8">
+          <p className="text-xs font-semibold uppercase tracking-wider text-primary-hover">Đăng nhập</p>
+          <h1 className="mt-2 text-3xl font-bold tracking-tight text-text">Chào mừng trở lại</h1>
+          <p className="mt-2 text-sm text-muted">Đăng nhập để tiếp tục quản lý ngôi nhà của bạn.</p>
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-5">
           {error && (
-            <div role="alert" aria-live="polite" className="bg-rose-950/60 border border-rose-500/30 text-rose-300 px-4 py-3 rounded-xl text-xs flex items-center gap-2 animate-shake">
-              <svg aria-hidden={true} className="w-4 h-4 shrink-0 text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
+            <div role="alert" aria-live="polite" className="flex items-start gap-2 rounded-xl border border-error bg-error-soft px-4 py-3 text-sm text-text animate-shake">
+              <AlertCircle aria-hidden="true" size={18} className="mt-0.5 shrink-0 text-error" />
               <span>{error}</span>
             </div>
           )}
 
           <div>
-            <label htmlFor="login-email" className="block text-xs font-medium text-slate-300 mb-1">Địa chỉ Email <span className="text-rose-400">*</span></label>
-            <input
-              id="login-email"
-              type="email"
-              name="email"
-              placeholder="name@example.com"
-              value={formData.email}
-              onChange={handleChange}
-              required
-              autoComplete="email"
-              spellCheck={false}
-              className="w-full bg-slate-950/60 border border-slate-800 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 outline-none transition"
-            />
+            <label htmlFor="login-email" className="mb-1.5 block text-sm font-medium text-text">Email</label>
+            <div className="relative">
+              <Mail aria-hidden="true" size={18} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-icon" />
+              <input
+                id="login-email"
+                type="email"
+                name="email"
+                placeholder="name@example.com"
+                value={formData.email}
+                onChange={handleChange}
+                required
+                autoComplete="email"
+                spellCheck={false}
+                className={inputClass}
+              />
+            </div>
           </div>
 
           <div>
-            <div className="flex items-center justify-between mb-1">
-              <label htmlFor="login-password" className="block text-xs font-medium text-slate-300">Mật khẩu <span className="text-rose-400">*</span></label>
+            <div className="mb-1.5 flex items-center justify-between">
+              <label htmlFor="login-password" className="block text-sm font-medium text-text">Mật khẩu</label>
               <Link
                 to={{ pathname: '/forgot-password', search: location.search, hash: location.hash }}
                 state={location.state}
-                className="text-xs text-cyan-400 hover:text-cyan-300"
+                className="text-sm font-medium text-primary-hover hover:underline underline-offset-4"
               >
                 Quên mật khẩu?
               </Link>
             </div>
             <div className="relative">
+              <LockKeyhole aria-hidden="true" size={18} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-icon" />
               <input
                 id="login-password"
                 type={showPassword ? 'text' : 'password'}
@@ -154,7 +159,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
                 onChange={handleChange}
                 required
                 autoComplete="current-password"
-                className="w-full rounded-xl border border-line bg-surface px-4 py-2.5 pr-12 text-sm text-text outline-none transition-colors placeholder:text-muted focus:border-primary focus:ring-1 focus:ring-primary"
+                className={`${inputClass} pr-12`}
               />
               <button
                 type="button"
@@ -162,18 +167,9 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
                 aria-pressed={showPassword}
                 title={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
                 onClick={() => setShowPassword((visible) => !visible)}
-                className="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-xl text-icon transition-colors hover:text-primary-hover"
+                className="absolute inset-y-0 right-0 flex w-12 items-center justify-center rounded-r-xl text-icon transition-colors hover:text-primary-hover"
               >
-                {showPassword ? (
-                  <svg aria-hidden="true" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="m3 3 18 18M10.6 10.7a2 2 0 0 0 2.7 2.7M9.9 5.4A10.8 10.8 0 0 1 12 5.2c6 0 9.8 6.8 9.8 6.8a16 16 0 0 1-3.1 3.9M6.2 6.2A16.4 16.4 0 0 0 2.2 12S6 18.8 12 18.8a10.8 10.8 0 0 0 3-.4" />
-                  </svg>
-                ) : (
-                  <svg aria-hidden="true" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.2 12S6 5.2 12 5.2 21.8 12 21.8 12 18 18.8 12 18.8 2.2 12 2.2 12Z" />
-                    <circle cx="12" cy="12" r="2.5" />
-                  </svg>
-                )}
+                {showPassword ? <EyeOff aria-hidden="true" size={19} /> : <Eye aria-hidden="true" size={19} />}
               </button>
             </div>
           </div>
@@ -181,40 +177,22 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
           <button
             type="submit"
             disabled={loading || googleLoading}
-            className="w-full mt-2 py-3 px-4 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 disabled:opacity-50 text-white font-medium text-sm rounded-xl transition shadow-lg shadow-cyan-500/25 active:scale-[0.98] flex items-center justify-center gap-2"
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-text shadow-soft transition hover:bg-primary-hover active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {loading ? (
-              <>
-                <svg aria-hidden={true} className="animate-spin w-4 h-4 text-white" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                </svg>
-                <span>Đang xác thực…</span>
-              </>
-            ) : (
-              <span>Đăng nhập Email/Mật khẩu</span>
-            )}
+            {loading ? <>{spinner}<span>Đang xác thực…</span></> : <><span>Đăng nhập</span><ArrowRight aria-hidden="true" size={17} /></>}
           </button>
         </form>
 
-        {/* Divider */}
-        <div className="relative my-6">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-slate-800" />
-          </div>
-          <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-slate-900 px-3 text-slate-400 font-medium">Hoặc tiếp tục với</span>
-          </div>
+        <div className="my-6 flex items-center gap-3 text-xs font-medium text-muted">
+          <span className="h-px flex-1 bg-line" />
+          <span>Hoặc tiếp tục với</span>
+          <span className="h-px flex-1 bg-line" />
         </div>
 
-        {/* Google Sign-In Button (SDK chính thức) */}
         {googleLoading ? (
-          <div className="flex items-center justify-center gap-2 py-3">
-            <svg aria-hidden={true} className="animate-spin w-4 h-4 text-slate-300" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-            </svg>
-            <span className="text-sm text-slate-300">Đang xác thực với Google…</span>
+          <div role="status" className="flex items-center justify-center gap-2 py-3 text-sm text-muted">
+            {spinner}
+            <span>Đang xác thực với Google…</span>
           </div>
         ) : (
           <GoogleSignInButton
@@ -224,18 +202,16 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
           />
         )}
 
-        <div className="text-center pt-4">
-          <p className="text-xs text-slate-400">
-            Chưa có tài khoản?{' '}
-            <Link
-              to={{ pathname: '/register', search: location.search, hash: location.hash }}
-              state={location.state}
-              className="text-cyan-400 hover:text-cyan-300 font-medium underline underline-offset-4"
-            >
-              Đăng ký ngay
-            </Link>
-          </p>
-        </div>
+        <p className="pt-6 text-center text-sm text-muted">
+          Chưa có tài khoản?{' '}
+          <Link
+            to={{ pathname: '/register', search: location.search, hash: location.hash }}
+            state={location.state}
+            className="font-semibold text-primary-hover underline-offset-4 hover:underline"
+          >
+            Đăng ký ngay
+          </Link>
+        </p>
       </div>
     </AuthShell>
   );

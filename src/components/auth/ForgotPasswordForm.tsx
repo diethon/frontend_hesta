@@ -37,7 +37,7 @@ export const ForgotPasswordForm: React.FC<ForgotPasswordFormProps> = ({ onBackTo
 
   return (
     <AuthShell>
-      <div className="auth-surface gentle-rise relative z-10 mt-20 w-full max-w-md p-6 sm:mt-0 sm:p-8">
+      <div className="auth-surface gentle-rise relative z-10 w-full max-w-md p-6 sm:p-8">
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-tr from-cyan-500 to-blue-600 shadow-lg shadow-cyan-500/30 mb-3">
             <svg aria-hidden={true} className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">

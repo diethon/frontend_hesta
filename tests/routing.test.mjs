@@ -97,7 +97,7 @@ function renderRoute(path, storedUser = null, state, routeSearch = search) {
 
 test('public pages render directly, even with an existing ADMIN session', () => {
   for (const [path, content] of [
-    ['/login', 'Đăng nhập Email/Mật khẩu'],
+    ['/login', 'Chào mừng trở lại'],
     ['/register', 'Đăng ký tài khoản hệ thống local-first'],
     ['/forgot-password', 'Nhập email để nhận mã khôi phục'],
   ]) {

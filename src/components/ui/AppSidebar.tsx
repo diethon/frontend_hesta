@@ -24,10 +24,17 @@ export const HomeIcon = () => (
   </svg>
 );
 
+/** HESTA "H" mark, traced from logo/concepts-v7 (hesta-logo-13); inherits currentColor. */
+export const HestaLogoMark: React.FC<{ className?: string }> = ({ className = 'h-6 w-auto' }) => (
+  <svg aria-hidden="true" className={className} viewBox="0 0 512 800" fill="currentColor">
+    <path d="M0 0H160V300H320V380H352V80H512V800H352V540H192V460H160V720H0Z" />
+  </svg>
+);
+
 export const BrandMark: React.FC<{ compact?: boolean }> = ({ compact = false }) => (
   <div className="flex items-center gap-3">
-    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary text-white shadow-soft">
-      <HomeIcon />
+    <div className="flex h-11 w-11 shrink-0 items-center justify-center text-text">
+      <HestaLogoMark className="h-10 w-auto" />
     </div>
     {compact ? null : (
       <div>
