@@ -33,7 +33,7 @@ export function DigitalTwinView({ homeId, initialMode, navigationOpen, onToggleN
     void dispatch(loadTwinSnapshot(homeId));
     if (!editingLayout) void dispatch(loadTwinLayout(homeId));
   };
-  return <div className="twin-premium-dashboard twin-v2-dashboard min-w-0 bg-app text-text">
+  return <div className="twin-premium-dashboard twin-v2-dashboard min-w-0 text-text">
     <TwinDashboardHeader homeId={homeId} connected={connected} connectionLabel={connectionLabel} loading={loading} canReload={matchesHome} onReload={reload} theme={theme} onThemeChange={setTheme} navigationOpen={navigationOpen} onToggleNavigation={onToggleNavigation} />
     <div className="v2-workspace">
     {!connected && matchesHome && initialized ? <p className="rounded-xl bg-warning-soft px-4 py-3 text-sm text-text">Đang hiển thị dữ liệu gần nhất. Sau khi kết nối lại, chọn “Đồng bộ lại” để nhận những thay đổi đã bỏ lỡ.</p> : null}
@@ -72,11 +72,7 @@ export function DigitalTwinPage() {
   }, [dispatch, homeId]);
 
   return (
-    <div className="app-shell digital-twin-shell">
-      {/* 3 Pastel glowing meshes matching Figma design */}
-      <div className="mesh mesh-one" />
-      <div className="mesh mesh-two" />
-      <div className="mesh mesh-three" />
+    <div className="app-shell digital-twin-shell studio st-theme st-pro">
 
       {/* Modern Unified NavRail sidebar */}
       <DashboardNavRail
@@ -93,7 +89,7 @@ export function DigitalTwinPage() {
       {/* Mobile Bottom Navigation */}
       <DashboardBottomNav
         homeId={homeId}
-        activeItem="overview"
+        activeItem="twin"
         onSelectOverview={() => navigate('/home')}
       />
     </div>

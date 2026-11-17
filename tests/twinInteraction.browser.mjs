@@ -97,7 +97,7 @@ try {
   await waitFor(`window.__twinFixtureScene?.()?.deviceModels.length === 13`);
   await settle();
   check('bright Daylight renderer is the default', await evaluate(`document.querySelector('.twin-3d-stage').dataset.theme==='DAYLIGHT'`));
-  check('desktop uses real house explorer scene and control columns', await evaluate(`!!document.querySelector('[aria-label="House Explorer"]') && !!document.querySelector('[aria-label="Bảng điều khiển thông minh"]') && !!document.querySelector('[aria-label="Thống kê ngôi nhà"]')`));
+  check('desktop uses real house explorer scene and control columns', await evaluate(`!!document.querySelector('[aria-label="Sơ đồ nhà"]') && !!document.querySelector('[aria-label="Bảng điều khiển thông minh"]') && !!document.querySelector('[aria-label="Thống kê ngôi nhà"]')`));
   check('shared HESTA sidebar retains every home navigation item and selected Twin', await evaluate(`(()=>{const nav=document.querySelector('.app-sidebar nav');return !!nav && nav.querySelectorAll('button').length>=7 && nav.querySelector('[aria-current="page"]')?.textContent.includes('Digital Twin')})()`));
   check('Twin content clears the fixed application sidebar', await evaluate(`document.querySelector('.twin-premium-dashboard').getBoundingClientRect().left>=256`));
   check('sensor history is never replaced with fabricated charts', await evaluate(`document.querySelectorAll('[aria-label="Thống kê ngôi nhà"] canvas,[aria-label="Thống kê ngôi nhà"] svg polyline').length===0`));

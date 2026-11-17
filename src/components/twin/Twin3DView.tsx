@@ -132,9 +132,9 @@ export function Twin3DView({ geometry, drafting, role, onEdit2D, rendererTheme, 
       {!desktop ? <button type="button" aria-label="Mở điều khiển thông minh" onClick={() => setPanelOpen(true)} className="v2-secondary-button"><Sliders size={16} />Điều khiển</button> : null}
     </div>
     <div className="v2-workbench" data-explorer-collapsed={explorerCollapsed} data-controls-collapsed={controlsCollapsed} data-has-explorer={explorerDesktop} data-has-controls={desktop}>
-      {explorerDesktop ? <aside aria-label="House Explorer" className={`v2-side-panel v2-explorer-panel ${explorerCollapsed ? 'v2-collapsed-panel' : ''}`}>
-        <div className="v2-panel-heading">{!explorerCollapsed ? <span>HOUSE EXPLORER</span> : null}<button type="button" aria-label={explorerCollapsed ? 'Mở bảng sơ đồ nhà' : 'Thu gọn bảng sơ đồ nhà'} aria-expanded={!explorerCollapsed} onClick={() => setExplorerCollapsed(value => !value)} className="v2-icon-button">{explorerCollapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}</button></div>
-        {explorerCollapsed ? <><House size={23} className="text-primary-hover" /><span className="v2-vertical-label">HOUSE EXPLORER</span></> : explorer}
+      {explorerDesktop ? <aside aria-label="Sơ đồ nhà" className={`v2-side-panel v2-explorer-panel ${explorerCollapsed ? 'v2-collapsed-panel' : ''}`}>
+        <div className="v2-panel-heading">{!explorerCollapsed ? <span>SƠ ĐỒ NHÀ</span> : null}<button type="button" aria-label={explorerCollapsed ? 'Mở bảng sơ đồ nhà' : 'Thu gọn bảng sơ đồ nhà'} aria-expanded={!explorerCollapsed} onClick={() => setExplorerCollapsed(value => !value)} className="v2-icon-button">{explorerCollapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}</button></div>
+        {explorerCollapsed ? <><House size={23} className="text-primary-hover" /><span className="v2-vertical-label">SƠ ĐỒ NHÀ</span></> : explorer}
       </aside> : null}
       <section className="twin-3d-stage v2-scene-stage" aria-label="Mô hình nhà 3D tương tác" data-theme={theme} data-floor-mode={mode} data-wall-mode={wallMode} data-marker-mode={markerMode}>
         {!ready ? <div role="status" className="v2-scene-loading"><Box size={30} /><strong>Đang dựng không gian của bạn</strong><span>Ánh sáng, vật liệu và những chi tiết nhỏ…</span></div> : null}
@@ -155,16 +155,16 @@ export function Twin3DView({ geometry, drafting, role, onEdit2D, rendererTheme, 
             <div className="v2-floor-tabs" role="group" aria-label="Chọn tầng nhanh">{[{ value: 'all' as const, label: 'Tổng thể' }, ...floors.map(floor => ({ value: floor, label: `Tầng ${floor}` }))].map(({ value, label }) => <button key={value} type="button" aria-pressed={value === (mode === 'single' ? resolvedFloor : 'all')} onClick={() => chooseFloor(value)}>{label}</button>)}</div>
           </div>
           {!focusRoomId ? <button type="button" className="v2-overview-button" onClick={returnToOverview}>Toàn cảnh<MoveUpRight size={14} /></button> : null}
-          <button type="button" aria-label={explorerCollapsed && controlsCollapsed ? 'Hiện đầy đủ bảng điều khiển' : 'Mở rộng tối đa không gian 3D'} className="v2-overview-button" onClick={() => {
+          {explorerDesktop || desktop ? <button type="button" aria-label={explorerCollapsed && controlsCollapsed ? 'Hiện đầy đủ bảng điều khiển' : 'Mở rộng tối đa không gian 3D'} className="v2-overview-button" onClick={() => {
             const next = !(explorerCollapsed && controlsCollapsed);
             setExplorerCollapsed(next);
             setControlsCollapsed(next);
           }}>
             {explorerCollapsed && controlsCollapsed ? 'Thu gọn bảng' : 'Mở rộng xem'}
             {explorerCollapsed && controlsCollapsed ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
-          </button>
+          </button> : null}
         </div>
-        <div className="v2-scene-caption"><span>{homeName}</span><p>{focusRoomId ? `Cận cảnh · ${selectedRoomName ?? 'Phòng đang chọn'}` : mode === 'single' ? `Tầng ${resolvedFloor} · ${activeRooms.length} không gian` : mode === 'exploded' ? 'Khám phá không gian · Tách tầng' : 'Architectural dollhouse · Toàn cảnh ngôi nhà'}</p></div>
+        <div className="v2-scene-caption"><span>{homeName}</span><p>{focusRoomId ? `Cận cảnh · ${selectedRoomName ?? 'Phòng đang chọn'}` : mode === 'single' ? `Tầng ${resolvedFloor} · ${activeRooms.length} không gian` : mode === 'exploded' ? 'Khám phá không gian · Tách tầng' : 'Toàn cảnh ngôi nhà'}</p></div>
         <div className="v2-compass" aria-label="La bàn minh họa, không phải hướng đo thực tế"><span>N</span><Compass size={37} strokeWidth={1} /></div>
         <div className="v2-scene-environment">{theme === 'NIGHT' ? <Moon size={15} /> : <Sun size={15} />}<span>{theme === 'NIGHT' ? 'Ánh sáng ban đêm' : 'Ánh sáng ban ngày'}</span></div>
         <div className="v2-scene-toolbar" role="toolbar" aria-label="Công cụ camera 3D">
@@ -182,8 +182,8 @@ export function Twin3DView({ geometry, drafting, role, onEdit2D, rendererTheme, 
         <div className="v2-scene-hint"><MousePointer2 size={12} /><span>Kéo để {cameraTool === 'pan' ? 'di chuyển' : 'xoay'} · Cuộn để thu phóng · Nhấp đúp để xem gần</span></div>
       </section>
       {desktop ? <aside aria-label="Bảng điều khiển ngôi nhà" className={`v2-side-panel v2-device-panel ${controlsCollapsed ? 'v2-collapsed-panel' : ''}`}>
-        <div className="v2-panel-heading">{!controlsCollapsed ? <span>SMART DEVICE CONTROL</span> : null}<button type="button" aria-label="Ẩn hoặc hiện bảng điều khiển" aria-expanded={!controlsCollapsed} onClick={() => setControlsCollapsed(value => !value)} className="v2-icon-button">{controlsCollapsed ? <PanelRightOpen size={17} /> : <PanelRightClose size={17} />}</button></div>
-        {controlsCollapsed ? <><Sliders size={23} className="text-primary-hover" /><span className="v2-vertical-label">DEVICE CONTROL</span></> : controls}
+        <div className="v2-panel-heading">{!controlsCollapsed ? <span>ĐIỀU KHIỂN THIẾT BỊ</span> : null}<button type="button" aria-label="Ẩn hoặc hiện bảng điều khiển" aria-expanded={!controlsCollapsed} onClick={() => setControlsCollapsed(value => !value)} className="v2-icon-button">{controlsCollapsed ? <PanelRightOpen size={17} /> : <PanelRightClose size={17} />}</button></div>
+        {controlsCollapsed ? <><Sliders size={23} className="text-primary-hover" /><span className="v2-vertical-label">ĐIỀU KHIỂN</span></> : controls}
       </aside> : null}
     </div>
     {unplacedRooms + unplaced.deviceIds.length + unplaced.sensorIds.length ? <p className="v2-unplaced-note">Chưa đặt: {unplacedRooms} phòng · {unplaced.deviceIds.length} thiết bị · {unplaced.sensorIds.length} cảm biến.</p> : null}
@@ -201,7 +201,7 @@ export function Twin3DView({ geometry, drafting, role, onEdit2D, rendererTheme, 
           </div>
         </details>
 
-    {!explorerDesktop ? <TwinPanelDialog open={treeOpen} title="House Explorer" side="left" onDismiss={() => setTreeOpen(false)}>{explorer}</TwinPanelDialog> : null}
+    {!explorerDesktop ? <TwinPanelDialog open={treeOpen} title="Sơ đồ nhà" side="left" onDismiss={() => setTreeOpen(false)}>{explorer}</TwinPanelDialog> : null}
     {!desktop ? <TwinPanelDialog open={panelOpen} title="Điều khiển thiết bị" side="right" onDismiss={closeControls}>{controls}<div className="p-3"><TwinRoomInfo roomId={selectedRoomId} geometry={geometry} /></div></TwinPanelDialog> : null}
   </section>;
 }
