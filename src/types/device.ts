@@ -76,7 +76,7 @@ export interface DeviceStateHistoryResponse {
 
 export interface ManualCommandResponse {
   command: { commandId?: string; success: boolean; status: string; errorCode?: string; message?: string; acknowledgedState?: DeviceState; latencyMs?: number };
-  overrideUntil: string;
+  overrideUntil?: string | null;
 }
 
 export interface ManualOverrideRecord {
