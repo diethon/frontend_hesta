@@ -133,9 +133,12 @@ export const sendRoomCommand = async (
 };
 
 export const sendManualPowerCommand = async (deviceId: string, action: 'TURN_ON' | 'TURN_OFF'): Promise<ManualCommandResponse> => {
-  const response = await apiClient.post(`/devices/${deviceId}/commands`, { action });
+  const command = await sendDeviceCommand(deviceId, action);
   invalidateDeviceMutations(deviceId);
-  return response.data.result;
+  return {
+    command,
+    overrideUntil: null,
+  };
 };
 
 export const cancelDeviceAutomation = async (deviceId: string, minutes: number = 30): Promise<string> => {
