@@ -83,7 +83,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin }) =
 
   return (
     <AuthShell>
-      <div className="auth-surface gentle-rise relative z-10 mt-20 w-full max-w-lg p-6 sm:mt-0 sm:p-8">
+      <div className="auth-surface gentle-rise relative z-10 w-full max-w-lg p-6 sm:p-8">
         {/* Header */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-tr from-cyan-500 to-blue-600 shadow-lg shadow-cyan-500/30 mb-3">

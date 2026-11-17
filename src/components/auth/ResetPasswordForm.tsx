@@ -88,7 +88,7 @@ export const ResetPasswordForm: React.FC<ResetPasswordFormProps> = ({ email, onB
 
   return (
     <AuthShell>
-      <div className="auth-surface gentle-rise relative z-10 mt-20 w-full max-w-md p-6 sm:mt-0 sm:p-8">
+      <div className="auth-surface gentle-rise relative z-10 w-full max-w-md p-6 sm:p-8">
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-600 shadow-lg shadow-emerald-500/30 mb-3">
             {step === 1 ? (

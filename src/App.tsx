@@ -3,6 +3,7 @@ import { NotificationLifecycle } from './realtime/NotificationLifecycle';
 import { RealtimeLifecycle } from './realtime/RealtimeLifecycle';
 import { AppRoutes } from './routes/AppRoutes';
 import { AppToaster } from './components/ui/AppToast';
+import { ConfirmDialogHost } from './components/ui/ConfirmModal';
 import { EmergencyFallModal } from './components/emergency/EmergencyFallModal';
 
 // Preserve the route tree; React Router's data router supplies navigation blocking.
@@ -17,6 +18,7 @@ function App() {
       <EmergencyFallModal />
       <RouterProvider router={router} />
       <AppToaster />
+      <ConfirmDialogHost />
     </>
   );
 }

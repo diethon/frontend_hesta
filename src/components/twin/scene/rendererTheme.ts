@@ -3,8 +3,8 @@ import type { Material } from 'three';
 
 export type TwinRendererTheme = 'DAYLIGHT' | 'COZY' | 'BLUEPRINT' | 'NIGHT';
 export const themeEnvironment = {
-  COZY: { background:'#263747', ground:'#263747', sky:'#ffe3bb', hemisphere:.55, sun:1.15, fill:.22, exposure:1, tint:[1,1,1] },
-  DAYLIGHT: { background:'#E9EFF4', ground:'#BCCBBE', sky:'#f7f8fa', hemisphere:.55, sun:1.5, fill:.15, exposure:.95, tint:[1,1,1] },
+  COZY: { background:'#e6e1da', ground:'#c9c6ba', sky:'#ffe3bb', hemisphere:.55, sun:1.15, fill:.22, exposure:1, tint:[1,1,1] },
+  DAYLIGHT: { background:'#eef3f7', ground:'#edf1f4', sky:'#f7f8fa', hemisphere:.55, sun:1.5, fill:.15, exposure:.95, tint:[1,1,1] },
   BLUEPRINT: { background:'#153747', ground:'#1e4758', sky:'#bfd7e5', hemisphere:.9, sun:.7, fill:.3, exposure:1, tint:[.43,.7,.82] },
   NIGHT: { background:'#182738', ground:'#253d47', sky:'#8ca9c9', hemisphere:.25, sun:.2, fill:.08, exposure:.95, tint:[.55,.67,.84] },
 } as const;

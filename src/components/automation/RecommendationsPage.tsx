@@ -1,3 +1,4 @@
+import { confirmDialog } from '../ui/confirmDialog';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import {
@@ -97,7 +98,7 @@ export function RecommendationsPage() {
   };
 
   const resolve = async (item: Recommendation, action: 'approve' | 'reject' | 'dismiss') => {
-    if (action === 'approve' && !window.confirm(`Tạo quy tắc tự động: ${actionText(item)} vào ${item.triggerCondition.time?.slice(0, 5) ?? 'giờ này'}?`)) {
+    if (action === 'approve' && !await confirmDialog({ title: 'Tạo quy tắc tự động?', description: `${actionText(item)} vào ${item.triggerCondition.time?.slice(0, 5) ?? 'giờ này'}.`, confirmText: 'Tạo quy tắc', variant: 'primary' })) {
       return;
     }
     setWorkingId(item.id);

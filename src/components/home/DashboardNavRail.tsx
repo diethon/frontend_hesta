@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router';
 import { Icon, type IconName } from './HomeIcons';
+import { HestaLogoMark } from '../ui/AppSidebar';
 import { notify } from '../ui/notify';
 import type { UserResponse } from '../../types/auth';
 
@@ -116,7 +117,7 @@ export const DashboardNavRail: React.FC<DashboardNavRailProps> = ({
   return (
     <aside className="nav-rail glass-g2">
       <div className="brand" title={brandTitle}>
-        H
+        <HestaLogoMark className="h-6 w-auto" />
       </div>
 
       <nav aria-label="Điều hướng chính">

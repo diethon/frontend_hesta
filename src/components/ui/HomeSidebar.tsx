@@ -7,9 +7,11 @@ interface HomeSidebarProps {
   activeItem: 'overview' | 'devices' | 'twin' | 'energy' | 'scenes' | 'automations';
   homeId?: string;
   showSystemSummary?: boolean;
+  compact?: boolean;
+  onToggleCompact?: () => void;
 }
 
-export function HomeSidebar({ activeItem, homeId, showSystemSummary }: HomeSidebarProps) {
+export function HomeSidebar({ activeItem, homeId, showSystemSummary, compact, onToggleCompact }: HomeSidebarProps) {
   const navigate = useNavigate();
   const isAdmin = useAppSelector((state) => state.auth.user?.platformRole === 'ADMIN');
   const overview = homeId ? `/home?homeId=${encodeURIComponent(homeId)}` : '/home';
@@ -23,7 +25,7 @@ export function HomeSidebar({ activeItem, homeId, showSystemSummary }: HomeSideb
     else navigate(`${overview}${section ? `#${section}` : ''}`);
   };
 
-  return <AppSidebar activeItem={activeItem} contextLabel="Không gian sống" showSystemSummary={showSystemSummary} items={[
+  return <AppSidebar activeItem={activeItem} contextLabel="Không gian sống" showSystemSummary={showSystemSummary} compact={compact} onToggleCompact={onToggleCompact} items={[
     { id: 'overview', label: 'Tổng quan', icon: <HomeIcon />, onClick: () => openOverview() },
     { id: 'devices', label: 'Thiết bị', icon: <DeviceIcon />, onClick: () => openPage('devices') },
     { id: 'twin', label: 'Digital Twin', icon: <TwinIcon />, onClick: () => openPage('digital-twin') },

@@ -3,8 +3,7 @@ import { selectTwinDevice } from '../../store/twinSelectors';
 import { summarizeState } from './twinPresentation';
 import { useTwinUpdateMotion } from './useTwinMotion';
 import { DeviceGlyph } from './TwinVisualIcon';
-import { TwinHealthBadge } from './TwinHealthBadge';
-import { TwinTime } from './TwinTime';
+import { TwinDeviceStatusBadge } from './TwinHealthBadge';
 import { sortStateEntries } from '../device/DeviceStateVisualizer';
 
 const stateLabels: Record<string, string> = {
@@ -16,7 +15,7 @@ const stateLabels: Record<string, string> = {
 
 export function TwinDeviceCard({ deviceId }: { deviceId: string }) {
   const device = useAppSelector((state) => selectTwinDevice(state, deviceId));
-  const motionRef = useTwinUpdateMotion<HTMLDListElement>(JSON.stringify([device?.currentState, device?.lastSeen]));
+  const motionRef = useTwinUpdateMotion<HTMLDListElement>(JSON.stringify([device?.currentState, device?.status]));
   if (!device) return null;
   const entries = device.currentState && typeof device.currentState === 'object' && !Array.isArray(device.currentState)
     ? sortStateEntries(device.currentState as Record<string, unknown>) : [['state', device.currentState] as const];
@@ -25,7 +24,7 @@ export function TwinDeviceCard({ deviceId }: { deviceId: string }) {
   return (
     <article aria-label={`Thiết bị ${device.name}`} className="min-w-0 rounded-2xl border border-line bg-surface p-4">
       <div className="flex items-start gap-3">
-        <DeviceGlyph deviceType={device.deviceType} />
+        <DeviceGlyph deviceType={device.deviceType} name={device.name} />
         <div className="min-w-0 flex-1">
           <h4 className="break-words font-semibold">{device.name}</h4>
           <p className="mt-1 text-xs text-muted">{device.deviceType}</p>
@@ -42,9 +41,8 @@ export function TwinDeviceCard({ deviceId }: { deviceId: string }) {
       </dl>
       {expanded.length ? <details className="mt-3 rounded-xl bg-app p-3"><summary className="cursor-pointer text-xs font-semibold text-primary-hover">Dữ liệu mở rộng · {expanded.length} thuộc tính</summary><dl className="mt-3 space-y-2 text-xs">{expanded.map(([key, value]) => <div key={key}><dt className="font-semibold text-muted">{stateLabels[key] ?? key}</dt><dd className="mt-1 break-words text-text">{summarizeState(value)}</dd></div>)}</dl></details> : null}
       <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-line pt-3">
-        <span className="text-xs text-muted">Độ mới</span><TwinHealthBadge healthStatus={device.healthStatus} />
+        <span className="text-xs text-muted">Kết nối</span><TwinDeviceStatusBadge status={device.status} />
       </div>
-      <p className="mt-2 break-words text-xs text-muted">Lần thấy cuối: <TwinTime value={device.lastSeen} /></p>
     </article>
   );
 }

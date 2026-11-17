@@ -1,3 +1,4 @@
+import { confirmDialog } from '../ui/confirmDialog';
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router';
 import { useAppSelector } from '../../store/hooks';
@@ -113,7 +114,7 @@ export const ParentalGuardianPage: React.FC<ParentalGuardianPageProps> = ({ home
   };
 
   const handleDelete = async (rule: ParentalGuardianRule) => {
-    if (!window.confirm(`Bạn có chắc chắn muốn xóa quy tắc "${rule.name}"?`)) return;
+    if (!await confirmDialog({ title: `Xóa quy tắc "${rule.name}"?`, description: 'Quy tắc giám sát này sẽ ngừng áp dụng ngay.', confirmText: 'Xóa quy tắc', variant: 'danger' })) return;
     try {
       await deleteGuardianRule(homeId, rule.id);
       setRules((prev) => prev.filter((r) => r.id !== rule.id));

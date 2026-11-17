@@ -155,7 +155,7 @@ export function homeBounds(rooms: readonly TwinRoomLayout[]): Twin3DBounds {
 export function cameraPoseForBounds(bounds: Twin3DBounds) {
   const span = Math.max(bounds.width, bounds.depth, 5);
   return {
-    position: [bounds.centerX + span * 0.82, span * 0.72 + 4.5, bounds.centerZ + span * 0.92] as const,
+    position: [bounds.centerX + span * 0.85, span * 0.72 + 4.5, bounds.centerZ + span * 0.85] as const,
     target: [bounds.centerX, 0, bounds.centerZ] as const,
     minDistance: Math.max(4, span * 0.45),
     maxDistance: Math.max(24, span * 2.8),

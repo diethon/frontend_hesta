@@ -9,7 +9,8 @@ import type { VoiceCommandResponse, SubCommandResult } from '../../services/voic
 type VoiceState = 'idle' | 'listening' | 'processing' | 'success' | 'error';
 
 /* ── Kiểm tra trình duyệt hỗ trợ Web Speech API ── */
-const SpeechRecognition =
+// Guarded so importing this module outside a browser (Node tests) does not throw.
+const SpeechRecognition = typeof window === 'undefined' ? undefined :
   (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
 /* ── Kết quả hiển thị ── */

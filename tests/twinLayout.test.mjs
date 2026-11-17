@@ -119,6 +119,11 @@ test('device appearance recognizes Vietnamese/English names and keeps authoritat
     ['LED_RGB', 'Dải LED phòng khách', 'led-strip', 'wall'],
     ['FAN', 'Quạt đứng phòng ngủ', 'standing-fan', 'floor'],
     ['FAN', 'Ceiling fan', 'ceiling-fan', 'ceiling'],
+    ['ROLLING_DOOR', 'Cổng garage', 'roller-door', 'opening'],
+    ['DOOR', 'Cửa cuốn', 'roller-door', 'opening'],
+    ['GATE', 'Cổng chính', 'door', 'opening'],
+    ['SMART_PLUG', 'Cửa cuốn garage', 'roller-door', 'opening'],
+    ['DOOR', 'Cửa chính phòng khách', 'door', 'opening'],
     ['UNKNOWN', 'Đèn bàn', 'table-lamp', 'table'],
     ['MOTION_SENSOR', 'Cảm biến cạnh điều hòa', 'motion-sensor', 'wall'],
     ['CAMERA_AI', 'Camera cửa sổ', 'camera', 'wall'],
@@ -365,6 +370,21 @@ test('grid and edge snapping align rooms while overlap warnings remain floor-sco
   assert.equal(geo.snapPoint(.113, true), .125);
 });
 
+test('edge resize moves only the dragged side and snaps that side', () => {
+  const room = { roomId: 'r', floor: 1, x: .2, y: .2, width: .4, height: .4 };
+  assert.deepEqual(geo.resizeRoomEdge(room, 'e', .1, .3), { ...room, width: .5 });
+  assert.deepEqual(geo.resizeRoomEdge(room, 's', .3, -.1), { ...room, height: .3 });
+  assert.deepEqual(geo.resizeRoomEdge(room, 'w', -.1, .3), { ...room, x: .1, width: .5 });
+  assert.deepEqual(geo.resizeRoomEdge(room, 'n', 0, .1), { ...room, y: .3, height: .3 });
+  // Dragging the left side past the right side keeps a sliver instead of flipping.
+  assert.equal(geo.resizeRoomEdge(room, 'w', .9, 0).x + geo.resizeRoomEdge(room, 'w', .9, 0).width, .6);
+  const anchor = { roomId: 'a', floor: 1, x: 0, y: 0, width: .105, height: 1 };
+  const snapped = geo.snapRoom({ ...room, x: .11, width: .49 }, [anchor], { grid: false, edges: true }, 'w');
+  assert.equal(snapped.room.x, .105);
+  assert.equal(snapped.room.x + snapped.room.width, .6);
+  assert.deepEqual(snapped.guides.x, [.105]);
+});
+
 test('shape-aware placement excludes missing corners and the 3D room uses the same outline metadata', () => {
   const room = { roomId, floor: 1, x: .1, y: .1, width: .5, height: .5 };
   const lShape = { shape: 'L_SHAPE', points: drafting.roomShapePoints('L_SHAPE'), floorHeightMeters: 3.1, wallThicknessMeters: .2 };
@@ -382,7 +402,7 @@ test('2D editor exposes quick draw, shape, snapping and blueprint tools; precise
   const store = await ready();
   edit(store);
   const editor = render(store);
-  for (const label of ['Vẽ nhanh', 'Nhập kích thước', 'Chữ nhật', 'Chữ L', 'Chữ U', 'Tự vẽ', 'Bắt lưới', 'Bắt cạnh', 'Chọn ảnh bản vẽ từ máy']) assert.ok(editor.includes(label), label);
+  for (const label of ['Kéo thả', 'Nhập số đo (m)', 'Chữ nhật', 'Chữ L', 'Chữ U', 'Tự vẽ', 'Bắt lưới', 'Bắt cạnh', 'Chọn ảnh bản vẽ từ máy']) assert.ok(editor.includes(label), label);
   const metadata = drafting.changeRoomShape(drafting.createTwinDraftingMetadata(), roomId, 'L_SHAPE');
   const inspector = renderToString(React.createElement(Provider, { store }, React.createElement(TwinLayoutInspector, {
     geometry: draft(store), drafting: metadata, mode: 'precise', selection: { kind: 'room', id: roomId }, editable: true,
@@ -443,8 +463,8 @@ test('2D/3D switcher exposes stable pressed state without mutating layout', () =
   assert.match(twoD, /aria-label="Chế độ 3D" aria-pressed="false"/);
   assert.match(threeD, /aria-label="Chế độ 3D" aria-pressed="true"/);
   const overview = renderToString(React.createElement(TwinViewSwitcher, { mode: 'overview', onChange: noop }));
-  assert.match(overview, /aria-label="Chế độ Overview" aria-pressed="true"/);
-  for (const label of ['Overview', '2D Layout', '3D Live']) assert.ok(overview.includes(label));
+  assert.match(overview, /aria-label="Chế độ tổng quan" aria-pressed="true"/);
+  for (const label of ['Tổng quan', 'Sơ đồ 2D', 'Xem 3D']) assert.ok(overview.includes(label));
   assert.deepEqual(saved.rooms[0], { roomId, floor: 1, x: 0.05, y: 0.05, width: 0.45, height: 0.4 });
 });
 
@@ -601,6 +621,26 @@ test('explicit Save freezes inferred architecture and excludes browser and runti
   assert.ok(!('settings' in architecture) && !('blueprints' in architecture) && !('state' in architecture));
 });
 
+test('Save regenerates frozen illustration furniture only for rooms whose size changed', () => {
+  const { materializeTwinArchitecture, refreshResizedFurniture } = loadSource('src/services/twinLayoutMaterialize.ts');
+  const { createTwinDraftingMetadata, draftingFromArchitecture } = loadSource('src/components/twin/twinDrafting.ts');
+  const small = { rooms: [geo.defaultRoom('living', 0), geo.defaultRoom('bed', 1)], nodes: [] };
+  const saved = draftingFromArchitecture(materializeTwinArchitecture('house', small, createTwinDraftingMetadata(), { living: 'Living Room', bed: 'Bedroom' }));
+  const handPlaced = { id: 'my-plant', kind: 'PLANT', x: .5, z: .5, width: .4, depth: .4, height: 1, rotation: 0 };
+  const editing = { ...saved, rooms: { ...saved.rooms, living: { ...saved.rooms.living, objects: [...saved.rooms.living.objects, handPlaced] } } };
+  const bigger = { ...small, rooms: [{ ...small.rooms[0], width: .5, height: .5 }, small.rooms[1]] };
+  const refreshed = refreshResizedFurniture(editing, saved, bigger, small);
+  assert.equal(refreshed.rooms.living.autoFurniture, true);
+  assert.deepEqual(refreshed.rooms.living.objects, [handPlaced]);
+  assert.equal(refreshed.rooms.bed, editing.rooms.bed, 'unchanged room keeps its frozen furniture');
+  const resaved = materializeTwinArchitecture('house', bigger, refreshed, { living: 'Living Room', bed: 'Bedroom' });
+  assert.equal(resaved.rooms.living.autoFurniture, false);
+  assert.ok(resaved.rooms.living.objects.some((o) => o.kind === 'SOFA'), 'resized room is furnished again');
+  assert.ok(resaved.rooms.living.objects.some((o) => o.id === 'my-plant'));
+  const emptyByChoice = { ...saved, rooms: { ...saved.rooms, living: { ...saved.rooms.living, objects: [] } } };
+  assert.equal(refreshResizedFurniture(emptyByChoice, saved, bigger, small), emptyByChoice, 'an emptied room is not refilled');
+});
+
 test('MIT wall port shares partial edges, handles T junctions and preserves real room IDs', () => {
   const { generateWalls } = loadSource('src/components/twin/neonplan/geometry/walls.ts');
   const room = (id, points) => ({ id, name: id, floor_material: 'wood', points });
@@ -667,6 +707,18 @@ test('Day heatmap interpolates surfaces and RGB state remains HESTA-only', () =>
   assert.equal(lightColor({state:{color:{r:999,g:0,b:0}}},'#ffffff'),'#ffffff');
 });
 
+test('visual state reads numeric MQTT values and both backend fan command fields', () => {
+  const { boundedPercent, fanSpeed, openingFraction } = loadSource('src/components/twin/devices/deviceVisualState.ts');
+  assert.equal(boundedPercent('35', 100), 35);
+  for (const value of ['', '  ', null, false, Infinity, 'bad']) assert.equal(boundedPercent(value, 60), 60);
+  assert.equal(boundedPercent(200, 0), 100);
+  assert.equal(fanSpeed({state:{fan:'LOW'}}), 25);
+  assert.equal(fanSpeed({state:{fan:'HIGH'}}), 100);
+  assert.equal(fanSpeed({state:{speed:'0',fan:'HIGH'}}), 0);
+  assert.equal(openingFraction({state:{position:'75'}}), .75);
+  assert.equal(openingFraction({state:{state:'OPENING'}}), 0);
+});
+
 test('unchanged geometry and returning to saved geometry are clean; invalid draft is rejected', async () => {
   const store = await ready(); edit(store);
   change(store, structuredClone(draft(store))); assert.equal(store.getState().twinLayout.dirty, false);
@@ -700,7 +752,8 @@ test('serialization whitelists geometry and never stores pixels or runtime field
 test('room list derives existing rooms and devices without creating domain data', async () => {
   backendLayout = empty; const store = await ready(); edit(store);
   const html = render(store);
-  for (const text of ['Phòng và thiết bị', 'Living Room', 'Bedroom', 'Tìm phòng, thiết bị', 'Chưa căn chỉnh']) assert.ok(html.includes(text), text);
+  // Rooms are collapsed until selected, so only room rows and their counts are rendered here.
+  for (const text of ['Phòng và thiết bị', 'Living Room', 'Bedroom', 'Tìm phòng, thiết bị', 'thiết bị']) assert.ok(html.includes(text), text);
   assert.doesNotMatch(html, /Tạo phòng|Đối tượng chưa đặt|Đặt từ bảng bên cạnh|Bỏ vị trí/);
   const runtime = store.getState().twin;
   change(store, { rooms: saved.rooms, nodes: [saved.nodes[0]] });
@@ -883,6 +936,52 @@ test('unassigned devices stay in a separate list and new devices are automatical
   assert.equal(puts().length, 0);
 });
 
+test('2D furniture movement uses metres, snaps at drop and preserves identity and dimensions', () => {
+  const { positionSceneObject } = loadSource('src/components/twin/twinObjectPlacement.ts');
+  const { roomShapePoints } = loadSource('src/components/twin/twinDrafting.ts');
+  const object = { id: 'chair', kind: 'CHAIR', x: 1, z: 1, width: .45, depth: .5, height: .9, rotation: 45 };
+  const room = { shape: 'RECTANGLE', points: roomShapePoints('RECTANGLE') };
+  const before = structuredClone(object);
+  const preview = positionSceneObject(object, 2.17, 3.36, room, 6, 5);
+  assert.equal(preview.x, 2.17);
+  assert.equal(preview.z, 3.36);
+  const drop = positionSceneObject(preview, preview.x, preview.z, room, 6, 5, .5);
+  assert.deepEqual(drop, { ...object, x: 2, z: 3.5 });
+  assert.deepEqual(object, before);
+});
+
+test('2D furniture cannot drop into the cutout of an L-shaped room', () => {
+  const { positionSceneObject } = loadSource('src/components/twin/twinObjectPlacement.ts');
+  const { roomShapePoints, pointInPolygon } = loadSource('src/components/twin/twinDrafting.ts');
+  const room = { shape: 'L_SHAPE', points: roomShapePoints('L_SHAPE') };
+  const object = { id: 'table', kind: 'TABLE', x: 1, z: 1, width: 1, depth: 1, height: .75, rotation: 0 };
+  for (const [x, z] of [[5, 5], [-100, -100], [100, 100]]) {
+    const moved = positionSceneObject(object, x, z, room, 6, 6, .5);
+    assert.ok(pointInPolygon({ x: moved.x / 6, y: moved.z / 6 }, room.points));
+  }
+});
+
+test('2D opening movement attaches to diagonal walls and preserves opening properties', () => {
+  const { positionSceneObject } = loadSource('src/components/twin/twinObjectPlacement.ts');
+  const room = { shape: 'CUSTOM', points: [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 0, y: 1 }] };
+  const door = { id: 'door', kind: 'DOOR', x: 1, z: 0, width: .9, depth: .12, height: 2.1, rotation: 0 };
+  const moved = positionSceneObject(door, 2.6, 2.5, room, 5, 5);
+  assert.ok(Math.abs(moved.x + moved.z - 5) < .001);
+  assert.ok(Math.abs(moved.rotation + 135) < .001);
+  assert.equal(moved.height, 2.1);
+  assert.equal(moved.id, door.id);
+});
+
+test('furniture move handles are exclusive to edit mode and have accessible names', () => {
+  const { TwinObjectPlan } = loadSource('src/components/twin/TwinObjectPlan.tsx');
+  const { roomShapePoints } = loadSource('src/components/twin/twinDrafting.ts');
+  const props = { room: { roomId: 'living', x: .1, y: .1, width: .4, height: .4 }, metadata: { shape: 'RECTANGLE', points: roomShapePoints('RECTANGLE'), objects: [{ id: 'chair', kind: 'CHAIR', x: 1, z: 1, width: .45, depth: .5, height: .9, rotation: 0 }] } };
+  const view = renderToString(React.createElement(TwinObjectPlan, props));
+  const edit = renderToString(React.createElement(TwinObjectPlan, { ...props, editable: true }));
+  assert.ok(!view.includes('<button'));
+  assert.ok(edit.includes('aria-label="Di chuyển ghế"'));
+});
+
 test('demo furniture keeps the saved world footprint, rotation and explicit mounting height', () => {
   const { interiorTransform } = loadSource('src/components/twin/interior/interiorLayout.ts');
   const { furnitureFootprint } = loadSource('src/components/twin/neonplan/model.ts');
@@ -952,4 +1051,22 @@ test('device focus keeps a useful existing angle and approaches wall devices fro
   }
   visual.userData.modelMount = 'floor';
   assert.equal(nodeFocusAngles(root, 2.4, 1.05).theta, 2.4);
+});
+
+test('2D captions are only shown where they do not cover another marker or caption', () => {
+  const { visibleCaptions } = viewport2d;
+  const far = visibleCaptions([{ key: 'a', x: 100, y: 100, label: 'TV', priority: 1 }, { key: 'b', x: 300, y: 100, label: 'Quạt', priority: 1 }]);
+  assert.deepEqual([...far].sort(), ['a', 'b']);
+  // b sits right under a: a's caption would cover b's icon, and b (a sensor) loses to the device.
+  const stacked = visibleCaptions([{ key: 'a', x: 100, y: 100, label: 'TV phòng khách', priority: 1 }, { key: 'b', x: 110, y: 140, label: 'Nhiệt độ', priority: 0 }]);
+  assert.ok(!stacked.has('a'), 'caption that would cover a neighbour icon is hidden');
+  const side = visibleCaptions([{ key: 'a', x: 100, y: 100, label: 'Điều hòa phòng khách', priority: 1 }, { key: 'b', x: 150, y: 100, label: 'Độ ẩm', priority: 0 }]);
+  assert.deepEqual([...side], ['a'], 'colliding captions keep the higher priority one');
+  assert.ok(visibleCaptions([{ key: 'a', x: 100, y: 100, label: 'Đèn', priority: 0 }, { key: 'b', x: 150, y: 100, label: 'Quạt đứng', priority: 2 }]).has('b'), 'selected node wins');
+});
+
+test('2D captions are hidden for markers stacked on the same spot', () => {
+  const { visibleCaptions } = viewport2d;
+  const shown = visibleCaptions([{ key: 'lamp', x: 100, y: 100, label: 'Đèn cây', priority: 1 }, { key: 'camera', x: 104, y: 98, label: 'Camera', priority: 1 }]);
+  assert.equal(shown.size, 0);
 });

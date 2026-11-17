@@ -1,4 +1,5 @@
 import React from 'react';
+import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 
 export type SidebarItem = {
   id: string;
@@ -12,6 +13,8 @@ export interface AppSidebarProps {
   items: SidebarItem[];
   contextLabel?: string;
   showSystemSummary?: boolean;
+  compact?: boolean;
+  onToggleCompact?: () => void;
 }
 
 export const HomeIcon = () => (
@@ -21,10 +24,17 @@ export const HomeIcon = () => (
   </svg>
 );
 
+/** HESTA "H" mark, traced from logo/concepts-v7 (hesta-logo-13); inherits currentColor. */
+export const HestaLogoMark: React.FC<{ className?: string }> = ({ className = 'h-6 w-auto' }) => (
+  <svg aria-hidden="true" className={className} viewBox="0 0 512 800" fill="currentColor">
+    <path d="M0 0H160V300H320V380H352V80H512V800H352V540H192V460H160V720H0Z" />
+  </svg>
+);
+
 export const BrandMark: React.FC<{ compact?: boolean }> = ({ compact = false }) => (
   <div className="flex items-center gap-3">
-    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary text-white shadow-soft">
-      <HomeIcon />
+    <div className="flex h-11 w-11 shrink-0 items-center justify-center text-text">
+      <HestaLogoMark className="h-10 w-auto" />
     </div>
     {compact ? null : (
       <div>
@@ -84,6 +94,8 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
   items,
   contextLabel = 'Không gian sống',
   showSystemSummary = true,
+  compact = false,
+  onToggleCompact,
 }) => {
   const isItemActive = (itemId: string) => {
     if (itemId === activeItem) return true;
@@ -97,13 +109,13 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
   };
 
   return (
-    <aside className="app-sidebar fixed inset-y-0 left-0 z-30 hidden w-64 flex-col overflow-y-auto p-5 lg:flex">
-      <div className="px-2 py-1">
-        <BrandMark />
+    <aside className={`app-sidebar fixed inset-y-0 left-0 z-30 hidden flex-col overflow-y-auto lg:flex ${compact ? 'w-20 p-3' : 'w-64 p-5'}`}>
+      <div className={compact ? 'flex justify-center py-1' : 'px-2 py-1'}>
+        <BrandMark compact={compact} />
       </div>
 
-      <div className="mt-8 px-3 text-xs font-semibold text-muted">{contextLabel}</div>
-      <nav aria-label="Điều hướng chính" className="mt-3 space-y-1.5">
+      <div className={compact ? 'sr-only' : 'mt-8 px-3 text-xs font-semibold text-muted'}>{contextLabel}</div>
+      <nav aria-label="Điều hướng chính" className={`${compact ? 'mt-8' : 'mt-3'} space-y-1.5`}>
         {items.map((item) => {
           const active = isItemActive(item.id);
           return (
@@ -111,21 +123,35 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
               key={item.id}
               type="button"
               aria-current={active ? 'page' : undefined}
+              aria-label={item.label}
+              title={compact ? item.label : undefined}
               onClick={item.onClick}
-              className={`flex w-full items-center gap-3 rounded-2xl px-3.5 py-3 text-left text-sm font-semibold transition-colors active:translate-y-px ${
+              className={`flex min-h-12 w-full items-center rounded-2xl py-3 text-left text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary active:translate-y-px ${compact ? 'justify-center' : 'gap-3 px-3.5'} ${
                 active
-                  ? 'bg-sidebar-active text-sky-800 font-bold border-r-4 border-primary shadow-xs'
+                  ? `bg-sidebar-active font-bold text-primary shadow-xs ${compact ? '' : 'border-r-4 border-primary'}`
                   : 'text-muted hover:bg-sidebar-hover hover:text-text'
               }`}
             >
               <span className={active ? 'text-primary' : 'text-icon'}>{item.icon}</span>
-              {item.label}
+              <span className={compact ? 'sr-only' : undefined}>{item.label}</span>
             </button>
           );
         })}
       </nav>
 
-      {showSystemSummary ? (
+      {onToggleCompact ? <button
+        type="button"
+        aria-label={compact ? 'Mở rộng điều hướng HESTA' : 'Thu gọn điều hướng HESTA'}
+        title={compact ? 'Mở rộng điều hướng HESTA' : 'Thu gọn điều hướng HESTA'}
+        aria-expanded={!compact}
+        onClick={onToggleCompact}
+        className={`mt-auto flex min-h-12 shrink-0 items-center rounded-2xl text-sm font-semibold text-muted hover:bg-sidebar-hover hover:text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${compact ? 'justify-center' : 'gap-3 px-3.5'}`}
+      >
+        {compact ? <PanelLeftOpen aria-hidden="true" size={20} /> : <PanelLeftClose aria-hidden="true" size={20} />}
+        <span className={compact ? 'sr-only' : undefined}>Thu gọn điều hướng</span>
+      </button> : null}
+
+      {showSystemSummary && !compact ? (
         <div className="mt-auto rounded-2xl border border-line bg-white/80 p-4">
           <div className="flex items-center gap-2 text-sm font-semibold text-text">
             <span className="status-pulse h-2 w-2 rounded-full bg-success" />

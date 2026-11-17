@@ -1,3 +1,4 @@
+import { confirmDialog } from '../ui/confirmDialog';
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { useNavigate } from 'react-router';
@@ -214,7 +215,7 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
 
   const handleRemoveDevice = async () => {
     if (!device) return;
-    if (window.confirm(`Bạn có chắc chắn muốn xóa thiết bị "${device.name}"?`)) {
+    if (await confirmDialog({ title: `Xóa thiết bị "${device.name}"?`, description: 'Thiết bị sẽ bị gỡ khỏi ngôi nhà.', confirmText: 'Xóa thiết bị', variant: 'danger' })) {
       try {
         await removeDevice(device.id);
         notify.success('Đã xóa thiết bị');

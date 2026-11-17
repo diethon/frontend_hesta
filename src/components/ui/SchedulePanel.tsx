@@ -1,3 +1,4 @@
+import { confirmDialog } from './confirmDialog';
 import { useEffect, useState, type FormEvent } from 'react';
 import { deleteSchedule, getSchedules, saveSchedule } from '../../services/scheduleApi';
 import type { Schedule } from '../../types/schedule';
@@ -50,7 +51,7 @@ export function SchedulePanel({ homeId, kind, targetId }: Props) {
   };
 
   const remove = async (item: Schedule) => {
-    if (!window.confirm('Xóa lịch này?')) return;
+    if (!await confirmDialog({ title: 'Xóa lịch này?', description: 'Lịch sẽ không còn tự chạy nữa.', confirmText: 'Xóa lịch', variant: 'danger' })) return;
     setError('');
     try { await deleteSchedule(homeId, kind, targetId, item.id); await refresh(); }
     catch (caught) { setError(caught instanceof Error ? caught.message : 'Không thể xóa lịch.'); }

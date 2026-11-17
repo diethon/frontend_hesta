@@ -1,13 +1,13 @@
 export const CAMERA_MIN_POLAR = .06;
-export const CAMERA_MAX_POLAR = Math.PI / 2 - .08;
+export const CAMERA_MAX_POLAR = Math.PI * .36;
 
 export const cameraViews = [
-  { id: 'isometric', label: 'Phối cảnh', theta: .68, phi: 1.0 },
+  { id: 'isometric', label: 'Phối cảnh', theta: Math.PI / 4, phi: Math.atan(Math.SQRT2) },
   { id: 'top', label: 'Từ trên', theta: 0, phi: CAMERA_MIN_POLAR },
-  { id: 'front', label: 'Mặt trước', theta: 0, phi: 1.08 },
-  { id: 'right', label: 'Bên phải', theta: Math.PI / 2, phi: 1.08 },
-  { id: 'back', label: 'Mặt sau', theta: Math.PI, phi: 1.08 },
-  { id: 'left', label: 'Bên trái', theta: -Math.PI / 2, phi: 1.08 },
+  { id: 'front', label: 'Mặt trước', theta: 0, phi: 0.95 },
+  { id: 'right', label: 'Bên phải', theta: Math.PI / 2, phi: 0.95 },
+  { id: 'back', label: 'Mặt sau', theta: Math.PI, phi: 0.95 },
+  { id: 'left', label: 'Bên trái', theta: -Math.PI / 2, phi: 0.95 },
 ] as const;
 
 export type TwinCameraView = typeof cameraViews[number]['id'];

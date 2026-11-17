@@ -1,0 +1,94 @@
+.twin-smart-marker,
+.twin-room-marker-cluster {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--color-line);
+  border-radius: 50%;
+  background: var(--color-surface);
+  color: var(--color-muted);
+  box-shadow: 0 3px 10px color-mix(in srgb, var(--color-text) 12%, transparent);
+  cursor: pointer;
+  transition: transform 180ms ease, opacity 180ms ease;
+}
+
+.twin-smart-marker > span:first-child {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+}
+
+.twin-smart-marker[data-status="on"],
+.twin-smart-marker[data-status="online"] { color: var(--color-success); }
+.twin-smart-marker[data-status="off"] { color: var(--color-off); }
+.twin-smart-marker[data-status="offline"] { color: var(--color-muted); opacity: .8; }
+.twin-smart-marker[data-status="error"] { color: var(--color-error); border-color: var(--color-error); }
+.twin-smart-marker[data-status="warning"],
+.twin-room-marker-cluster[data-status="warning"] { color: var(--color-warning); border-color: var(--color-warning); }
+.twin-smart-marker[data-status="pending"] { color: var(--color-primary-hover); }
+
+.twin-smart-marker[aria-pressed="true"] {
+  color: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-primary) 20%, transparent), 0 3px 10px color-mix(in srgb, var(--color-text) 12%, transparent);
+}
+
+.twin-smart-marker:hover,
+.twin-room-marker-cluster:hover { transform: translateY(-2px); }
+.twin-smart-marker:focus-visible,
+.twin-room-marker-cluster:focus-visible { outline: 3px solid var(--color-primary); outline-offset: 3px; }
+
+.twin-smart-marker-status {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  display: grid;
+  width: 17px;
+  height: 17px;
+  place-items: center;
+  border: 2px solid var(--color-surface);
+  border-radius: 50%;
+  background: var(--color-off-soft);
+}
+
+.twin-smart-marker-tooltip {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  display: grid;
+  gap: 3px;
+  width: max-content;
+  max-width: 210px;
+  padding: 9px 12px;
+  border: 1px solid var(--color-line);
+  border-radius: 12px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  text-align: left;
+  font-size: 11px;
+  line-height: 1.45;
+  box-shadow: 0 6px 20px color-mix(in srgb, var(--color-text) 12%, transparent);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translate(-50%, 3px);
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.twin-smart-marker-tooltip > span { color: var(--color-muted); }
+.twin-smart-marker:hover .twin-smart-marker-tooltip,
+.twin-smart-marker:focus-visible .twin-smart-marker-tooltip { opacity: 1; visibility: visible; transform: translate(-50%, 0); }
+.twin-room-marker-cluster { width: auto; min-width: 48px; gap: 5px; padding: 0 9px; border-radius: 18px; color: var(--color-primary-hover); font-size: 12px; font-weight: 700; }
+
+@media (pointer: coarse) {
+  .twin-smart-marker, .twin-room-marker-cluster { min-width: 44px; height: 44px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .twin-smart-marker, .twin-room-marker-cluster, .twin-smart-marker-tooltip { transition: none; }
+}
