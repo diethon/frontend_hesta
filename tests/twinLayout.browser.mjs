@@ -130,7 +130,7 @@ try {
   const vertexBefore = await evaluate(`document.querySelector(${JSON.stringify(vertexSelector)}).getAttribute('style')`);
   await drag(vertexSelector, -22, 14);
   check('corner drag updates one editable room vertex', vertexBefore !== await evaluate(`document.querySelector(${JSON.stringify(vertexSelector)}).getAttribute('style')`));
-  await click('Nhập kích thước');
+  await click('Nhập số đo (m)');
   check('optional metric editor is available without changing API geometry', await evaluate(`(() => { const input = [...document.querySelectorAll('label')].find(e => e.textContent.trim() === 'Chiều rộng (m)')?.querySelector('input'); return !!input && !input.disabled; })()`));
   await field('Chiều rộng (m)', 4.2);
   await waitFor(`document.querySelector('[data-room-id="${initialRoom.roomId}"]').textContent.includes('4.2 m')`);

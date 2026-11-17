@@ -24,7 +24,7 @@ export function TwinDeviceCard({ deviceId }: { deviceId: string }) {
   return (
     <article aria-label={`Thiết bị ${device.name}`} className="min-w-0 rounded-2xl border border-line bg-surface p-4">
       <div className="flex items-start gap-3">
-        <DeviceGlyph deviceType={device.deviceType} />
+        <DeviceGlyph deviceType={device.deviceType} name={device.name} />
         <div className="min-w-0 flex-1">
           <h4 className="break-words font-semibold">{device.name}</h4>
           <p className="mt-1 text-xs text-muted">{device.deviceType}</p>

@@ -9,14 +9,15 @@ type ObjectDrag = {
   origin: TwinSceneObject; preview: TwinSceneObject;
 };
 
-export function TwinObjectPlan({ room, metadata, editable = false, selected = false, gridStep, onSelectRoom, onChange }: {
-  room: TwinRoomLayout; metadata: TwinRoomDrafting; editable?: boolean; selected?: boolean; gridStep?: number;
+export function TwinObjectPlan({ room, metadata, editable = false, gridStep, selectedObjectId = null, onSelectObject, onSelectRoom, onChange }: {
+  room: TwinRoomLayout; metadata: TwinRoomDrafting; editable?: boolean; gridStep?: number;
+  selectedObjectId?: string | null; onSelectObject?: (id: string) => void;
   onSelectRoom?: () => void; onChange?: (next: TwinRoomDrafting) => void;
 }) {
   const world = roomToWorld(room);
   const drag = useRef<ObjectDrag | null>(null);
   const [preview, setPreview] = useState<TwinSceneObject | null>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const setSelectedId = (id: string) => onSelectObject?.(id);
   const update = (object: TwinSceneObject) => onChange?.({ ...metadata, objects: metadata.objects?.map(item => item.id === object.id ? object : item) });
   const finish = (event: PointerEvent<HTMLButtonElement>, cancel = false) => {
     const current = drag.current;
@@ -31,13 +32,13 @@ export function TwinObjectPlan({ room, metadata, editable = false, selected = fa
   return <div className="pointer-events-none absolute inset-0 z-10" style={{ clipPath: polygonCss(metadata.points) }}>
     {metadata.objects?.map(original => {
       const object = preview?.id === original.id ? preview : original;
-      const active = selected && selectedId === object.id;
+      const active = selectedObjectId === object.id;
       const label = sceneObjectLabels[object.kind];
       return <span key={object.id} data-scene-object={object.id} data-object-kind={object.kind} data-x={object.x} data-z={object.z}
-        className="absolute" style={{ left: `${object.x / world.width * 100}%`, top: `${object.z / world.depth * 100}%`, width: `${object.width / world.width * 100}%`, height: `${object.depth / world.depth * 100}%`, transform: `translate(-50%, -50%) rotate(${-object.rotation}deg)` }}>
+        className={`absolute ${active ? 'z-20' : ''}`} style={{ left: `${object.x / world.width * 100}%`, top: `${object.z / world.depth * 100}%`, width: `${object.width / world.width * 100}%`, height: `${object.depth / world.depth * 100}%`, transform: `translate(-50%, -50%) rotate(${-object.rotation}deg)` }}>
         <span aria-hidden="true" className={`absolute inset-0 border ${active ? 'border-primary bg-info-soft ring-2 ring-primary' : object.kind === 'WINDOW' ? 'border-primary bg-info-soft' : object.kind === 'DOOR' ? 'border-icon bg-surface' : 'border-icon bg-twin-fabric'}`} />
         {editable ? <button type="button" aria-label={`Di chuyển ${label.toLowerCase()}`} aria-pressed={active} title={`${label} · Kéo để di chuyển · Phím mũi tên để căn chỉnh`}
-          className="pointer-events-auto absolute left-1/2 top-1/2 h-full min-h-11 w-full min-w-11 -translate-1/2 touch-none cursor-move rounded-sm focus-visible:outline-2 focus-visible:outline-primary"
+          className="pointer-events-auto absolute left-1/2 top-1/2 h-full min-h-11 w-full min-w-11 -translate-1/2 touch-none cursor-move rounded-sm hover:ring-2 hover:ring-primary/50 focus-visible:outline-2 focus-visible:outline-primary"
           onClick={(event) => { event.stopPropagation(); setSelectedId(object.id); onSelectRoom?.(); }}
           onPointerDown={(event) => {
             if (event.button !== 0 || drag.current) return;
@@ -73,6 +74,7 @@ export function TwinObjectPlan({ room, metadata, editable = false, selected = fa
             update(positionSceneObject(object, object.x + direction[0] * step, object.z + direction[1] * step, metadata, world.width, world.depth, event.shiftKey ? undefined : gridStep));
           }}
         /> : null}
+        {active ? <span aria-hidden="true" className="pointer-events-none absolute bottom-full left-1/2 mb-1 -translate-x-1/2 whitespace-nowrap rounded-md bg-primary px-1.5 py-0.5 text-[10px] font-semibold text-surface shadow-soft" style={{ transform: `translateX(-50%) rotate(${object.rotation}deg)` }}>{label}</span> : null}
       </span>;
     })}
   </div>;

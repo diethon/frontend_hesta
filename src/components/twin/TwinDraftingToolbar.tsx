@@ -1,4 +1,4 @@
-import { FlipHorizontal2, FlipVertical2, Grid3X3, ImagePlus, Info, Magnet, PencilRuler, RotateCcw, RotateCw, Ruler, Trash2 } from 'lucide-react';
+import { ChevronDown, FlipHorizontal2, FlipVertical2, Grid3X3, ImagePlus, Info, Magnet, PencilRuler, RotateCcw, RotateCw, Ruler, Trash2 } from 'lucide-react';
 import { useId, useState } from 'react';
 import type { TwinLayoutSelection } from '../../types/twinLayout';
 import {
@@ -70,23 +70,22 @@ export function TwinDraftingToolbar({ metadata, selection, floor, disabled, mode
     reader.readAsDataURL(file);
   };
 
-  return <section aria-label="Công cụ dựng mặt bằng" className="surface-card space-y-4 p-4">
-    <label className="flex min-h-11 items-center gap-3 text-xs font-semibold text-muted">Bước lưới (m)<select disabled={disabled} value={metadata.settings.gridMeters ?? .5} onChange={(event) => onChange({ ...metadata, settings: { ...metadata.settings, gridMeters: Number(event.target.value) } })} className="min-h-11 rounded-xl border border-line bg-surface px-3 text-text">{[.25, .5, 1].map((step) => <option key={step} value={step}>{step} m</option>)}</select></label>
+  return <section aria-label="Công cụ dựng mặt bằng" className="surface-card space-y-3 p-4">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div>
         <h2 className="font-semibold text-text">Dựng mặt bằng</h2>
-        <p className="mt-1 text-xs text-muted">Vẽ trước, tinh chỉnh số đo khi cần.</p>
+        <p className="mt-1 text-xs text-muted">{mode === 'quick' ? 'Kéo phòng và các góc trên sơ đồ.' : 'Nhập kích thước thật của phòng đang chọn ở khung bên phải.'}</p>
       </div>
       <div className="flex rounded-xl border border-line bg-app p-1" aria-label="Phương thức thiết kế">
-        <button type="button" aria-pressed={mode === 'quick'} onClick={() => onModeChange('quick')} className={`flex min-h-10 items-center gap-2 rounded-lg px-3 text-xs font-semibold ${mode === 'quick' ? 'bg-surface text-primary-hover shadow-soft' : 'text-muted'}`}><PencilRuler size={16} aria-hidden="true" />Vẽ nhanh</button>
-        <button type="button" aria-pressed={mode === 'precise'} onClick={() => onModeChange('precise')} className={`flex min-h-10 items-center gap-2 rounded-lg px-3 text-xs font-semibold ${mode === 'precise' ? 'bg-surface text-primary-hover shadow-soft' : 'text-muted'}`}><Ruler size={16} aria-hidden="true" />Nhập kích thước</button>
+        <button type="button" aria-pressed={mode === 'quick'} onClick={() => onModeChange('quick')} className={`flex min-h-10 items-center gap-2 rounded-lg px-3 text-xs font-semibold ${mode === 'quick' ? 'bg-surface text-primary-hover shadow-soft' : 'text-muted'}`}><PencilRuler size={16} aria-hidden="true" />Kéo thả</button>
+        <button type="button" aria-pressed={mode === 'precise'} onClick={() => onModeChange('precise')} className={`flex min-h-10 items-center gap-2 rounded-lg px-3 text-xs font-semibold ${mode === 'precise' ? 'bg-surface text-primary-hover shadow-soft' : 'text-muted'}`}><Ruler size={16} aria-hidden="true" />Nhập số đo (m)</button>
       </div>
     </div>
 
     <div>
       <p className="mb-2 text-xs font-semibold text-text">Hình phòng đang chọn</p>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        {shapes.map((shape) => <button key={shape.value} type="button" aria-label={shape.label} aria-pressed={roomShape === shape.value} disabled={disabled || !selectedRoomId} onClick={() => selectedRoomId && onChange(changeRoomShape(metadata, selectedRoomId, shape.value))} className={`flex min-h-14 items-center gap-2 rounded-xl border px-3 text-left text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-45 ${roomShape === shape.value ? 'border-primary bg-info-soft text-primary-hover' : 'border-line bg-surface text-text hover:bg-sidebar-hover'}`}>
+        {shapes.map((shape) => <button key={shape.value} type="button" aria-label={shape.label} aria-pressed={roomShape === shape.value} disabled={disabled || !selectedRoomId} onClick={() => selectedRoomId && onChange(changeRoomShape(metadata, selectedRoomId, shape.value))} className={`flex min-h-11 items-center gap-2 rounded-xl border px-3 text-left text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-45 ${roomShape === shape.value ? 'border-primary bg-info-soft text-primary-hover' : 'border-line bg-surface text-text hover:bg-sidebar-hover'}`}>
           <ShapePreview shape={shape.value} /><span>{shape.shortLabel}</span>
         </button>)}
       </div>
@@ -105,17 +104,19 @@ export function TwinDraftingToolbar({ metadata, selection, floor, disabled, mode
     </div>
 
     <div className="grid gap-2 sm:grid-cols-2">
-      <button type="button" aria-label="Bắt lưới" aria-pressed={metadata.settings.gridSnap} disabled={disabled} onClick={() => onChange({ ...metadata, settings: { ...metadata.settings, gridSnap: !metadata.settings.gridSnap } })} className={`flex min-h-12 items-center gap-3 rounded-xl border px-3 text-left text-sm font-semibold ${metadata.settings.gridSnap ? 'border-primary bg-info-soft text-primary-hover' : 'border-line bg-surface text-muted'}`}><Grid3X3 size={18} aria-hidden="true" /><span>Bắt lưới<small className="block font-normal text-muted">{metadata.settings.gridMeters ?? .5} m trên mặt bằng</small></span></button>
+      <div className={`flex min-h-12 items-center gap-2 rounded-xl border pr-2 ${metadata.settings.gridSnap ? 'border-primary bg-info-soft' : 'border-line bg-surface'}`}>
+        <button type="button" aria-label="Bắt lưới" aria-pressed={metadata.settings.gridSnap} disabled={disabled} onClick={() => onChange({ ...metadata, settings: { ...metadata.settings, gridSnap: !metadata.settings.gridSnap } })} className={`flex min-h-12 min-w-0 flex-1 items-center gap-3 px-3 text-left text-sm font-semibold ${metadata.settings.gridSnap ? 'text-primary-hover' : 'text-muted'}`}><Grid3X3 size={18} aria-hidden="true" /><span>Bắt lưới<small className="block font-normal text-muted">Phòng hít vào ô lưới khi kéo</small></span></button>
+        <select aria-label="Bước lưới" disabled={disabled} value={metadata.settings.gridMeters ?? .5} onChange={(event) => onChange({ ...metadata, settings: { ...metadata.settings, gridMeters: Number(event.target.value) } })} className="min-h-10 shrink-0 rounded-lg border border-line bg-surface px-2 text-xs text-text">{[.25, .5, 1].map((step) => <option key={step} value={step}>{step} m</option>)}</select>
+      </div>
       <button type="button" aria-pressed={metadata.settings.edgeSnap} disabled={disabled} onClick={() => onChange({ ...metadata, settings: { ...metadata.settings, edgeSnap: !metadata.settings.edgeSnap } })} className={`flex min-h-12 items-center gap-3 rounded-xl border px-3 text-left text-sm font-semibold ${metadata.settings.edgeSnap ? 'border-primary bg-info-soft text-primary-hover' : 'border-line bg-surface text-muted'}`}><Magnet size={18} aria-hidden="true" /><span>Bắt cạnh<small className="block font-normal text-muted">Căn theo tường phòng gần nhất</small></span></button>
     </div>
 
-    <div className="rounded-xl border border-line bg-app p-3">
-      <div className="flex items-start gap-3">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-info-soft text-primary-hover"><ImagePlus size={19} aria-hidden="true" /></span>
-        <div><p className="text-sm font-semibold text-text">Dùng ảnh bản vẽ làm nền <span className="font-normal text-muted">(không bắt buộc)</span></p><p className="mt-1 text-xs leading-5 text-muted">Ảnh sẽ nằm mờ phía dưới sơ đồ tầng {floor}. Bạn kéo các phòng trùng theo đường tường trong ảnh — hệ thống không tự nhận diện hay tự tạo phòng.</p></div>
-      </div>
+    <details className="group rounded-xl border border-line bg-app">
+      <summary className="flex min-h-11 cursor-pointer items-center gap-2 px-3 text-xs font-semibold text-text"><ImagePlus size={16} aria-hidden="true" className="text-muted" />Ảnh bản vẽ làm nền <span className="font-normal text-muted">(không bắt buộc)</span>{blueprint ? <span className="rounded-full bg-info-soft px-2 py-0.5 text-[11px] text-primary-hover">Đang dùng ảnh nền</span> : null}<ChevronDown size={16} aria-hidden="true" className="ml-auto text-muted transition-transform group-open:rotate-180" /></summary>
+      <div className="space-y-3 border-t border-line p-3">
+      <p className="text-xs leading-5 text-muted">Ảnh nằm mờ phía dưới sơ đồ tầng {floor} để bạn kéo phòng trùng theo đường tường. Hệ thống không tự nhận diện hay tự tạo phòng từ ảnh.</p>
 
-      <ol className="mt-3 grid gap-2 text-xs text-muted sm:grid-cols-3">
+      <ol className="grid gap-2 text-xs text-muted sm:grid-cols-3">
         <li className="rounded-lg bg-surface px-3 py-2"><strong className="block text-text">1. Chọn ảnh</strong>JPG, PNG hoặc WebP dưới 2 MB.</li>
         <li className="rounded-lg bg-surface px-3 py-2"><strong className="block text-text">2. Chỉnh độ mờ</strong>Để nhìn thấy cả ảnh và phòng.</li>
         <li className="rounded-lg bg-surface px-3 py-2"><strong className="block text-text">3. Vẽ đè</strong>Kéo phòng và các điểm góc theo ảnh.</li>
@@ -134,7 +135,8 @@ export function TwinDraftingToolbar({ metadata, selection, floor, disabled, mode
         </label>
       </div> : <label htmlFor={uploadId} className={`mt-3 flex min-h-16 cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-primary bg-info-soft px-4 text-sm font-semibold text-primary-hover hover:bg-sidebar-hover ${disabled ? 'pointer-events-none opacity-45' : ''}`}><ImagePlus size={18} aria-hidden="true" />Chọn ảnh bản vẽ từ máy</label>}
       {uploadError ? <p role="alert" className="mt-2 text-xs font-medium text-error">{uploadError}</p> : null}
-      <p className="mt-3 flex items-start gap-2 text-xs leading-5 text-muted"><Info size={15} className="mt-0.5 shrink-0" aria-hidden="true" />Ảnh chỉ là lớp tham chiếu trên trình duyệt này, không được tải lên Backend và không xuất hiện trên thiết bị khác.</p>
-    </div>
+      <p className="mt-3 flex items-start gap-2 text-xs leading-5 text-muted"><Info size={15} className="mt-0.5 shrink-0" aria-hidden="true" />Ảnh chỉ dùng tạm khi chỉnh và không được lưu. Tải lại trang hoặc lưu bố cục thì ảnh sẽ mất.</p>
+      </div>
+    </details>
   </section>;
 }

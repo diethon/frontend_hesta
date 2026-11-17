@@ -29,6 +29,22 @@ export function resizeRoom(room: TwinRoomLayout, width: number, height: number) 
   return { ...room, width: Math.max(0.001, clampCoordinate(width, 1 - room.x)), height: Math.max(0.001, clampCoordinate(height, 1 - room.y)) };
 }
 
+export type TwinResizeEdge = 'n' | 'e' | 's' | 'w';
+
+/** Move one side of the room; the opposite side stays where it is. */
+export function resizeRoomEdge(room: TwinRoomLayout, edge: TwinResizeEdge, dx: number, dy: number): TwinRoomLayout {
+  const right = room.x + room.width;
+  const bottom = room.y + room.height;
+  if (edge === 'e') return resizeRoom(room, room.width + dx, room.height);
+  if (edge === 's') return resizeRoom(room, room.width, room.height + dy);
+  if (edge === 'w') {
+    const x = clampCoordinate(Math.min(room.x + dx, right - 0.001));
+    return { ...room, x, width: round(right - x) };
+  }
+  const y = clampCoordinate(Math.min(room.y + dy, bottom - 0.001));
+  return { ...room, y, height: round(bottom - y) };
+}
+
 export function defaultRoom(roomId: string, count: number, floor?: number): TwinRoomLayout {
   return { roomId, x: round(0.04 + (count % 2) * 0.48), y: round(0.04 + (Math.floor(count / 2) % 2) * 0.46), width: 0.44, height: 0.4, ...(floor ? { floor } : {}) };
 }
@@ -48,9 +64,10 @@ function nearestSnap(value: number, candidates: readonly number[]) {
   return distance <= TWIN_EDGE_SNAP_DISTANCE ? nearest : value;
 }
 
-export function snapRoom(room: TwinRoomLayout, others: readonly TwinRoomLayout[], options: TwinSnapOptions, resize = false) {
+export function snapRoom(room: TwinRoomLayout, others: readonly TwinRoomLayout[], options: TwinSnapOptions, resize: boolean | TwinResizeEdge = false) {
   let next = clampRoom(room);
   const guides: TwinSnapGuides = { x: [], y: [] };
+  if (typeof resize === 'string') return snapRoomEdge(next, others, options, resize);
   if (options.grid) {
     if (resize) next = resizeRoom(next, snapToGrid(next.width, options.stepX), snapToGrid(next.height, options.stepY));
     else next = clampRoom({ ...next, x: snapToGrid(next.x, options.stepX), y: snapToGrid(next.y, options.stepY) });
@@ -77,6 +94,23 @@ export function snapRoom(room: TwinRoomLayout, others: readonly TwinRoomLayout[]
     next = clampRoom({ ...next, x: snappedX, y: snappedY });
   }
   return { room: next, guides };
+}
+
+// Snap only the dragged side so the opposite side never shifts.
+function snapRoomEdge(room: TwinRoomLayout, others: readonly TwinRoomLayout[], options: TwinSnapOptions, edge: TwinResizeEdge) {
+  const guides: TwinSnapGuides = { x: [], y: [] };
+  const horizontal = edge === 'e' || edge === 'w';
+  const sameFloor = others.filter((other) => (other.floor ?? 1) === (room.floor ?? 1) && other.roomId !== room.roomId);
+  const edges = sameFloor.flatMap((other) => horizontal ? [other.x, other.x + other.width] : [other.y, other.y + other.height]);
+  const current = edge === 'e' ? room.x + room.width : edge === 's' ? room.y + room.height : edge === 'w' ? room.x : room.y;
+  let target = options.grid ? snapToGrid(current, horizontal ? options.stepX : options.stepY) : current;
+  if (options.edges) {
+    const snapped = nearestSnap(target, edges);
+    if (snapped !== target) (horizontal ? guides.x : guides.y).push(snapped);
+    target = snapped;
+  }
+  const delta = target - current;
+  return { room: resizeRoomEdge(room, edge, horizontal ? delta : 0, horizontal ? 0 : delta), guides };
 }
 
 export function snapPoint(value: number, enabled: boolean, step = TWIN_GRID_STEP) {

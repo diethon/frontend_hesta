@@ -21,10 +21,11 @@ export function deviceVisualKind(type: string) {
 }
 
 export function sensorVisualKind(metric: string) {
-  switch (metric.toUpperCase()) {
+  // Some nodes report e.g. MOTION_SENSOR / LIGHT_SENSOR instead of the bare metric.
+  switch (metric.toUpperCase().replace(/_SENSOR$/, '')) {
     case 'TEMPERATURE': return 'temperature';
     case 'HUMIDITY': return 'humidity';
-    case 'LIGHT': case 'ILLUMINANCE': return 'light';
+    case 'LIGHT': case 'ILLUMINANCE': case 'LUX': return 'light';
     case 'MOTION': return 'motion';
     case 'AIR_QUALITY': return 'air';
     case 'CO2': return 'gas';
@@ -32,6 +33,12 @@ export function sensorVisualKind(metric: string) {
     default: return 'generic';
   }
 }
+
+const sensorLabels: Record<ReturnType<typeof sensorVisualKind>, string> = {
+  temperature: 'Nhiệt độ', humidity: 'Độ ẩm', light: 'Ánh sáng', motion: 'Chuyển động',
+  air: 'Không khí', gas: 'CO₂', smoke: 'Khói', generic: 'Cảm biến',
+};
+export const sensorLabel = (metric: string) => sensorLabels[sensorVisualKind(metric)];
 
 export function knownPower(state: unknown): boolean | null {
   if (!state || typeof state !== 'object' || Array.isArray(state)) return null;
