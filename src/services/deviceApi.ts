@@ -1,4 +1,4 @@
-import { apiClient } from './apiClient';
+import { apiClient, ApiError } from './apiClient';
 import type { DeviceEnergyBreakdown } from '../types/energy';
 import type {
   DeviceCommandResult,
@@ -28,6 +28,22 @@ export const invalidateDeviceMutations = (deviceId: string): void => {
   invalidateCache(`energy:device:${deviceId}`);
   invalidateCache('devices:home:');
 };
+
+function unwrapCommandResult(response: {
+  status?: number;
+  data?: { code?: number; result?: DeviceCommandResult };
+}): DeviceCommandResult {
+  const result = response.data?.result as DeviceCommandResult;
+  if (result && result.success === false) {
+    throw new ApiError(
+      result.message || 'Thiết bị không thể thực thi lệnh',
+      response.status,
+      response.data?.code,
+      result.errorCode
+    );
+  }
+  return result;
+}
 
 export interface DevicePublicPreviewResponse {
   deviceId: string;
@@ -116,7 +132,7 @@ export const sendDeviceCommand = async (
     parameters: parameters || {}
   });
   invalidateDeviceMutations(deviceId);
-  return response.data.result;
+  return unwrapCommandResult(response);
 };
 
 export const sendRoomCommand = async (
@@ -161,43 +177,43 @@ export const getDeviceOverrideHistory = async (deviceId: string): Promise<Manual
 export const setAcPower = async (deviceId: string, power: boolean): Promise<DeviceCommandResult> => {
   const response = await apiClient.post(`/devices/${deviceId}/air-conditioner/power?power=${power}`);
   invalidateDeviceMutations(deviceId);
-  return response.data.result;
+  return unwrapCommandResult(response);
 };
 
 export const setAcTemperature = async (deviceId: string, temperature: number): Promise<DeviceCommandResult> => {
   const response = await apiClient.post(`/devices/${deviceId}/air-conditioner/temperature?temperature=${temperature}`);
   invalidateDeviceMutations(deviceId);
-  return response.data.result;
+  return unwrapCommandResult(response);
 };
 
 export const adjustAcTempUp = async (deviceId: string): Promise<DeviceCommandResult> => {
   const response = await apiClient.post(`/devices/${deviceId}/air-conditioner/temperature-plus`);
   invalidateDeviceMutations(deviceId);
-  return response.data.result;
+  return unwrapCommandResult(response);
 };
 
 export const adjustAcTempDown = async (deviceId: string): Promise<DeviceCommandResult> => {
   const response = await apiClient.post(`/devices/${deviceId}/air-conditioner/temperature-minus`);
   invalidateDeviceMutations(deviceId);
-  return response.data.result;
+  return unwrapCommandResult(response);
 };
 
 export const setAcFan = async (deviceId: string, fan: string): Promise<DeviceCommandResult> => {
   const response = await apiClient.post(`/devices/${deviceId}/air-conditioner/fan?fan=${fan}`);
   invalidateDeviceMutations(deviceId);
-  return response.data.result;
+  return unwrapCommandResult(response);
 };
 
 export const setAcMode = async (deviceId: string, mode: string): Promise<DeviceCommandResult> => {
   const response = await apiClient.post(`/devices/${deviceId}/air-conditioner/mode?mode=${mode}`);
   invalidateDeviceMutations(deviceId);
-  return response.data.result;
+  return unwrapCommandResult(response);
 };
 
 export const setAcSwing = async (deviceId: string, enabled: boolean): Promise<DeviceCommandResult> => {
   const response = await apiClient.post(`/devices/${deviceId}/air-conditioner/swing?enabled=${enabled}`);
   invalidateDeviceMutations(deviceId);
-  return response.data.result;
+  return unwrapCommandResult(response);
 };
 
 export const getAcState = async (deviceId: string): Promise<DeviceCommandResult> => {
@@ -210,21 +226,21 @@ export const openGate = async (deviceId: string, nodeId?: string): Promise<Devic
   const params = nodeId ? `?nodeId=${nodeId}` : '';
   const response = await apiClient.post(`/devices/${deviceId}/gate/open${params}`);
   invalidateDeviceMutations(deviceId);
-  return response.data.result;
+  return unwrapCommandResult(response);
 };
 
 export const closeGate = async (deviceId: string, nodeId?: string): Promise<DeviceCommandResult> => {
   const params = nodeId ? `?nodeId=${nodeId}` : '';
   const response = await apiClient.post(`/devices/${deviceId}/gate/close${params}`);
   invalidateDeviceMutations(deviceId);
-  return response.data.result;
+  return unwrapCommandResult(response);
 };
 
 export const stopGate = async (deviceId: string, nodeId?: string): Promise<DeviceCommandResult> => {
   const params = nodeId ? `?nodeId=${nodeId}` : '';
   const response = await apiClient.post(`/devices/${deviceId}/gate/stop${params}`);
   invalidateDeviceMutations(deviceId);
-  return response.data.result;
+  return unwrapCommandResult(response);
 };
 
 export const getGateState = async (deviceId: string): Promise<{ deviceId: string; state: string; currentState: Record<string, unknown> }> => {

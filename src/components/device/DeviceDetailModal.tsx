@@ -99,6 +99,7 @@ const DeviceDetailInner: React.FC<DeviceDetailModalProps & { device: DetailDevic
       notify.warning('Bạn chỉ có quyền xem thiết bị này');
       return;
     }
+    if (disabled) return;
     setIsOn((prev) => !prev);
     onTogglePower?.();
   };

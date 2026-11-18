@@ -50,7 +50,8 @@ export function mapDeviceToUI(
 ): UIMappedDevice {
   const isOnline = d.status === 'ONLINE';
   const isUnknown = d.status === 'UNKNOWN';
-  const isOffline = d.status === 'OFFLINE' || isUnknown;
+  const isError = d.status === 'ERROR';
+  const isOffline = d.status === 'OFFLINE' || isUnknown || isError || d.status === 'UNCLAIMED';
   const isPowerOn =
     localPower[d.id] !== undefined
       ? localPower[d.id]
@@ -141,7 +142,7 @@ export function mapDeviceToUI(
   }
 
   // Construct status text
-  let statusText = isUnknown ? 'Không xác định' : isOffline ? 'Ngoại tuyến' : isPowerOn ? 'Đang bật' : 'Tắt';
+  let statusText = isUnknown ? 'Không xác định' : isError ? 'Lỗi thiết bị' : isOffline ? 'Ngoại tuyến' : isPowerOn ? 'Đang bật' : 'Tắt';
   if (isOnline) {
     if (type === 'Đèn') {
       statusText = isPowerOn ? `Đang bật · ${brightness}%` : 'Đã tắt';
