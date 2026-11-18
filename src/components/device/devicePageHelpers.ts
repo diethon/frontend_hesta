@@ -17,6 +17,7 @@ export interface UIMappedDevice {
   brightness?: number;
   manualOverrideUntil?: string | null;
   manualOverrideActive?: boolean;
+  accessLevel?: 'NONE' | 'VIEW' | 'CONTROL';
   raw?: DeviceResponse;
 }
 
@@ -49,7 +50,8 @@ export function mapDeviceToUI(
 ): UIMappedDevice {
   const isOnline = d.status === 'ONLINE';
   const isUnknown = d.status === 'UNKNOWN';
-  const isOffline = d.status === 'OFFLINE' || isUnknown;
+  const isError = d.status === 'ERROR';
+  const isOffline = d.status === 'OFFLINE' || isUnknown || isError || d.status === 'UNCLAIMED';
   const isPowerOn =
     localPower[d.id] !== undefined
       ? localPower[d.id]
@@ -85,7 +87,10 @@ export function mapDeviceToUI(
   } else if (
     typeUpper.includes('GATE') ||
     typeUpper.includes('ROLLING') ||
-    nameLower.includes('cổng')
+    typeUpper.includes('CURTAIN') ||
+    nameLower.includes('cổng') ||
+    nameLower.includes('cửa cuốn') ||
+    nameLower.includes('rèm')
   ) {
     type = 'Cổng';
     icon = 'door';
@@ -137,7 +142,7 @@ export function mapDeviceToUI(
   }
 
   // Construct status text
-  let statusText = isUnknown ? 'Không xác định' : isOffline ? 'Ngoại tuyến' : isPowerOn ? 'Đang bật' : 'Tắt';
+  let statusText = isUnknown ? 'Không xác định' : isError ? 'Lỗi thiết bị' : isOffline ? 'Ngoại tuyến' : isPowerOn ? 'Đang bật' : 'Tắt';
   if (isOnline) {
     if (type === 'Đèn') {
       statusText = isPowerOn ? `Đang bật · ${brightness}%` : 'Đã tắt';
@@ -196,6 +201,7 @@ export function mapDeviceToUI(
       (d.manualOverrideUntil
         ? new Date(d.manualOverrideUntil).getTime() > Date.now()
         : false),
+    accessLevel: d.accessLevel,
     raw: normalizedDevice,
   };
 }

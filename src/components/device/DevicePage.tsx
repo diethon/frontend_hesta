@@ -13,6 +13,8 @@ import {
   Filter,
   Power,
   Thermometer,
+  Search,
+  X,
 } from 'lucide-react';
 import { Icon } from '../home/HomeIcons';
 import { DashboardNavRail } from '../home/DashboardNavRail';
@@ -32,7 +34,7 @@ import {
 } from '../../services/deviceApi';
 import { getRooms } from '../../services/roomApi';
 import { getHomeEnergyAnalytics, energyAnalyticsKey } from '../../services/energyApi';
-import { peekCache } from '../../services/queryCache';
+import { peekCache, invalidateCache } from '../../services/queryCache';
 import type { DeviceResponse } from '../../types/device';
 import type { RoomResponse } from '../../types/room';
 import type { DeviceEnergyBreakdown } from '../../types/energy';
@@ -58,6 +60,16 @@ import './devices-page.css';
 // Re-export interface and helper to maintain backwards compatibility
 export type { UIMappedDevice } from './devicePageHelpers';
 export { mapDeviceToUI } from './devicePageHelpers';
+
+export function normalizeSearchText(value: string): string {
+  return (value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .toLowerCase()
+    .trim();
+}
 
 // ──────────────────────────────────────────────────────────────────────────
 // Subcomponents
@@ -248,6 +260,7 @@ function DevicesDeviceCard({
   const { isOverrideActive, formattedTime } = useOverrideCountdown(
     device.manualOverrideUntil
   );
+  const isViewOnly = device.accessLevel === 'VIEW' || device.raw?.accessLevel === 'VIEW';
 
   const colorClass = getDeviceTypeColorClass(device.type);
   const isPowerDevice =
@@ -295,6 +308,11 @@ function DevicesDeviceCard({
         </div>
 
         <div className="flex items-center gap-1.5">
+          {isViewOnly && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
+              Chỉ xem
+            </span>
+          )}
           {isOverrideActive && (
             <span
               className="override-badge"
@@ -308,7 +326,21 @@ function DevicesDeviceCard({
               <span>{formattedTime}</span>
             </span>
           )}
-          {!device.offline && !device.sensor && device.type !== 'Cổng' ? (
+          {isViewOnly && !device.offline && !device.sensor && device.type !== 'Cổng' ? (
+            <button
+              type="button"
+              disabled
+              className={`toggle ${device.on ? 'active' : ''} opacity-40 cursor-not-allowed`}
+              title="Thiết bị ở chế độ chỉ xem"
+              onClick={(event) => {
+                event.stopPropagation();
+              }}
+              aria-disabled="true"
+              aria-label={`${device.name} (Chỉ xem)`}
+            >
+              <span />
+            </button>
+          ) : !device.offline && !device.sensor && device.type !== 'Cổng' ? (
             <button
               type="button"
               className={`toggle ${device.on ? 'active' : ''}`}
@@ -346,7 +378,7 @@ function DevicesDeviceCard({
         <p>{device.status}</p>
       </div>
 
-      {device.type === 'Đèn' && device.on && (
+      {!device.offline && device.type === 'Đèn' && device.on && (
         <div
           className="brightness"
           aria-label={`Độ sáng ${device.brightness || 80}%`}
@@ -362,9 +394,11 @@ function DevicesDeviceCard({
             <button
               type="button"
               key={item}
-              className={gate === item ? 'active' : ''}
+              disabled={device.offline || isViewOnly}
+              className={`${gate === item ? 'active' : ''} ${isViewOnly ? 'opacity-40 cursor-not-allowed' : ''}`}
               onClick={(event) => {
                 event.stopPropagation();
+                if (device.offline || isViewOnly) return;
                 setGate(item);
                 onGateCommand(item);
               }}
@@ -492,7 +526,6 @@ export const DevicePage: React.FC = () => {
     'all' | 'on' | 'offline' | 'sensor'
   >('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [searchOpen, setSearchOpen] = useState(false);
   const [typeFilter, setTypeFilter] = useState<string>('Tất cả');
   const [sort, setSort] = useState<DeviceSortOption>('Nhóm theo phòng');
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
@@ -577,6 +610,30 @@ export const DevicePage: React.FC = () => {
         };
       });
       return hasChanges ? next : prev;
+    });
+
+    // Clear optimistic local overrides for devices that just received authoritative realtime state
+    setLocalPower((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      updates.forEach((patch, id) => {
+        if (patch.currentState && patch.currentState.power !== undefined && id in next) {
+          delete next[id];
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+    setLocalBrightness((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      updates.forEach((patch, id) => {
+        if (patch.currentState && patch.currentState.brightness !== undefined && id in next) {
+          delete next[id];
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
     });
 
     setSelectedDevice((prev) => {
@@ -683,6 +740,8 @@ export const DevicePage: React.FC = () => {
         setError('');
         const data = await getDevicesByHome(homeId);
         setDevices(data || []);
+        setLocalPower({});
+        setLocalBrightness({});
         void fetchEnergy();
       } catch (err: unknown) {
         setError(getErrorMessage(err, 'Lỗi tải danh sách thiết bị'));
@@ -692,6 +751,16 @@ export const DevicePage: React.FC = () => {
     },
     [homeId, fetchEnergy]
   );
+
+  // Refetch rooms and devices immediately whenever Owner changes this member's access
+  useEffect(() => {
+    return realtimeEventDispatcher.register('MEMBER_ACCESS_UPDATED', (event) => {
+      if (event.homeId && homeId && event.homeId !== homeId) return;
+      invalidateCache('devices:home:');
+      void fetchRooms();
+      void fetchDevices(true);
+    });
+  }, [homeId, fetchRooms, fetchDevices]);
 
   useEffect(() => {
     let active = true;
@@ -736,11 +805,10 @@ export const DevicePage: React.FC = () => {
   // Toggle power handler
   const handleTogglePower = async (deviceId: string) => {
     const dev = devices.find((d) => d.id === deviceId);
-    if (!dev) {
-      setLocalPower((prev) => ({
-        ...prev,
-        [deviceId]: prev[deviceId] !== undefined ? !prev[deviceId] : false,
-      }));
+    if (!dev || dev.status !== 'ONLINE') return;
+
+    if (dev.accessLevel === 'VIEW') {
+      notify.warning('Bạn chỉ có quyền xem thiết bị này');
       return;
     }
 
@@ -775,6 +843,8 @@ export const DevicePage: React.FC = () => {
   // Turn off all lights
   const handleTurnOffAllLights = async () => {
     const onLights = devices.filter((d) => {
+      if (d.status !== 'ONLINE') return false;
+      if (d.accessLevel === 'VIEW' || d.accessLevel === 'NONE') return false;
       const isLight =
         (d.deviceType || '').toUpperCase().includes('LIGHT') ||
         (d.deviceType || '').toUpperCase().includes('LED');
@@ -789,23 +859,59 @@ export const DevicePage: React.FC = () => {
     });
 
     if (onLights.length === 0) {
-      notify.info('Không có đèn nào đang bật');
+      notify.info('Không có đèn nào đang bật hoặc bạn không có quyền điều khiển');
       return;
     }
 
     notify.info(`Đang tắt ${onLights.length} đèn...`);
+    const prevPowerSnapshot: Record<string, boolean | undefined> = {};
     const nextPowerMap: Record<string, boolean> = { ...localPower };
     onLights.forEach((l) => {
+      prevPowerSnapshot[l.id] = localPower[l.id];
       nextPowerMap[l.id] = false;
     });
     setLocalPower(nextPowerMap);
 
-    await Promise.allSettled(
-      onLights.map((l) =>
-        sendManualPowerCommand(l.id, 'TURN_OFF').catch(console.warn)
-      )
+    const results = await Promise.allSettled(
+      onLights.map((l) => sendManualPowerCommand(l.id, 'TURN_OFF'))
     );
-    notify.success('Đã tắt toàn bộ đèn');
+
+    let succeeded = 0;
+    let failed = 0;
+    const failedIds: string[] = [];
+
+    results.forEach((res, idx) => {
+      if (res.status === 'fulfilled' && res.value?.command?.success !== false) {
+        succeeded += 1;
+      } else {
+        failed += 1;
+        failedIds.push(onLights[idx].id);
+      }
+    });
+
+    if (failedIds.length > 0) {
+      setLocalPower((prev) => {
+        const next = { ...prev };
+        failedIds.forEach((id) => {
+          const prevVal = prevPowerSnapshot[id];
+          if (prevVal === undefined) {
+            delete next[id];
+          } else {
+            next[id] = prevVal;
+          }
+        });
+        return next;
+      });
+    }
+
+    if (failed === 0 && succeeded > 0) {
+      notify.success('Đã tắt toàn bộ đèn');
+    } else if (succeeded > 0 && failed > 0) {
+      notify.warning(`Đã tắt ${succeeded}/${onLights.length} đèn, ${failed} đèn thất bại`);
+    } else {
+      notify.error('Không thể tắt đèn');
+    }
+
     void fetchDevices(true);
   };
 
@@ -815,13 +921,21 @@ export const DevicePage: React.FC = () => {
     cmd: 'Mở' | 'Dừng' | 'Đóng'
   ) => {
     const dev = devices.find((d) => d.id === deviceId);
-    if (!dev) return;
+    if (!dev || dev.status !== 'ONLINE') return;
+    if (dev.accessLevel === 'VIEW') {
+      notify.warning('Bạn chỉ có quyền xem thiết bị này');
+      return;
+    }
     const action = cmd === 'Mở' ? 'OPEN' : cmd === 'Đóng' ? 'CLOSE' : 'STOP';
     try {
-      await sendDeviceCommand(deviceId, action);
-      notify.success(`Đã gửi lệnh ${cmd} cổng`);
+      const command = await sendDeviceCommand(deviceId, action);
+      if (command && command.success === false) {
+        notify.error(command.message || `Không thể gửi lệnh ${cmd} ${dev.name}`);
+        return;
+      }
+      notify.success(`Đã gửi lệnh ${cmd} ${dev.name}`);
     } catch (e) {
-      notify.error(getErrorMessage(e, 'Lỗi điều khiển cổng'));
+      notify.error(getErrorMessage(e, `Lỗi điều khiển ${dev.name}`));
     }
   };
 
@@ -830,13 +944,24 @@ export const DevicePage: React.FC = () => {
     deviceId: string,
     brightness: number
   ) => {
-    setLocalBrightness((prev) => ({ ...prev, [deviceId]: brightness }));
     const dev = devices.find((d) => d.id === deviceId);
-    if (!dev) return;
+    if (!dev || dev.status !== 'ONLINE') return;
+    if (dev.accessLevel === 'VIEW') return;
+    const prevBrightness = localBrightness[deviceId];
+    setLocalBrightness((prev) => ({ ...prev, [deviceId]: brightness }));
     try {
       await sendDeviceCommand(deviceId, 'SET_BRIGHTNESS', { brightness });
     } catch (e) {
-      console.warn('Set brightness error:', e);
+      setLocalBrightness((prev) => {
+        const next = { ...prev };
+        if (prevBrightness === undefined) {
+          delete next[deviceId];
+        } else {
+          next[deviceId] = prevBrightness;
+        }
+        return next;
+      });
+      notify.error(getErrorMessage(e, 'Lỗi khi chỉnh độ sáng'));
     }
   };
 
@@ -847,13 +972,14 @@ export const DevicePage: React.FC = () => {
     g: number,
     b: number
   ) => {
-    const brightness = localBrightness[deviceId] || 80;
     const dev = devices.find((d) => d.id === deviceId);
-    if (!dev) return;
+    if (!dev || dev.status !== 'ONLINE') return;
+    if (dev.accessLevel === 'VIEW') return;
+    const brightness = localBrightness[deviceId] || 80;
     try {
       await sendDeviceCommand(deviceId, 'SET_RGB', { r, g, b, brightness });
     } catch (e) {
-      console.warn('Set color error:', e);
+      notify.error(getErrorMessage(e, 'Lỗi khi đổi màu đèn'));
     }
   };
 
@@ -910,6 +1036,7 @@ export const DevicePage: React.FC = () => {
   // Filtered devices
   const visibleDevices = useMemo(() => {
     return uiDevices.filter((device) => {
+      if (device.accessLevel === 'NONE' || device.raw?.accessLevel === 'NONE') return false;
       // Room filter
       if (selectedRoomId !== 'ALL') {
         const matchId = device.roomId === selectedRoomId;
@@ -921,16 +1048,20 @@ export const DevicePage: React.FC = () => {
         return false;
       }
       // Quick filter
-      if (quickFilter === 'on' && !device.on) return false;
+      if (quickFilter === 'on' && (device.offline || !device.on)) return false;
       if (quickFilter === 'offline' && !device.offline) return false;
       if (quickFilter === 'sensor' && !device.sensor) return false;
       // Search query
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim();
-        const matchName = device.name.toLowerCase().includes(q);
-        const matchRoom = device.room.toLowerCase().includes(q);
-        const matchType = device.type.toLowerCase().includes(q);
-        if (!matchName && !matchRoom && !matchType) return false;
+      const q = normalizeSearchText(searchQuery);
+      if (q) {
+        const matchName = normalizeSearchText(device.name).includes(q);
+        const matchRoom = normalizeSearchText(device.room).includes(q);
+        const matchType = normalizeSearchText(device.type).includes(q);
+        const matchRawType = normalizeSearchText(device.raw?.deviceType ?? '').includes(q);
+        const matchModel = normalizeSearchText(device.raw?.model ?? '').includes(q);
+        if (!matchName && !matchRoom && !matchType && !matchRawType && !matchModel) {
+          return false;
+        }
       }
       return true;
     });
@@ -1019,11 +1150,6 @@ export const DevicePage: React.FC = () => {
         <AutomationTopBar
           caption={`${onlineCount} trực tuyến · ${activeCount} đang bật`}
           title="Thiết bị"
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          searchOpen={searchOpen}
-          onSearchToggle={() => setSearchOpen(!searchOpen)}
-          searchPlaceholder="Tìm thiết bị"
           userInitial={userInitial}
         />
 
@@ -1093,7 +1219,7 @@ export const DevicePage: React.FC = () => {
         </div>
 
         {/* 3. Filters & Sort Toolbar */}
-        <div className="flex items-center justify-between gap-3 flex-wrap sm:flex-nowrap">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <QuickFilters
             active={quickFilter}
             activeCount={activeCount}
@@ -1103,6 +1229,31 @@ export const DevicePage: React.FC = () => {
             onChange={setQuickFilter}
             onTurnOffAllLights={handleTurnOffAllLights}
           />
+
+          <div className="relative flex-1 min-w-[200px] sm:max-w-xs">
+            <Search className="w-3.5 h-3.5 text-[var(--tertiary)] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape' && searchQuery) setSearchQuery('');
+              }}
+              placeholder="Tìm thiết bị theo tên, phòng, loại..."
+              aria-label="Tìm thiết bị"
+              className="w-full h-8 pl-8 pr-7 rounded-full border border-[var(--border)] bg-[var(--surface)] text-xs text-[var(--text)] placeholder:text-[var(--tertiary)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/20 transition-all"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                aria-label="Xóa tìm kiếm"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--tertiary)] hover:text-[var(--text)] p-0.5 rounded-full cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
 
           <div className="flex items-center gap-2 shrink-0 ml-auto">
             {/* Desktop / Tablet: 2 Ghost Dropdowns */}

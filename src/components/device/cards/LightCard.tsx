@@ -129,6 +129,7 @@ const LightCardComponent: React.FC<LightCardProps> = ({
   }, []);
 
   const handleBrightnessChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (isOffline) return;
     const val = Number(e.target.value);
     setBrightness(val); // Phản hồi 60Hz siêu tốc nội bộ thẻ, KHÔNG gọi onStateChange gây re-render cả trang!
 
@@ -281,9 +282,16 @@ const LightCardComponent: React.FC<LightCardProps> = ({
             {isPlug ? <Plug2 className="w-5 h-5" /> : <Lightbulb className="w-5 h-5" />}
           </div>
           <div className="min-w-0">
-            <h3 className="font-semibold text-[15px] leading-tight text-text truncate">
-              {device.name}
-            </h3>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <h3 className="font-semibold text-[15px] leading-tight text-text truncate">
+                {device.name}
+              </h3>
+              {device.accessLevel === 'VIEW' && (
+                <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold rounded-md bg-amber-500/10 text-amber-600 border border-amber-500/20">
+                  Chỉ xem
+                </span>
+              )}
+            </div>
             <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
               <p className="text-xs text-muted truncate">
                 {isOffline
@@ -323,8 +331,8 @@ const LightCardComponent: React.FC<LightCardProps> = ({
           </button>
           <button
             type="button"
-            title={isOn ? 'Tắt' : 'Bật'}
-            disabled={isOffline || powerPending}
+            title={device.accessLevel === 'VIEW' ? 'Chỉ xem' : (isOn ? 'Tắt' : 'Bật')}
+            disabled={isOffline || powerPending || device.accessLevel === 'VIEW'}
             onClick={handleToggle}
             className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${
               isOn

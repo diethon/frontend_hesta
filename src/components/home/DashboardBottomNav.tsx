@@ -13,7 +13,7 @@ export interface DashboardBottomNavCustomItem {
 
 export interface DashboardBottomNavProps {
   homeId?: string;
-  activeItem?: 'overview' | 'devices' | 'scenes' | 'energy' | 'more' | string;
+  activeItem?: 'overview' | 'devices' | 'scenes' | 'energy' | 'more' | 'members' | string;
   onSelectOverview?: () => void;
   onOpenMore?: () => void;
   items?: DashboardBottomNavCustomItem[];

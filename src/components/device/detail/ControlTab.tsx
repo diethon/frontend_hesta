@@ -525,6 +525,7 @@ export const ControlTab: React.FC<ControlTabProps> = ({
   }, []);
 
   const emitColorChange = useCallback((hex: string) => {
+    if (disabled) return;
     const clean = hex.replace('#', '');
     if (clean.length === 6) {
       const num = parseInt(clean, 16);
@@ -545,7 +546,7 @@ export const ControlTab: React.FC<ControlTabProps> = ({
         }
       }
     }
-  }, [onColorChange, device, lightLevel]);
+  }, [disabled, onColorChange, device, lightLevel]);
 
   const handlePickerChange = (newHex: string) => {
     setSelectedColor(newHex);
@@ -576,6 +577,7 @@ export const ControlTab: React.FC<ControlTabProps> = ({
   };
 
   const handleLevel = (val: number) => {
+    if (disabled) return;
     setLightLevel(val);
     onBrightnessChange?.(val);
   };
@@ -604,6 +606,7 @@ export const ControlTab: React.FC<ControlTabProps> = ({
   }
 
   const handleAcTemp = (delta: number) => {
+    if (disabled) return;
     const next = Math.max(16, Math.min(32, acTemp + delta));
     setAcTemp(next);
     const targetId = device?.realDeviceId || device?.id;
@@ -615,6 +618,7 @@ export const ControlTab: React.FC<ControlTabProps> = ({
   };
 
   const handleAcModeChange = (m: string) => {
+    if (disabled) return;
     setAcMode(m);
     const targetId = device?.realDeviceId || device?.id;
     if (targetId) {
@@ -625,6 +629,7 @@ export const ControlTab: React.FC<ControlTabProps> = ({
   };
 
   const handleAcFanChange = (fan: string) => {
+    if (disabled) return;
     setAcFan(fan);
     const targetId = device?.realDeviceId || device?.id;
     if (targetId) {
@@ -633,6 +638,7 @@ export const ControlTab: React.FC<ControlTabProps> = ({
   };
 
   const handleAcSwingChange = (swing: boolean) => {
+    if (disabled) return;
     setAcSwing(swing);
     const targetId = device?.realDeviceId || device?.id;
     if (targetId) {
@@ -654,14 +660,23 @@ export const ControlTab: React.FC<ControlTabProps> = ({
       : 50;
 
   const handleGateAction = async (item: string) => {
+    if (disabled) return;
+    const prevGateState = gateState;
     setGateState(item);
     const action = item === 'Mở' ? 'OPEN' : item === 'Đóng' ? 'CLOSE' : 'STOP';
     const targetId = device?.realDeviceId || device?.id;
     if (targetId) {
       try {
-        await sendDeviceCommand(targetId, action);
+        const command = await sendDeviceCommand(targetId, action);
+        if (command && command.success === false) {
+          setGateState(prevGateState);
+          notify.error(command.message || `Không thể gửi lệnh ${item} cổng`);
+          return;
+        }
         notify.success(`Đã gửi lệnh ${item} cổng`);
       } catch (e) {
+        setGateState(prevGateState);
+        notify.error(`Không thể gửi lệnh ${item} cổng`);
         console.warn(e);
       }
     }

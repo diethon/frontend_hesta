@@ -51,6 +51,7 @@ export interface DeviceResponse {
   createdAt?: string;
   updatedAt?: string;
   settings?: Record<string, any>;
+  accessLevel?: 'NONE' | 'VIEW' | 'CONTROL';
 }
 
 export interface DeviceUpdateRequest {

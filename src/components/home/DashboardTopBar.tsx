@@ -9,6 +9,7 @@ export interface HomeOption {
   homeId: string;
   homeName: string;
   role: 'OWNER' | 'MEMBER';
+  accessScope?: 'ALL' | 'CUSTOM';
 }
 
 interface DashboardTopBarProps {

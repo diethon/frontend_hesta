@@ -26,6 +26,7 @@ import { SecurityCenterPage } from '../components/security/SecurityCenterPage';
 import { ProfilePage } from '../components/profile/ProfilePage';
 import { EnergyDashboardPage } from '../components/energy/EnergyDashboardPage';
 import { FallDetectionPage } from '../components/emergency/FallDetectionPage';
+import { MemberPage } from '../components/member/MemberPage';
 
 export function AppRoutes() {
   const { initialized, user, login, logout, updateUser } = useRouteSession();
@@ -81,7 +82,13 @@ export function AppRoutes() {
           state={state} replace />
       )} />
       <Route path="/join" element={user ? (
-        <JoinHome key={location.search} onSuccess={leaveInvitation} onCancel={leaveInvitation} />
+        <JoinHome
+          key={location.search}
+          user={user}
+          onSuccess={leaveInvitation}
+          onCancel={leaveInvitation}
+          onSwitchAccount={logout}
+        />
       ) : invitationToken(location.search) ? (
         <UnauthenticatedJoin
           onSelectLogin={() => go('/login', state, false, invitationSearch(location.search, 'inviteToken'))}
@@ -100,6 +107,8 @@ export function AppRoutes() {
         <Route path="/homes/:homeId/guardian" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <ParentalGuardianRouteWrapper />} />
         <Route path="/homes/:homeId/security" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <SecurityCenterPage />} />
         <Route path="/homes/:homeId/anomalies" element={<Navigate to="../security?tab=anomalies" relative="path" replace />} />
+        <Route path="/homes/:homeId/members" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <MemberPage />} />
+        <Route path="/home/:homeId/members" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <MemberPage />} />
         <Route path="/home/:homeId/devices" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <DevicePage />} />
         <Route path="/home/:homeId/energy" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <EnergyDashboardPage />} />
         <Route path="/home/:homeId/digital-twin" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <Suspense fallback={<p role="status" className="p-8 text-muted">Đang tải Digital Twin…</p>}><DigitalTwinPage /></Suspense>} />

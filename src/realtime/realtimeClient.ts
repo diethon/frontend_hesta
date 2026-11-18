@@ -59,12 +59,14 @@ class RecentEventIds {
   }
 }
 
-export function homeEventsDestination(homeId: string) {
+export function homeEventsDestination(homeId: string, isCustomScope = false) {
   const normalizedHomeId = homeId.trim();
   if (!normalizedHomeId || normalizedHomeId.includes('/')) {
     throw new Error('A valid homeId is required for a realtime subscription.');
   }
-  return `/topic/homes/${normalizedHomeId}/events`;
+  return isCustomScope
+    ? `/user/queue/homes/${normalizedHomeId}/events`
+    : `/topic/homes/${normalizedHomeId}/events`;
 }
 
 export class SharedRealtimeClient {
@@ -75,6 +77,7 @@ export class SharedRealtimeClient {
   private clientToken: string | null = null;
   private desiredToken: string | null = null;
   private desiredHomeId: string | null = null;
+  private desiredCustomScope = false;
   private subscription: StompSubscription | null = null;
   private subscribedHomeId: string | null = null;
   private readonly recentEventIds = new RecentEventIds(MAX_RECENT_EVENT_IDS);
@@ -107,11 +110,12 @@ export class SharedRealtimeClient {
     return this.queueReconcile();
   }
 
-  subscribeToHome(homeId: string) {
+  subscribeToHome(homeId: string, isCustomScope = false) {
     const normalizedHomeId = homeId.trim();
-    homeEventsDestination(normalizedHomeId);
-    if (this.desiredHomeId === normalizedHomeId) return;
+    homeEventsDestination(normalizedHomeId, isCustomScope);
+    if (this.desiredHomeId === normalizedHomeId && this.desiredCustomScope === isCustomScope) return;
     this.desiredHomeId = normalizedHomeId;
+    this.desiredCustomScope = isCustomScope;
     this.syncSubscription(this.client);
   }
 
@@ -209,8 +213,9 @@ export class SharedRealtimeClient {
     if (!this.desiredHomeId) return;
 
     const homeId = this.desiredHomeId;
+    const isCustom = this.desiredCustomScope;
     try {
-      this.subscription = client.subscribe(homeEventsDestination(homeId), (message) => {
+      this.subscription = client.subscribe(homeEventsDestination(homeId, isCustom), (message) => {
         this.handleMessage(message.body, homeId);
       });
       this.subscribedHomeId = homeId;

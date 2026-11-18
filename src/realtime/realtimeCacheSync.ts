@@ -1,6 +1,7 @@
 import type { RealtimeEvent } from './realtimeTypes';
 import { invalidateDeviceMutations } from '../services/deviceApi';
 import { invalidateSceneDevicesCache, invalidateScenesCache } from '../services/sceneApi';
+import { clearAllCache } from '../services/queryCache';
 
 /** Someone else changed server data: forget cached copies so the next page opened shows it, not a stale cache. */
 export function invalidateCachesFor(event: RealtimeEvent) {
@@ -9,5 +10,7 @@ export function invalidateCachesFor(event: RealtimeEvent) {
     invalidateSceneDevicesCache(event.homeId);
   } else if (event.type === 'SCENE_CHANGED') {
     invalidateScenesCache(event.homeId);
+  } else if (event.type === 'MEMBER_ACCESS_UPDATED') {
+    clearAllCache();
   }
 }
