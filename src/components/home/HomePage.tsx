@@ -5,7 +5,6 @@ import type { DeviceResponse } from "../../types/device";
 import type { RoomResponse } from "../../types/room";
 import type { SceneResponse } from "../../types/scene";
 import type { EnergySummary, EnergyAnalyticsResponse, DeviceEnergyBreakdown } from "../../types/energy";
-import { ProfileModal } from "../profile/ProfileModal";
 import { MemberManagement } from "./MemberManagement";
 import { RoomManagementModal } from "../device/RoomManagementModal";
 import { HomeHeroLiveCamera } from "./HomeHeroLiveCamera";
@@ -47,7 +46,6 @@ import { notify } from '../ui/notify';
 interface HomePageProps {
   user: UserResponse;
   onLogout: () => void;
-  onProfileUpdate: (user: UserResponse) => void;
 }
 
 function retainSelectedHome(
@@ -73,7 +71,6 @@ function isDeviceOn(d: DeviceResponse): boolean {
 export const HomePage: React.FC<HomePageProps> = ({
   user,
   onLogout,
-  onProfileUpdate,
 }) => {
   // Hooks called unconditionally at top of component
   const dispatch = useAppDispatch();
@@ -82,7 +79,6 @@ export const HomePage: React.FC<HomePageProps> = ({
   const [searchParams] = useSearchParams();
   const requestedHomeId = searchParams.get("homeId");
 
-  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
   // Home state
   const [userHome, setUserHome] = useState<HomeOption | null>(null);
@@ -428,7 +424,7 @@ export const HomePage: React.FC<HomePageProps> = ({
         homeId={userHome?.homeId}
         activeItem={activeTabSection === 'dashboard' ? 'overview' : 'members'}
         user={user}
-        onOpenSettings={() => setIsProfileModalOpen(true)}
+        onOpenSettings={() => navigate('/profile?tab=notifications')}
         onSelectOverview={() => {
           setActiveTabSection('dashboard');
           window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -439,7 +435,7 @@ export const HomePage: React.FC<HomePageProps> = ({
             document.getElementById('members-section')?.scrollIntoView({ behavior: 'smooth' });
           }, 50);
         }}
-        onOpenProfile={() => setIsProfileModalOpen(true)}
+        onOpenProfile={() => navigate('/profile')}
       />
 
       <main>
@@ -451,7 +447,7 @@ export const HomePage: React.FC<HomePageProps> = ({
           onSelectHome={(h) => setUserHome(h)}
           onOpenCreateHome={() => setIsCreateModalOpen(true)}
           onOpenRenameHome={(h) => handleOpenRename(h)}
-          onOpenProfile={() => setIsProfileModalOpen(true)}
+          onOpenProfile={() => navigate('/profile')}
           onLogout={onLogout}
           avgTemp={avgTemp}
           avgHum={avgHum}
@@ -564,7 +560,7 @@ export const HomePage: React.FC<HomePageProps> = ({
         homeId={userHome?.homeId}
         activeItem={activeTabSection === 'dashboard' ? 'overview' : 'scenes'}
         onSelectOverview={() => setActiveTabSection('dashboard')}
-        onOpenMore={() => setIsProfileModalOpen(true)}
+        onOpenMore={() => navigate('/profile')}
       />
 
       {/* ── Functional Modals with Glass Polish ── */}
@@ -788,15 +784,6 @@ export const HomePage: React.FC<HomePageProps> = ({
         </div>
       )}
 
-      {/* Profile Modal */}
-      {isProfileModalOpen ? (
-        <ProfileModal
-          isOpen
-          onClose={() => setIsProfileModalOpen(false)}
-          user={user}
-          onProfileUpdate={onProfileUpdate}
-        />
-      ) : null}
     </div>
   );
 };

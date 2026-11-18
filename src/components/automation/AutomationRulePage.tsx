@@ -225,8 +225,6 @@ export function AutomationRulePage() {
         activeItem="automations"
         user={authUser ?? undefined}
         onSelectOverview={() => navigate('/home')}
-        onOpenSettings={() => {}}
-        onOpenProfile={() => {}}
       />
 
       <main>

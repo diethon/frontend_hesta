@@ -15,7 +15,7 @@ export interface DashboardNavRailCustomItem {
 
 export interface DashboardNavRailProps {
   homeId?: string;
-  activeItem?: 'overview' | 'devices' | 'twin' | 'energy' | 'scenes' | 'automations' | 'members' | string;
+  activeItem?: 'overview' | 'devices' | 'twin' | 'energy' | 'scenes' | 'automations' | 'security' | 'members' | string;
   user?: UserResponse;
   onOpenSettings?: () => void;
   onSelectMembers?: () => void;
@@ -27,7 +27,7 @@ export interface DashboardNavRailProps {
 }
 
 interface NavItemDef {
-  id: 'overview' | 'devices' | 'twin' | 'energy' | 'scenes' | 'automations' | 'members';
+  id: 'overview' | 'devices' | 'twin' | 'energy' | 'scenes' | 'automations' | 'security' | 'members';
   icon: IconName;
   label: string;
 }
@@ -39,6 +39,7 @@ const navItems: NavItemDef[] = [
   { id: 'energy', icon: 'energy', label: 'Tiêu thụ điện' },
   { id: 'scenes', icon: 'sparkles', label: 'Kịch bản' },
   { id: 'automations', icon: 'automation', label: 'Tự động hóa' },
+  { id: 'security', icon: 'shield', label: 'An ninh' },
   { id: 'members', icon: 'users', label: 'Thành viên' },
 ];
 
@@ -96,6 +97,13 @@ export const DashboardNavRail: React.FC<DashboardNavRailProps> = ({
       case 'automations':
         if (homeId) {
           navigate(`/homes/${encodeURIComponent(homeId)}/automation-rules`);
+        } else {
+          notify.info('Hãy chọn hoặc tạo một ngôi nhà trước.');
+        }
+        break;
+      case 'security':
+        if (homeId) {
+          navigate(`/homes/${encodeURIComponent(homeId)}/security`);
         } else {
           notify.info('Hãy chọn hoặc tạo một ngôi nhà trước.');
         }
@@ -161,7 +169,7 @@ export const DashboardNavRail: React.FC<DashboardNavRailProps> = ({
             className="nav-item"
             aria-label="Cài đặt"
             title="Cài đặt"
-            onClick={onOpenSettings}
+            onClick={onOpenSettings ?? (() => navigate('/profile?tab=notifications'))}
           >
             <Icon name="settings" />
           </button>
@@ -172,7 +180,7 @@ export const DashboardNavRail: React.FC<DashboardNavRailProps> = ({
           className="avatar small"
           aria-label="Hồ sơ tài khoản"
           title={user?.fullName || 'Tài khoản của bạn'}
-          onClick={onOpenProfile}
+          onClick={onOpenProfile ?? (() => navigate('/profile'))}
         >
           {userInitial}
         </button>
