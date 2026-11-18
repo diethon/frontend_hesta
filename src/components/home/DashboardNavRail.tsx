@@ -4,6 +4,8 @@ import { Icon, type IconName } from './HomeIcons';
 import { HestaLogoMark } from '../ui/AppSidebar';
 import { notify } from '../ui/notify';
 import type { UserResponse } from '../../types/auth';
+import { useAppSelector } from '../../store/hooks';
+import { selectCurrentHomeAccessScope } from '../../store/selectors';
 
 export interface DashboardNavRailCustomItem {
   id: string;
@@ -55,6 +57,11 @@ export const DashboardNavRail: React.FC<DashboardNavRailProps> = ({
   hideSettings = false,
 }) => {
   const navigate = useNavigate();
+  const currentAccessScope = useAppSelector(selectCurrentHomeAccessScope);
+
+  const visibleNavItems = currentAccessScope === 'CUSTOM'
+    ? navItems.filter((item) => item.id !== 'automations')
+    : navItems;
 
   const handleNavClick = (item: NavItemDef) => {
     switch (item.id) {
@@ -103,6 +110,8 @@ export const DashboardNavRail: React.FC<DashboardNavRailProps> = ({
       case 'members':
         if (onSelectMembers) {
           onSelectMembers();
+        } else if (homeId) {
+          navigate(`/homes/${encodeURIComponent(homeId)}/members`);
         } else {
           navigate('/home#members-section');
         }
@@ -137,7 +146,7 @@ export const DashboardNavRail: React.FC<DashboardNavRailProps> = ({
                 </button>
               );
             })
-          : navItems.map((item) => {
+          : visibleNavItems.map((item) => {
               const isActive = activeItem === item.id;
               return (
                 <button

@@ -39,7 +39,7 @@ import {
   RotateCw,
   ArrowLeft,
 } from "lucide-react";
-import { currentHomeChanged, currentHomeCleared } from "../../store/homeSlice";
+import { currentHomeDetailsChanged, currentHomeCleared } from "../../store/homeSlice";
 import { useAppDispatch } from "../../store/hooks";
 import { getErrorMessage } from "../../utils/errors";
 import { notify } from '../ui/notify';
@@ -229,15 +229,17 @@ export const HomePage: React.FC<HomePageProps> = ({
     if (location.hash === "#scenes-section") {
       navigate(`/homes/${encodeURIComponent(userHome.homeId)}/scenes`);
     } else if (location.hash === "#members-section") {
-      queueMicrotask(() => {
-        setActiveTabSection('members');
-      });
+      navigate(`/homes/${encodeURIComponent(userHome.homeId)}/members`);
     }
   }, [location.hash, location.key, userHome, navigate]);
 
   useEffect(() => {
-    dispatch(currentHomeChanged(userHome?.homeId ?? null));
-  }, [dispatch, userHome?.homeId]);
+    dispatch(currentHomeDetailsChanged({
+      homeId: userHome?.homeId ?? null,
+      role: userHome?.role ?? null,
+      accessScope: userHome?.accessScope ?? null,
+    }));
+  }, [dispatch, userHome?.homeId, userHome?.role, userHome?.accessScope]);
 
   useEffect(
     () => () => {
@@ -324,6 +326,7 @@ export const HomePage: React.FC<HomePageProps> = ({
   // Turn off all lights quick handler
   const handleTurnOffAllLights = async () => {
     const activeLights = devices.filter((d) => {
+      if (d.accessLevel === 'VIEW' || d.accessLevel === 'NONE') return false;
       const isLight = d.deviceType === 'LIGHT' || d.deviceType === 'LED_RGB';
       const isPowerOn = d.currentState?.power === 'ON' || d.currentState?.power === true;
       return isLight && isPowerOn;
@@ -434,10 +437,11 @@ export const HomePage: React.FC<HomePageProps> = ({
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
         onSelectMembers={() => {
-          setActiveTabSection('members');
-          setTimeout(() => {
-            document.getElementById('members-section')?.scrollIntoView({ behavior: 'smooth' });
-          }, 50);
+          if (userHome?.homeId) {
+            navigate(`/homes/${encodeURIComponent(userHome.homeId)}/members`);
+          } else {
+            notify.info('Hãy chọn hoặc tạo một ngôi nhà trước.');
+          }
         }}
         onOpenProfile={() => setIsProfileModalOpen(true)}
       />

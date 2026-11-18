@@ -58,8 +58,10 @@ const DeviceDetailInner: React.FC<DeviceDetailModalProps & { device: DetailDevic
 }) => {
   const devId = device?.raw?.id || device?.id;
   const resolvedType = resolveFigmaDeviceType(device);
+  const isReadOnly = device?.accessLevel === 'VIEW' || device?.raw?.accessLevel === 'VIEW';
   const isUnknown = device?.raw?.status === 'UNKNOWN' || device?.status === 'UNKNOWN';
-  const disabled = Boolean(device?.offline || device?.status === 'OFFLINE' || isUnknown);
+  const isOfflineStatus = Boolean(device?.offline || device?.status === 'OFFLINE' || isUnknown);
+  const disabled = isOfflineStatus || isReadOnly;
 
   // Active tab state (resets to 'control' when device id changes inside DetailTabs)
   const [activeTab, setActiveTab] = useState<DetailTabType>('control');
@@ -93,6 +95,10 @@ const DeviceDetailInner: React.FC<DeviceDetailModalProps & { device: DetailDevic
   }
 
   const handleToggleCurrent = () => {
+    if (isReadOnly) {
+      notify.warning('Bạn chỉ có quyền xem thiết bị này');
+      return;
+    }
     setIsOn((prev) => !prev);
     onTogglePower?.();
   };
@@ -392,7 +398,7 @@ const DeviceDetailInner: React.FC<DeviceDetailModalProps & { device: DetailDevic
           </button>
 
           <div>
-            {rename ? (
+            {rename && !isReadOnly ? (
               <input
                 autoFocus
                 value={name}
@@ -401,26 +407,28 @@ const DeviceDetailInner: React.FC<DeviceDetailModalProps & { device: DetailDevic
                 onKeyDown={(event) => event.key === 'Enter' && handleSaveName()}
               />
             ) : (
-              <strong onClick={() => setRename(true)} title="Nhấp để sửa tên">
-                {name} <small>Sửa</small>
+              <strong onClick={() => !isReadOnly && setRename(true)} title={isReadOnly ? name : 'Nhấp để sửa tên'}>
+                {name} {!isReadOnly && <small>Sửa</small>}
               </strong>
             )}
-            <span className={isUnknown ? 'unknown' : disabled ? 'offline' : ''}>
+            <span className={isUnknown ? 'unknown' : isOfflineStatus ? 'offline' : ''}>
               <i />
-              {isUnknown ? 'Không xác định' : disabled ? 'Ngoại tuyến' : 'Trực tuyến'} · {device?.room || device?.roomName || 'Nhà'}
+              {isUnknown ? 'Không xác định' : isOfflineStatus ? 'Ngoại tuyến' : 'Trực tuyến'} · {device?.room || device?.roomName || 'Nhà'}
             </span>
           </div>
 
-          <button
-            type="button"
-            className="detail-icon-button"
-            onClick={() => setMenu(!menu)}
-            aria-label="Tùy chọn thiết bị"
-          >
-            <MoreHorizontal className="w-5 h-5" />
-          </button>
+          {!isReadOnly && (
+            <button
+              type="button"
+              className="detail-icon-button"
+              onClick={() => setMenu(!menu)}
+              aria-label="Tùy chọn thiết bị"
+            >
+              <MoreHorizontal className="w-5 h-5" />
+            </button>
+          )}
 
-          {menu && (
+          {menu && !isReadOnly && (
             <div className="detail-menu glass-g2">
               <button
                 type="button"
@@ -470,6 +478,12 @@ const DeviceDetailInner: React.FC<DeviceDetailModalProps & { device: DetailDevic
 
         {/* 2. Scrollable Body containing Hero, Sticky Tabs, and Active Tab Panel */}
         <div className="detail-scroll-body">
+          {isReadOnly && (
+            <div className="mx-4 my-2 px-3 py-2 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400 text-xs flex items-center gap-2">
+              <span className="font-semibold px-1.5 py-0.5 rounded bg-blue-500/20 text-[10px] shrink-0">Chỉ xem</span>
+              <span>Bạn có quyền theo dõi trạng thái thiết bị nhưng không thể điều khiển hoặc thay đổi cấu hình.</span>
+            </div>
+          )}
           {/* Hero Section with Big Readout, Tinted Icon Tile, Power Button, and Action Banners */}
           <DetailHero
             device={device}

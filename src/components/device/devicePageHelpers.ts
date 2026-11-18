@@ -17,6 +17,7 @@ export interface UIMappedDevice {
   brightness?: number;
   manualOverrideUntil?: string | null;
   manualOverrideActive?: boolean;
+  accessLevel?: 'NONE' | 'VIEW' | 'CONTROL';
   raw?: DeviceResponse;
 }
 
@@ -196,6 +197,7 @@ export function mapDeviceToUI(
       (d.manualOverrideUntil
         ? new Date(d.manualOverrideUntil).getTime() > Date.now()
         : false),
+    accessLevel: d.accessLevel,
     raw: normalizedDevice,
   };
 }

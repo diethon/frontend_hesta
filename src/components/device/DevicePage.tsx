@@ -248,6 +248,7 @@ function DevicesDeviceCard({
   const { isOverrideActive, formattedTime } = useOverrideCountdown(
     device.manualOverrideUntil
   );
+  const isViewOnly = device.accessLevel === 'VIEW' || device.raw?.accessLevel === 'VIEW';
 
   const colorClass = getDeviceTypeColorClass(device.type);
   const isPowerDevice =
@@ -295,6 +296,11 @@ function DevicesDeviceCard({
         </div>
 
         <div className="flex items-center gap-1.5">
+          {isViewOnly && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
+              Chỉ xem
+            </span>
+          )}
           {isOverrideActive && (
             <span
               className="override-badge"
@@ -308,7 +314,21 @@ function DevicesDeviceCard({
               <span>{formattedTime}</span>
             </span>
           )}
-          {!device.offline && !device.sensor && device.type !== 'Cổng' ? (
+          {isViewOnly && !device.offline && !device.sensor && device.type !== 'Cổng' ? (
+            <button
+              type="button"
+              disabled
+              className={`toggle ${device.on ? 'active' : ''} opacity-40 cursor-not-allowed`}
+              title="Thiết bị ở chế độ chỉ xem"
+              onClick={(event) => {
+                event.stopPropagation();
+              }}
+              aria-disabled="true"
+              aria-label={`${device.name} (Chỉ xem)`}
+            >
+              <span />
+            </button>
+          ) : !device.offline && !device.sensor && device.type !== 'Cổng' ? (
             <button
               type="button"
               className={`toggle ${device.on ? 'active' : ''}`}
@@ -362,9 +382,11 @@ function DevicesDeviceCard({
             <button
               type="button"
               key={item}
-              className={gate === item ? 'active' : ''}
+              disabled={isViewOnly}
+              className={`${gate === item ? 'active' : ''} ${isViewOnly ? 'opacity-40 cursor-not-allowed' : ''}`}
               onClick={(event) => {
                 event.stopPropagation();
+                if (isViewOnly) return;
                 setGate(item);
                 onGateCommand(item);
               }}
@@ -744,6 +766,11 @@ export const DevicePage: React.FC = () => {
       return;
     }
 
+    if (dev.accessLevel === 'VIEW') {
+      notify.warning('Bạn chỉ có quyền xem thiết bị này');
+      return;
+    }
+
     const currentOn =
       localPower[deviceId] !== undefined
         ? localPower[deviceId]
@@ -775,6 +802,7 @@ export const DevicePage: React.FC = () => {
   // Turn off all lights
   const handleTurnOffAllLights = async () => {
     const onLights = devices.filter((d) => {
+      if (d.accessLevel === 'VIEW' || d.accessLevel === 'NONE') return false;
       const isLight =
         (d.deviceType || '').toUpperCase().includes('LIGHT') ||
         (d.deviceType || '').toUpperCase().includes('LED');
@@ -789,7 +817,7 @@ export const DevicePage: React.FC = () => {
     });
 
     if (onLights.length === 0) {
-      notify.info('Không có đèn nào đang bật');
+      notify.info('Không có đèn nào đang bật hoặc bạn không có quyền điều khiển');
       return;
     }
 
@@ -816,6 +844,10 @@ export const DevicePage: React.FC = () => {
   ) => {
     const dev = devices.find((d) => d.id === deviceId);
     if (!dev) return;
+    if (dev.accessLevel === 'VIEW') {
+      notify.warning('Bạn chỉ có quyền xem thiết bị này');
+      return;
+    }
     const action = cmd === 'Mở' ? 'OPEN' : cmd === 'Đóng' ? 'CLOSE' : 'STOP';
     try {
       await sendDeviceCommand(deviceId, action);
@@ -830,9 +862,10 @@ export const DevicePage: React.FC = () => {
     deviceId: string,
     brightness: number
   ) => {
-    setLocalBrightness((prev) => ({ ...prev, [deviceId]: brightness }));
     const dev = devices.find((d) => d.id === deviceId);
     if (!dev) return;
+    if (dev.accessLevel === 'VIEW') return;
+    setLocalBrightness((prev) => ({ ...prev, [deviceId]: brightness }));
     try {
       await sendDeviceCommand(deviceId, 'SET_BRIGHTNESS', { brightness });
     } catch (e) {
@@ -847,9 +880,10 @@ export const DevicePage: React.FC = () => {
     g: number,
     b: number
   ) => {
-    const brightness = localBrightness[deviceId] || 80;
     const dev = devices.find((d) => d.id === deviceId);
     if (!dev) return;
+    if (dev.accessLevel === 'VIEW') return;
+    const brightness = localBrightness[deviceId] || 80;
     try {
       await sendDeviceCommand(deviceId, 'SET_RGB', { r, g, b, brightness });
     } catch (e) {
@@ -910,6 +944,7 @@ export const DevicePage: React.FC = () => {
   // Filtered devices
   const visibleDevices = useMemo(() => {
     return uiDevices.filter((device) => {
+      if (device.accessLevel === 'NONE' || device.raw?.accessLevel === 'NONE') return false;
       // Room filter
       if (selectedRoomId !== 'ALL') {
         const matchId = device.roomId === selectedRoomId;

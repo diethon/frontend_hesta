@@ -38,8 +38,9 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
   const [localAcTemp, setLocalAcTemp] = useState<Record<string, number>>({});
   const [selectedDetail, setSelectedDetail] = useState<UIMappedDevice | null>(null);
 
-  // Filter devices by selected room
+  // Filter devices by accessLevel & selected room
   const filteredRawDevices = devices.filter((d) => {
+    if (d.accessLevel === 'NONE') return false;
     if (!selectedRoomId) return true;
     if (selectedRoomId === '__unassigned__') return !d.roomId;
     return d.roomId === selectedRoomId;
@@ -50,7 +51,14 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
     mapDeviceToUI(d, localPower, localBrightness)
   );
 
+  const isReadOnlyDevice = (device: UIMappedDevice) =>
+    device.accessLevel === 'VIEW' || device.raw?.accessLevel === 'VIEW';
+
   const handleToggle = async (device: UIMappedDevice) => {
+    if (isReadOnlyDevice(device)) {
+      notify.warning('Bạn chỉ có quyền xem thiết bị này');
+      return;
+    }
     const nextOn = !device.on;
     setLocalPower((prev) => ({ ...prev, [device.id]: nextOn }));
 
@@ -72,6 +80,7 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
     e: React.MouseEvent<HTMLDivElement>
   ) => {
     e.stopPropagation();
+    if (isReadOnlyDevice(device)) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
     const newPercent = Math.min(100, Math.max(10, Math.round((clickX / rect.width) * 100)));
@@ -86,6 +95,7 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
   };
 
   const handleSetBrightness = async (device: UIMappedDevice, brightness: number) => {
+    if (isReadOnlyDevice(device)) return;
     setLocalBrightness((prev) => ({ ...prev, [device.id]: brightness }));
     try {
       await sendDeviceCommand(device.id, 'SET_BRIGHTNESS', { brightness });
@@ -95,6 +105,10 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
   };
 
   const handleAdjustAcTemp = async (device: UIMappedDevice, delta: number) => {
+    if (isReadOnlyDevice(device)) {
+      notify.warning('Bạn chỉ có quyền xem thiết bị này');
+      return;
+    }
     const currentTemp =
       localAcTemp[device.id] ??
       (device.raw?.currentState?.temperature
@@ -113,6 +127,10 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
   };
 
   const handleSetAcMode = async (device: UIMappedDevice, mode: string) => {
+    if (isReadOnlyDevice(device)) {
+      notify.warning('Bạn chỉ có quyền xem thiết bị này');
+      return;
+    }
     try {
       await sendDeviceCommand(device.id, 'SET_MODE', { mode });
       notify.success(`Chế độ ${device.name}: ${mode}`);
@@ -199,6 +217,7 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
             const handleCardClick = () => {
               setSelectedDetail(device);
             };
+            const isViewOnly = isReadOnlyDevice(device);
 
             return (
               <article
@@ -225,28 +244,47 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
                     )}
                   </div>
 
-                  {device.offline ? (
-                    <span className="offline-dot" title="Ngoại tuyến" />
-                  ) : device.type === 'Cảm biến' || device.type === 'Cổng' ? (
-                    <IconButton
-                      icon="more"
-                      label={`Tùy chọn ${device.name}`}
-                      onClick={handleCardClick}
-                    />
-                  ) : (
-                    <button
-                      type="button"
-                      className={`toggle ${isOn ? 'active' : ''}`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleToggle(device);
-                      }}
-                      aria-label={`${isOn ? 'Tắt' : 'Bật'} ${device.name}`}
-                      aria-pressed={isOn}
-                    >
-                      <span />
-                    </button>
-                  )}
+                  <div className="flex items-center gap-1.5">
+                    {isViewOnly && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
+                        Chỉ xem
+                      </span>
+                    )}
+                    {device.offline ? (
+                      <span className="offline-dot" title="Ngoại tuyến" />
+                    ) : device.type === 'Cảm biến' || device.type === 'Cổng' ? (
+                      <IconButton
+                        icon="more"
+                        label={`Tùy chọn ${device.name}`}
+                        onClick={handleCardClick}
+                      />
+                    ) : isViewOnly ? (
+                      <button
+                        type="button"
+                        disabled
+                        className={`toggle ${isOn ? 'active' : ''} opacity-40 cursor-not-allowed`}
+                        title="Thiết bị ở chế độ chỉ xem"
+                        onClick={(e) => e.stopPropagation()}
+                        aria-disabled="true"
+                        aria-label={`${device.name} (Chỉ xem)`}
+                      >
+                        <span />
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className={`toggle ${isOn ? 'active' : ''}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleToggle(device);
+                        }}
+                        aria-label={`${isOn ? 'Tắt' : 'Bật'} ${device.name}`}
+                        aria-pressed={isOn}
+                      >
+                        <span />
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Big sensor value if available */}
@@ -266,9 +304,9 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
                 {/* Interactive Controls per Device Type */}
                 {device.type === 'Đèn' ? (
                   <div
-                    className="brightness"
+                    className={`brightness ${isViewOnly ? 'opacity-60 cursor-default' : ''}`}
                     aria-label={`Độ sáng ${currentBrightness}%`}
-                    title="Nhấp để chỉnh độ sáng"
+                    title={isViewOnly ? 'Chế độ chỉ xem' : 'Nhấp để chỉnh độ sáng'}
                     onClick={(e) => handleBrightnessChange(device, e)}
                   >
                     <span style={{ width: `${currentBrightness}%` }} />
@@ -280,7 +318,7 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
                       <button
                         type="button"
                         onClick={() => handleAdjustAcTemp(device, -1)}
-                        disabled={!isOn || acTemp <= 16}
+                        disabled={isViewOnly || !isOn || acTemp <= 16}
                         className="w-6 h-6 rounded-md bg-[var(--solid)] border border-[var(--border)] text-xs font-bold flex items-center justify-center hover:bg-[var(--g1)] disabled:opacity-30 cursor-pointer"
                         title="Giảm nhiệt độ"
                       >
@@ -292,7 +330,7 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
                       <button
                         type="button"
                         onClick={() => handleAdjustAcTemp(device, 1)}
-                        disabled={!isOn || acTemp >= 32}
+                        disabled={isViewOnly || !isOn || acTemp >= 32}
                         className="w-6 h-6 rounded-md bg-[var(--solid)] border border-[var(--border)] text-xs font-bold flex items-center justify-center hover:bg-[var(--g1)] disabled:opacity-30 cursor-pointer"
                         title="Tăng nhiệt độ"
                       >
@@ -308,8 +346,9 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
                           <button
                             key={m}
                             type="button"
+                            disabled={isViewOnly}
                             onClick={() => handleSetAcMode(device, m)}
-                            className={`px-1.5 py-0.5 rounded text-[9px] font-semibold transition-colors shrink-0 ${
+                            className={`px-1.5 py-0.5 rounded text-[9px] font-semibold transition-colors shrink-0 disabled:opacity-40 disabled:cursor-not-allowed ${
                               isCurrentMode && isOn
                                 ? 'bg-sky-500 text-white'
                                 : 'bg-[var(--solid)] text-[var(--secondary)] border border-[var(--border)] hover:bg-[var(--g1)]'
@@ -340,8 +379,11 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
                         <button
                           key={btn}
                           type="button"
-                          onClick={() => handleGateCommand(device, action, btn)}
-                          className={`py-1 px-1 rounded-md border text-[10px] font-bold transition-colors cursor-pointer text-center ${
+                          disabled={isViewOnly}
+                          onClick={() => !isViewOnly && handleGateCommand(device, action, btn)}
+                          className={`py-1 px-1 rounded-md border text-[10px] font-bold transition-colors text-center disabled:opacity-40 disabled:cursor-not-allowed ${
+                            isViewOnly ? 'cursor-not-allowed' : 'cursor-pointer'
+                          } ${
                             isGateActive
                               ? 'bg-primary text-white border-primary shadow-2xs'
                               : 'bg-[var(--solid)] border-[var(--border)] text-[var(--text)] hover:bg-primary hover:text-white'

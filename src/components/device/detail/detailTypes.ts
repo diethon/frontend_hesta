@@ -45,6 +45,7 @@ export interface DetailDeviceInput {
   manualOverrideActive?: boolean;
   currentState?: Record<string, unknown>;
   settings?: Record<string, unknown>;
+  accessLevel?: 'NONE' | 'VIEW' | 'CONTROL';
   raw?: Partial<DeviceResponse> & DetailDeviceRawExtras;
 }
 
