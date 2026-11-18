@@ -1,6 +1,7 @@
 import { useCallback, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { realtimeClient } from '../realtime/realtimeClient';
+import { clearAllCache } from '../services/queryCache';
 import { clearSession, persistCurrentUser, persistSession, subscribeSessionExpired } from '../services/session';
 import { currentUserUpdated, sessionAuthenticated, sessionEnded } from '../store/authSlice';
 import { currentHomeCleared } from '../store/homeSlice';
@@ -19,6 +20,7 @@ export function useRouteSession() {
 
   const endSession = useCallback(() => {
     void realtimeClient.disconnect();
+    clearAllCache();
     clearSession();
     dispatch(sessionEnded());
     dispatch(currentHomeCleared());
@@ -41,6 +43,7 @@ export function useRouteSession() {
   }), [endSession, location, navigate]);
 
   const login = useCallback((authData: AuthResponse) => {
+    clearAllCache();
     persistSession(authData);
     dispatch(sessionAuthenticated(authData));
   }, [dispatch]);

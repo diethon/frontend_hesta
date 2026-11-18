@@ -6,6 +6,7 @@ export const REALTIME_EVENT_TYPES = [
   'SCENE_CHANGED',
   'AUTOMATION_RULE_CHANGED',
   'SCENE_EXECUTION_UPDATED',
+  'MEMBER_ACCESS_UPDATED',
 ] as const;
 
 export type RealtimeEventType = (typeof REALTIME_EVENT_TYPES)[number];

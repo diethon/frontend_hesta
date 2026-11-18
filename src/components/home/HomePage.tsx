@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useLocation, useSearchParams, useNavigate, Navigate } from "react-router";
 import type { UserResponse } from "../../types/auth";
 import type { DeviceResponse } from "../../types/device";
@@ -28,7 +28,7 @@ import type { TwinDeviceSnapshotResponse } from "../../types/twin";
 
 const DASHBOARD_SCENE_EVENTS = ['SCENE_CHANGED'] as const;
 import { getHomeEnergyAnalytics, energyAnalyticsKey } from "../../services/energyApi";
-import { peekCache } from "../../services/queryCache";
+import { peekCache, setCacheValue, clearAllCache } from "../../services/queryCache";
 import {
   Pencil,
   Sparkles,
@@ -39,7 +39,7 @@ import {
   RotateCw,
   ArrowLeft,
 } from "lucide-react";
-import { currentHomeChanged, currentHomeCleared } from "../../store/homeSlice";
+import { currentHomeDetailsChanged, currentHomeCleared } from "../../store/homeSlice";
 import { useAppDispatch } from "../../store/hooks";
 import { getErrorMessage } from "../../utils/errors";
 import { notify } from '../ui/notify';
@@ -57,6 +57,17 @@ function retainSelectedHome(
   if (homes.length === 0) return null;
   if (!selectedHome) return homes[0];
   return homes.find((home) => home.homeId === selectedHome.homeId) ?? homes[0];
+}
+
+function sortDevicesStable(list: DeviceResponse[]): DeviceResponse[] {
+  return [...list].sort((a, b) => {
+    const aTime = a.createdAt ? Date.parse(a.createdAt) : Number.NaN;
+    const bTime = b.createdAt ? Date.parse(b.createdAt) : Number.NaN;
+    if (Number.isFinite(aTime) && Number.isFinite(bTime) && aTime !== bTime) {
+      return aTime - bTime;
+    }
+    return a.id.localeCompare(b.id);
+  });
 }
 
 function isDeviceOn(d: DeviceResponse): boolean {
@@ -143,6 +154,8 @@ export const HomePage: React.FC<HomePageProps> = ({
 
   // Refresh counter to trigger dashboard reload
   const [dashboardVersion, setDashboardVersion] = useState(0);
+  const lastLoadedHomeIdRef = useRef<string | null>(null);
+  const lastDevicePatchAtRef = useRef<Map<string, number>>(new Map());
   const reloadDashboard = useCallback(() => {
     setDashboardVersion((v) => v + 1);
   }, []);
@@ -152,17 +165,23 @@ export const HomePage: React.FC<HomePageProps> = ({
     if (!userHome?.homeId) return;
     const homeId = userHome.homeId;
     let active = true;
+    const isHomeSwitch = lastLoadedHomeIdRef.current !== homeId;
+    lastLoadedHomeIdRef.current = homeId;
+    const fetchStartedAt = Date.now();
 
-    // Fast-path: immediately restore cached devices & energy analytics so switching back to Overview has zero flicker
-    const cachedDevices = peekCache<DeviceResponse[]>(homeDevicesKey(homeId));
-    if (cachedDevices) {
-      setDevices(cachedDevices);
-    }
-    const cachedAnalytics = peekCache<EnergyAnalyticsResponse>(energyAnalyticsKey(homeId, '7D'));
-    if (cachedAnalytics) {
-      setEnergyAnalytics(cachedAnalytics);
-      if (cachedAnalytics.summary) {
-        setEnergySummary(cachedAnalytics.summary);
+    // Fast-path: only restore cached devices on initial load / home switch so reloadDashboard never rolls back live WS state
+    if (isHomeSwitch) {
+      lastDevicePatchAtRef.current.clear();
+      const cachedDevices = peekCache<DeviceResponse[]>(homeDevicesKey(homeId));
+      if (cachedDevices) {
+        setDevices(sortDevicesStable(cachedDevices));
+      }
+      const cachedAnalytics = peekCache<EnergyAnalyticsResponse>(energyAnalyticsKey(homeId, '7D'));
+      if (cachedAnalytics) {
+        setEnergyAnalytics(cachedAnalytics);
+        if (cachedAnalytics.summary) {
+          setEnergySummary(cachedAnalytics.summary);
+        }
       }
     }
 
@@ -175,7 +194,27 @@ export const HomePage: React.FC<HomePageProps> = ({
       .then(([fetchedRooms, fetchedDevices, fetchedScenes, fetchedAnalytics]) => {
         if (!active) return;
         if (fetchedRooms.status === 'fulfilled') setRooms(fetchedRooms.value || []);
-        if (fetchedDevices.status === 'fulfilled') setDevices(fetchedDevices.value || []);
+        if (fetchedDevices.status === 'fulfilled') {
+          const sorted = sortDevicesStable(fetchedDevices.value || []);
+          setDevices((prev) => {
+            const prevById = new Map(prev.map((d) => [d.id, d]));
+            const merged = sorted.map((d) => {
+              const patchedAt = lastDevicePatchAtRef.current.get(d.id) ?? 0;
+              const existing = prevById.get(d.id);
+              if (existing && patchedAt >= fetchStartedAt) {
+                return {
+                  ...d,
+                  currentState: existing.currentState,
+                  status: existing.status,
+                  lastSeen: existing.lastSeen ?? d.lastSeen,
+                };
+              }
+              return d;
+            });
+            setCacheValue(homeDevicesKey(homeId), merged);
+            return merged;
+          });
+        }
         if (fetchedScenes.status === 'fulfilled') setScenes(fetchedScenes.value || []);
         if (fetchedAnalytics.status === 'fulfilled' && fetchedAnalytics.value) {
           setEnergyAnalytics(fetchedAnalytics.value);
@@ -202,6 +241,7 @@ export const HomePage: React.FC<HomePageProps> = ({
     const state = data.currentState && typeof data.currentState === 'object' && !Array.isArray(data.currentState)
       ? (data.currentState as DeviceResponse['currentState'])
       : null;
+    lastDevicePatchAtRef.current.set(targetId, Date.now());
     setDevices((prev) => {
       let changed = false;
       const next = prev.map((device) => {
@@ -214,6 +254,9 @@ export const HomePage: React.FC<HomePageProps> = ({
           lastSeen: data.lastSeen ?? device.lastSeen,
         };
       });
+      if (changed && userHome?.homeId) {
+        setCacheValue(homeDevicesKey(userHome.homeId), next);
+      }
       return changed ? next : prev;
     });
   }), [userHome?.homeId]);
@@ -223,21 +266,33 @@ export const HomePage: React.FC<HomePageProps> = ({
     if (homeId) void getScenes(homeId).then((data) => setScenes(data || [])).catch(() => undefined);
   });
 
+  // Member access scope / room / device permissions changed by Owner:
+  // immediately clear cached device lists, refresh home accessScope + rooms + devices.
+  useEffect(() => realtimeEventDispatcher.register('MEMBER_ACCESS_UPDATED', (event) => {
+    if (event.homeId && userHome?.homeId && event.homeId !== userHome.homeId) return;
+    clearAllCache();
+    setSelectedRoomId(null);
+    void fetchHomes();
+    reloadDashboard();
+  }), [userHome?.homeId, fetchHomes, reloadDashboard]);
+
   // Deep links scroll and tab selection
   useEffect(() => {
     if (!userHome) return;
     if (location.hash === "#scenes-section") {
       navigate(`/homes/${encodeURIComponent(userHome.homeId)}/scenes`);
     } else if (location.hash === "#members-section") {
-      queueMicrotask(() => {
-        setActiveTabSection('members');
-      });
+      navigate(`/homes/${encodeURIComponent(userHome.homeId)}/members`);
     }
   }, [location.hash, location.key, userHome, navigate]);
 
   useEffect(() => {
-    dispatch(currentHomeChanged(userHome?.homeId ?? null));
-  }, [dispatch, userHome?.homeId]);
+    dispatch(currentHomeDetailsChanged({
+      homeId: userHome?.homeId ?? null,
+      role: userHome?.role ?? null,
+      accessScope: userHome?.accessScope ?? null,
+    }));
+  }, [dispatch, userHome?.homeId, userHome?.role, userHome?.accessScope]);
 
   useEffect(
     () => () => {
@@ -324,6 +379,7 @@ export const HomePage: React.FC<HomePageProps> = ({
   // Turn off all lights quick handler
   const handleTurnOffAllLights = async () => {
     const activeLights = devices.filter((d) => {
+      if (d.accessLevel === 'VIEW' || d.accessLevel === 'NONE') return false;
       const isLight = d.deviceType === 'LIGHT' || d.deviceType === 'LED_RGB';
       const isPowerOn = d.currentState?.power === 'ON' || d.currentState?.power === true;
       return isLight && isPowerOn;
@@ -434,10 +490,11 @@ export const HomePage: React.FC<HomePageProps> = ({
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
         onSelectMembers={() => {
-          setActiveTabSection('members');
-          setTimeout(() => {
-            document.getElementById('members-section')?.scrollIntoView({ behavior: 'smooth' });
-          }, 50);
+          if (userHome?.homeId) {
+            navigate(`/homes/${encodeURIComponent(userHome.homeId)}/members`);
+          } else {
+            notify.info('Hãy chọn hoặc tạo một ngôi nhà trước.');
+          }
         }}
         onOpenProfile={() => setIsProfileModalOpen(true)}
       />
@@ -526,9 +583,14 @@ export const HomePage: React.FC<HomePageProps> = ({
               selectedRoomId={selectedRoomId}
               onRefreshDevices={reloadDashboard}
               onDeviceUpdated={(updated) => {
-                setDevices((prev) =>
-                  prev.map((d) => (d.id === updated.id ? { ...d, ...updated } : d))
-                );
+                lastDevicePatchAtRef.current.set(updated.id, Date.now());
+                setDevices((prev) => {
+                  const next = prev.map((d) => (d.id === updated.id ? { ...d, ...updated } : d));
+                  if (userHome?.homeId) {
+                    setCacheValue(homeDevicesKey(userHome.homeId), next);
+                  }
+                  return next;
+                });
               }}
               onDeviceDeleted={(deletedId) => {
                 setDevices((prev) => prev.filter((d) => d.id !== deletedId));

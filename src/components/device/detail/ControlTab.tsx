@@ -661,14 +661,22 @@ export const ControlTab: React.FC<ControlTabProps> = ({
 
   const handleGateAction = async (item: string) => {
     if (disabled) return;
+    const prevGateState = gateState;
     setGateState(item);
     const action = item === 'Mở' ? 'OPEN' : item === 'Đóng' ? 'CLOSE' : 'STOP';
     const targetId = device?.realDeviceId || device?.id;
     if (targetId) {
       try {
-        await sendDeviceCommand(targetId, action);
+        const command = await sendDeviceCommand(targetId, action);
+        if (command && command.success === false) {
+          setGateState(prevGateState);
+          notify.error(command.message || `Không thể gửi lệnh ${item} cổng`);
+          return;
+        }
         notify.success(`Đã gửi lệnh ${item} cổng`);
       } catch (e) {
+        setGateState(prevGateState);
+        notify.error(`Không thể gửi lệnh ${item} cổng`);
         console.warn(e);
       }
     }

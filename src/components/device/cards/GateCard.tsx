@@ -107,9 +107,16 @@ const GateCardComponent: React.FC<GateCardProps> = ({
             <DoorOpen className="w-5 h-5" />
           </div>
           <div className="min-w-0">
-            <h3 className="font-semibold text-[15px] leading-tight text-text truncate">
-              {device.name}
-            </h3>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <h3 className="font-semibold text-[15px] leading-tight text-text truncate">
+                {device.name}
+              </h3>
+              {device.accessLevel === 'VIEW' && (
+                <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold rounded-md bg-amber-500/10 text-amber-600 border border-amber-500/20">
+                  Chỉ xem
+                </span>
+              )}
+            </div>
             <p className="text-xs text-muted truncate mt-0.5">
               {device.deviceType === 'ROLLING_DOOR' ? 'Cửa cuốn thông minh' : 'Cổng tự động'}
             </p>
@@ -162,7 +169,7 @@ const GateCardComponent: React.FC<GateCardProps> = ({
       >
         <button
           type="button"
-          disabled={isOffline || pendingAction !== null || isOpen}
+          disabled={isOffline || pendingAction !== null || isOpen || device.accessLevel === 'VIEW'}
           onClick={(e) => handleAction('OPEN', e)}
           className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition-all ${
             isOpen
@@ -180,7 +187,7 @@ const GateCardComponent: React.FC<GateCardProps> = ({
 
         <button
           type="button"
-          disabled={isOffline || pendingAction !== null}
+          disabled={isOffline || pendingAction !== null || device.accessLevel === 'VIEW'}
           onClick={(e) => handleAction('STOP', e)}
           className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition-all ${
             isStopped
@@ -198,7 +205,7 @@ const GateCardComponent: React.FC<GateCardProps> = ({
 
         <button
           type="button"
-          disabled={isOffline || pendingAction !== null || (!isOpen && !isStopped && !isOpening && !isClosing)}
+          disabled={isOffline || pendingAction !== null || (!isOpen && !isStopped && !isOpening && !isClosing) || device.accessLevel === 'VIEW'}
           onClick={(e) => handleAction('CLOSE', e)}
           className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition-all ${
             !isOpen && !isStopped && !isOpening && !isClosing

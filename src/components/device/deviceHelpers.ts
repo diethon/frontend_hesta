@@ -79,8 +79,17 @@ export const getPowerState = (device: DeviceResponse): 'ON' | 'OFF' => {
  * Check if a device type has a direct toggleable power switch.
  */
 export const isControllable = (device: DeviceResponse): boolean => {
+  if (device.accessLevel === 'VIEW' || device.accessLevel === 'NONE') return false;
   const type = resolveEffectiveType(device);
   return ['LIGHT', 'LED_RGB', 'SMART_PLUG', 'AIR_CONDITIONER'].includes(type);
+};
+
+export const canControlDevice = (device: DeviceResponse): boolean => {
+  return device.accessLevel !== 'VIEW' && device.accessLevel !== 'NONE';
+};
+
+export const isReadOnlyDevice = (device: DeviceResponse): boolean => {
+  return device.accessLevel === 'VIEW';
 };
 
 /**

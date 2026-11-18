@@ -10,6 +10,8 @@ import {
 } from '../../services/deviceApi';
 import { notify } from '../ui/notify';
 import { getErrorMessage } from '../../utils/errors';
+import { ApiError } from '../../services/apiClient';
+import { invalidateCache } from '../../services/queryCache';
 import { DeviceDetailModal } from '../device/DeviceDetailModal';
 import { mapDeviceToUI, type UIMappedDevice } from '../device/devicePageHelpers';
 
@@ -38,12 +40,53 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
   const [localAcTemp, setLocalAcTemp] = useState<Record<string, number>>({});
   const [selectedDetail, setSelectedDetail] = useState<UIMappedDevice | null>(null);
 
-  // Filter devices by selected room
-  const filteredRawDevices = devices.filter((d) => {
-    if (!selectedRoomId) return true;
-    if (selectedRoomId === '__unassigned__') return !d.roomId;
-    return d.roomId === selectedRoomId;
-  });
+  // Clear optimistic overrides ONLY for the specific device(s) whose authoritative state actually changed.
+  // Never wipe all devices when an unrelated sensor or another device emits a WebSocket update.
+  const [prevDevices, setPrevDevices] = useState(devices);
+  if (devices !== prevDevices) {
+    const prevById = new Map(prevDevices.map((d) => [d.id, d]));
+    const changedIds: string[] = [];
+    for (const d of devices) {
+      const prev = prevById.get(d.id);
+      if (!prev || prev.currentState !== d.currentState || prev.status !== d.status) {
+        changedIds.push(d.id);
+      }
+    }
+    setPrevDevices(devices);
+    if (changedIds.length > 0) {
+      const clearIds = <T,>(map: Record<string, T>): Record<string, T> => {
+        let touched = false;
+        const next = { ...map };
+        for (const id of changedIds) {
+          if (id in next) {
+            delete next[id];
+            touched = true;
+          }
+        }
+        return touched ? next : map;
+      };
+      setLocalPower(clearIds);
+      setLocalBrightness(clearIds);
+      setLocalAcTemp(clearIds);
+    }
+  }
+
+  // Filter devices by accessLevel & selected room, and keep deterministic stable order
+  const filteredRawDevices = devices
+    .filter((d) => {
+      if (d.accessLevel === 'NONE') return false;
+      if (!selectedRoomId) return true;
+      if (selectedRoomId === '__unassigned__') return !d.roomId;
+      return d.roomId === selectedRoomId;
+    })
+    .sort((a, b) => {
+      const aTime = a.createdAt ? Date.parse(a.createdAt) : Number.NaN;
+      const bTime = b.createdAt ? Date.parse(b.createdAt) : Number.NaN;
+      if (Number.isFinite(aTime) && Number.isFinite(bTime) && aTime !== bTime) {
+        return aTime - bTime;
+      }
+      return a.id.localeCompare(b.id);
+    });
 
   // Map real filtered devices to UIMappedDevice
   const uiDevices: UIMappedDevice[] = filteredRawDevices.map((d) =>
@@ -66,22 +109,62 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
     });
   };
 
+  const isReadOnlyDevice = (device: UIMappedDevice) =>
+    device.accessLevel === 'VIEW' || device.raw?.accessLevel === 'VIEW';
+
+  const patchDeviceStateInPlace = (
+    device: UIMappedDevice,
+    patch: Record<string, unknown>,
+    acknowledgedState?: Record<string, unknown>,
+  ) => {
+    if (onDeviceUpdated && device.raw) {
+      onDeviceUpdated({
+        ...device.raw,
+        currentState: {
+          ...device.raw.currentState,
+          ...patch,
+          ...(acknowledgedState ?? {}),
+        },
+      });
+    } else {
+      onRefreshDevices?.();
+    }
+  };
+
   const handleToggle = async (device: UIMappedDevice) => {
     if (device.offline) return;
+    if (isReadOnlyDevice(device)) {
+      notify.warning('Bạn chỉ có quyền xem thiết bị này');
+      return;
+    }
     const prevPower = localPower[device.id];
     const nextOn = !device.on;
     setLocalPower((prev) => ({ ...prev, [device.id]: nextOn }));
 
     try {
-      if (device.type === 'Điều hòa') {
-        await setAcPower(device.id, nextOn);
-      } else {
-        await sendManualPowerCommand(device.id, nextOn ? 'TURN_ON' : 'TURN_OFF');
+      const command =
+        device.type === 'Điều hòa'
+          ? await setAcPower(device.id, nextOn)
+          : (await sendManualPowerCommand(device.id, nextOn ? 'TURN_ON' : 'TURN_OFF')).command;
+
+      if (command && command.success === false) {
+        restoreRecordValue(setLocalPower, device.id, prevPower);
+        notify.error(command.message || `Không thể ${nextOn ? 'bật' : 'tắt'} ${device.name}`);
+        return;
       }
-      onRefreshDevices?.();
+
+      patchDeviceStateInPlace(
+        device,
+        { power: nextOn ? 'ON' : 'OFF' },
+        command?.acknowledgedState,
+      );
       notify.success(`${nextOn ? 'Đã bật' : 'Đã tắt'} ${device.name}`);
     } catch (err: unknown) {
       restoreRecordValue(setLocalPower, device.id, prevPower);
+      if (err instanceof ApiError && (err.status === 403 || err.status === 404)) {
+        invalidateCache('devices:home:');
+        onRefreshDevices?.();
+      }
       notify.error(getErrorMessage(err, `Lỗi khi ${nextOn ? 'bật' : 'tắt'} ${device.name}`));
     }
   };
@@ -92,6 +175,7 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
   ) => {
     e.stopPropagation();
     if (device.offline) return;
+    if (isReadOnlyDevice(device)) return;
     const prevBrightness = localBrightness[device.id];
     const rect = e.currentTarget.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
@@ -99,7 +183,17 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
     setLocalBrightness((prev) => ({ ...prev, [device.id]: newPercent }));
 
     try {
-      await sendDeviceCommand(device.id, 'SET_BRIGHTNESS', { brightness: newPercent });
+      const command = await sendDeviceCommand(device.id, 'SET_BRIGHTNESS', { brightness: newPercent });
+      if (command && command.success === false) {
+        restoreRecordValue(setLocalBrightness, device.id, prevBrightness);
+        notify.error(command.message || 'Không thể chỉnh độ sáng');
+        return;
+      }
+      patchDeviceStateInPlace(
+        device,
+        { brightness: newPercent },
+        command?.acknowledgedState,
+      );
       notify.success(`Độ sáng ${device.name}: ${newPercent}%`);
     } catch (err: unknown) {
       restoreRecordValue(setLocalBrightness, device.id, prevBrightness);
@@ -109,10 +203,21 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
 
   const handleSetBrightness = async (device: UIMappedDevice, brightness: number) => {
     if (device.offline) return;
+    if (isReadOnlyDevice(device)) return;
     const prevBrightness = localBrightness[device.id];
     setLocalBrightness((prev) => ({ ...prev, [device.id]: brightness }));
     try {
-      await sendDeviceCommand(device.id, 'SET_BRIGHTNESS', { brightness });
+      const command = await sendDeviceCommand(device.id, 'SET_BRIGHTNESS', { brightness });
+      if (command && command.success === false) {
+        restoreRecordValue(setLocalBrightness, device.id, prevBrightness);
+        notify.error(command.message || 'Không thể chỉnh độ sáng');
+        return;
+      }
+      patchDeviceStateInPlace(
+        device,
+        { brightness },
+        command?.acknowledgedState,
+      );
     } catch (err: unknown) {
       restoreRecordValue(setLocalBrightness, device.id, prevBrightness);
       notify.error(getErrorMessage(err, 'Lỗi khi chỉnh độ sáng'));
@@ -121,6 +226,10 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
 
   const handleAdjustAcTemp = async (device: UIMappedDevice, delta: number) => {
     if (device.offline || !device.on) return;
+    if (isReadOnlyDevice(device)) {
+      notify.warning('Bạn chỉ có quyền xem thiết bị này');
+      return;
+    }
     const prevTemp = localAcTemp[device.id];
     const currentTemp =
       localAcTemp[device.id] ??
@@ -131,9 +240,18 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
     setLocalAcTemp((prev) => ({ ...prev, [device.id]: newTemp }));
 
     try {
-      await setAcTemperature(device.id, newTemp);
+      const command = await setAcTemperature(device.id, newTemp);
+      if (command && command.success === false) {
+        restoreRecordValue(setLocalAcTemp, device.id, prevTemp);
+        notify.error(command.message || 'Không thể điều chỉnh nhiệt độ');
+        return;
+      }
       notify.success(`Điều hòa ${device.name}: ${newTemp}°C`);
-      onRefreshDevices?.();
+      patchDeviceStateInPlace(
+        device,
+        { temperature: newTemp },
+        command?.acknowledgedState,
+      );
     } catch (err: unknown) {
       restoreRecordValue(setLocalAcTemp, device.id, prevTemp);
       notify.error(getErrorMessage(err, 'Lỗi khi điều chỉnh nhiệt độ'));
@@ -142,10 +260,22 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
 
   const handleSetAcMode = async (device: UIMappedDevice, mode: string) => {
     if (device.offline) return;
+    if (isReadOnlyDevice(device)) {
+      notify.warning('Bạn chỉ có quyền xem thiết bị này');
+      return;
+    }
     try {
-      await sendDeviceCommand(device.id, 'SET_MODE', { mode });
+      const command = await sendDeviceCommand(device.id, 'SET_MODE', { mode });
+      if (command && command.success === false) {
+        notify.error(command.message || 'Không thể chọn chế độ điều hòa');
+        return;
+      }
       notify.success(`Chế độ ${device.name}: ${mode}`);
-      onRefreshDevices?.();
+      patchDeviceStateInPlace(
+        device,
+        { mode },
+        command?.acknowledgedState,
+      );
     } catch (err: unknown) {
       notify.error(getErrorMessage(err, 'Lỗi khi chọn chế độ điều hòa'));
     }
@@ -154,9 +284,17 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
   const handleGateCommand = async (device: UIMappedDevice, action: string, label: string) => {
     if (device.offline) return;
     try {
-      await sendDeviceCommand(device.id, action);
+      const command = await sendDeviceCommand(device.id, action);
+      if (command && command.success === false) {
+        notify.error(command.message || `Không thể gửi lệnh ${label}`);
+        return;
+      }
       notify.success(`Cổng ${device.name}: ${label}`);
-      onRefreshDevices?.();
+      patchDeviceStateInPlace(
+        device,
+        { state: action },
+        command?.acknowledgedState,
+      );
     } catch (err: unknown) {
       notify.error(getErrorMessage(err, `Lỗi khi gửi lệnh ${label}`));
     }
@@ -229,6 +367,7 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
             const handleCardClick = () => {
               setSelectedDetail(device);
             };
+            const isViewOnly = isReadOnlyDevice(device);
 
             return (
               <article
@@ -255,28 +394,47 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
                     )}
                   </div>
 
-                  {device.offline ? (
-                    <span className="offline-dot" title="Ngoại tuyến" />
-                  ) : device.type === 'Cảm biến' || device.type === 'Cổng' ? (
-                    <IconButton
-                      icon="more"
-                      label={`Tùy chọn ${device.name}`}
-                      onClick={handleCardClick}
-                    />
-                  ) : (
-                    <button
-                      type="button"
-                      className={`toggle ${isOn ? 'active' : ''}`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleToggle(device);
-                      }}
-                      aria-label={`${isOn ? 'Tắt' : 'Bật'} ${device.name}`}
-                      aria-pressed={isOn}
-                    >
-                      <span />
-                    </button>
-                  )}
+                  <div className="flex items-center gap-1.5">
+                    {isViewOnly && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
+                        Chỉ xem
+                      </span>
+                    )}
+                    {device.offline ? (
+                      <span className="offline-dot" title="Ngoại tuyến" />
+                    ) : device.type === 'Cảm biến' || device.type === 'Cổng' ? (
+                      <IconButton
+                        icon="more"
+                        label={`Tùy chọn ${device.name}`}
+                        onClick={handleCardClick}
+                      />
+                    ) : isViewOnly ? (
+                      <button
+                        type="button"
+                        disabled
+                        className={`toggle ${isOn ? 'active' : ''} opacity-40 cursor-not-allowed`}
+                        title="Thiết bị ở chế độ chỉ xem"
+                        onClick={(e) => e.stopPropagation()}
+                        aria-disabled="true"
+                        aria-label={`${device.name} (Chỉ xem)`}
+                      >
+                        <span />
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className={`toggle ${isOn ? 'active' : ''}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleToggle(device);
+                        }}
+                        aria-label={`${isOn ? 'Tắt' : 'Bật'} ${device.name}`}
+                        aria-pressed={isOn}
+                      >
+                        <span />
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Big sensor value if available */}
@@ -296,14 +454,26 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
                 {/* Interactive Controls per Device Type */}
                 {device.type === 'Đèn' ? (
                   <div
-                    className={`brightness ${device.offline ? 'disabled' : ''}`}
+                    className={`brightness ${device.offline ? 'disabled' : ''} ${isViewOnly ? 'opacity-60 cursor-default' : ''}`}
                     role="slider"
                     aria-valuemin={10}
                     aria-valuemax={100}
                     aria-valuenow={currentBrightness}
-                    aria-disabled={device.offline}
-                    aria-label={device.offline ? `${device.name} đang ngoại tuyến — không thể chỉnh độ sáng` : `Độ sáng ${currentBrightness}%`}
-                    title={device.offline ? 'Thiết bị đang ngoại tuyến' : 'Nhấp để chỉnh độ sáng'}
+                    aria-disabled={device.offline || isViewOnly}
+                    aria-label={
+                      device.offline
+                        ? `${device.name} đang ngoại tuyến — không thể chỉnh độ sáng`
+                        : isViewOnly
+                          ? `${device.name} ở chế độ chỉ xem — độ sáng ${currentBrightness}%`
+                          : `Độ sáng ${currentBrightness}%`
+                    }
+                    title={
+                      device.offline
+                        ? 'Thiết bị đang ngoại tuyến'
+                        : isViewOnly
+                          ? 'Chế độ chỉ xem'
+                          : 'Nhấp để chỉnh độ sáng'
+                    }
                     onClick={(e) => handleBrightnessChange(device, e)}
                   >
                     <span style={{ width: `${currentBrightness}%` }} />
@@ -315,7 +485,7 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
                       <button
                         type="button"
                         onClick={() => handleAdjustAcTemp(device, -1)}
-                        disabled={device.offline || !isOn || acTemp <= 16}
+                        disabled={device.offline || isViewOnly || !isOn || acTemp <= 16}
                         className="w-6 h-6 rounded-md bg-[var(--solid)] border border-[var(--border)] text-xs font-bold flex items-center justify-center hover:bg-[var(--g1)] disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
                         title="Giảm nhiệt độ"
                       >
@@ -327,7 +497,7 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
                       <button
                         type="button"
                         onClick={() => handleAdjustAcTemp(device, 1)}
-                        disabled={device.offline || !isOn || acTemp >= 32}
+                        disabled={device.offline || isViewOnly || !isOn || acTemp >= 32}
                         className="w-6 h-6 rounded-md bg-[var(--solid)] border border-[var(--border)] text-xs font-bold flex items-center justify-center hover:bg-[var(--g1)] disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
                         title="Tăng nhiệt độ"
                       >
@@ -343,7 +513,7 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
                           <button
                             key={m}
                             type="button"
-                            disabled={device.offline}
+                            disabled={device.offline || isViewOnly}
                             onClick={() => handleSetAcMode(device, m)}
                             className={`px-1.5 py-0.5 rounded text-[9px] font-semibold transition-colors shrink-0 disabled:opacity-40 disabled:cursor-not-allowed ${
                               isCurrentMode && isOn
@@ -376,9 +546,11 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
                         <button
                           key={btn}
                           type="button"
-                          disabled={device.offline}
-                          onClick={() => handleGateCommand(device, action, btn)}
-                          className={`py-1 px-1 rounded-md border text-[10px] font-bold transition-colors cursor-pointer text-center disabled:opacity-40 disabled:cursor-not-allowed ${
+                          disabled={device.offline || isViewOnly}
+                          onClick={() => !device.offline && !isViewOnly && handleGateCommand(device, action, btn)}
+                          className={`py-1 px-1 rounded-md border text-[10px] font-bold transition-colors text-center disabled:opacity-40 disabled:cursor-not-allowed ${
+                            device.offline || isViewOnly ? 'cursor-not-allowed' : 'cursor-pointer'
+                          } ${
                             isGateActive
                               ? 'bg-primary text-white border-primary shadow-2xs'
                               : 'bg-[var(--solid)] border-[var(--border)] text-[var(--text)] hover:bg-primary hover:text-white'

@@ -34,7 +34,7 @@ import {
 } from '../../services/deviceApi';
 import { getRooms } from '../../services/roomApi';
 import { getHomeEnergyAnalytics, energyAnalyticsKey } from '../../services/energyApi';
-import { peekCache } from '../../services/queryCache';
+import { peekCache, invalidateCache } from '../../services/queryCache';
 import type { DeviceResponse } from '../../types/device';
 import type { RoomResponse } from '../../types/room';
 import type { DeviceEnergyBreakdown } from '../../types/energy';
@@ -260,6 +260,7 @@ function DevicesDeviceCard({
   const { isOverrideActive, formattedTime } = useOverrideCountdown(
     device.manualOverrideUntil
   );
+  const isViewOnly = device.accessLevel === 'VIEW' || device.raw?.accessLevel === 'VIEW';
 
   const colorClass = getDeviceTypeColorClass(device.type);
   const isPowerDevice =
@@ -307,6 +308,11 @@ function DevicesDeviceCard({
         </div>
 
         <div className="flex items-center gap-1.5">
+          {isViewOnly && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
+              Chỉ xem
+            </span>
+          )}
           {isOverrideActive && (
             <span
               className="override-badge"
@@ -320,7 +326,21 @@ function DevicesDeviceCard({
               <span>{formattedTime}</span>
             </span>
           )}
-          {!device.offline && !device.sensor && device.type !== 'Cổng' ? (
+          {isViewOnly && !device.offline && !device.sensor && device.type !== 'Cổng' ? (
+            <button
+              type="button"
+              disabled
+              className={`toggle ${device.on ? 'active' : ''} opacity-40 cursor-not-allowed`}
+              title="Thiết bị ở chế độ chỉ xem"
+              onClick={(event) => {
+                event.stopPropagation();
+              }}
+              aria-disabled="true"
+              aria-label={`${device.name} (Chỉ xem)`}
+            >
+              <span />
+            </button>
+          ) : !device.offline && !device.sensor && device.type !== 'Cổng' ? (
             <button
               type="button"
               className={`toggle ${device.on ? 'active' : ''}`}
@@ -374,11 +394,11 @@ function DevicesDeviceCard({
             <button
               type="button"
               key={item}
-              disabled={device.offline}
-              className={gate === item ? 'active' : ''}
+              disabled={device.offline || isViewOnly}
+              className={`${gate === item ? 'active' : ''} ${isViewOnly ? 'opacity-40 cursor-not-allowed' : ''}`}
               onClick={(event) => {
                 event.stopPropagation();
-                if (device.offline) return;
+                if (device.offline || isViewOnly) return;
                 setGate(item);
                 onGateCommand(item);
               }}
@@ -592,6 +612,30 @@ export const DevicePage: React.FC = () => {
       return hasChanges ? next : prev;
     });
 
+    // Clear optimistic local overrides for devices that just received authoritative realtime state
+    setLocalPower((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      updates.forEach((patch, id) => {
+        if (patch.currentState && patch.currentState.power !== undefined && id in next) {
+          delete next[id];
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+    setLocalBrightness((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      updates.forEach((patch, id) => {
+        if (patch.currentState && patch.currentState.brightness !== undefined && id in next) {
+          delete next[id];
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+
     setSelectedDevice((prev) => {
       if (!prev) return null;
       const patch = updates.get(prev.id);
@@ -696,6 +740,8 @@ export const DevicePage: React.FC = () => {
         setError('');
         const data = await getDevicesByHome(homeId);
         setDevices(data || []);
+        setLocalPower({});
+        setLocalBrightness({});
         void fetchEnergy();
       } catch (err: unknown) {
         setError(getErrorMessage(err, 'Lỗi tải danh sách thiết bị'));
@@ -705,6 +751,16 @@ export const DevicePage: React.FC = () => {
     },
     [homeId, fetchEnergy]
   );
+
+  // Refetch rooms and devices immediately whenever Owner changes this member's access
+  useEffect(() => {
+    return realtimeEventDispatcher.register('MEMBER_ACCESS_UPDATED', (event) => {
+      if (event.homeId && homeId && event.homeId !== homeId) return;
+      invalidateCache('devices:home:');
+      void fetchRooms();
+      void fetchDevices(true);
+    });
+  }, [homeId, fetchRooms, fetchDevices]);
 
   useEffect(() => {
     let active = true;
@@ -751,6 +807,11 @@ export const DevicePage: React.FC = () => {
     const dev = devices.find((d) => d.id === deviceId);
     if (!dev || dev.status !== 'ONLINE') return;
 
+    if (dev.accessLevel === 'VIEW') {
+      notify.warning('Bạn chỉ có quyền xem thiết bị này');
+      return;
+    }
+
     const currentOn =
       localPower[deviceId] !== undefined
         ? localPower[deviceId]
@@ -783,6 +844,7 @@ export const DevicePage: React.FC = () => {
   const handleTurnOffAllLights = async () => {
     const onLights = devices.filter((d) => {
       if (d.status !== 'ONLINE') return false;
+      if (d.accessLevel === 'VIEW' || d.accessLevel === 'NONE') return false;
       const isLight =
         (d.deviceType || '').toUpperCase().includes('LIGHT') ||
         (d.deviceType || '').toUpperCase().includes('LED');
@@ -797,7 +859,7 @@ export const DevicePage: React.FC = () => {
     });
 
     if (onLights.length === 0) {
-      notify.info('Không có đèn nào đang bật');
+      notify.info('Không có đèn nào đang bật hoặc bạn không có quyền điều khiển');
       return;
     }
 
@@ -860,12 +922,20 @@ export const DevicePage: React.FC = () => {
   ) => {
     const dev = devices.find((d) => d.id === deviceId);
     if (!dev || dev.status !== 'ONLINE') return;
+    if (dev.accessLevel === 'VIEW') {
+      notify.warning('Bạn chỉ có quyền xem thiết bị này');
+      return;
+    }
     const action = cmd === 'Mở' ? 'OPEN' : cmd === 'Đóng' ? 'CLOSE' : 'STOP';
     try {
-      await sendDeviceCommand(deviceId, action);
-      notify.success(`Đã gửi lệnh ${cmd} cổng`);
+      const command = await sendDeviceCommand(deviceId, action);
+      if (command && command.success === false) {
+        notify.error(command.message || `Không thể gửi lệnh ${cmd} ${dev.name}`);
+        return;
+      }
+      notify.success(`Đã gửi lệnh ${cmd} ${dev.name}`);
     } catch (e) {
-      notify.error(getErrorMessage(e, 'Lỗi điều khiển cổng'));
+      notify.error(getErrorMessage(e, `Lỗi điều khiển ${dev.name}`));
     }
   };
 
@@ -876,6 +946,7 @@ export const DevicePage: React.FC = () => {
   ) => {
     const dev = devices.find((d) => d.id === deviceId);
     if (!dev || dev.status !== 'ONLINE') return;
+    if (dev.accessLevel === 'VIEW') return;
     const prevBrightness = localBrightness[deviceId];
     setLocalBrightness((prev) => ({ ...prev, [deviceId]: brightness }));
     try {
@@ -903,6 +974,7 @@ export const DevicePage: React.FC = () => {
   ) => {
     const dev = devices.find((d) => d.id === deviceId);
     if (!dev || dev.status !== 'ONLINE') return;
+    if (dev.accessLevel === 'VIEW') return;
     const brightness = localBrightness[deviceId] || 80;
     try {
       await sendDeviceCommand(deviceId, 'SET_RGB', { r, g, b, brightness });
@@ -964,6 +1036,7 @@ export const DevicePage: React.FC = () => {
   // Filtered devices
   const visibleDevices = useMemo(() => {
     return uiDevices.filter((device) => {
+      if (device.accessLevel === 'NONE' || device.raw?.accessLevel === 'NONE') return false;
       // Room filter
       if (selectedRoomId !== 'ALL') {
         const matchId = device.roomId === selectedRoomId;
