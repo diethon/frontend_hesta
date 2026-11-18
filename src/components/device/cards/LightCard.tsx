@@ -129,6 +129,7 @@ const LightCardComponent: React.FC<LightCardProps> = ({
   }, []);
 
   const handleBrightnessChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (isOffline) return;
     const val = Number(e.target.value);
     setBrightness(val); // Phản hồi 60Hz siêu tốc nội bộ thẻ, KHÔNG gọi onStateChange gây re-render cả trang!
 

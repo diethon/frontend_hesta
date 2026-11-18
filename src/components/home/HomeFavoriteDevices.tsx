@@ -93,6 +93,22 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
     mapDeviceToUI(d, localPower, localBrightness)
   );
 
+  const restoreRecordValue = <T,>(
+    setter: React.Dispatch<React.SetStateAction<Record<string, T>>>,
+    id: string,
+    prevValue: T | undefined
+  ) => {
+    setter((prev) => {
+      const next = { ...prev };
+      if (prevValue === undefined) {
+        delete next[id];
+      } else {
+        next[id] = prevValue;
+      }
+      return next;
+    });
+  };
+
   const isReadOnlyDevice = (device: UIMappedDevice) =>
     device.accessLevel === 'VIEW' || device.raw?.accessLevel === 'VIEW';
 
@@ -116,12 +132,13 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
   };
 
   const handleToggle = async (device: UIMappedDevice) => {
+    if (device.offline) return;
     if (isReadOnlyDevice(device)) {
       notify.warning('Bạn chỉ có quyền xem thiết bị này');
       return;
     }
-    const prevOn = Boolean(device.on);
-    const nextOn = !prevOn;
+    const prevPower = localPower[device.id];
+    const nextOn = !device.on;
     setLocalPower((prev) => ({ ...prev, [device.id]: nextOn }));
 
     try {
@@ -131,7 +148,7 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
           : (await sendManualPowerCommand(device.id, nextOn ? 'TURN_ON' : 'TURN_OFF')).command;
 
       if (command && command.success === false) {
-        setLocalPower((prev) => ({ ...prev, [device.id]: prevOn }));
+        restoreRecordValue(setLocalPower, device.id, prevPower);
         notify.error(command.message || `Không thể ${nextOn ? 'bật' : 'tắt'} ${device.name}`);
         return;
       }
@@ -143,7 +160,7 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
       );
       notify.success(`${nextOn ? 'Đã bật' : 'Đã tắt'} ${device.name}`);
     } catch (err: unknown) {
-      setLocalPower((prev) => ({ ...prev, [device.id]: prevOn }));
+      restoreRecordValue(setLocalPower, device.id, prevPower);
       if (err instanceof ApiError && (err.status === 403 || err.status === 404)) {
         invalidateCache('devices:home:');
         onRefreshDevices?.();
@@ -157,8 +174,9 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
     e: React.MouseEvent<HTMLDivElement>
   ) => {
     e.stopPropagation();
+    if (device.offline) return;
     if (isReadOnlyDevice(device)) return;
-    const prevBrightness = localBrightness[device.id] ?? device.brightness ?? 80;
+    const prevBrightness = localBrightness[device.id];
     const rect = e.currentTarget.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
     const newPercent = Math.min(100, Math.max(10, Math.round((clickX / rect.width) * 100)));
@@ -167,7 +185,7 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
     try {
       const command = await sendDeviceCommand(device.id, 'SET_BRIGHTNESS', { brightness: newPercent });
       if (command && command.success === false) {
-        setLocalBrightness((prev) => ({ ...prev, [device.id]: prevBrightness }));
+        restoreRecordValue(setLocalBrightness, device.id, prevBrightness);
         notify.error(command.message || 'Không thể chỉnh độ sáng');
         return;
       }
@@ -178,19 +196,20 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
       );
       notify.success(`Độ sáng ${device.name}: ${newPercent}%`);
     } catch (err: unknown) {
-      setLocalBrightness((prev) => ({ ...prev, [device.id]: prevBrightness }));
+      restoreRecordValue(setLocalBrightness, device.id, prevBrightness);
       notify.error(getErrorMessage(err, 'Lỗi khi chỉnh độ sáng'));
     }
   };
 
   const handleSetBrightness = async (device: UIMappedDevice, brightness: number) => {
+    if (device.offline) return;
     if (isReadOnlyDevice(device)) return;
-    const prevBrightness = localBrightness[device.id] ?? device.brightness ?? 80;
+    const prevBrightness = localBrightness[device.id];
     setLocalBrightness((prev) => ({ ...prev, [device.id]: brightness }));
     try {
       const command = await sendDeviceCommand(device.id, 'SET_BRIGHTNESS', { brightness });
       if (command && command.success === false) {
-        setLocalBrightness((prev) => ({ ...prev, [device.id]: prevBrightness }));
+        restoreRecordValue(setLocalBrightness, device.id, prevBrightness);
         notify.error(command.message || 'Không thể chỉnh độ sáng');
         return;
       }
@@ -200,16 +219,18 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
         command?.acknowledgedState,
       );
     } catch (err: unknown) {
-      setLocalBrightness((prev) => ({ ...prev, [device.id]: prevBrightness }));
+      restoreRecordValue(setLocalBrightness, device.id, prevBrightness);
       notify.error(getErrorMessage(err, 'Lỗi khi chỉnh độ sáng'));
     }
   };
 
   const handleAdjustAcTemp = async (device: UIMappedDevice, delta: number) => {
+    if (device.offline || !device.on) return;
     if (isReadOnlyDevice(device)) {
       notify.warning('Bạn chỉ có quyền xem thiết bị này');
       return;
     }
+    const prevTemp = localAcTemp[device.id];
     const currentTemp =
       localAcTemp[device.id] ??
       (device.raw?.currentState?.temperature
@@ -221,7 +242,7 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
     try {
       const command = await setAcTemperature(device.id, newTemp);
       if (command && command.success === false) {
-        setLocalAcTemp((prev) => ({ ...prev, [device.id]: currentTemp }));
+        restoreRecordValue(setLocalAcTemp, device.id, prevTemp);
         notify.error(command.message || 'Không thể điều chỉnh nhiệt độ');
         return;
       }
@@ -232,12 +253,13 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
         command?.acknowledgedState,
       );
     } catch (err: unknown) {
-      setLocalAcTemp((prev) => ({ ...prev, [device.id]: currentTemp }));
+      restoreRecordValue(setLocalAcTemp, device.id, prevTemp);
       notify.error(getErrorMessage(err, 'Lỗi khi điều chỉnh nhiệt độ'));
     }
   };
 
   const handleSetAcMode = async (device: UIMappedDevice, mode: string) => {
+    if (device.offline) return;
     if (isReadOnlyDevice(device)) {
       notify.warning('Bạn chỉ có quyền xem thiết bị này');
       return;
@@ -260,6 +282,7 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
   };
 
   const handleGateCommand = async (device: UIMappedDevice, action: string, label: string) => {
+    if (device.offline) return;
     try {
       const command = await sendDeviceCommand(device.id, action);
       if (command && command.success === false) {
@@ -422,7 +445,7 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
                 <div className="device-copy">
                   <h3 title={device.name}>{device.name}</h3>
                   <p>
-                    {device.type === 'Đèn'
+                    {!device.offline && device.type === 'Đèn'
                       ? `${isOn ? 'Đang bật' : 'Đã tắt'} · ${currentBrightness}%`
                       : device.status}
                   </p>
@@ -431,9 +454,26 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
                 {/* Interactive Controls per Device Type */}
                 {device.type === 'Đèn' ? (
                   <div
-                    className={`brightness ${isViewOnly ? 'opacity-60 cursor-default' : ''}`}
-                    aria-label={`Độ sáng ${currentBrightness}%`}
-                    title={isViewOnly ? 'Chế độ chỉ xem' : 'Nhấp để chỉnh độ sáng'}
+                    className={`brightness ${device.offline ? 'disabled' : ''} ${isViewOnly ? 'opacity-60 cursor-default' : ''}`}
+                    role="slider"
+                    aria-valuemin={10}
+                    aria-valuemax={100}
+                    aria-valuenow={currentBrightness}
+                    aria-disabled={device.offline || isViewOnly}
+                    aria-label={
+                      device.offline
+                        ? `${device.name} đang ngoại tuyến — không thể chỉnh độ sáng`
+                        : isViewOnly
+                          ? `${device.name} ở chế độ chỉ xem — độ sáng ${currentBrightness}%`
+                          : `Độ sáng ${currentBrightness}%`
+                    }
+                    title={
+                      device.offline
+                        ? 'Thiết bị đang ngoại tuyến'
+                        : isViewOnly
+                          ? 'Chế độ chỉ xem'
+                          : 'Nhấp để chỉnh độ sáng'
+                    }
                     onClick={(e) => handleBrightnessChange(device, e)}
                   >
                     <span style={{ width: `${currentBrightness}%` }} />
@@ -445,8 +485,8 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
                       <button
                         type="button"
                         onClick={() => handleAdjustAcTemp(device, -1)}
-                        disabled={isViewOnly || !isOn || acTemp <= 16}
-                        className="w-6 h-6 rounded-md bg-[var(--solid)] border border-[var(--border)] text-xs font-bold flex items-center justify-center hover:bg-[var(--g1)] disabled:opacity-30 cursor-pointer"
+                        disabled={device.offline || isViewOnly || !isOn || acTemp <= 16}
+                        className="w-6 h-6 rounded-md bg-[var(--solid)] border border-[var(--border)] text-xs font-bold flex items-center justify-center hover:bg-[var(--g1)] disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
                         title="Giảm nhiệt độ"
                       >
                         -
@@ -457,8 +497,8 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
                       <button
                         type="button"
                         onClick={() => handleAdjustAcTemp(device, 1)}
-                        disabled={isViewOnly || !isOn || acTemp >= 32}
-                        className="w-6 h-6 rounded-md bg-[var(--solid)] border border-[var(--border)] text-xs font-bold flex items-center justify-center hover:bg-[var(--g1)] disabled:opacity-30 cursor-pointer"
+                        disabled={device.offline || isViewOnly || !isOn || acTemp >= 32}
+                        className="w-6 h-6 rounded-md bg-[var(--solid)] border border-[var(--border)] text-xs font-bold flex items-center justify-center hover:bg-[var(--g1)] disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
                         title="Tăng nhiệt độ"
                       >
                         +
@@ -473,7 +513,7 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
                           <button
                             key={m}
                             type="button"
-                            disabled={isViewOnly}
+                            disabled={device.offline || isViewOnly}
                             onClick={() => handleSetAcMode(device, m)}
                             className={`px-1.5 py-0.5 rounded text-[9px] font-semibold transition-colors shrink-0 disabled:opacity-40 disabled:cursor-not-allowed ${
                               isCurrentMode && isOn
@@ -506,10 +546,10 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
                         <button
                           key={btn}
                           type="button"
-                          disabled={isViewOnly}
-                          onClick={() => !isViewOnly && handleGateCommand(device, action, btn)}
+                          disabled={device.offline || isViewOnly}
+                          onClick={() => !device.offline && !isViewOnly && handleGateCommand(device, action, btn)}
                           className={`py-1 px-1 rounded-md border text-[10px] font-bold transition-colors text-center disabled:opacity-40 disabled:cursor-not-allowed ${
-                            isViewOnly ? 'cursor-not-allowed' : 'cursor-pointer'
+                            device.offline || isViewOnly ? 'cursor-not-allowed' : 'cursor-pointer'
                           } ${
                             isGateActive
                               ? 'bg-primary text-white border-primary shadow-2xs'
@@ -595,6 +635,7 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
             handleSetBrightness(selectedDetail, brightness);
           }}
           onColorChange={(r, g, b) => {
+            if (selectedDetail.offline) return;
             sendDeviceCommand(selectedDetail.id, 'SET_RGB', {
               r,
               g,

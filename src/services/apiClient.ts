@@ -4,11 +4,13 @@ import { notifySessionExpired } from './session';
 export class ApiError extends Error {
   readonly status?: number;
   readonly code?: number;
-  constructor(message: string, status?: number, code?: number) {
+  readonly errorCode?: string;
+  constructor(message: string, status?: number, code?: number, errorCode?: string) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.code = code;
+    this.errorCode = errorCode;
   }
 }
 
@@ -45,6 +47,7 @@ apiClient.interceptors.response.use(
       throw new Error('Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.');
     }
     const errorMessage = error.response?.data?.message || error.message || 'Có lỗi xảy ra';
-    throw new ApiError(errorMessage, error.response?.status, error.response?.data?.code);
+    const errorCode = error.response?.data?.result?.errorCode ?? error.response?.data?.errorCode;
+    throw new ApiError(errorMessage, error.response?.status, error.response?.data?.code, errorCode);
   }
 );

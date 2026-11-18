@@ -32,6 +32,19 @@
   filter: grayscale(20%);
 }
 
+.devices-page .devices-device-card .brightness {
+  cursor: default;
+}
+
+.devices-page .devices-device-card .gate-controls button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.devices-page .devices-device-card .gate-controls button:disabled:not(.active):hover {
+  background: transparent;
+}
+
 .devices-page .devices-device-card .device-top {
   display: flex;
   align-items: center;
