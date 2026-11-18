@@ -113,7 +113,11 @@ export function resolveFigmaDeviceType(device: DetailDeviceInput | null | undefi
     device.type === 'Cổng' ||
     devTypeStr.includes('GATE') ||
     devTypeStr.includes('DOOR') ||
-    devName.includes('cổng')
+    devTypeStr.includes('ROLLING') ||
+    devTypeStr.includes('CURTAIN') ||
+    devName.includes('cổng') ||
+    devName.includes('cửa cuốn') ||
+    devName.includes('rèm')
   ) {
     return 'Cổng';
   }

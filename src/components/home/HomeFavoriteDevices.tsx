@@ -10,6 +10,8 @@ import {
 } from '../../services/deviceApi';
 import { notify } from '../ui/notify';
 import { getErrorMessage } from '../../utils/errors';
+import { ApiError } from '../../services/apiClient';
+import { invalidateCache } from '../../services/queryCache';
 import { DeviceDetailModal } from '../device/DeviceDetailModal';
 import { mapDeviceToUI, type UIMappedDevice } from '../device/devicePageHelpers';
 
@@ -38,13 +40,53 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
   const [localAcTemp, setLocalAcTemp] = useState<Record<string, number>>({});
   const [selectedDetail, setSelectedDetail] = useState<UIMappedDevice | null>(null);
 
-  // Filter devices by accessLevel & selected room
-  const filteredRawDevices = devices.filter((d) => {
-    if (d.accessLevel === 'NONE') return false;
-    if (!selectedRoomId) return true;
-    if (selectedRoomId === '__unassigned__') return !d.roomId;
-    return d.roomId === selectedRoomId;
-  });
+  // Clear optimistic overrides ONLY for the specific device(s) whose authoritative state actually changed.
+  // Never wipe all devices when an unrelated sensor or another device emits a WebSocket update.
+  const [prevDevices, setPrevDevices] = useState(devices);
+  if (devices !== prevDevices) {
+    const prevById = new Map(prevDevices.map((d) => [d.id, d]));
+    const changedIds: string[] = [];
+    for (const d of devices) {
+      const prev = prevById.get(d.id);
+      if (!prev || prev.currentState !== d.currentState || prev.status !== d.status) {
+        changedIds.push(d.id);
+      }
+    }
+    setPrevDevices(devices);
+    if (changedIds.length > 0) {
+      const clearIds = <T,>(map: Record<string, T>): Record<string, T> => {
+        let touched = false;
+        const next = { ...map };
+        for (const id of changedIds) {
+          if (id in next) {
+            delete next[id];
+            touched = true;
+          }
+        }
+        return touched ? next : map;
+      };
+      setLocalPower(clearIds);
+      setLocalBrightness(clearIds);
+      setLocalAcTemp(clearIds);
+    }
+  }
+
+  // Filter devices by accessLevel & selected room, and keep deterministic stable order
+  const filteredRawDevices = devices
+    .filter((d) => {
+      if (d.accessLevel === 'NONE') return false;
+      if (!selectedRoomId) return true;
+      if (selectedRoomId === '__unassigned__') return !d.roomId;
+      return d.roomId === selectedRoomId;
+    })
+    .sort((a, b) => {
+      const aTime = a.createdAt ? Date.parse(a.createdAt) : Number.NaN;
+      const bTime = b.createdAt ? Date.parse(b.createdAt) : Number.NaN;
+      if (Number.isFinite(aTime) && Number.isFinite(bTime) && aTime !== bTime) {
+        return aTime - bTime;
+      }
+      return a.id.localeCompare(b.id);
+    });
 
   // Map real filtered devices to UIMappedDevice
   const uiDevices: UIMappedDevice[] = filteredRawDevices.map((d) =>
@@ -54,23 +96,58 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
   const isReadOnlyDevice = (device: UIMappedDevice) =>
     device.accessLevel === 'VIEW' || device.raw?.accessLevel === 'VIEW';
 
+  const patchDeviceStateInPlace = (
+    device: UIMappedDevice,
+    patch: Record<string, unknown>,
+    acknowledgedState?: Record<string, unknown>,
+  ) => {
+    if (onDeviceUpdated && device.raw) {
+      onDeviceUpdated({
+        ...device.raw,
+        currentState: {
+          ...device.raw.currentState,
+          ...patch,
+          ...(acknowledgedState ?? {}),
+        },
+      });
+    } else {
+      onRefreshDevices?.();
+    }
+  };
+
   const handleToggle = async (device: UIMappedDevice) => {
     if (isReadOnlyDevice(device)) {
       notify.warning('Bạn chỉ có quyền xem thiết bị này');
       return;
     }
-    const nextOn = !device.on;
+    const prevOn = Boolean(device.on);
+    const nextOn = !prevOn;
     setLocalPower((prev) => ({ ...prev, [device.id]: nextOn }));
 
     try {
-      if (device.type === 'Điều hòa') {
-        await setAcPower(device.id, nextOn);
-      } else {
-        await sendManualPowerCommand(device.id, nextOn ? 'TURN_ON' : 'TURN_OFF');
+      const command =
+        device.type === 'Điều hòa'
+          ? await setAcPower(device.id, nextOn)
+          : (await sendManualPowerCommand(device.id, nextOn ? 'TURN_ON' : 'TURN_OFF')).command;
+
+      if (command && command.success === false) {
+        setLocalPower((prev) => ({ ...prev, [device.id]: prevOn }));
+        notify.error(command.message || `Không thể ${nextOn ? 'bật' : 'tắt'} ${device.name}`);
+        return;
       }
-      onRefreshDevices?.();
+
+      patchDeviceStateInPlace(
+        device,
+        { power: nextOn ? 'ON' : 'OFF' },
+        command?.acknowledgedState,
+      );
       notify.success(`${nextOn ? 'Đã bật' : 'Đã tắt'} ${device.name}`);
     } catch (err: unknown) {
+      setLocalPower((prev) => ({ ...prev, [device.id]: prevOn }));
+      if (err instanceof ApiError && (err.status === 403 || err.status === 404)) {
+        invalidateCache('devices:home:');
+        onRefreshDevices?.();
+      }
       notify.error(getErrorMessage(err, `Lỗi khi ${nextOn ? 'bật' : 'tắt'} ${device.name}`));
     }
   };
@@ -81,25 +158,49 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
   ) => {
     e.stopPropagation();
     if (isReadOnlyDevice(device)) return;
+    const prevBrightness = localBrightness[device.id] ?? device.brightness ?? 80;
     const rect = e.currentTarget.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
     const newPercent = Math.min(100, Math.max(10, Math.round((clickX / rect.width) * 100)));
     setLocalBrightness((prev) => ({ ...prev, [device.id]: newPercent }));
 
     try {
-      await sendDeviceCommand(device.id, 'SET_BRIGHTNESS', { brightness: newPercent });
+      const command = await sendDeviceCommand(device.id, 'SET_BRIGHTNESS', { brightness: newPercent });
+      if (command && command.success === false) {
+        setLocalBrightness((prev) => ({ ...prev, [device.id]: prevBrightness }));
+        notify.error(command.message || 'Không thể chỉnh độ sáng');
+        return;
+      }
+      patchDeviceStateInPlace(
+        device,
+        { brightness: newPercent },
+        command?.acknowledgedState,
+      );
       notify.success(`Độ sáng ${device.name}: ${newPercent}%`);
     } catch (err: unknown) {
+      setLocalBrightness((prev) => ({ ...prev, [device.id]: prevBrightness }));
       notify.error(getErrorMessage(err, 'Lỗi khi chỉnh độ sáng'));
     }
   };
 
   const handleSetBrightness = async (device: UIMappedDevice, brightness: number) => {
     if (isReadOnlyDevice(device)) return;
+    const prevBrightness = localBrightness[device.id] ?? device.brightness ?? 80;
     setLocalBrightness((prev) => ({ ...prev, [device.id]: brightness }));
     try {
-      await sendDeviceCommand(device.id, 'SET_BRIGHTNESS', { brightness });
+      const command = await sendDeviceCommand(device.id, 'SET_BRIGHTNESS', { brightness });
+      if (command && command.success === false) {
+        setLocalBrightness((prev) => ({ ...prev, [device.id]: prevBrightness }));
+        notify.error(command.message || 'Không thể chỉnh độ sáng');
+        return;
+      }
+      patchDeviceStateInPlace(
+        device,
+        { brightness },
+        command?.acknowledgedState,
+      );
     } catch (err: unknown) {
+      setLocalBrightness((prev) => ({ ...prev, [device.id]: prevBrightness }));
       notify.error(getErrorMessage(err, 'Lỗi khi chỉnh độ sáng'));
     }
   };
@@ -118,10 +219,20 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
     setLocalAcTemp((prev) => ({ ...prev, [device.id]: newTemp }));
 
     try {
-      await setAcTemperature(device.id, newTemp);
+      const command = await setAcTemperature(device.id, newTemp);
+      if (command && command.success === false) {
+        setLocalAcTemp((prev) => ({ ...prev, [device.id]: currentTemp }));
+        notify.error(command.message || 'Không thể điều chỉnh nhiệt độ');
+        return;
+      }
       notify.success(`Điều hòa ${device.name}: ${newTemp}°C`);
-      onRefreshDevices?.();
+      patchDeviceStateInPlace(
+        device,
+        { temperature: newTemp },
+        command?.acknowledgedState,
+      );
     } catch (err: unknown) {
+      setLocalAcTemp((prev) => ({ ...prev, [device.id]: currentTemp }));
       notify.error(getErrorMessage(err, 'Lỗi khi điều chỉnh nhiệt độ'));
     }
   };
@@ -132,9 +243,17 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
       return;
     }
     try {
-      await sendDeviceCommand(device.id, 'SET_MODE', { mode });
+      const command = await sendDeviceCommand(device.id, 'SET_MODE', { mode });
+      if (command && command.success === false) {
+        notify.error(command.message || 'Không thể chọn chế độ điều hòa');
+        return;
+      }
       notify.success(`Chế độ ${device.name}: ${mode}`);
-      onRefreshDevices?.();
+      patchDeviceStateInPlace(
+        device,
+        { mode },
+        command?.acknowledgedState,
+      );
     } catch (err: unknown) {
       notify.error(getErrorMessage(err, 'Lỗi khi chọn chế độ điều hòa'));
     }
@@ -142,9 +261,17 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
 
   const handleGateCommand = async (device: UIMappedDevice, action: string, label: string) => {
     try {
-      await sendDeviceCommand(device.id, action);
+      const command = await sendDeviceCommand(device.id, action);
+      if (command && command.success === false) {
+        notify.error(command.message || `Không thể gửi lệnh ${label}`);
+        return;
+      }
       notify.success(`Cổng ${device.name}: ${label}`);
-      onRefreshDevices?.();
+      patchDeviceStateInPlace(
+        device,
+        { state: action },
+        command?.acknowledgedState,
+      );
     } catch (err: unknown) {
       notify.error(getErrorMessage(err, `Lỗi khi gửi lệnh ${label}`));
     }

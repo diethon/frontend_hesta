@@ -32,7 +32,7 @@ import {
 } from '../../services/deviceApi';
 import { getRooms } from '../../services/roomApi';
 import { getHomeEnergyAnalytics, energyAnalyticsKey } from '../../services/energyApi';
-import { peekCache } from '../../services/queryCache';
+import { peekCache, invalidateCache } from '../../services/queryCache';
 import type { DeviceResponse } from '../../types/device';
 import type { RoomResponse } from '../../types/room';
 import type { DeviceEnergyBreakdown } from '../../types/energy';
@@ -601,6 +601,30 @@ export const DevicePage: React.FC = () => {
       return hasChanges ? next : prev;
     });
 
+    // Clear optimistic local overrides for devices that just received authoritative realtime state
+    setLocalPower((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      updates.forEach((patch, id) => {
+        if (patch.currentState && patch.currentState.power !== undefined && id in next) {
+          delete next[id];
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+    setLocalBrightness((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      updates.forEach((patch, id) => {
+        if (patch.currentState && patch.currentState.brightness !== undefined && id in next) {
+          delete next[id];
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+
     setSelectedDevice((prev) => {
       if (!prev) return null;
       const patch = updates.get(prev.id);
@@ -705,6 +729,8 @@ export const DevicePage: React.FC = () => {
         setError('');
         const data = await getDevicesByHome(homeId);
         setDevices(data || []);
+        setLocalPower({});
+        setLocalBrightness({});
         void fetchEnergy();
       } catch (err: unknown) {
         setError(getErrorMessage(err, 'Lỗi tải danh sách thiết bị'));
@@ -714,6 +740,16 @@ export const DevicePage: React.FC = () => {
     },
     [homeId, fetchEnergy]
   );
+
+  // Refetch rooms and devices immediately whenever Owner changes this member's access
+  useEffect(() => {
+    return realtimeEventDispatcher.register('MEMBER_ACCESS_UPDATED', (event) => {
+      if (event.homeId && homeId && event.homeId !== homeId) return;
+      invalidateCache('devices:home:');
+      void fetchRooms();
+      void fetchDevices(true);
+    });
+  }, [homeId, fetchRooms, fetchDevices]);
 
   useEffect(() => {
     let active = true;
@@ -850,10 +886,14 @@ export const DevicePage: React.FC = () => {
     }
     const action = cmd === 'Mở' ? 'OPEN' : cmd === 'Đóng' ? 'CLOSE' : 'STOP';
     try {
-      await sendDeviceCommand(deviceId, action);
-      notify.success(`Đã gửi lệnh ${cmd} cổng`);
+      const command = await sendDeviceCommand(deviceId, action);
+      if (command && command.success === false) {
+        notify.error(command.message || `Không thể gửi lệnh ${cmd} ${dev.name}`);
+        return;
+      }
+      notify.success(`Đã gửi lệnh ${cmd} ${dev.name}`);
     } catch (e) {
-      notify.error(getErrorMessage(e, 'Lỗi điều khiển cổng'));
+      notify.error(getErrorMessage(e, `Lỗi điều khiển ${dev.name}`));
     }
   };
 

@@ -86,7 +86,10 @@ export function mapDeviceToUI(
   } else if (
     typeUpper.includes('GATE') ||
     typeUpper.includes('ROLLING') ||
-    nameLower.includes('cổng')
+    typeUpper.includes('CURTAIN') ||
+    nameLower.includes('cổng') ||
+    nameLower.includes('cửa cuốn') ||
+    nameLower.includes('rèm')
   ) {
     type = 'Cổng';
     icon = 'door';
