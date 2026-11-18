@@ -93,6 +93,7 @@ const DeviceDetailInner: React.FC<DeviceDetailModalProps & { device: DetailDevic
   }
 
   const handleToggleCurrent = () => {
+    if (disabled) return;
     setIsOn((prev) => !prev);
     onTogglePower?.();
   };
