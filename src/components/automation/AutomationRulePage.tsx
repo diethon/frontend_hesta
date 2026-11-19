@@ -1,205 +1,405 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { Link, useParams } from 'react-router';
-import { createAutomationRule, deleteAutomationRule, getAutomationExecutions, getAutomationRules, testAutomationRule, toggleAutomationRule, updateAutomationRule } from '../../services/automationApi';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useNavigate, useParams } from 'react-router';
+import { useAppDispatch, useAppSelector } from '../../store/hooks';
+import { currentHomeChanged, currentHomeCleared } from '../../store/homeSlice';
+import {
+  getAutomationRules,
+  toggleAutomationRule,
+  deleteAutomationRule,
+  createAutomationRule,
+} from '../../services/automationApi';
 import { getDevices, getScenes } from '../../services/sceneApi';
-import type { AutomationExecution, AutomationRule, AutomationTestResult, DeviceSummary } from '../../types/automation';
+import { getSchedules } from '../../services/scheduleApi';
+import type {
+  AutomationRule,
+  AutomationRuleInput,
+  DeviceSummary,
+} from '../../types/automation';
 import type { SceneResponse } from '../../types/scene';
-import { actionOptions, buildActionInput, getDeviceActions, type DraftAction } from './automationActions';
-import { SchedulePanel } from '../ui/SchedulePanel';
+import { DashboardNavRail } from '../home/DashboardNavRail';
+import { DashboardBottomNav } from '../home/DashboardBottomNav';
+import { Icon } from '../ui/LucideIcon';
+import { AutomationTopBar } from './AutomationTopBar';
+import { AutomationEmpty } from './AutomationEmpty';
+import { RuleCard } from './RuleCard';
+import { RuleEditorPanel } from './RuleEditorPanel';
+import { RuleHistoryPanel } from './RuleHistoryPanel';
+import { ConfirmModal } from '../ui/ConfirmModal';
+import { notify } from '../ui/notify';
+import { useRealtimeRefetch } from '../../realtime/useRealtimeRefetch';
 
-interface DraftCondition { deviceId: string; attribute: string; operator: 'EQ' | 'NE' | 'GT' | 'GTE' | 'LT' | 'LTE'; expected: string; logicalOperator: 'AND' | 'OR' }
+const AUTOMATION_REFRESH_EVENTS = ['AUTOMATION_RULE_CHANGED', 'SCENE_CHANGED'] as const;
 
-const triggerLabels = { SENSOR: 'Dữ liệu cảm biến', EVENT: 'Sự kiện', SCHEDULE: 'Theo lịch' };
-const conditionOperators = [
-  { code: 'EQ', label: 'Bằng' }, { code: 'NE', label: 'Khác' },
-  { code: 'GT', label: 'Lớn hơn' }, { code: 'GTE', label: 'Lớn hơn hoặc bằng' },
-  { code: 'LT', label: 'Nhỏ hơn' }, { code: 'LTE', label: 'Nhỏ hơn hoặc bằng' },
-] as const;
+const TRIGGER_GROUPS = [
+  { id: 'SENSOR' as const, label: 'Cảm biến', hint: 'Chạy khi giá trị cảm biến khớp điều kiện' },
+  { id: 'EVENT' as const, label: 'Sự kiện', hint: 'Chạy khi thiết bị báo một sự kiện' },
+  { id: 'SCHEDULE' as const, label: 'Lịch', hint: 'Chạy vào giờ đã hẹn' },
+];
 
 export function AutomationRulePage() {
   const { homeId = '' } = useParams();
+  const navigate = useNavigate();
+  const authUser = useAppSelector((state) => state.auth.user);
+  const dispatch = useAppDispatch();
+  // Subscribe the realtime socket to this home even when the page is opened directly.
+  useEffect(() => {
+    dispatch(currentHomeChanged(homeId || null));
+    return () => {
+      dispatch(currentHomeCleared());
+    };
+  }, [dispatch, homeId]);
+  const userInitial = authUser?.fullName?.charAt(0) || authUser?.email?.charAt(0) || 'U';
+
   const [rules, setRules] = useState<AutomationRule[]>([]);
   const [devices, setDevices] = useState<DeviceSummary[]>([]);
   const [scenes, setScenes] = useState<SceneResponse[]>([]);
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [editingRule, setEditingRule] = useState<AutomationRule | null>(null);
-  const [historyRuleId, setHistoryRuleId] = useState<string | null>(null);
-  const [executions, setExecutions] = useState<AutomationExecution[]>([]);
-  const [testRuleId, setTestRuleId] = useState<string | null>(null);
-  const [scheduleRuleId, setScheduleRuleId] = useState<string | null>(null);
-  const [testData, setTestData] = useState('{}');
-  const [testResult, setTestResult] = useState<AutomationTestResult | null>(null);
-  const [success, setSuccess] = useState('');
-  const [triggerType, setTriggerType] = useState<'SENSOR' | 'EVENT' | 'SCHEDULE'>('SENSOR');
-  const [conditions, setConditions] = useState<DraftCondition[]>([]);
-  const [actions, setActions] = useState<DraftAction[]>([]);
-  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
+  // Filters and search
+  const [statusFilter, setStatusFilter] = useState<'Tất cả' | 'Đang bật' | 'Đang tắt'>('Tất cả');
+  const [typeFilter, setTypeFilter] = useState<'ALL' | 'SENSOR' | 'EVENT' | 'SCHEDULE'>('ALL');
+  const [query, setQuery] = useState('');
+
+  // Modals & Panels
+  const [editorRule, setEditorRule] = useState<AutomationRule | null | undefined>(undefined); // undefined = closed
+  const [scrollToTrigger, setScrollToTrigger] = useState(false);
+  const [ruleToDelete, setRuleToDelete] = useState<AutomationRule | null>(null);
+  const [historyModalRule, setHistoryModalRule] = useState<AutomationRule | null>(null);
+
+  // Load data
+  const loadData = useCallback(async () => {
+    if (!homeId) return;
+    setError(null);
     try {
-      const [ruleResult, deviceResult, sceneResult] = await Promise.all([getAutomationRules(homeId), getDevices(homeId), getScenes(homeId)]);
-      setRules(ruleResult); setDevices(deviceResult); setScenes(sceneResult);
-    } catch (caught) { setError(caught instanceof Error ? caught.message : 'Không thể tải dữ liệu'); }
+      const [fetchedRules, fetchedDevices, fetchedScenes] = await Promise.all([
+        getAutomationRules(homeId),
+        getDevices(homeId),
+        getScenes(homeId),
+      ]);
+      setRules(fetchedRules || []);
+      setDevices(fetchedDevices || []);
+      setScenes(fetchedScenes || []);
+    } catch (err: unknown) {
+      console.warn('Load automation rules warning:', err);
+      setError(err instanceof Error ? err.message : 'Không thể tải danh sách quy tắc tự động.');
+    } finally {
+      setLoading(false);
+    }
   }, [homeId]);
+
   useEffect(() => {
-    let active = true;
-    Promise.all([getAutomationRules(homeId), getDevices(homeId), getScenes(homeId)])
-      .then(([ruleResult, deviceResult, sceneResult]) => {
-        if (!active) return;
-        setRules(ruleResult);
-        setDevices(deviceResult);
-        setScenes(sceneResult);
-      })
-      .catch((caught: unknown) => {
-        if (active) setError(caught instanceof Error ? caught.message : 'Không thể tải dữ liệu');
-      });
-    return () => { active = false; };
-  }, [homeId]);
+    void loadData();
+  }, [loadData]);
 
-  const submit = async (event: FormEvent) => {
-    event.preventDefault(); setError(''); setSuccess('');
+  // Rules list scenes by name, so a scene edit refreshes this page too.
+  useRealtimeRefetch(AUTOMATION_REFRESH_EVENTS, homeId, () => void loadData());
+
+  // Counts and statistics
+  const activeCount = useMemo(() => rules.filter((r) => r.enabled).length, [rules]);
+
+  // Filtered and searched rules
+  const visibleRules = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return rules.filter((rule) => {
+      // Status filter
+      if (statusFilter === 'Đang bật' && !rule.enabled) return false;
+      if (statusFilter === 'Đang tắt' && rule.enabled) return false;
+
+      // Type filter
+      if (typeFilter !== 'ALL' && rule.triggerType !== typeFilter) return false;
+
+      // Search query
+      if (q) {
+        const matchName = rule.name.toLowerCase().includes(q);
+        const matchDesc = rule.description?.toLowerCase().includes(q);
+        if (!matchName && !matchDesc) return false;
+      }
+      return true;
+    });
+  }, [rules, statusFilter, typeFilter, query]);
+
+  // Optimistic Toggle
+  const handleToggleRule = async (ruleId: string, nextEnabled: boolean) => {
+    setRules((prev) =>
+      prev.map((r) => (r.id === ruleId ? { ...r, enabled: nextEnabled } : r)),
+    );
     try {
-      const input = {
-        name, description, triggerType, enabled: editingRule?.enabled ?? true,
-        conditions: conditions.map((item, order) => ({ ...item, expectedValue: parseValue(item.expected), order })),
-        actions: actions.map((item, order) => buildActionInput(item, order, devices)),
+      await toggleAutomationRule(homeId, ruleId, nextEnabled);
+      notify.success(nextEnabled ? 'Đã bật quy tắc' : 'Đã tắt quy tắc');
+    } catch (err) {
+      // Revert on error
+      setRules((prev) =>
+        prev.map((r) => (r.id === ruleId ? { ...r, enabled: !nextEnabled } : r)),
+      );
+      notify.error(err instanceof Error ? err.message : 'Không thể đổi trạng thái quy tắc');
+    }
+  };
+
+  // Duplicate Rule
+  const handleDuplicateRule = async (rule: AutomationRule) => {
+    try {
+      const input: AutomationRuleInput = {
+        name: `${rule.name} (bản sao)`,
+        description: rule.description,
+        triggerType: rule.triggerType,
+        enabled: false,
+        conditions: (rule.conditions || []).map((c, i) => ({
+          deviceId: c.deviceId,
+          attribute: c.attribute,
+          operator: c.operator,
+          expectedValue: c.expectedValue,
+          logicalOperator: c.logicalOperator || 'AND',
+          order: i,
+        })),
+        actions: (rule.actions || []).map((a, i) => ({
+          deviceId: a.deviceId,
+          sceneId: a.sceneId,
+          action: a.action,
+          parameters: a.parameters || {},
+          order: i,
+        })),
       };
-      if (editingRule) await updateAutomationRule(homeId, editingRule.id, input);
-      else await createAutomationRule(homeId, input);
-      setSuccess(editingRule ? 'Đã lưu quy tắc.' : 'Đã tạo quy tắc.');
-      clearEditor(); await load();
-    } catch (caught) { setError(caught instanceof Error ? caught.message : 'Dữ liệu quy tắc không hợp lệ'); }
+      if (rule.triggerType === 'SCHEDULE') {
+        // The copy is created disabled, but its times go with it: a SCHEDULE rule cannot exist without one.
+        const times = await getSchedules(homeId, 'automation-rules', rule.id);
+        input.schedules = (times || []).map((t) => ({
+          scheduledTime: t.scheduledTime,
+          repeatDays: t.repeatDays || [],
+          active: t.active,
+        }));
+      }
+      await createAutomationRule(homeId, input);
+
+      notify.success('Đã nhân bản quy tắc', `Đã tạo bản sao cho “${rule.name}”`);
+      await loadData();
+    } catch (err) {
+      notify.error(err instanceof Error ? err.message : 'Không thể nhân bản quy tắc');
+    }
   };
 
-  const clearEditor = () => {
-    setEditingRule(null); setName(''); setDescription(''); setTriggerType('SENSOR');
-    setConditions([]); setActions([]);
-  };
-
-  const edit = (rule: AutomationRule) => {
-    setEditingRule(rule); setName(rule.name); setDescription(rule.description ?? ''); setTriggerType(rule.triggerType);
-    setConditions(rule.conditions.map((item) => ({ deviceId: item.deviceId ?? '', attribute: item.attribute,
-      operator: item.operator, expected: typeof item.expectedValue === 'string' ? item.expectedValue : JSON.stringify(item.expectedValue),
-      logicalOperator: item.logicalOperator })));
-    setActions(rule.actions.map((item) => {
-      const option = actionOptions.find((candidate) => candidate.code === item.action);
-      return { deviceId: item.deviceId ?? '', sceneId: item.sceneId, action: item.action,
-        value: option?.valueKind === 'json' ? JSON.stringify(item.parameters)
-          : option?.parameterKey ? String(item.parameters[option.parameterKey] ?? '') : '' };
-    }));
-  };
-
-  const remove = async (rule: AutomationRule) => {
-    if (!window.confirm(`Xóa quy tắc “${rule.name}”? Hành động này không thể hoàn tác.`)) return;
-    try { await deleteAutomationRule(homeId, rule.id); if (editingRule?.id === rule.id) clearEditor(); await load(); setSuccess('Đã xóa quy tắc.'); }
-    catch (caught) { setError(caught instanceof Error ? caught.message : 'Không thể xóa quy tắc.'); }
-  };
-
-  const showHistory = async (ruleId: string) => {
-    if (historyRuleId === ruleId) { setHistoryRuleId(null); return; }
-    setHistoryRuleId(ruleId); setExecutions([]);
-    try { setExecutions(await getAutomationExecutions(homeId, ruleId)); }
-    catch (caught) { setError(caught instanceof Error ? caught.message : 'Không thể tải lịch sử.'); }
-  };
-
-  const openTest = (rule: AutomationRule) => {
-    setTestRuleId(rule.id); setTestResult(null);
-    const data = Object.fromEntries(rule.conditions.filter((item) => item.attribute !== 'eventType')
-      .map((item) => [item.attribute, item.expectedValue]));
-    setTestData(JSON.stringify(data, null, 2));
-  };
-
-  const runTest = async (rule: AutomationRule) => {
-    setError(''); setTestResult(null);
+  // Delete Rule
+  const handleConfirmDelete = async () => {
+    if (!ruleToDelete) return;
     try {
-      const data: unknown = JSON.parse(testData);
-      if (!data || Array.isArray(data) || typeof data !== 'object') throw new Error('Dữ liệu chạy thử phải là đối tượng JSON.');
-      setTestResult(await testAutomationRule(homeId, rule.id, {
-        sourceDeviceId: rule.conditions[0]?.deviceId,
-        eventType: rule.triggerType === 'SENSOR' ? 'SENSOR_READING' : 'EVENT',
-        data: data as Record<string, unknown>,
-      }));
-    } catch (caught) { setError(caught instanceof Error ? caught.message : 'Không thể chạy thử.'); }
+      await deleteAutomationRule(homeId, ruleToDelete.id);
+      notify.success('Đã xóa quy tắc', `Quy tắc “${ruleToDelete.name}” đã được xóa.`);
+      setRuleToDelete(null);
+      await loadData();
+    } catch {
+      notify.error('Không thể xóa quy tắc');
+    }
   };
 
-  const addCondition = () => setConditions((items) => [...items, { deviceId: devices[0]?.id || '', attribute: 'temperature', operator: 'GT', expected: '30', logicalOperator: 'AND' }]);
-  const addAction = () => {
-    const device = devices.find((candidate) => getDeviceActions(candidate).length > 0);
-    const option = getDeviceActions(device)[0];
-    if (device && option) setActions((items) => [...items, { deviceId: device.id, action: option.code, value: option.defaultValue }]);
-  };
-  const addSceneAction = () => {
-    if (availableScenes[0]) setActions((items) => [...items, { deviceId: '', sceneId: availableScenes[0].id, action: 'EXECUTE_SCENE', value: '' }]);
-  };
-  const updateCondition = (index: number, patch: Partial<DraftCondition>) => setConditions((items) => items.map((item, i) => i === index ? { ...item, ...patch } : item));
-  const updateAction = (index: number, patch: Partial<DraftAction>) => setActions((items) => items.map((item, i) => i === index ? { ...item, ...patch } : item));
-  const changeActionDevice = (index: number, deviceId: string) => {
-    const option = getDeviceActions(devices.find((device) => device.id === deviceId))[0];
-    updateAction(index, { deviceId, action: option?.code ?? '', value: option?.defaultValue ?? '' });
-  };
-  const changeActionType = (index: number, actionCode: string) => {
-    const option = actionOptions.find((candidate) => candidate.code === actionCode);
-    updateAction(index, { action: actionCode, value: option?.defaultValue ?? '' });
-  };
-  const hasActionableDevice = devices.some((device) => getDeviceActions(device).length > 0);
-  const availableScenes = scenes.filter((scene) => scene.enabled && scene.actions.length > 0);
+  const ruleRow = (rule: AutomationRule) => (
+    <RuleCard
+      key={rule.id}
+      rule={rule}
+      devices={devices}
+      scenes={scenes}
+      onToggle={(nextEnabled) => handleToggleRule(rule.id, nextEnabled)}
+      onEdit={() => {
+        setScrollToTrigger(false);
+        setEditorRule(rule);
+      }}
+      onHistory={() => setHistoryModalRule(rule)}
+      onSchedule={() => {
+        setScrollToTrigger(true);
+        setEditorRule(rule);
+      }}
+      onDuplicate={() => handleDuplicateRule(rule)}
+      onDelete={() => setRuleToDelete(rule)}
+    />
+  );
 
-  return <main className="min-h-screen bg-slate-950 p-6 text-slate-100"><div className="mx-auto max-w-6xl space-y-5">
-    <header className="flex flex-wrap items-center justify-between gap-3"><div><h1 className="text-2xl font-bold">Quy tắc tự động</h1><p className="text-xs text-muted">Nhà: {homeId}</p></div><nav aria-label="Điều hướng tự động hóa" className="flex flex-wrap gap-2"><Link to={`/homes/${homeId}/scenes`} className="rounded-xl bg-sidebar px-3 py-2 text-sm text-text">Kịch bản</Link><Link to={`/homes/${homeId}/recommendations`} className="rounded-xl bg-sidebar px-3 py-2 text-sm text-text">Gợi ý AI</Link><Link to="/home" className="button">Về trang chủ</Link></nav></header>
-    {error && <p role="alert" className="rounded-lg bg-rose-950 p-3 text-rose-300">{error}</p>}
-    {success && <p role="status" className="rounded-xl bg-success-soft p-3 text-text">{success}</p>}
-    <div className="grid gap-6 lg:grid-cols-2">
-      <section className="space-y-3 rounded-2xl border border-slate-800 bg-slate-900 p-5">
-        <h2 className="text-lg font-semibold">Danh sách quy tắc</h2>
-        {rules.map((rule) => <article key={rule.id} className="rounded-xl border border-slate-700 p-4">
-          <div className="flex justify-between gap-3"><div><h3>{rule.name}</h3><p className="text-sm text-slate-400">{triggerLabels[rule.triggerType]} · {rule.conditions.length} điều kiện · {rule.actions.length} hành động</p></div>
-            <div className="flex flex-wrap gap-2 text-sm"><button type="button" onClick={() => edit(rule)} className="rounded-xl bg-sidebar px-3 py-2 text-text">Sửa</button><button type="button" onClick={() => openTest(rule)} className="rounded-xl bg-sidebar px-3 py-2 text-text">Chạy thử</button><button type="button" onClick={() => void showHistory(rule.id)} className="rounded-xl bg-sidebar px-3 py-2 text-text">Lịch sử</button>{rule.triggerType === 'SCHEDULE' && <button type="button" onClick={() => setScheduleRuleId(scheduleRuleId === rule.id ? null : rule.id)} className="rounded-xl bg-sidebar px-3 py-2 text-text">Lịch chạy</button>}<button type="button" onClick={() => void toggleAutomationRule(homeId, rule.id, !rule.enabled).then(load).catch((caught: unknown) => setError(caught instanceof Error ? caught.message : 'Không thể đổi trạng thái'))} className="rounded-xl bg-primary px-3 py-2 text-white">{rule.enabled ? 'Tắt' : 'Bật'}</button><button type="button" onClick={() => void remove(rule)} className="rounded-xl bg-error-soft px-3 py-2 text-text">Xóa</button></div>
+  // Rules grouped by what starts them; empty groups are hidden.
+  const groups = TRIGGER_GROUPS.map((group) => ({
+    ...group,
+    rules: visibleRules.filter((rule) => rule.triggerType === group.id),
+  })).filter((group) => group.rules.length > 0);
+
+  return (
+    <div className="app-shell scenes-page studio st-theme st-pro">
+      <DashboardNavRail
+        homeId={homeId}
+        activeItem="automations"
+        user={authUser ?? undefined}
+        onSelectOverview={() => navigate('/home')}
+        onOpenSettings={() => {}}
+        onOpenProfile={() => {}}
+      />
+
+      <main>
+        <AutomationTopBar
+          caption={`${rules.length} quy tắc · ${activeCount} đang bật`}
+          title={<>Tự động hóa <span className="sr-only">Quy tắc tự động</span></>}
+          subtitle="Để ngôi nhà tự phản ứng với cảm biến, sự kiện của thiết bị hoặc giờ hẹn."
+          userInitial={userInitial}
+        />
+
+        <div className="st-toolbar">
+          <div className="st-seg" role="tablist" aria-label="Lọc theo trạng thái">
+            {(['Tất cả', 'Đang bật', 'Đang tắt'] as const).map((item) => (
+              <button
+                key={item}
+                type="button"
+                role="tab"
+                aria-selected={statusFilter === item}
+                className={statusFilter === item ? 'active' : ''}
+                onClick={() => setStatusFilter(item)}
+              >
+                {item}
+              </button>
+            ))}
           </div>
-          {testRuleId === rule.id && <div className="mt-3 space-y-2 rounded-xl bg-info-soft p-3 text-sm text-text"><label className="block">Dữ liệu sự kiện để chạy thử<textarea value={testData} onChange={(event) => setTestData(event.target.value)} className="input mt-1" /></label><button type="button" onClick={() => void runTest(rule)} className="rounded-xl bg-primary px-3 py-2 font-semibold text-white">Kiểm tra điều kiện</button>{testResult && <p role="status">{testResult.matched ? `Khớp điều kiện · ${testResult.proposedActions.length} hành động sẽ chạy` : 'Không khớp điều kiện'}. Chạy thử không gửi lệnh tới thiết bị.</p>}</div>}
-          {historyRuleId === rule.id && <div className="mt-3 rounded-xl bg-sidebar p-3 text-sm text-text">{executions.length ? executions.map((item) => <div key={item.id} className="border-b border-line py-2 last:border-0"><p>{new Date(item.matchedAt).toLocaleString('vi-VN')} · {item.triggerSource} · {item.status}</p><ol className="mt-1 list-inside list-decimal text-muted">{item.resultDetail.map((result, index) => <li key={`${item.id}-${index}`}>{result.sceneId ? scenes.find((scene) => scene.id === result.sceneId)?.name ?? result.sceneId : devices.find((device) => device.id === result.deviceId)?.name ?? result.deviceId}: {result.action} · {result.status}</li>)}</ol></div>) : 'Chưa có lần thực thi nào.'}</div>}
-          {scheduleRuleId === rule.id && <SchedulePanel homeId={homeId} kind="automation-rules" targetId={rule.id} />}
-        </article>)}
-        {!rules.length && <p className="text-sm text-slate-400">Chưa có quy tắc.</p>}
-      </section>
 
-      <form onSubmit={submit} className="space-y-4 rounded-2xl border border-slate-800 bg-slate-900 p-5">
-        <div className="flex items-center justify-between"><h2 className="text-lg font-semibold">{editingRule ? 'Sửa quy tắc' : 'Tạo quy tắc tự động'}</h2>{editingRule && <button type="button" onClick={clearEditor} className="text-sm text-primary-hover">Tạo mới</button>}</div>
-        <label className="block text-sm">Tên<input required value={name} onChange={(e) => setName(e.target.value)} className="input mt-1" /></label>
-        <label className="block text-sm">Mô tả<textarea value={description} onChange={(e) => setDescription(e.target.value)} className="input mt-1" /></label>
-        <label className="block text-sm">Loại kích hoạt<select value={triggerType} onChange={(e) => { const next = e.target.value as typeof triggerType; setTriggerType(next); if (next === 'SCHEDULE') setConditions([]); }} className="input mt-1"><option value="SENSOR">Dữ liệu cảm biến</option><option value="EVENT">Sự kiện</option><option value="SCHEDULE">Theo lịch</option></select></label>
-        <div className="flex justify-between"><h3>Điều kiện{triggerType === 'SCHEDULE' ? ' · thời gian được đặt trong lịch' : ''}</h3>{triggerType !== 'SCHEDULE' && <button type="button" disabled={!devices.length} onClick={addCondition} className="button">+ Thêm</button>}</div>
-        {conditions.map((condition, index) => <div key={index} className="grid gap-2 rounded-xl border border-slate-700 p-3 sm:grid-cols-2">
-          <label className="text-sm">Thiết bị<select value={condition.deviceId} onChange={(e) => updateCondition(index, { deviceId: e.target.value })} className="input mt-1">{devices.map((device) => <option key={device.id} value={device.id}>{device.name}</option>)}</select></label>
-          <label className="text-sm">Thuộc tính<input value={condition.attribute} onChange={(e) => updateCondition(index, { attribute: e.target.value })} className="input mt-1" /></label>
-          <label className="text-sm">So sánh<select value={condition.operator} onChange={(e) => updateCondition(index, { operator: e.target.value as DraftCondition['operator'] })} className="input mt-1">{conditionOperators.map((option) => <option key={option.code} value={option.code}>{option.label}</option>)}</select></label>
-          <label className="text-sm">Giá trị điều kiện<input value={condition.expected} onChange={(e) => updateCondition(index, { expected: e.target.value })} className="input mt-1" /></label>
-          <button type="button" onClick={() => setConditions((items) => items.filter((_, i) => i !== index))} className="text-left text-sm text-rose-400">Xóa điều kiện</button>
-        </div>)}
-        <div className="flex justify-between"><h3>Hành động</h3><div className="flex gap-2"><button type="button" disabled={!hasActionableDevice} onClick={addAction} className="button">+ Thiết bị</button><button type="button" disabled={!availableScenes.length} onClick={addSceneAction} className="button">+ Kịch bản</button></div></div>
-        {!hasActionableDevice && !availableScenes.length && <p className="text-sm text-amber-300">Chưa có thiết bị hoặc kịch bản hỗ trợ hành động tự động.</p>}
-        {actions.map((action, index) => {
-          if (action.action === 'EXECUTE_SCENE') return <div key={index} className="space-y-2 rounded-xl border border-slate-700 p-3"><label className="block text-sm">Kịch bản hành động {index + 1}<select value={action.sceneId ?? ''} onChange={(event) => updateAction(index, { sceneId: event.target.value })} className="input mt-1">{availableScenes.map((scene) => <option key={scene.id} value={scene.id}>{scene.name}</option>)}</select></label><button type="button" onClick={() => setActions((items) => items.filter((_, i) => i !== index))} className="text-sm text-rose-400">Xóa hành động</button></div>;
-          const selectedDevice = devices.find((device) => device.id === action.deviceId);
-          const availableActions = getDeviceActions(selectedDevice);
-          const selectedOption = availableActions.find((option) => option.code === action.action);
-          return <div key={index} className="grid gap-2 rounded-xl border border-slate-700 p-3 sm:grid-cols-2">
-            <label className="text-sm">Thiết bị hành động {index + 1}<select value={action.deviceId} onChange={(e) => changeActionDevice(index, e.target.value)} className="input mt-1">{devices.map((device) => <option key={device.id} value={device.id}>{device.name}</option>)}</select></label>
-            <label className="text-sm">Hành động<select value={action.action} onChange={(e) => changeActionType(index, e.target.value)} disabled={!availableActions.length} className="input mt-1">{!availableActions.length && <option value="">Không có hành động phù hợp</option>}{availableActions.map((option) => <option key={option.code} value={option.code}>{option.label}</option>)}</select></label>
-            {selectedOption?.valueKind === 'none' && <p className="text-sm text-slate-400 sm:col-span-2">Hành động này không cần nhập giá trị.</p>}
-            {(selectedOption?.valueKind === 'percentage' || selectedOption?.valueKind === 'number') && <label className="text-sm sm:col-span-2">{selectedOption.valueLabel}<input required type="number" min={selectedOption.valueKind === 'percentage' ? 0 : undefined} max={selectedOption.valueKind === 'percentage' ? 100 : undefined} step={selectedOption.valueKind === 'percentage' ? 1 : 'any'} value={action.value} onChange={(e) => updateAction(index, { value: e.target.value })} className="input mt-1" /></label>}
-            {selectedOption?.valueKind === 'text' && <label className="text-sm sm:col-span-2">{selectedOption.valueLabel}<input required value={action.value} onChange={(e) => updateAction(index, { value: e.target.value })} className="input mt-1" /></label>}
-            {selectedOption?.valueKind === 'json' && <label className="text-sm sm:col-span-2">{selectedOption.valueLabel}<textarea required value={action.value} onChange={(e) => updateAction(index, { value: e.target.value })} className="input mt-1" placeholder='{"power": "ON"}' /></label>}
-            {!selectedOption && <p className="text-sm text-amber-300 sm:col-span-2">Thiết bị này chưa khai báo hành động hợp lệ. Hãy chọn thiết bị khác.</p>}
-            <button type="button" onClick={() => setActions((items) => items.filter((_, i) => i !== index))} className="text-left text-sm text-rose-400">Xóa hành động</button>
-          </div>;
-        })}
-        <button disabled={(triggerType !== 'SCHEDULE' && !conditions.length) || !actions.length || actions.some((item) => item.action === 'EXECUTE_SCENE' ? !availableScenes.some((scene) => scene.id === item.sceneId) : !getDeviceActions(devices.find((device) => device.id === item.deviceId)).some((option) => option.code === item.action))} className="button w-full">{editingRule ? 'Lưu thay đổi' : 'Tạo quy tắc'}</button>
-      </form>
+          <div className="st-seg" role="tablist" aria-label="Lọc theo loại kích hoạt">
+            {[{ id: 'ALL' as const, label: 'Mọi loại' }, ...TRIGGER_GROUPS].map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                role="tab"
+                aria-selected={typeFilter === t.id}
+                className={typeFilter === t.id ? 'active' : ''}
+                onClick={() => setTypeFilter(t.id)}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+
+          <label className="st-search">
+            <Icon name="search" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Tìm quy tắc"
+              aria-label="Tìm quy tắc"
+            />
+          </label>
+
+          <div className="st-toolbar-end">
+            <button
+              type="button"
+              className="st-link"
+              onClick={() => navigate(homeId ? `/homes/${homeId}/scenes` : '/home')}
+            >
+              <Icon name="sparkles" />
+              <span>Kịch bản</span>
+            </button>
+            <button
+              type="button"
+              className="st-link"
+              onClick={() => navigate(homeId ? `/homes/${homeId}/recommendations` : '/home')}
+            >
+              <Icon name="zap" />
+              <span>Gợi ý AI</span>
+            </button>
+            <button
+              type="button"
+              className="st-link"
+              onClick={() => navigate(homeId ? `/homes/${homeId}/guardian` : '/home')}
+            >
+              <Icon name="shield" />
+              <span>Giám hộ</span>
+            </button>
+            <button type="button" className="st-btn st-btn-primary" onClick={() => setEditorRule(null)}>
+              <Icon name="plus" size={18} />
+              Tạo quy tắc
+            </button>
+          </div>
+        </div>
+
+        {error && (
+          <div role="alert" className="st-alert error">
+            <span>{error}</span>
+            <button type="button" className="st-btn st-btn-sm" onClick={() => void loadData()}>
+              Thử lại
+            </button>
+          </div>
+        )}
+
+        {loading ? (
+          <div className="st-list" aria-busy="true">
+            {Array.from({ length: 4 }).map((_, idx) => (
+              <div key={idx} className="st-skeleton st-rule-skeleton" />
+            ))}
+          </div>
+        ) : rules.length === 0 ? (
+          <AutomationEmpty
+            mode="empty"
+            onCreate={() => setEditorRule(null)}
+            onSelectTemplateName={(tmplName) => {
+              setEditorRule(null);
+              notify.info(`Đã chọn mẫu: ${tmplName}`);
+            }}
+          />
+        ) : visibleRules.length === 0 ? (
+          <AutomationEmpty
+            mode={query ? 'search' : 'filter'}
+            onResetSearch={() => {
+              setQuery('');
+              setStatusFilter('Tất cả');
+              setTypeFilter('ALL');
+            }}
+          />
+        ) : (
+          groups.map((group) => (
+            <section className="st-group" key={group.id} aria-label={group.label}>
+              <header className="st-group-head">
+                <h3>{group.label}</h3>
+                <small>{group.rules.length}</small>
+                <p>{group.hint}</p>
+              </header>
+              <div className="st-list">{group.rules.map(ruleRow)}</div>
+            </section>
+          ))
+        )}
+      </main>
+
+      {/* Mobile Bottom Navigation */}
+      <DashboardBottomNav activeItem="more" homeId={homeId} />
+
+      {/* ── Rule Editor Panel (Phase 3 & 4) ── */}
+      <RuleEditorPanel
+        rule={editorRule}
+        isOpen={editorRule !== undefined}
+        onClose={() => {
+          setEditorRule(undefined);
+          setScrollToTrigger(false);
+        }}
+        onSaved={loadData}
+        devices={devices}
+        scenes={scenes}
+        homeId={homeId}
+        onDuplicate={handleDuplicateRule}
+        initialScrollToTrigger={scrollToTrigger}
+      />
+
+      {/* ── Delete Confirmation Dialog ── */}
+      {ruleToDelete && (
+        <ConfirmModal
+          isOpen={true}
+          title="Xóa quy tắc tự động"
+          description={`Bạn có chắc chắn muốn xóa quy tắc “${ruleToDelete.name}”? Thao tác này không thể hoàn tác.`}
+          confirmText="Xóa quy tắc"
+          cancelText="Hủy"
+          variant="danger"
+          onConfirm={handleConfirmDelete}
+          onCancel={() => setRuleToDelete(null)}
+        />
+      )}
+
+      {/* ── Rule Execution History Panel ── */}
+      {historyModalRule && (
+        <RuleHistoryPanel
+          homeId={homeId}
+          rule={historyModalRule}
+          devices={devices}
+          scenes={scenes}
+          onClose={() => setHistoryModalRule(null)}
+        />
+      )}
     </div>
-  </div></main>;
-}
-
-function parseValue(value: string): unknown {
-  try { return JSON.parse(value) as unknown; } catch { return value; }
+  );
 }

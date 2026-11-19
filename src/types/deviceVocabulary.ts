@@ -1,4 +1,4 @@
-﻿// ---------------------------------------------------------
+// ---------------------------------------------------------
 // TỪ ĐIỂN ĐỒNG BỘ GIAO TIẾP (FRONTEND <-> IOT FIRMWARE)
 // ---------------------------------------------------------
 
@@ -19,9 +19,13 @@ export type DeviceAction =
   | 'TURN_OFF'
   | 'TOGGLE'
   | 'SET_COLOR'
+  | 'SET_RGB'
   | 'SET_BRIGHTNESS'
   | 'SET_TEMPERATURE'
   | 'SET_SPEED'
+  | 'OPEN'
+  | 'CLOSE'
+  | 'STOP'
   | 'SEND_IR_CODE'     // Gửi mã hồng ngoại 
   | 'SET_AI_MODE'      // Bật/Tắt chế độ cảnh báo Camera
   | 'SET_STATE';       // Gửi JSON State tổng hợp (Dành cho Scene)
@@ -34,7 +38,8 @@ export const DEVICE_TYPES = {
   TEMP_HUMID_SENSOR: 'TEMP_HUMID_SENSOR', // Cảm biến DHT22
   MOTION_SENSOR: 'MOTION_SENSOR',   // Cảm biến PIR
   SMOKE_SENSOR: 'SMOKE_SENSOR',     // Cảm biến MQ-2
-  CAMERA_AI: 'CAMERA_AI'            // Camera Ugreen qua Orange Pi
+  CAMERA_AI: 'CAMERA_AI',           // Camera Ugreen qua Orange Pi
+  LUX_SENSOR: 'LUX_SENSOR',         // Cảm biến ánh sáng quang trở (LDR)
 } as const;
 
 export type DeviceType = keyof typeof DEVICE_TYPES;

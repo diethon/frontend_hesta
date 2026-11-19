@@ -2,6 +2,19 @@ export interface DeviceState {
   [key: string]: unknown;
 }
 
+export interface DeviceShadowResponse {
+  deviceId: string;
+  deviceName: string;
+  desiredState: Record<string, unknown>;
+  reportedState: Record<string, unknown>;
+  deltaState: Record<string, unknown>;
+  desiredVersion: number;
+  reportedVersion: number;
+  desiredUpdatedAt: string;
+  reportedUpdatedAt: string;
+  inSync: boolean;
+}
+
 export interface DeviceCommandResult {
   commandId?: string;
   success: boolean;
@@ -32,7 +45,13 @@ export interface DeviceResponse {
   digitalTwinX?: number;
   digitalTwinY?: number;
   digitalTwinZ?: number;
+  manualOverrideUntil?: string | null;
+  manualOverrideActive?: boolean;
   lastSeen?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  settings?: Record<string, any>;
+  accessLevel?: 'NONE' | 'VIEW' | 'CONTROL';
 }
 
 export interface DeviceUpdateRequest {
@@ -42,6 +61,7 @@ export interface DeviceUpdateRequest {
   digitalTwinX?: number;
   digitalTwinY?: number;
   digitalTwinZ?: number;
+  settings?: Record<string, any>;
 }
 
 export interface DeviceStateHistoryResponse {
@@ -56,14 +76,38 @@ export interface DeviceStateHistoryResponse {
 }
 
 export interface ManualCommandResponse {
-  command: { success: boolean; status: string; message?: string; acknowledgedState?: DeviceState };
-  overrideUntil: string;
+  command: { commandId?: string; success: boolean; status: string; errorCode?: string; message?: string; acknowledgedState?: DeviceState; latencyMs?: number };
+  overrideUntil?: string | null;
 }
 
 export interface ManualOverrideRecord {
   id: string;
-  action: 'OVERRIDE' | 'CANCEL';
+  action: 'OVERRIDE' | 'CANCEL' | 'RESUME';
   userId: string;
   occurredAt: string;
   expiresAt: string;
+}
+
+export interface DeviceUptimeTimelinePoint {
+  hour: number;
+  state: 'ON' | 'OFF';
+  timestamp?: string;
+  durationSeconds?: number;
+}
+
+export interface DeviceUptimeResponse {
+  uptimePercent: number;
+  totalHours: number;
+  onHours: number;
+  offHours: number;
+  timelinePoints: DeviceUptimeTimelinePoint[];
+}
+
+export interface DeviceHealthResponse {
+  switchCycles: number;
+  maxRatedCycles: number;
+  healthPercent: number;
+  chatteringWarning: boolean;
+  safetyTripped: boolean;
+  lastCycleAt: string;
 }

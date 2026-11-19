@@ -21,7 +21,16 @@ import { referenceLayout, referenceSnapshot } from './twin-reference-fixture';
 import { multiFloorLayout, multiFloorSnapshot } from './twin-multifloor-fixture';
 
 const store = createAppStore();
-declare global { interface Window { __twinFixtureScene: () => unknown; __twinFixtureEmitDevice: (id: string, state: import('../src/types/twin').JsonValue) => void; } }
+// Await the real demand-rendered frame before reading a software WebGL screenshot.
+async function flushFixtureFrame() {
+  const canvas = document.querySelector('.twin-3d-stage canvas') as HTMLCanvasElement | null;
+  const state = canvas ? _roots.get(canvas)?.store.getState() : undefined;
+  state?.invalidate();
+  await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+  state?.gl.getContext().finish();
+}
+Object.assign(window, { __twinFixtureFlushFrame: flushFixtureFrame });
+declare global { interface Window { __twinFixtureScene: () => unknown; __twinFixtureEmitDevice: (id: string, state: import('../src/types/twin').JsonValue) => void; __twinFixtureRequests: () => readonly { method?: string; url?: string; body?: unknown }[]; __twinFixtureCommandFailure: boolean; __twinFixtureCommandHold: boolean; } }
 let deviceEventIndex = 10;
 window.__twinFixtureEmitDevice = (id, currentState) => {
   const device = store.getState().twin.devicesById[id];
@@ -38,7 +47,7 @@ window.__twinFixtureScene = () => {
   const lights: { intensity: number; color: string }[] = [];
   const floors: { name: string; y: number; bounds: number[][] }[] = [];
   const roomSurfaces: { id: string; color: string; opacity: number }[] = [];
-  const deviceModels: { id: string; world: number[]; screen: number[]; geometry: string[]; meshes: number; emissive: number; animation: number[] }[] = [];
+  const deviceModels: { id: string; world: number[]; screen: number[]; geometry: string[]; meshes: number; emissive: number; animation: number[]; diffusers: string[] }[] = [];
   const projected: number[][] = [];
   state.scene.traverse((object) => {
     if (object.name.includes(':floor:')) { const box = new Box3().setFromObject(object); floors.push({ name: object.name, y: object.position.y, bounds: [box.min.toArray(), box.max.toArray()] }); }
@@ -47,10 +56,12 @@ window.__twinFixtureScene = () => {
       let meshCount = 0, emissive = 0;
       const animation: number[] = [];
       const geometry: string[] = [];
-      object.traverse((child) => { animation.push(child.rotation.y); if (child instanceof Mesh) { meshCount++; const m = Array.isArray(child.material) ? child.material[0] : child.material; if ('emissiveIntensity' in m) emissive = Math.max(emissive, Number(m.emissiveIntensity)); } });
+      const diffusers: string[] = [];
+      object.traverse((child) => { if (child.name === 'light-diffuser' && child instanceof Mesh && !Array.isArray(child.material) && 'color' in child.material) diffusers.push((child.material.color as import('three').Color).getHexString()); });
+      object.traverse((child) => { animation.push(child.rotation.y); if (child instanceof Mesh) { meshCount++; const m = Array.isArray(child.material) ? child.material[0] : child.material; if ('emissiveIntensity' in m && 'emissive' in m) { const color = m.emissive as import('three').Color; emissive = Math.max(emissive, Number(m.emissiveIntensity) * Math.max(color.r, color.g, color.b)); } } });
       object.traverse((child) => { if (child instanceof Mesh) geometry.push(child.geometry.uuid); });
       const center = new Box3().setFromObject(object).getCenter(new Vector3()).project(state.camera);
-      deviceModels.push({ id: object.name, world: object.getWorldPosition(new Vector3()).toArray(), screen: [(center.x + 1) * state.size.width / 2, (1 - center.y) * state.size.height / 2], geometry, meshes: meshCount, emissive, animation });
+      deviceModels.push({ id: object.name, world: object.getWorldPosition(new Vector3()).toArray(), screen: [(center.x + 1) * state.size.width / 2, (1 - center.y) * state.size.height / 2], geometry, meshes: meshCount, emissive, animation, diffusers });
     }
     if (object instanceof PointLight) lights.push({ intensity: object.intensity, color: object.color.getHexString() });
     if (object instanceof Mesh) {
@@ -83,7 +94,8 @@ const query = new URLSearchParams(location.search);
 const multiFloor = query.has('multifloor');
 const reference = query.has('reference');
 const demo = reference || multiFloor;
-const extraModels = query.has('models');
+const appearanceModels = query.has('appearances');
+const extraModels = query.has('models') || appearanceModels;
 const modelDevices = [
   { deviceId: 'fan', name: 'Quạt trần', deviceType: 'FAN', roomId: 'living' },
   { deviceId: 'camera', name: 'Camera phòng khách', deviceType: 'CAMERA', roomId: 'living' },
@@ -91,7 +103,14 @@ const modelDevices = [
   { deviceId: 'door', name: 'Cửa thông minh', deviceType: 'DOOR', roomId: 'living' },
   { deviceId: 'window', name: 'Cửa sổ thông minh', deviceType: 'WINDOW', roomId: 'bedroom' },
   { deviceId: 'blind', name: 'Rèm thông minh', deviceType: 'BLIND', roomId: 'kitchen' },
-].map((d) => ({ ...d, icon: null, status: 'ONLINE' as const, currentState: { power: 'ON', open: false, position: 0, speed: 30 }, lastSeen: '2026-09-18T08:00:00Z', healthStatus: 'ACTIVE' as const }));
+  ...(appearanceModels ? [
+    { deviceId: 'named-ac', name: 'Điều hòa phòng khách', deviceType: 'IR_REMOTE', roomId: 'living' },
+    { deviceId: 'named-floor-lamp', name: 'Đèn cây cạnh sofa', deviceType: 'SMART_PLUG', roomId: 'living' },
+    { deviceId: 'named-table-lamp', name: 'Đèn bàn phòng ngủ', deviceType: 'LIGHT', roomId: 'bedroom' },
+    { deviceId: 'named-fan', name: 'Quạt đứng', deviceType: 'FAN', roomId: 'bedroom' },
+  ] : []),
+  ...(query.has('roller') ? [{ deviceId: 'roller', name: 'Cửa cuốn', deviceType: 'ROLLING_DOOR', roomId: 'kitchen' }] : []),
+].map((d) => ({ ...d, icon: null, status: 'ONLINE' as const, currentState: { power: 'ON', open: false, position: 0, speed: 30, temperature: 23, fan: 'HIGH', swing: true }, lastSeen: '2026-09-18T08:00:00Z', healthStatus: 'ACTIVE' as const }));
 const demoSnapshot = multiFloor ? multiFloorSnapshot : extraModels ? { ...referenceSnapshot, rooms: referenceSnapshot.rooms.map((room) => ({ ...room, devices: [...room.devices, ...modelDevices.filter((d) => d.roomId === room.roomId)] })) } : referenceSnapshot;
 const demoLayout = multiFloor ? multiFloorLayout : extraModels ? { ...referenceLayout, nodes: [...referenceLayout.nodes, ...modelDevices.map((d, index) => ({ nodeType: 'DEVICE' as const, nodeId: d.deviceId, roomId: d.roomId, x: d.roomId === 'bedroom' ? .75 : .15 + index % 3 * .12, y: d.roomId === 'kitchen' ? .7 : .22 + index % 2 * .14 }))] } : referenceLayout;
 const referenceRoomIds = demoSnapshot.rooms.map((room) => room.roomId);
@@ -105,14 +124,25 @@ let role: 'OWNER' | 'MEMBER' = 'OWNER';
 let fail = false;
 let forbidden = false;
 const requests: { method?: string; url?: string; body?: unknown }[] = [];
+window.__twinFixtureRequests = () => requests;
+window.__twinFixtureCommandFailure = false;
+window.__twinFixtureCommandHold = false;
 apiClient.defaults.adapter = async (config) => {
   requests.push({ method: config.method, url: config.url, body: config.data ? JSON.parse(config.data) : undefined });
   if (config.url?.startsWith('/devices/')) {
     const deviceId = decodeURIComponent(config.url.split('/')[2]);
     const snapshot = demo ? demoSnapshot : snapshotFixture.result;
     const device = [...snapshot.rooms.flatMap((room) => room.devices), ...snapshot.unassignedDevices].find((item) => item.deviceId === deviceId);
-    if (config.method === 'get') return { config, data: { code: 1000, result: device ? { id: deviceId, homeId, name: device.name, deviceType: device.deviceType, capabilities: { POWER: ['TURN_ON', 'TURN_OFF'], LIGHT: ['SET_BRIGHTNESS', 'SET_COLOR'] } } : null }, status: 200, statusText: 'OK', headers: {} };
+    const interactionCapabilities: Record<string, Record<string, string[]>> = {
+      'main-light': { POWER: [], BRIGHTNESS: [], RGB: ['SET_RGB'] },
+      door: { GATE: [] }, window: { DOOR: ['OPEN', 'CLOSE'] }, blind: { DOOR: ['OPEN', 'CLOSE', 'STOP'] },
+      fan: { POWER: [], SPEED: ['SET_SPEED'] }, camera: {}, tv: { POWER: ['TURN_ON', 'TURN_OFF'] },
+    };
+    const capabilities = query.has('interactions') ? interactionCapabilities[deviceId] ?? {} : { POWER: ['TURN_ON', 'TURN_OFF'], LIGHT: ['SET_BRIGHTNESS', 'SET_COLOR'] };
+    if (config.method === 'get') return { config, data: { code: 1000, result: device ? { id: deviceId, homeId, name: device.name, deviceType: device.deviceType, capabilities } : null }, status: 200, statusText: 'OK', headers: {} };
     await new Promise((resolve) => setTimeout(resolve, 500));
+    while (window.__twinFixtureCommandHold) await new Promise((resolve) => setTimeout(resolve, 50));
+    if (window.__twinFixtureCommandFailure) throw new Error('Thiết bị không xác nhận lệnh thử nghiệm.');
     return { config, data: { code: 1000, result: config.url.endsWith('/commands') ? { command: { success: true, status: 'SUCCESS' } } : { success: true, status: 'SUCCESS' } }, status: 200, statusText: 'OK', headers: {} };
   }
   if (config.url?.endsWith('/my-homes')) return { config, data: { code: 1000, result: [{ homeId, role }, { homeId: 'home-b', role }] }, status: 200, statusText: 'OK', headers: {} };
@@ -148,6 +178,7 @@ export function LayoutFixtureShell() {
     <button onClick={() => emit({ ...runtimeSensorFixture, data: { ...runtimeSensorFixture.data, latestValue: 31, observedAt: '2026-09-19T10:04:00Z' }, timestamp: '2026-09-19T10:04:00Z' })}>Sensor → 31</button>
     <button onClick={() => emit({ ...runtimeDeviceFixture, data: { ...runtimeDeviceFixture.data, currentState: { power: 'OFF' }, lastSeen: '2026-09-19T10:00:00Z' }, timestamp: '2026-09-19T10:00:00Z' })}>Device → OFF</button>
     <button onClick={() => emit({ ...runtimeDeviceFixture, data: { ...runtimeDeviceFixture.data, currentState: { power: 'ON', brightness: 35, color: { r: 255, g: 100, b: 45 } }, lastSeen: '2026-09-19T10:05:00Z' }, timestamp: '2026-09-19T10:05:00Z' })}>Device → RGB 35%</button>
+    {appearanceModels ? <>{(['OFF', 'ON'] as const).map((power) => <button key={power} onClick={() => window.__twinFixtureEmitDevice('named-ac', { power, temperature: 23, fan: 'HIGH', swing: true })}>Điều hòa mẫu → {power}</button>)}</> : null}
     {(['STALE', 'OFFLINE', 'ACTIVE'] as const).map((healthStatus, index) => <button key={healthStatus} onClick={() => emit({ ...runtimeHealthFixture, timestamp: `2026-09-19T10:0${index + 1}:00Z`, data: { ...runtimeHealthFixture.data, healthStatus, referenceTime: '2026-09-19T10:00:00Z', evaluatedAt: `2026-09-19T10:0${index + 1}:00Z` } })}>{healthStatus}</button>)}
     <button onClick={() => { saved = { ...saved, revision: saved.revision + 1 }; }}>Simulate concurrent save</button>
     <button onClick={() => { fail = !fail; }}>Toggle layout failure</button>

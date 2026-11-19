@@ -5,11 +5,14 @@ import { ForgotPasswordForm } from '../components/auth/ForgotPasswordForm';
 import { ResetPasswordForm } from '../components/auth/ResetPasswordForm';
 import { HomePage } from '../components/home/HomePage';
 import { AdminDashboard } from '../components/admin/AdminDashboard';
+import { AdminUsersPage } from '../components/admin/AdminUsersPage';
+import { SystemDiagnosticsPage } from '../components/admin/SystemDiagnosticsPage';
 import { JoinHome } from '../components/home/JoinHome';
 import { UnauthenticatedJoin } from '../components/home/UnauthenticatedJoin';
 import { DevicePage } from '../components/device/DevicePage';
 import { lazy, Suspense } from 'react';
 const DigitalTwinPage = lazy(() => import('../components/twin/DigitalTwinPage').then(module => ({ default: module.DigitalTwinPage })));
+const TwinDemoPage = lazy(() => import('../components/twin/demo/TwinDemoPage'));
 import type { AuthResponse } from '../types/auth';
 import { RequireAdmin, RequireAuth } from './RouteGuards';
 import { defaultRoute, invitationSearch, invitationToken, loginDestination, readNavigationState } from './navigation';
@@ -18,6 +21,10 @@ import { useRouteSession } from './useRouteSession';
 import { ScenePage } from '../components/scene/ScenePage';
 import { AutomationRulePage } from '../components/automation/AutomationRulePage';
 import { RecommendationsPage } from '../components/automation/RecommendationsPage';
+import { ParentalGuardianRouteWrapper } from '../components/guardian/ParentalGuardianRouteWrapper';
+import { EnergyDashboardPage } from '../components/energy/EnergyDashboardPage';
+import { FallDetectionPage } from '../components/emergency/FallDetectionPage';
+import { MemberPage } from '../components/member/MemberPage';
 
 export function AppRoutes() {
   const { initialized, user, login, logout, updateUser } = useRouteSession();
@@ -36,7 +43,7 @@ export function AppRoutes() {
       destination === '/join' ? invitationSearch(location.search, 'token') : location.search);
   };
 
-  const leaveInvitation = () => go('/home', {
+  const leaveInvitation = () => go(defaultRoute(user), {
     ...state,
     returnTo: undefined,
     handledInviteToken: invitationToken(location.search) || undefined,
@@ -44,6 +51,10 @@ export function AppRoutes() {
 
   return (
     <Routes>
+      <Route path="/fall-detection" element={<FallDetectionPage />} />
+      <Route path="/camera-ai" element={<FallDetectionPage />} />
+      <Route path="/home/:homeId/fall-detection" element={<FallDetectionPage />} />
+      <Route path="/twin-demo" element={<Suspense fallback={<p role="status" className="p-8 text-muted">Đang mở căn hộ mẫu…</p>}><TwinDemoPage /></Suspense>} />
       <Route path="/login" element={
         <LoginForm
           onLoginSuccess={handleLoginSuccess}
@@ -69,7 +80,13 @@ export function AppRoutes() {
           state={state} replace />
       )} />
       <Route path="/join" element={user ? (
-        <JoinHome key={location.search} onSuccess={leaveInvitation} onCancel={leaveInvitation} />
+        <JoinHome
+          key={location.search}
+          user={user}
+          onSuccess={leaveInvitation}
+          onCancel={leaveInvitation}
+          onSwitchAccount={logout}
+        />
       ) : invitationToken(location.search) ? (
         <UnauthenticatedJoin
           onSelectLogin={() => go('/login', state, false, invitationSearch(location.search, 'inviteToken'))}
@@ -79,15 +96,22 @@ export function AppRoutes() {
         <Navigate to={{ pathname: '/login', search: location.search, hash: location.hash }} state={state} replace />
       )} />
       <Route element={<RequireAuth initialized={initialized} user={user} />}>
-        <Route path="/home" element={<HomePage user={user!} onLogout={logout} onProfileUpdate={updateUser} />} />
-        <Route path="/homes/:homeId/scenes" element={<ScenePage />} />
-        <Route path="/homes/:homeId/scenes/:sceneId" element={<ScenePage />} />
-        <Route path="/homes/:homeId/automation-rules" element={<AutomationRulePage />} />
-        <Route path="/homes/:homeId/recommendations" element={<RecommendationsPage />} />
-        <Route path="/home/:homeId/devices" element={<DevicePage />} />
-        <Route path="/home/:homeId/digital-twin" element={<Suspense fallback={<p role="status" className="p-8 text-muted">Đang tải Digital Twin…</p>}><DigitalTwinPage /></Suspense>} />
+        <Route path="/home" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <HomePage user={user!} onLogout={logout} onProfileUpdate={updateUser} />} />
+        <Route path="/homes/:homeId/scenes" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <ScenePage />} />
+        <Route path="/homes/:homeId/scenes/:sceneId" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <ScenePage />} />
+        <Route path="/homes/:homeId/automation-rules" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <AutomationRulePage />} />
+        <Route path="/homes/:homeId/recommendations" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <RecommendationsPage />} />
+        <Route path="/homes/:homeId/guardian" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <ParentalGuardianRouteWrapper />} />
+        <Route path="/homes/:homeId/members" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <MemberPage />} />
+        <Route path="/home/:homeId/members" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <MemberPage />} />
+        <Route path="/home/:homeId/devices" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <DevicePage />} />
+        <Route path="/home/:homeId/energy" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <EnergyDashboardPage />} />
+        <Route path="/home/:homeId/digital-twin" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <Suspense fallback={<p role="status" className="p-8 text-muted">Đang tải Digital Twin…</p>}><DigitalTwinPage /></Suspense>} />
         <Route element={<RequireAdmin initialized={initialized} user={user} />}>
           <Route path="/admin" element={<AdminDashboard user={user!} onLogout={logout} onProfileUpdate={updateUser} />} />
+          <Route path="/admin/devices" element={<Navigate to="/admin" replace />} />
+          <Route path="/admin/users" element={<AdminUsersPage user={user!} onLogout={logout} onProfileUpdate={updateUser} />} />
+          <Route path="/admin/diagnostics" element={<SystemDiagnosticsPage user={user!} onLogout={logout} onProfileUpdate={updateUser} />} />
         </Route>
       </Route>
       <Route path="*" element={

@@ -1,17 +1,20 @@
 import React from 'react';
+import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 
-type SidebarItem = {
+export type SidebarItem = {
   id: string;
   label: string;
   icon: React.ReactNode;
   onClick: () => void;
 };
 
-interface AppSidebarProps {
+export interface AppSidebarProps {
   activeItem: string;
   items: SidebarItem[];
-  contextLabel: string;
+  contextLabel?: string;
   showSystemSummary?: boolean;
+  compact?: boolean;
+  onToggleCompact?: () => void;
 }
 
 export const HomeIcon = () => (
@@ -21,10 +24,17 @@ export const HomeIcon = () => (
   </svg>
 );
 
+/** HESTA "H" mark, traced from logo/concepts-v7 (hesta-logo-13); inherits currentColor. */
+export const HestaLogoMark: React.FC<{ className?: string }> = ({ className = 'h-6 w-auto' }) => (
+  <svg aria-hidden="true" className={className} viewBox="0 0 512 800" fill="currentColor">
+    <path d="M0 0H160V300H320V380H352V80H512V800H352V540H192V460H160V720H0Z" />
+  </svg>
+);
+
 export const BrandMark: React.FC<{ compact?: boolean }> = ({ compact = false }) => (
   <div className="flex items-center gap-3">
-    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary text-white shadow-soft">
-      <HomeIcon />
+    <div className="flex h-11 w-11 shrink-0 items-center justify-center text-text">
+      <HestaLogoMark className="h-10 w-auto" />
     </div>
     {compact ? null : (
       <div>
@@ -67,41 +77,89 @@ export const AdminIcon = () => (
     </svg>
   );
 
-export const AppSidebar: React.FC<AppSidebarProps> = ({ activeItem, items, contextLabel, showSystemSummary = true }) => (
-  <aside className="app-sidebar fixed inset-y-0 left-0 z-30 hidden w-64 flex-col p-5 lg:flex">
-    <div className="px-2 py-1">
-      <BrandMark />
-    </div>
+export const EnergyIcon = () => (
+    <svg aria-hidden="true" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+      <path strokeLinecap="round" strokeLinejoin="round" d="m3.75 13.5 10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75Z" />
+    </svg>
+  );
 
-    <div className="mt-8 px-3 text-xs font-semibold text-muted">{contextLabel}</div>
-    <nav aria-label="Điều hướng chính" className="mt-3 space-y-1.5">
-      {items.map((item) => {
-        const active = item.id === activeItem;
-        return (
-          <button
-            key={item.id}
-            type="button"
-            aria-current={active ? 'page' : undefined}
-            onClick={item.onClick}
-            className={`flex w-full items-center gap-3 rounded-2xl px-3.5 py-3 text-left text-sm font-semibold transition-colors active:translate-y-px ${
-              active
-                ? 'bg-sidebar-active text-primary-hover'
-                : 'text-muted hover:bg-sidebar-hover hover:text-text'
-            }`}
-          >
-            <span className={active ? 'text-primary' : 'text-icon'}>{item.icon}</span>
-            {item.label}
-          </button>
-        );
-      })}
-    </nav>
-
-    {showSystemSummary ? <div className="mt-auto rounded-2xl border border-line bg-white/80 p-4">
-      <div className="flex items-center gap-2 text-sm font-semibold text-text">
-        <span className="status-pulse h-2 w-2 rounded-full bg-success" />
-        Hệ thống ổn định
-      </div>
-      <p className="mt-2 text-xs leading-5 text-muted">Nhà của bạn đang được kết nối an toàn.</p>
-    </div> : null}
-  </aside>
+export const AutomationIcon = () => (
+  <svg aria-hidden="true" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 3v1.5M4.5 8.25H3m18 0h-1.5M4.5 12H3m18 0h-1.5m-15 3.75H3m18 0h-1.5M8.25 19.5V21M12 3v1.5m0 15V21m3.75-18v1.5m0 15V21m-9-1.5h10.5a2.25 2.25 0 0 0 2.25-2.25V6.75a2.25 2.25 0 0 0-2.25-2.25H6.75A2.25 2.25 0 0 0 4.5 6.75v10.5a2.25 2.25 0 0 0 2.25 2.25Zm.75-12h9v9h-9v-9Z" />
+  </svg>
 );
+
+export const AppSidebar: React.FC<AppSidebarProps> = ({
+  activeItem,
+  items,
+  contextLabel = 'Không gian sống',
+  showSystemSummary = true,
+  compact = false,
+  onToggleCompact,
+}) => {
+  const isItemActive = (itemId: string) => {
+    if (itemId === activeItem) return true;
+    if (
+      (itemId === 'overview' && activeItem === 'home') ||
+      (itemId === 'home' && activeItem === 'overview')
+    ) {
+      return true;
+    }
+    return false;
+  };
+
+  return (
+    <aside className={`app-sidebar fixed inset-y-0 left-0 z-30 hidden flex-col overflow-y-auto lg:flex ${compact ? 'w-20 p-3' : 'w-64 p-5'}`}>
+      <div className={compact ? 'flex justify-center py-1' : 'px-2 py-1'}>
+        <BrandMark compact={compact} />
+      </div>
+
+      <div className={compact ? 'sr-only' : 'mt-8 px-3 text-xs font-semibold text-muted'}>{contextLabel}</div>
+      <nav aria-label="Điều hướng chính" className={`${compact ? 'mt-8' : 'mt-3'} space-y-1.5`}>
+        {items.map((item) => {
+          const active = isItemActive(item.id);
+          return (
+            <button
+              key={item.id}
+              type="button"
+              aria-current={active ? 'page' : undefined}
+              aria-label={item.label}
+              title={compact ? item.label : undefined}
+              onClick={item.onClick}
+              className={`flex min-h-12 w-full items-center rounded-2xl py-3 text-left text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary active:translate-y-px ${compact ? 'justify-center' : 'gap-3 px-3.5'} ${
+                active
+                  ? `bg-sidebar-active font-bold text-primary shadow-xs ${compact ? '' : 'border-r-4 border-primary'}`
+                  : 'text-muted hover:bg-sidebar-hover hover:text-text'
+              }`}
+            >
+              <span className={active ? 'text-primary' : 'text-icon'}>{item.icon}</span>
+              <span className={compact ? 'sr-only' : undefined}>{item.label}</span>
+            </button>
+          );
+        })}
+      </nav>
+
+      {onToggleCompact ? <button
+        type="button"
+        aria-label={compact ? 'Mở rộng điều hướng HESTA' : 'Thu gọn điều hướng HESTA'}
+        title={compact ? 'Mở rộng điều hướng HESTA' : 'Thu gọn điều hướng HESTA'}
+        aria-expanded={!compact}
+        onClick={onToggleCompact}
+        className={`mt-auto flex min-h-12 shrink-0 items-center rounded-2xl text-sm font-semibold text-muted hover:bg-sidebar-hover hover:text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${compact ? 'justify-center' : 'gap-3 px-3.5'}`}
+      >
+        {compact ? <PanelLeftOpen aria-hidden="true" size={20} /> : <PanelLeftClose aria-hidden="true" size={20} />}
+        <span className={compact ? 'sr-only' : undefined}>Thu gọn điều hướng</span>
+      </button> : null}
+
+      {showSystemSummary && !compact ? (
+        <div className="mt-auto rounded-2xl border border-line bg-white/80 p-4">
+          <div className="flex items-center gap-2 text-sm font-semibold text-text">
+            <span className="status-pulse h-2 w-2 rounded-full bg-success" />
+            Hệ thống ổn định
+          </div>
+          <p className="mt-2 text-xs leading-5 text-muted">Nhà của bạn đang được kết nối an toàn.</p>
+        </div>
+      ) : null}
+    </aside>
+  );
+};

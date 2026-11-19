@@ -8,8 +8,9 @@ import type { TwinCameraRequest } from './twin3dCamera';
 import { HouseScene } from './scene/HouseScene';
 import { useTwinScene } from './hooks/useTwinScene';
 import type { TwinFloorMode, TwinWallMode, TwinMarkerMode } from './scene/architectureMaterials';
+import { V2SurfaceProvider } from './v2/surfaces';
 
-export const Twin3DCanvas = memo(function Twin3DCanvas({ geometry, drafting, activeFloor, mode, wallMode, markerMode, selection, fitRequest, cameraRequest, focusRoomId, focusNodeKey, compact, palette, theme, heatmapMode, onSelect, onFocus, onReady, onCameraInteract }: {
+export const Twin3DCanvas = memo(function Twin3DCanvas({ geometry, drafting, activeFloor, mode, wallMode, markerMode, selection, fitRequest, cameraRequest, focusRoomId, focusNodeKey, compact, palette, theme, heatmapMode, onSelect, onFocus, onReady, onCameraInteract, tool = 'select' }: {
   geometry: TwinLayoutGeometry;
   drafting: TwinDraftingMetadata;
   activeFloor: number | 'all';
@@ -22,6 +23,7 @@ export const Twin3DCanvas = memo(function Twin3DCanvas({ geometry, drafting, act
   focusRoomId: string | null;
   focusNodeKey: string | null;
   compact: boolean;
+  tool?: 'select' | 'pan' | 'rotate';
   palette: Twin3DPalette; theme: import('./scene/rendererTheme').TwinRendererTheme;
   heatmapMode: TwinHeatmapMode;
   onFocus: (selection: TwinLayoutSelection) => void;
@@ -31,6 +33,6 @@ export const Twin3DCanvas = memo(function Twin3DCanvas({ geometry, drafting, act
 }) {
   const house = useTwinScene(geometry, drafting);
   return <Canvas aria-label="Mô hình nhà 3D" shadows={compact ? false : 'percentage'} frameloop="demand" dpr={[1, compact ? 1.2 : 1.5]} gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }} onCreated={onReady}>
-    <HouseScene house={house} geometry={geometry} drafting={drafting} activeFloor={activeFloor} mode={mode} wallMode={wallMode} markerMode={markerMode} selection={selection} fitRequest={fitRequest} cameraRequest={cameraRequest} focusRoomId={focusRoomId} focusNodeKey={focusNodeKey} compact={compact} palette={palette} theme={theme} heatmapMode={heatmapMode} onFocus={onFocus} onSelect={onSelect} onCameraInteract={onCameraInteract} />
+    <V2SurfaceProvider><HouseScene house={house} geometry={geometry} drafting={drafting} activeFloor={activeFloor} mode={mode} wallMode={wallMode} markerMode={markerMode} selection={selection} fitRequest={fitRequest} cameraRequest={cameraRequest} focusRoomId={focusRoomId} focusNodeKey={focusNodeKey} compact={compact} palette={palette} theme={theme} heatmapMode={heatmapMode} onFocus={onFocus} onSelect={onSelect} onCameraInteract={onCameraInteract} tool={tool} /></V2SurfaceProvider>
   </Canvas>;
 });

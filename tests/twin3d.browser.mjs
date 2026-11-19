@@ -100,8 +100,8 @@ try {
   await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
   await send('Page.navigate', { url: testUrl });
   await waitFor(`document.querySelector('button[aria-label="Chế độ 3D"]') !== null`);
-  check('Digital Twin opens in 3D Live with all three mode controls', await evaluate(`document.querySelector('button[aria-label="Chế độ 3D"]').getAttribute('aria-pressed') === 'true' && !!document.querySelector('button[aria-label="Chế độ Overview"]')`));
-  await click('Chế độ Overview');
+  check('Digital Twin opens in 3D Live with all three mode controls', await evaluate(`document.querySelector('button[aria-label="Chế độ 3D"]').getAttribute('aria-pressed') === 'true' && !!document.querySelector('button[aria-label="Chế độ tổng quan"]')`));
+  await click('Chế độ tổng quan');
   await waitFor(`document.querySelector('section[aria-label="Overview"]') !== null`);
   check('Overview exposes runtime counts and unplaced objects', await evaluate(`['Phòng','Thiết bị','Cảm biến','ACTIVE','STALE','OFFLINE','Chưa đặt'].every(label => document.querySelector('section[aria-label="Overview"]').textContent.includes(label))`));
   await click('Chế độ 2D');

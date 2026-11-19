@@ -1,4 +1,5 @@
-import { apiClient } from './apiClient';
+import { apiClient, ApiError } from './apiClient';
+import type { DeviceEnergyBreakdown } from '../types/energy';
 import type {
   DeviceCommandResult,
   DeviceResponse,
@@ -6,16 +7,92 @@ import type {
   DeviceUpdateRequest,
   ManualCommandResponse,
   ManualOverrideRecord,
+  DeviceUptimeResponse,
+  DeviceHealthResponse,
+  DeviceShadowResponse,
 } from '../types/device';
+import { cachedFetch, invalidateCache } from './queryCache';
+import { getDeviceEnergy as getEnergyApiDeviceEnergy } from './energyApi';
+
+// Cache key helpers
+export const homeDevicesKey = (homeId: string): string => `devices:home:${homeId}`;
+export const deviceHistoryKey = (deviceId: string): string => `device:history:${deviceId}`;
+export const deviceUptimeKey = (deviceId: string, days = 7): string => `device:uptime:${deviceId}:${days}`;
+export const deviceHealthKey = (deviceId: string): string => `device:health:${deviceId}`;
+export const deviceShadowKey = (deviceId: string): string => `device:shadow:${deviceId}`;
+
+export const invalidateDeviceMutations = (deviceId: string): void => {
+  invalidateCache(`device:history:${deviceId}`);
+  invalidateCache(`device:health:${deviceId}`);
+  invalidateCache(`device:shadow:${deviceId}`);
+  invalidateCache(`energy:device:${deviceId}`);
+  invalidateCache('devices:home:');
+};
+
+function unwrapCommandResult(response: {
+  status?: number;
+  data?: { code?: number; result?: DeviceCommandResult };
+}): DeviceCommandResult {
+  const result = response.data?.result as DeviceCommandResult;
+  if (result && result.success === false) {
+    throw new ApiError(
+      result.message || 'Thiết bị không thể thực thi lệnh',
+      response.status,
+      response.data?.code,
+      result.errorCode
+    );
+  }
+  return result;
+}
+
+export interface DevicePublicPreviewResponse {
+  deviceId: string;
+  name: string;
+  deviceType: string;
+  model?: string;
+  serialNumber?: string;
+  status: string;
+}
+
+export interface DeviceClaimRequest {
+  token: string;
+  homeId: string;
+  roomId: string;
+  name?: string;
+  nodeCode?: string;
+}
+
+export const resolveQrToken = async (token: string): Promise<DevicePublicPreviewResponse> => {
+  const prefix = 'syna://device/register?token=';
+  const cleanToken = token.startsWith(prefix) ? token.slice(prefix.length) : token.trim();
+  const response = await apiClient.get(`/devices/qr/${cleanToken}`);
+  return response.data.result;
+};
+
+export const claimDevice = async (deviceId: string, request: DeviceClaimRequest): Promise<DeviceResponse> => {
+  const response = await apiClient.post(`/devices/${deviceId}/claim`, request);
+  invalidateCache('devices:home:');
+  return response.data.result;
+};
 
 export const getDevicesByHome = async (homeId: string): Promise<DeviceResponse[]> => {
-  const response = await apiClient.get(`/homes/${homeId}/devices`);
-  return response.data.result;
+  return cachedFetch(
+    homeDevicesKey(homeId),
+    async () => {
+      const response = await apiClient.get(`/homes/${homeId}/devices`);
+      return response.data.result;
+    },
+    { ttlMs: 20_000 }
+  );
 };
 
 export const getDevicesByRoom = async (roomId: string): Promise<DeviceResponse[]> => {
   const response = await apiClient.get(`/rooms/${roomId}/devices`);
   return response.data.result;
+};
+
+export const getDeviceEnergy = async (deviceId: string, period = '30D'): Promise<DeviceEnergyBreakdown> => {
+  return getEnergyApiDeviceEnergy(deviceId, period);
 };
 
 export const getDeviceDetail = async (deviceId: string): Promise<DeviceResponse> => {
@@ -25,16 +102,24 @@ export const getDeviceDetail = async (deviceId: string): Promise<DeviceResponse>
 
 export const updateDeviceConfig = async (deviceId: string, request: DeviceUpdateRequest): Promise<DeviceResponse> => {
   const response = await apiClient.put(`/devices/${deviceId}`, request);
+  invalidateDeviceMutations(deviceId);
   return response.data.result;
 };
 
 export const removeDevice = async (deviceId: string): Promise<void> => {
   await apiClient.delete(`/devices/${deviceId}`);
+  invalidateDeviceMutations(deviceId);
 };
 
 export const getDeviceHistory = async (deviceId: string): Promise<DeviceStateHistoryResponse[]> => {
-  const response = await apiClient.get(`/devices/${deviceId}/history`);
-  return response.data.result;
+  return cachedFetch(
+    deviceHistoryKey(deviceId),
+    async () => {
+      const response = await apiClient.get(`/devices/${deviceId}/history`);
+      return response.data.result;
+    },
+    { ttlMs: 20_000 }
+  );
 };
 
 export const sendDeviceCommand = async (
@@ -46,7 +131,8 @@ export const sendDeviceCommand = async (
     action,
     parameters: parameters || {}
   });
-  return response.data.result;
+  invalidateDeviceMutations(deviceId);
+  return unwrapCommandResult(response);
 };
 
 export const sendRoomCommand = async (
@@ -58,17 +144,28 @@ export const sendRoomCommand = async (
     action,
     parameters: parameters || {}
   });
+  invalidateCache('devices:home:');
   return response.data.result;
 };
 
 export const sendManualPowerCommand = async (deviceId: string, action: 'TURN_ON' | 'TURN_OFF'): Promise<ManualCommandResponse> => {
-  const response = await apiClient.post(`/devices/${deviceId}/commands`, { action });
+  const command = await sendDeviceCommand(deviceId, action);
+  invalidateDeviceMutations(deviceId);
+  return {
+    command,
+    overrideUntil: null,
+  };
+};
+
+export const cancelDeviceAutomation = async (deviceId: string, minutes: number = 30): Promise<string> => {
+  const response = await apiClient.post(`/devices/${deviceId}/automation/cancel`, { minutes });
+  invalidateDeviceMutations(deviceId);
   return response.data.result;
 };
 
-export const cancelDeviceAutomation = async (deviceId: string): Promise<string> => {
-  const response = await apiClient.post(`/devices/${deviceId}/automation/cancel`);
-  return response.data.result;
+export const resumeDeviceAutomation = async (deviceId: string): Promise<void> => {
+  await apiClient.post(`/devices/${deviceId}/automation/resume`);
+  invalidateDeviceMutations(deviceId);
 };
 
 export const getDeviceOverrideHistory = async (deviceId: string): Promise<ManualOverrideRecord[]> => {
@@ -79,37 +176,44 @@ export const getDeviceOverrideHistory = async (deviceId: string): Promise<Manual
 // ===== Air Conditioner API =====
 export const setAcPower = async (deviceId: string, power: boolean): Promise<DeviceCommandResult> => {
   const response = await apiClient.post(`/devices/${deviceId}/air-conditioner/power?power=${power}`);
-  return response.data.result;
+  invalidateDeviceMutations(deviceId);
+  return unwrapCommandResult(response);
 };
 
 export const setAcTemperature = async (deviceId: string, temperature: number): Promise<DeviceCommandResult> => {
   const response = await apiClient.post(`/devices/${deviceId}/air-conditioner/temperature?temperature=${temperature}`);
-  return response.data.result;
+  invalidateDeviceMutations(deviceId);
+  return unwrapCommandResult(response);
 };
 
 export const adjustAcTempUp = async (deviceId: string): Promise<DeviceCommandResult> => {
   const response = await apiClient.post(`/devices/${deviceId}/air-conditioner/temperature-plus`);
-  return response.data.result;
+  invalidateDeviceMutations(deviceId);
+  return unwrapCommandResult(response);
 };
 
 export const adjustAcTempDown = async (deviceId: string): Promise<DeviceCommandResult> => {
   const response = await apiClient.post(`/devices/${deviceId}/air-conditioner/temperature-minus`);
-  return response.data.result;
+  invalidateDeviceMutations(deviceId);
+  return unwrapCommandResult(response);
 };
 
 export const setAcFan = async (deviceId: string, fan: string): Promise<DeviceCommandResult> => {
   const response = await apiClient.post(`/devices/${deviceId}/air-conditioner/fan?fan=${fan}`);
-  return response.data.result;
+  invalidateDeviceMutations(deviceId);
+  return unwrapCommandResult(response);
 };
 
 export const setAcMode = async (deviceId: string, mode: string): Promise<DeviceCommandResult> => {
   const response = await apiClient.post(`/devices/${deviceId}/air-conditioner/mode?mode=${mode}`);
-  return response.data.result;
+  invalidateDeviceMutations(deviceId);
+  return unwrapCommandResult(response);
 };
 
 export const setAcSwing = async (deviceId: string, enabled: boolean): Promise<DeviceCommandResult> => {
   const response = await apiClient.post(`/devices/${deviceId}/air-conditioner/swing?enabled=${enabled}`);
-  return response.data.result;
+  invalidateDeviceMutations(deviceId);
+  return unwrapCommandResult(response);
 };
 
 export const getAcState = async (deviceId: string): Promise<DeviceCommandResult> => {
@@ -121,23 +225,112 @@ export const getAcState = async (deviceId: string): Promise<DeviceCommandResult>
 export const openGate = async (deviceId: string, nodeId?: string): Promise<DeviceCommandResult> => {
   const params = nodeId ? `?nodeId=${nodeId}` : '';
   const response = await apiClient.post(`/devices/${deviceId}/gate/open${params}`);
-  return response.data.result;
+  invalidateDeviceMutations(deviceId);
+  return unwrapCommandResult(response);
 };
 
 export const closeGate = async (deviceId: string, nodeId?: string): Promise<DeviceCommandResult> => {
   const params = nodeId ? `?nodeId=${nodeId}` : '';
   const response = await apiClient.post(`/devices/${deviceId}/gate/close${params}`);
-  return response.data.result;
+  invalidateDeviceMutations(deviceId);
+  return unwrapCommandResult(response);
 };
 
 export const stopGate = async (deviceId: string, nodeId?: string): Promise<DeviceCommandResult> => {
   const params = nodeId ? `?nodeId=${nodeId}` : '';
   const response = await apiClient.post(`/devices/${deviceId}/gate/stop${params}`);
-  return response.data.result;
+  invalidateDeviceMutations(deviceId);
+  return unwrapCommandResult(response);
 };
 
 export const getGateState = async (deviceId: string): Promise<{ deviceId: string; state: string; currentState: Record<string, unknown> }> => {
   const response = await apiClient.get(`/devices/${deviceId}/gate/state`);
+  return response.data.result;
+};
+
+export const exportDeviceHistoryCsv = async (deviceId: string, filename?: string): Promise<void> => {
+  const response = await apiClient.get(`/devices/${deviceId}/history/export`, {
+    responseType: 'blob',
+  });
+  const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8;' });
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', filename || `device_audit_${deviceId}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  link.parentNode?.removeChild(link);
+  window.URL.revokeObjectURL(url);
+};
+
+export const exportHomeDeviceHistoryCsv = async (homeId: string, filename?: string): Promise<void> => {
+  const response = await apiClient.get(`/homes/${homeId}/devices/history/export`, {
+    responseType: 'blob',
+  });
+  const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8;' });
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', filename || `home_audit_${homeId}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  link.parentNode?.removeChild(link);
+  window.URL.revokeObjectURL(url);
+};
+
+export const getDeviceUptime = async (deviceId: string, days = 7): Promise<DeviceUptimeResponse> => {
+  return cachedFetch(
+    deviceUptimeKey(deviceId, days),
+    async () => {
+      const response = await apiClient.get(`/devices/${deviceId}/analytics/uptime`, {
+        params: { days },
+      });
+      return response.data.result;
+    },
+    { ttlMs: 45_000 }
+  );
+};
+
+export const getDeviceHealth = async (deviceId: string): Promise<DeviceHealthResponse> => {
+  return cachedFetch(
+    deviceHealthKey(deviceId),
+    async () => {
+      const response = await apiClient.get(`/devices/${deviceId}/health`);
+      return response.data.result;
+    },
+    { ttlMs: 45_000 }
+  );
+};
+
+export const exportDeviceHistoryExcel = async (
+  deviceId: string,
+  filename?: string,
+  from?: string,
+  to?: string
+): Promise<void> => {
+  const response = await apiClient.get(`/devices/${deviceId}/history/export/excel`, {
+    responseType: 'blob',
+    params: {
+      ...(from ? { from } : {}),
+      ...(to ? { to } : {}),
+    },
+  });
+  const blob = new Blob([response.data], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  });
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', filename || `device_history_${deviceId}.xlsx`);
+  document.body.appendChild(link);
+  link.click();
+  link.parentNode?.removeChild(link);
+  window.URL.revokeObjectURL(url);
+};
+
+export const extendDeviceAutomation = async (deviceId: string, hours = 1): Promise<string> => {
+  const response = await apiClient.post(`/devices/${deviceId}/automation/extend`, { hours });
+  invalidateDeviceMutations(deviceId);
   return response.data.result;
 };
 
@@ -167,6 +360,7 @@ export interface AdminDeviceCreatedResponse {
 
 export const adminCreateDevice = async (payload: AdminCreateDevicePayload): Promise<AdminDeviceCreatedResponse> => {
   const response = await apiClient.post('/admin/devices', payload);
+  invalidateCache('devices:home:');
   return response.data.result;
 };
 
@@ -180,3 +374,39 @@ export const adminRegenerateQr = async (deviceId: string): Promise<QrInfo> => {
   return response.data.result;
 };
 
+export const getHomeDeviceCapabilities = async (homeId: string): Promise<import('../types/automation').HomeCapabilitiesResponse> => {
+  const response = await apiClient.get(`/homes/${homeId}/device-capabilities`);
+  return response.data.result;
+};
+
+export const getDeviceCapabilities = async (deviceId: string): Promise<import('../types/automation').DeviceCapabilityInfo> => {
+  const response = await apiClient.get(`/devices/${deviceId}/capabilities`);
+  return response.data.result;
+};
+
+// Device Shadow (Desired vs Reported State)
+export const getDeviceShadow = async (deviceId: string): Promise<DeviceShadowResponse> => {
+  return cachedFetch(
+    deviceShadowKey(deviceId),
+    async () => {
+      const response = await apiClient.get(`/devices/${deviceId}/shadow`);
+      return response.data.result;
+    },
+    { ttlMs: 20_000 }
+  );
+};
+
+export const updateDesiredShadow = async (
+  deviceId: string,
+  desiredState: Record<string, unknown>
+): Promise<DeviceShadowResponse> => {
+  const response = await apiClient.put(`/devices/${deviceId}/shadow/desired`, desiredState);
+  invalidateDeviceMutations(deviceId);
+  return response.data.result;
+};
+
+export const reconcileDeviceShadow = async (deviceId: string): Promise<DeviceShadowResponse> => {
+  const response = await apiClient.post(`/devices/${deviceId}/shadow/reconcile`);
+  invalidateDeviceMutations(deviceId);
+  return response.data.result;
+};

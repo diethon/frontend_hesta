@@ -13,7 +13,7 @@ function RoomEntry({ id, selection, onFocus }: { id: string; selection: TwinLayo
 function DeviceEntry({ id, selection, onFocus }: { id: string; selection: TwinLayoutSelection | null; onFocus: (selection: TwinLayoutSelection) => void }) {
   const device = useAppSelector((state) => state.twin.devicesById[id]);
   if (!device) return null;
-  return <button type="button" aria-pressed={selection?.kind === 'node' && selection.id === `DEVICE:${id}`} onClick={() => onFocus({ kind: 'node', id: `DEVICE:${id}` })} className="flex min-h-11 w-full items-center gap-2 rounded-lg pl-6 pr-3 text-left text-xs text-muted hover:bg-sidebar-hover"><span aria-hidden="true" className={`h-2 w-2 shrink-0 rounded-full ${device.status === 'ONLINE' && device.healthStatus === 'ACTIVE' ? 'bg-success' : 'bg-off'}`} /><span className="min-w-0 break-words">{device.name}</span></button>;
+  return <button type="button" aria-pressed={selection?.kind === 'node' && selection.id === `DEVICE:${id}`} onClick={() => onFocus({ kind: 'node', id: `DEVICE:${id}` })} className="flex min-h-11 w-full items-center gap-2 rounded-lg pl-6 pr-3 text-left text-xs text-muted hover:bg-sidebar-hover"><span aria-hidden="true" className={`h-2 w-2 shrink-0 rounded-full ${device.status === 'ONLINE' ? 'bg-success' : 'bg-off'}`} /><span className="min-w-0 break-words">{device.name}</span></button>;
 }
 export function TwinSidebar({ geometry, selection, onFocus }: { geometry: TwinLayoutGeometry; selection: TwinLayoutSelection | null; onFocus: (selection: TwinLayoutSelection) => void }) {
   const name = useAppSelector((state) => state.twin.home?.name);

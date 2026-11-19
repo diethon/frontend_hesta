@@ -26,7 +26,7 @@ export function TwinUnplacedPanel({ geometry, disabled, onChange, floor, draftin
   const placedNodes = new Set(geometry.nodes.map(nodeKey));
   const items = [
     ...twin.roomIds.filter((id) => !placedRooms.has(id)).map((id) => ({ kind: 'room' as const, id, name: twin.roomsById[id].name, detail: 'Phòng', icon: <RoomGlyph name={twin.roomsById[id].name} /> })),
-    ...twin.deviceIds.filter((id) => !placedNodes.has(`DEVICE:${id}`)).map((id) => ({ kind: 'DEVICE' as const, id, name: twin.devicesById[id].name, detail: 'Thiết bị', icon: <DeviceGlyph deviceType={twin.devicesById[id].deviceType} /> })),
+    ...twin.deviceIds.filter((id) => !placedNodes.has(`DEVICE:${id}`)).map((id) => ({ kind: 'DEVICE' as const, id, name: twin.devicesById[id].name, detail: 'Thiết bị', icon: <DeviceGlyph deviceType={twin.devicesById[id].deviceType} name={twin.devicesById[id].name} /> })),
     ...twin.sensorIds.filter((id) => !placedNodes.has(`SENSOR:${id}`)).map((id) => ({ kind: 'SENSOR' as const, id, name: `${twin.sensorsById[id].metricType} · ${twin.devicesById[twin.sensorsById[id].deviceId]?.name ?? 'Cảm biến'}`, detail: 'Cảm biến', icon: <SensorGlyph metricType={twin.sensorsById[id].metricType} /> })),
   ];
   const groupedItems = items.map((item) => {

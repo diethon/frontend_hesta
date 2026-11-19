@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { motion } from 'motion/react';
 import type { DeviceResponse } from '../../../types/device';
 import {
   Snowflake,
@@ -21,7 +22,9 @@ import {
   setAcSwing,
 } from '../../../services/deviceApi';
 import { notify } from '../../ui/notify';
-import { getErrorMessage } from '../../../utils/errors';
+import { getErrorMessage, isDuplicateCommandError } from '../../../utils/errors';
+import { useOverrideCountdown } from '../useOverrideCountdown';
+import { OverrideActionModal } from '../OverrideActionModal';
 
 interface AcCardProps {
   device: DeviceResponse;
@@ -75,7 +78,7 @@ const describeArc = (
   return `M ${start.x} ${start.y} A ${r} ${r} 0 ${largeArcFlag} 1 ${end.x} ${end.y}`;
 };
 
-export const AcCard: React.FC<AcCardProps> = ({
+const AcCardComponent: React.FC<AcCardProps> = ({
   device,
   powerPending = false,
   onTogglePower,
@@ -86,6 +89,15 @@ export const AcCard: React.FC<AcCardProps> = ({
 
   const rawPower = device.currentState?.power;
   const isPowerOn = rawPower === 'ON' || rawPower === true || rawPower === 'true';
+
+  const [overrideUntil, setOverrideUntil] = useState<string | null | undefined>(device.manualOverrideUntil);
+
+  useEffect(() => {
+    setOverrideUntil(device.manualOverrideUntil);
+  }, [device.manualOverrideUntil]);
+
+  const { isOverrideActive, formattedTime } = useOverrideCountdown(overrideUntil);
+  const [isOverrideModalOpen, setIsOverrideModalOpen] = useState(false);
 
   const [power, setPower] = useState<boolean>(isPowerOn);
   const [temperature, setTemperature] = useState<number>(
@@ -147,7 +159,11 @@ export const AcCard: React.FC<AcCardProps> = ({
             currentState: { ...device.currentState, temperature: newTemp },
           });
         } catch (err) {
-          notify.error(getErrorMessage(err, 'Lỗi cài đặt nhiệt độ'));
+          if (isDuplicateCommandError(err)) {
+            notify.warning('Thiết bị đang thực thi lệnh trước, vui lòng không click liên tục.');
+          } else {
+            notify.error(getErrorMessage(err, 'Lỗi cài đặt nhiệt độ'));
+          }
         }
       }, 350);
     },
@@ -169,14 +185,18 @@ export const AcCard: React.FC<AcCardProps> = ({
     setIsPowerBusy(true);
     try {
       await setAcPower(device.id, nextPower);
-      notify.success(nextPower ? 'Đã bật điều hòa' : 'Đã tắt điều hòa');
+      notify.success(nextPower ? 'Đã bật điều hòa' : 'Đã tắt điều hòa', 'Tự động hóa tạm dừng 30 phút');
       onStateChange?.({
         ...device,
         currentState: { ...device.currentState, power: nextPower ? 'ON' : 'OFF' },
       });
     } catch (err) {
       setPower(!nextPower);
-      notify.error(getErrorMessage(err, 'Lỗi cập nhật nguồn điều hòa'));
+      if (isDuplicateCommandError(err)) {
+        notify.warning('Thiết bị đang thực thi lệnh trước, vui lòng không click liên tục.');
+      } else {
+        notify.error(getErrorMessage(err, 'Lỗi cập nhật nguồn điều hòa'));
+      }
     } finally {
       setIsPowerBusy(false);
     }
@@ -196,7 +216,11 @@ export const AcCard: React.FC<AcCardProps> = ({
         currentState: { ...device.currentState, temperature: nextTemp },
       });
     } catch (err) {
-      notify.error(getErrorMessage(err, 'Lỗi giảm nhiệt độ'));
+      if (isDuplicateCommandError(err)) {
+        notify.warning('Thiết bị đang thực thi lệnh trước, vui lòng không click liên tục.');
+      } else {
+        notify.error(getErrorMessage(err, 'Lỗi giảm nhiệt độ'));
+      }
     }
   };
 
@@ -213,7 +237,11 @@ export const AcCard: React.FC<AcCardProps> = ({
         currentState: { ...device.currentState, temperature: nextTemp },
       });
     } catch (err) {
-      notify.error(getErrorMessage(err, 'Lỗi tăng nhiệt độ'));
+      if (isDuplicateCommandError(err)) {
+        notify.warning('Thiết bị đang thực thi lệnh trước, vui lòng không click liên tục.');
+      } else {
+        notify.error(getErrorMessage(err, 'Lỗi tăng nhiệt độ'));
+      }
     }
   };
 
@@ -226,14 +254,18 @@ export const AcCard: React.FC<AcCardProps> = ({
     setMode(newMode);
     try {
       await setAcMode(device.id, newMode);
-      notify.success(`Chế độ: ${newMode}`);
+      notify.success('Đã đổi chế độ điều hòa', `Chế độ: ${newMode}`);
       onStateChange?.({
         ...device,
         currentState: { ...device.currentState, mode: newMode },
       });
     } catch (err) {
       setMode(oldMode);
-      notify.error(getErrorMessage(err, 'Lỗi đổi chế độ'));
+      if (isDuplicateCommandError(err)) {
+        notify.warning('Thiết bị đang thực thi lệnh trước, vui lòng không click liên tục.');
+      } else {
+        notify.error(getErrorMessage(err, 'Lỗi đổi chế độ'));
+      }
     }
   };
 
@@ -246,14 +278,18 @@ export const AcCard: React.FC<AcCardProps> = ({
     setFan(newFan);
     try {
       await setAcFan(device.id, newFan);
-      notify.success(`Quạt: ${newFan}`);
+      notify.success('Đã đổi tốc độ quạt', `Tốc độ: ${newFan}`);
       onStateChange?.({
         ...device,
         currentState: { ...device.currentState, fan: newFan },
       });
     } catch (err) {
       setFan(oldFan);
-      notify.error(getErrorMessage(err, 'Lỗi đổi tốc độ quạt'));
+      if (isDuplicateCommandError(err)) {
+        notify.warning('Thiết bị đang thực thi lệnh trước, vui lòng không click liên tục.');
+      } else {
+        notify.error(getErrorMessage(err, 'Lỗi đổi tốc độ quạt'));
+      }
     }
   };
 
@@ -273,7 +309,11 @@ export const AcCard: React.FC<AcCardProps> = ({
       });
     } catch (err) {
       setSwing(!nextSwing);
-      notify.error(getErrorMessage(err, 'Lỗi cài đặt đảo gió'));
+      if (isDuplicateCommandError(err)) {
+        notify.warning('Thiết bị đang thực thi lệnh trước, vui lòng không click liên tục.');
+      } else {
+        notify.error(getErrorMessage(err, 'Lỗi cài đặt đảo gió'));
+      }
     }
   };
 
@@ -365,21 +405,42 @@ export const AcCard: React.FC<AcCardProps> = ({
   const currentModeObj = MODES.find((m) => m.id === mode) || MODES[0];
   const currentFanObj = FAN_SPEEDS.find((f) => f.id === fan) || FAN_SPEEDS[0];
 
+  // Dynamic glow & shadow
+  const acGlowShadow = isOffline
+    ? 'none'
+    : power
+    ? `0 14px 36px -4px ${activeColors.glow}, 0 2px 8px -2px rgba(0,0,0,0.05), inset 0 1px 1px 0 rgba(255, 255, 255, 0.9)`
+    : '0 2px 8px -2px rgba(0, 0, 0, 0.04)';
+
   return (
-    <article
+    <motion.article
       role="button"
       tabIndex={0}
+      whileHover={{ translateY: -3 }}
+      whileTap={{ scale: 0.985 }}
+      transition={{ type: 'spring', stiffness: 450, damping: 25 }}
       onClick={() => onClick?.(device.id)}
       onKeyDown={(e) => e.key === 'Enter' && onClick?.(device.id)}
-      className={`relative flex flex-col justify-between p-5 sm:p-6 rounded-3xl border transition-all duration-300 select-none cursor-pointer ${
+      style={{ boxShadow: acGlowShadow }}
+      className={`relative flex flex-col justify-between p-5 sm:p-6 rounded-3xl border transition-all duration-300 select-none cursor-pointer overflow-hidden ${
         isOffline
           ? 'bg-slate-100/70 border-line/60 opacity-60 grayscale'
           : power
-          ? 'bg-gradient-to-b from-white via-slate-50/50 to-sky-50/20 border-slate-200/90 shadow-[0_12px_32px_rgba(58,74,90,0.06),0_2px_6px_rgba(58,74,90,0.03)] hover:shadow-lg'
+          ? 'bg-gradient-to-b from-white via-slate-50/50 to-sky-50/20 border-slate-200/90'
           : 'bg-gradient-to-b from-white to-slate-50/70 border-slate-200/70 shadow-xs'
       }`}
       aria-label={`${device.name} — ${power ? `${temperature}°C • ${currentModeObj.label}` : 'Đã tắt'}`}
     >
+      {/* Dynamic Ambient Glow Spotlight */}
+      {power && !isOffline && (
+        <div
+          className="absolute -top-16 -right-16 w-56 h-56 rounded-full pointer-events-none opacity-25 transition-all duration-500"
+          style={{
+            background: `radial-gradient(circle, ${activeColors.start} 0%, transparent 70%)`,
+            filter: 'blur(30px)',
+          }}
+        />
+      )}
       {/* ── 1. KHUNG TIÊU ĐỀ TRÊN CÙNG (HEADER) ── */}
       <div className="flex items-center justify-between gap-3 mb-2">
         <div className="flex items-center gap-3.5 min-w-0">
@@ -401,17 +462,39 @@ export const AcCard: React.FC<AcCardProps> = ({
             />
           </div>
           <div className="min-w-0">
-            <h3 className="font-bold text-base sm:text-lg text-slate-800 leading-tight truncate">
-              {device.name || 'Điều khiển Máy lạnh'}
-            </h3>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="font-bold text-base sm:text-lg text-slate-800 leading-tight truncate">
+                {device.name || 'Điều khiển Máy lạnh'}
+              </h3>
+              {device.accessLevel === 'VIEW' && (
+                <span className="inline-flex items-center px-2 py-0.5 text-[10px] font-semibold rounded-md bg-amber-500/10 text-amber-600 border border-amber-500/20">
+                  Chỉ xem
+                </span>
+              )}
+            </div>
             {/* Sub-text tóm tắt đồng bộ thời gian thực: 24°C • Hút ẩm • Quạt AUTO */}
-            <p className="text-xs sm:text-[13px] text-slate-500 font-medium truncate mt-0.5">
-              {isOffline
-                ? 'Ngoại tuyến • Không phản hồi'
-                : power
-                ? `${temperature}°C • ${currentModeObj.label} • Quạt ${currentFanObj.label}`
-                : 'Đã tắt nguồn'}
-            </p>
+            <div className="flex items-center gap-2 flex-wrap mt-0.5">
+              <p className="text-xs sm:text-[13px] text-slate-500 font-medium truncate">
+                {isOffline
+                  ? 'Ngoại tuyến • Không phản hồi'
+                  : power
+                  ? `${temperature}°C • ${currentModeObj.label} • Quạt ${currentFanObj.label}`
+                  : 'Đã tắt nguồn'}
+              </p>
+              {isOverrideActive && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsOverrideModalOpen(true);
+                  }}
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded-md bg-amber-100 hover:bg-amber-200 text-amber-800 border border-amber-300 animate-pulse transition cursor-pointer"
+                  title="Đang khóa tự động hóa. Bấm để quản lý hoặc gia hạn"
+                >
+                  🔒 {formattedTime}
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
@@ -430,8 +513,8 @@ export const AcCard: React.FC<AcCardProps> = ({
           </button>
           <button
             type="button"
-            title={power ? 'Tắt điều hòa' : 'Bật điều hòa'}
-            disabled={isOffline || isPowerBusy || powerPending}
+            title={device.accessLevel === 'VIEW' ? 'Chỉ xem' : (power ? 'Tắt điều hòa' : 'Bật điều hòa')}
+            disabled={isOffline || isPowerBusy || powerPending || device.accessLevel === 'VIEW'}
             onClick={handleToggle}
             className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-all ${
               power
@@ -537,7 +620,7 @@ export const AcCard: React.FC<AcCardProps> = ({
             {/* Quick Stepper Minus Button [-] */}
             <button
               type="button"
-              disabled={!power || isOffline || temperature <= 16}
+              disabled={!power || isOffline || temperature <= 16 || device.accessLevel === 'VIEW'}
               onClick={handleTempDown}
               className="absolute left-1.5 p-1 rounded-full text-slate-400 hover:text-slate-800 hover:bg-slate-100 active:scale-90 transition-all disabled:opacity-20"
               aria-label="Giảm 1 độ"
@@ -571,7 +654,7 @@ export const AcCard: React.FC<AcCardProps> = ({
             {/* Quick Stepper Plus Button [+] */}
             <button
               type="button"
-              disabled={!power || isOffline || temperature >= 30}
+              disabled={!power || isOffline || temperature >= 30 || device.accessLevel === 'VIEW'}
               onClick={handleTempUp}
               className="absolute right-1.5 p-1 rounded-full text-slate-400 hover:text-slate-800 hover:bg-slate-100 active:scale-90 transition-all disabled:opacity-20"
               aria-label="Tăng 1 độ"
@@ -654,6 +737,34 @@ export const AcCard: React.FC<AcCardProps> = ({
           </button>
         </div>
       </div>
-    </article>
+
+      {/* Override Action Modal [PHO-043] */}
+      <OverrideActionModal
+        isOpen={isOverrideModalOpen}
+        onClose={() => setIsOverrideModalOpen(false)}
+        deviceId={device.id}
+        deviceName={device.name}
+        formattedTime={formattedTime}
+        onOverrideChanged={(newUntil) => {
+          setOverrideUntil(newUntil);
+          onStateChange?.({
+            ...device,
+            manualOverrideUntil: newUntil,
+            manualOverrideActive: Boolean(newUntil),
+          });
+        }}
+      />
+    </motion.article>
   );
 };
+
+export const AcCard = React.memo(AcCardComponent, (prev, next) => {
+  return (
+    prev.device.id === next.device.id &&
+    prev.device.status === next.device.status &&
+    prev.powerPending === next.powerPending &&
+    prev.device.name === next.device.name &&
+    prev.device.manualOverrideUntil === next.device.manualOverrideUntil &&
+    JSON.stringify(prev.device.currentState) === JSON.stringify(next.device.currentState)
+  );
+});

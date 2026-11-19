@@ -1,0 +1,103 @@
+/* Custom styling for Energy Dashboard components */
+
+.energy-page {
+  font-feature-settings: 'tnum' 1, 'cv02' 1, 'cv03' 1, 'cv04' 1;
+}
+
+/* Override index.css pale yellow (#ffd166) inside .energy-page for readable WCAG amber text */
+.energy-page .text-amber-500 {
+  color: #d97706;
+}
+
+html.dark .energy-page .text-amber-500,
+[data-theme="dark"] .energy-page .text-amber-500 {
+  color: #fbbf24;
+}
+
+/* Keep action buttons visible and properly sized on mobile */
+@media (max-width: 639px) {
+  .energy-page .scene-actions-right {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .energy-page .scene-actions-right .scene-ghost:first-of-type {
+    display: inline-flex;
+  }
+
+  .energy-page .scene-actions-right .scene-ghost {
+    width: auto;
+    height: 36px;
+    padding: 0 12px;
+    font-size: 12px;
+  }
+}
+
+/* Tabular nums utility */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Custom scrollbars for device and breakdown lists */
+.energy-scroll-area::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.energy-scroll-area::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.energy-scroll-area::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 9999px;
+}
+
+.energy-scroll-area::-webkit-scrollbar-thumb:hover {
+  background: var(--tertiary);
+}
+
+/* SVG Chart Transitions */
+.energy-chart-line {
+  transition: stroke-dashoffset 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.energy-chart-dot {
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), fill 0.2s ease;
+}
+
+/* Ladder step hover and active highlight */
+.ladder-step {
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.ladder-step:hover {
+  transform: translateX(2px);
+}
+
+/* Tooltip floating box */
+.energy-tooltip {
+  pointer-events: none;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* Focus visible styles for keyboard navigation in chart */
+.energy-chart-container:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Prefers-reduced-motion compliance */
+@media (prefers-reduced-motion: reduce) {
+  .energy-chart-line,
+  .energy-chart-dot,
+  .ladder-step,
+  .energy-tooltip,
+  .energy-transition {
+    transition: none !important;
+    animation: none !important;
+    transform: none !important;
+  }
+}

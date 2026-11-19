@@ -19,7 +19,7 @@ export const executeTwinCommand = createAsyncThunk<void, { homeId: string; devic
   { condition: ({ homeId, deviceId }, { getState }) => {
     const state = getState();
     const device = state.twin.devicesById[deviceId];
-    return state.twin.homeId === homeId && device?.status === 'ONLINE' && device.healthStatus === 'ACTIVE'
+    return state.twin.homeId === homeId && device?.status === 'ONLINE'
       && !state.twinCommand.byId[deviceId]?.pending;
   } },
 );

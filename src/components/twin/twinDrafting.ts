@@ -52,7 +52,6 @@ export interface TwinDraftingMetadata {
   floors?: Record<string, { elevation: number; height: number; slabThickness: number }>;
 }
 
-const STORAGE_PREFIX = 'hesta:twin-drafting:v1:';
 const PRECISION = 1000;
 
 const templatePoints: Record<TwinRoomShape, TwinDraftPoint[]> = {
@@ -181,69 +180,6 @@ export function sameTwinDrafting(left: TwinDraftingMetadata, right: TwinDrafting
 
 export function blueprintKey(floor: number) {
   return `floor-${Math.max(1, Math.round(floor))}`;
-}
-
-function validPoint(value: unknown): value is TwinDraftPoint {
-  if (!value || typeof value !== 'object') return false;
-  const point = value as TwinDraftPoint;
-  return Number.isFinite(point.x) && Number.isFinite(point.y) && point.x >= 0 && point.x <= 1 && point.y >= 0 && point.y <= 1;
-}
-
-function parseMetadata(value: unknown): TwinDraftingMetadata | null {
-  if (!value || typeof value !== 'object') return null;
-  const candidate = value as Partial<TwinDraftingMetadata>;
-  if (candidate.version !== 1 || !candidate.settings || !candidate.rooms || !candidate.blueprints) return null;
-  const rooms: TwinDraftingMetadata['rooms'] = {};
-  for (const [roomId, room] of Object.entries(candidate.rooms)) {
-    if (!room || !['RECTANGLE', 'L_SHAPE', 'U_SHAPE', 'CUSTOM'].includes(room.shape) || !Array.isArray(room.points)
-      || room.points.length < 3 || !room.points.every(validPoint)) continue;
-    rooms[roomId] = { ...room, ...(room.objects ? { objects: Array.isArray(room.objects) ? room.objects.filter(validSceneObject) : [] } : {}), points: room.points.map((point) => ({ x: clamp(point.x), y: clamp(point.y) })) };
-  }
-  const blueprints: TwinDraftingMetadata['blueprints'] = {};
-  for (const [key, blueprint] of Object.entries(candidate.blueprints)) {
-    if (!blueprint || typeof blueprint.name !== 'string' || typeof blueprint.dataUrl !== 'string'
-      || !blueprint.dataUrl.startsWith('data:image/') || !Number.isFinite(blueprint.opacity)) continue;
-    blueprints[key] = { ...blueprint, opacity: clamp(blueprint.opacity) };
-  }
-  return {
-    version: 1,
-    settings: {
-      gridSnap: candidate.settings.gridSnap !== false,
-      edgeSnap: candidate.settings.edgeSnap !== false,
-      gridMeters: [0.25, 0.5, 1].includes(candidate.settings.gridMeters ?? 0.5) ? candidate.settings.gridMeters ?? 0.5 : 0.5,
-    },
-    rooms,
-    blueprints,
-    ...(candidate.nodeRotations ? { nodeRotations: Object.fromEntries(Object.entries(candidate.nodeRotations).filter(([, angle]) => Number.isFinite(angle))) } : {}),
-  };
-}
-
-function validSceneObject(value: unknown): value is TwinSceneObject {
-  if (!value || typeof value !== 'object') return false;
-  const item = value as TwinSceneObject;
-  return typeof item.id === 'string' && sceneObjectKinds.includes(item.kind)
-    && [item.x, item.z, item.width, item.depth, item.height, item.rotation].every(Number.isFinite)
-    && item.x >= 0 && item.z >= 0 && item.width > 0 && item.depth > 0 && item.height > 0;
-}
-
-export function loadTwinDrafting(homeId: string): TwinDraftingMetadata {
-  if (typeof localStorage === 'undefined') return createTwinDraftingMetadata();
-  try {
-    const raw = localStorage.getItem(`${STORAGE_PREFIX}${homeId}`);
-    return raw ? parseMetadata(JSON.parse(raw)) ?? createTwinDraftingMetadata() : createTwinDraftingMetadata();
-  } catch {
-    return createTwinDraftingMetadata();
-  }
-}
-
-export function cacheTwinDraftingDraft(homeId: string, metadata: TwinDraftingMetadata) {
-  if (typeof localStorage === 'undefined' || typeof localStorage.setItem !== 'function') return false;
-  try {
-    localStorage.setItem(`hesta:twin-unsaved-draft:v1:${homeId}`, JSON.stringify(metadata));
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 export function pruneTwinDrafting(metadata: TwinDraftingMetadata, roomIds: readonly string[]): TwinDraftingMetadata {

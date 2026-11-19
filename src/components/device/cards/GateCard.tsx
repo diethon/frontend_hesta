@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { motion } from 'motion/react';
 import type { DeviceResponse } from '../../../types/device';
 import {
   DoorOpen,
@@ -18,7 +19,7 @@ interface GateCardProps {
   onStateChange?: (updatedDevice: DeviceResponse) => void;
 }
 
-export const GateCard: React.FC<GateCardProps> = ({
+const GateCardComponent: React.FC<GateCardProps> = ({
   device,
   onClick,
   onStateChange,
@@ -70,9 +71,12 @@ export const GateCard: React.FC<GateCardProps> = ({
   const isStopped = state === 'STOPPED';
 
   return (
-    <article
+    <motion.article
       role="button"
       tabIndex={0}
+      whileHover={{ translateY: -3 }}
+      whileTap={{ scale: 0.985 }}
+      transition={{ type: 'spring', stiffness: 450, damping: 25 }}
       onClick={() => onClick?.(device.id)}
       onKeyDown={(e) => e.key === 'Enter' && onClick?.(device.id)}
       className={`relative flex flex-col justify-between p-4 sm:p-5 rounded-2xl border transition-all duration-200 select-none cursor-pointer ${
@@ -103,9 +107,16 @@ export const GateCard: React.FC<GateCardProps> = ({
             <DoorOpen className="w-5 h-5" />
           </div>
           <div className="min-w-0">
-            <h3 className="font-semibold text-[15px] leading-tight text-text truncate">
-              {device.name}
-            </h3>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <h3 className="font-semibold text-[15px] leading-tight text-text truncate">
+                {device.name}
+              </h3>
+              {device.accessLevel === 'VIEW' && (
+                <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold rounded-md bg-amber-500/10 text-amber-600 border border-amber-500/20">
+                  Chỉ xem
+                </span>
+              )}
+            </div>
             <p className="text-xs text-muted truncate mt-0.5">
               {device.deviceType === 'ROLLING_DOOR' ? 'Cửa cuốn thông minh' : 'Cổng tự động'}
             </p>
@@ -158,7 +169,7 @@ export const GateCard: React.FC<GateCardProps> = ({
       >
         <button
           type="button"
-          disabled={isOffline || pendingAction !== null || isOpen}
+          disabled={isOffline || pendingAction !== null || isOpen || device.accessLevel === 'VIEW'}
           onClick={(e) => handleAction('OPEN', e)}
           className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition-all ${
             isOpen
@@ -176,7 +187,7 @@ export const GateCard: React.FC<GateCardProps> = ({
 
         <button
           type="button"
-          disabled={isOffline || pendingAction !== null}
+          disabled={isOffline || pendingAction !== null || device.accessLevel === 'VIEW'}
           onClick={(e) => handleAction('STOP', e)}
           className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition-all ${
             isStopped
@@ -194,7 +205,7 @@ export const GateCard: React.FC<GateCardProps> = ({
 
         <button
           type="button"
-          disabled={isOffline || pendingAction !== null || (!isOpen && !isStopped && !isOpening && !isClosing)}
+          disabled={isOffline || pendingAction !== null || (!isOpen && !isStopped && !isOpening && !isClosing) || device.accessLevel === 'VIEW'}
           onClick={(e) => handleAction('CLOSE', e)}
           className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition-all ${
             !isOpen && !isStopped && !isOpening && !isClosing
@@ -210,6 +221,15 @@ export const GateCard: React.FC<GateCardProps> = ({
           <span>Đóng</span>
         </button>
       </div>
-    </article>
+    </motion.article>
   );
 };
+
+export const GateCard = React.memo(GateCardComponent, (prev, next) => {
+  return (
+    prev.device.id === next.device.id &&
+    prev.device.status === next.device.status &&
+    prev.device.name === next.device.name &&
+    JSON.stringify(prev.device.currentState) === JSON.stringify(next.device.currentState)
+  );
+});

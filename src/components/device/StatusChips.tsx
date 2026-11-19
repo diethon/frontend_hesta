@@ -30,7 +30,8 @@ export const StatusChips: React.FC<StatusChipsProps> = ({
 
       // Lights count (power ON)
       if (['LIGHT', 'LED_RGB', 'SMART_PLUG'].includes(device.deviceType)) {
-        if (device.currentState?.power === 'ON' || device.currentState?.power === true) {
+        const p = device.currentState?.power;
+        if (p === 'ON' || p === 'on' || p === true || p === 'true') {
           lightCount++;
         }
       }

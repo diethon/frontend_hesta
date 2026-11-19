@@ -1,14 +1,22 @@
 import React from 'react';
-import { Search, X } from 'lucide-react';
+import { Search, X, Settings } from 'lucide-react';
+import { getRoomIcon } from './roomHelpers';
+
+export interface RoomItem {
+  id: string;
+  name: string;
+  icon?: string | null;
+}
 
 interface DeviceFiltersProps {
-  rooms: { id: string; name: string }[];
+  rooms: RoomItem[];
   selectedRoomId: string; // 'ALL' or room UUID
   onRoomChange: (roomId: string) => void;
   roomCounts?: Record<string, number>;
   totalDeviceCount?: number;
   searchQuery?: string;
   onSearchChange?: (query: string) => void;
+  onOpenRoomManagement?: () => void;
 }
 
 export const DeviceFilters: React.FC<DeviceFiltersProps> = ({
@@ -19,6 +27,7 @@ export const DeviceFilters: React.FC<DeviceFiltersProps> = ({
   totalDeviceCount = 0,
   searchQuery = '',
   onSearchChange,
+  onOpenRoomManagement,
 }) => {
   return (
     <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
@@ -48,6 +57,7 @@ export const DeviceFilters: React.FC<DeviceFiltersProps> = ({
         {rooms.map((room) => {
           const isSelected = selectedRoomId === room.id;
           const count = roomCounts[room.id] || 0;
+          const RoomIcon = getRoomIcon(room.icon);
           return (
             <button
               key={room.id}
@@ -59,6 +69,7 @@ export const DeviceFilters: React.FC<DeviceFiltersProps> = ({
                   : 'text-muted hover:bg-sidebar-hover hover:text-text'
               }`}
             >
+              <RoomIcon className="w-3.5 h-3.5 shrink-0 opacity-80" />
               <span>{room.name}</span>
               <span
                 className={`text-[11px] px-1.5 py-0.5 rounded-full font-bold ${
@@ -72,6 +83,18 @@ export const DeviceFilters: React.FC<DeviceFiltersProps> = ({
             </button>
           );
         })}
+
+        {onOpenRoomManagement && (
+          <button
+            type="button"
+            onClick={onOpenRoomManagement}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold whitespace-nowrap text-muted hover:text-primary hover:bg-primary/10 border border-dashed border-line transition-all shrink-0 cursor-pointer ml-1"
+            title="Thêm mới hoặc quản lý các phòng"
+          >
+            <Settings className="w-3.5 h-3.5 text-primary shrink-0" />
+            <span>Quản lý phòng</span>
+          </button>
+        )}
       </div>
 
       {/* ── Instant Search Input ── */}

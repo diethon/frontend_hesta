@@ -1,0 +1,34 @@
+﻿[
+    {
+        "asset":  "wood_table_001",
+        "map":  "nor_gl",
+        "file":  "wood_table_001_nor_gl.jpg",
+        "source":  "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/wood_table_001/wood_table_001_nor_gl_1k.jpg",
+        "md5":  "6360e09967add8baecaa5ecc55fb5e03",
+        "bytes":  51927
+    },
+    {
+        "asset":  "wood_table_001",
+        "map":  "rough",
+        "file":  "wood_table_001_rough.jpg",
+        "source":  "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/wood_table_001/wood_table_001_rough_1k.jpg",
+        "md5":  "05b60bd20a1cc4355c5d73a99b245d44",
+        "bytes":  237261
+    },
+    {
+        "asset":  "denim_fabric",
+        "map":  "nor_gl",
+        "file":  "denim_fabric_nor_gl.jpg",
+        "source":  "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/denim_fabric/denim_fabric_nor_gl_1k.jpg",
+        "md5":  "9008fe723671f9cb3e6d0889eab9adb0",
+        "bytes":  474669
+    },
+    {
+        "asset":  "denim_fabric",
+        "map":  "rough",
+        "file":  "denim_fabric_rough.jpg",
+        "source":  "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/denim_fabric/denim_fabric_rough_1k.jpg",
+        "md5":  "7eebb4a6185f2e6805976bc356dd1b41",
+        "bytes":  467773
+    }
+]

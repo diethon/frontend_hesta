@@ -13,7 +13,6 @@ interface RealtimeState {
   activeHomeId: string | null;
   lastEvent: RealtimeEvent | null;
   lastEventAt: string | null;
-  lastEvent: RealtimeEvent | null;
   error: string | null;
 }
 
@@ -22,7 +21,6 @@ const initialState: RealtimeState = {
   activeHomeId: null,
   lastEvent: null,
   lastEventAt: null,
-  lastEvent: null,
   error: null,
 };
 
@@ -40,7 +38,6 @@ const realtimeSlice = createSlice({
     realtimeEventReceived(state, action: PayloadAction<RealtimeEvent>) {
       state.lastEvent = action.payload;
       state.lastEventAt = action.payload.timestamp;
-      state.lastEvent = action.payload;
       state.error = null;
     },
     realtimeErrorOccurred(state, action: PayloadAction<string>) {

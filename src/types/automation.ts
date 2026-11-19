@@ -1,12 +1,46 @@
+import type { RuleScheduleInput } from './schedule';
+
 export interface DeviceSummary {
   id: string;
   homeId: string;
   roomId?: string;
   roomName?: string;
+  room?: string;
+  online?: boolean;
   name: string;
   deviceType: string;
   status: string;
+  currentState?: Record<string, unknown>;
   capabilities?: Record<string, string[]>;
+  icon?: string;
+  supportedActions?: string[];
+  supportedAttributes?: string[];
+  sensor?: boolean;
+  actionable?: boolean;
+}
+
+export interface DeviceCapabilityInfo extends DeviceSummary {
+  supportedActions: string[];
+  supportedAttributes: string[];
+  sensor: boolean;
+  actionable: boolean;
+}
+
+export interface CapabilityGroup {
+  code: string;
+  label: string;
+  icon: string;
+  actions: string[];
+  deviceIds: string[];
+  deviceCount: number;
+}
+
+export interface HomeCapabilitiesResponse {
+  homeId: string;
+  devices: DeviceCapabilityInfo[];
+  capabilities: CapabilityGroup[];
+  actionTypes: string[];
+  sensorAttributes: string[];
 }
 
 export interface SceneActionInput {
@@ -76,20 +110,19 @@ export interface AutomationRuleInput {
   enabled: boolean;
   conditions: RuleConditionInput[];
   actions: RuleActionInput[];
+  /** All times of a SCHEDULE rule, saved in the same request (at least one must be active). Omit to keep the saved ones. */
+  schedules?: RuleScheduleInput[];
 }
 
 export interface AutomationExecution {
   id: string;
   ruleId: string;
+  ruleName?: string;
   triggerSource: string;
   status: string;
   test: boolean;
   matchedAt: string;
+  startedAt?: string;
+  completedAt?: string;
   resultDetail: Array<{ deviceId?: string; sceneId?: string; action: string; success: boolean; status: string }>;
-}
-
-export interface AutomationTestResult {
-  ruleId: string;
-  matched: boolean;
-  proposedActions: RuleActionInput[];
 }

@@ -29,6 +29,22 @@ export function resizeRoom(room: TwinRoomLayout, width: number, height: number) 
   return { ...room, width: Math.max(0.001, clampCoordinate(width, 1 - room.x)), height: Math.max(0.001, clampCoordinate(height, 1 - room.y)) };
 }
 
+export type TwinResizeEdge = 'n' | 'e' | 's' | 'w';
+
+/** Move one side of the room; the opposite side stays where it is. */
+export function resizeRoomEdge(room: TwinRoomLayout, edge: TwinResizeEdge, dx: number, dy: number): TwinRoomLayout {
+  const right = room.x + room.width;
+  const bottom = room.y + room.height;
+  if (edge === 'e') return resizeRoom(room, room.width + dx, room.height);
+  if (edge === 's') return resizeRoom(room, room.width, room.height + dy);
+  if (edge === 'w') {
+    const x = clampCoordinate(Math.min(room.x + dx, right - 0.001));
+    return { ...room, x, width: round(right - x) };
+  }
+  const y = clampCoordinate(Math.min(room.y + dy, bottom - 0.001));
+  return { ...room, y, height: round(bottom - y) };
+}
+
 export function defaultRoom(roomId: string, count: number, floor?: number): TwinRoomLayout {
   return { roomId, x: round(0.04 + (count % 2) * 0.48), y: round(0.04 + (Math.floor(count / 2) % 2) * 0.46), width: 0.44, height: 0.4, ...(floor ? { floor } : {}) };
 }
@@ -48,9 +64,10 @@ function nearestSnap(value: number, candidates: readonly number[]) {
   return distance <= TWIN_EDGE_SNAP_DISTANCE ? nearest : value;
 }
 
-export function snapRoom(room: TwinRoomLayout, others: readonly TwinRoomLayout[], options: TwinSnapOptions, resize = false) {
+export function snapRoom(room: TwinRoomLayout, others: readonly TwinRoomLayout[], options: TwinSnapOptions, resize: boolean | TwinResizeEdge = false) {
   let next = clampRoom(room);
   const guides: TwinSnapGuides = { x: [], y: [] };
+  if (typeof resize === 'string') return snapRoomEdge(next, others, options, resize);
   if (options.grid) {
     if (resize) next = resizeRoom(next, snapToGrid(next.width, options.stepX), snapToGrid(next.height, options.stepY));
     else next = clampRoom({ ...next, x: snapToGrid(next.x, options.stepX), y: snapToGrid(next.y, options.stepY) });
@@ -77,6 +94,23 @@ export function snapRoom(room: TwinRoomLayout, others: readonly TwinRoomLayout[]
     next = clampRoom({ ...next, x: snappedX, y: snappedY });
   }
   return { room: next, guides };
+}
+
+// Snap only the dragged side so the opposite side never shifts.
+function snapRoomEdge(room: TwinRoomLayout, others: readonly TwinRoomLayout[], options: TwinSnapOptions, edge: TwinResizeEdge) {
+  const guides: TwinSnapGuides = { x: [], y: [] };
+  const horizontal = edge === 'e' || edge === 'w';
+  const sameFloor = others.filter((other) => (other.floor ?? 1) === (room.floor ?? 1) && other.roomId !== room.roomId);
+  const edges = sameFloor.flatMap((other) => horizontal ? [other.x, other.x + other.width] : [other.y, other.y + other.height]);
+  const current = edge === 'e' ? room.x + room.width : edge === 's' ? room.y + room.height : edge === 'w' ? room.x : room.y;
+  let target = options.grid ? snapToGrid(current, horizontal ? options.stepX : options.stepY) : current;
+  if (options.edges) {
+    const snapped = nearestSnap(target, edges);
+    if (snapped !== target) (horizontal ? guides.x : guides.y).push(snapped);
+    target = snapped;
+  }
+  const delta = target - current;
+  return { room: resizeRoomEdge(room, edge, horizontal ? delta : 0, horizontal ? 0 : delta), guides };
 }
 
 export function snapPoint(value: number, enabled: boolean, step = TWIN_GRID_STEP) {
@@ -112,6 +146,39 @@ export function moveLayoutNode(node: TwinNodeLayout, x: number, y: number, rooms
   const point = { x: clampCoordinate(x), y: clampCoordinate(y) };
   const target = [...rooms].reverse().find((room) => roomContainsPoint(room, point.x, point.y, roomPoints?.(room.roomId)));
   return { ...node, ...point, roomId: target?.roomId ?? null };
+}
+
+/** Keep the domain room identity; dragging a marker never reassigns a device. */
+export function positionNodeInRoom(node: TwinNodeLayout, x: number, y: number, rooms: readonly TwinRoomLayout[], roomPoints?: (roomId: string) => readonly TwinDraftPoint[]): TwinNodeLayout {
+  const room = rooms.find((item) => item.roomId === node.roomId);
+  if (!room) return node;
+  const points = roomPoints?.(room.roomId);
+  const point = { x: clampCoordinate(Math.max(room.x, Math.min(room.x + room.width, x))), y: clampCoordinate(Math.max(room.y, Math.min(room.y + room.height, y))) };
+  if (roomContainsPoint(room, point.x, point.y, points)) return { ...node, ...point };
+  // Concave rooms need an interior point, not just a bounding-box clamp.
+  let nearest = node;
+  let distance = Infinity;
+  for (let row = 1; row < 40; row += 1) {
+    for (let col = 1; col < 40; col += 1) {
+      const candidate = { x: round(room.x + room.width * col / 40), y: round(room.y + room.height * row / 40) };
+      const nextDistance = (candidate.x - point.x) ** 2 + (candidate.y - point.y) ** 2;
+      if (nextDistance < distance && roomContainsPoint(room, candidate.x, candidate.y, points)) {
+        nearest = { ...node, ...candidate };
+        distance = nextDistance;
+      }
+    }
+  }
+  return nearest;
+}
+
+/** Persist canvas coordinates, but preserve each marker's relative room position. */
+export function updateRoomGeometry(geometry: TwinLayoutGeometry, nextRoom: TwinRoomLayout, roomPoints?: (roomId: string) => readonly TwinDraftPoint[]): TwinLayoutGeometry {
+  const previous = geometry.rooms.find((room) => room.roomId === nextRoom.roomId);
+  if (!previous) return geometry;
+  const rooms = geometry.rooms.map((room) => room.roomId === nextRoom.roomId ? nextRoom : room);
+  return { ...geometry, rooms, nodes: geometry.nodes.map((node) => node.roomId !== nextRoom.roomId ? node : positionNodeInRoom(node,
+    nextRoom.x + (node.x - previous.x) / previous.width * nextRoom.width,
+    nextRoom.y + (node.y - previous.y) / previous.height * nextRoom.height, rooms, roomPoints)) };
 }
 
 export function geometryError(geometry: TwinLayoutGeometry): string | null {

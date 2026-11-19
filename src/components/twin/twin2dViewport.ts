@@ -38,3 +38,30 @@ export function nodeDisplayPosition(node: TwinNodeLayout, rooms: readonly TwinRo
   }
   return { x, y };
 }
+
+export interface TwinCaptionCandidate { key: string; x: number; y: number; label: string; priority: number }
+type Box = { left: number; top: number; right: number; bottom: number };
+const overlaps = (a: Box, b: Box) => a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+
+/**
+ * Chooses which marker captions fit without covering another marker or caption.
+ * Higher priority wins a contested spot; hidden captions remain available on hover.
+ * Coordinates are marker centres in canvas pixels.
+ */
+export function visibleCaptions(candidates: readonly TwinCaptionCandidate[], marker = 40, maxWidth = 112) {
+  const half = marker / 2;
+  const markers = candidates.map((item) => ({ key: item.key, box: { left: item.x - half, top: item.y - half, right: item.x + half, bottom: item.y + half } }));
+  const placed: Box[] = [];
+  const shown = new Set<string>();
+  for (const item of [...candidates].sort((a, b) => b.priority - a.priority || a.y - b.y || a.x - b.x)) {
+    // ~6px per character at the 10px caption size, plus padding.
+    const width = Math.min(maxWidth, item.label.length * 6 + 12);
+    const box = { left: item.x - width / 2, top: item.y + half + 4, right: item.x + width / 2, bottom: item.y + half + 22 };
+    // A marker stacked on another would show its caption under the wrong (top-most) icon.
+    const stacked = candidates.some((other) => other.key !== item.key && Math.hypot(other.x - item.x, other.y - item.y) < marker * .75);
+    if (stacked || placed.some((other) => overlaps(box, other)) || markers.some((other) => other.key !== item.key && overlaps(box, other.box))) continue;
+    placed.push(box);
+    shown.add(item.key);
+  }
+  return shown;
+}

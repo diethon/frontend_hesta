@@ -1,4 +1,4 @@
-﻿import type { DeviceAction } from './deviceVocabulary';
+import type { DeviceAction } from './deviceVocabulary';
 
 export type SceneActionType = DeviceAction;
 
@@ -29,6 +29,7 @@ export interface SceneActionResponse {
   id: string;
   targetDeviceId: string;
   targetDeviceName: string;
+  targetDeviceType?: string;
   action: SceneActionType;
   value: unknown | null;
   order: number;
@@ -52,16 +53,22 @@ export interface SceneExecutionResponse {
   id: string;
   sceneId: string;
   triggerSource: 'MANUAL' | 'SCHEDULE' | 'AUTOMATION';
-  status: 'SUCCESS' | 'PARTIAL' | 'FAILED' | 'SKIPPED';
+  /** PENDING while devices are still answering (async run). */
+  status: 'PENDING' | 'SUCCESS' | 'PARTIAL' | 'FAILED' | 'SKIPPED';
   startedAt: string;
-  completedAt: string;
+  completedAt?: string;
   resultDetail: Array<{ deviceId: string; action: string; success: boolean; status: string; message?: string }>;
 }
 
 export interface DeviceResponse {
   id: string;
   homeId: string;
+  roomId?: string;
+  roomName?: string;
   name: string;
   deviceType: string;
-  status: 'ONLINE' | 'OFFLINE' | 'ERROR' | 'UNKNOWN';
+  status: 'ONLINE' | 'OFFLINE' | 'ERROR' | 'UNKNOWN' | 'UNCLAIMED';
+  currentState?: Record<string, unknown>;
+  capabilities?: Record<string, string[]>;
+  icon?: string;
 }
