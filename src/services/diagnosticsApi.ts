@@ -59,6 +59,25 @@ export const getOtaPackages = async (): Promise<FirmwarePackage[]> => {
   return response.data.result || [];
 };
 
+export const uploadOtaPackage = async (params: {
+  file: File;
+  deviceType: string;
+  version: string;
+  releaseNotes?: string;
+}): Promise<FirmwarePackage> => {
+  const formData = new FormData();
+  formData.append('file', params.file);
+  formData.append('deviceType', params.deviceType);
+  formData.append('version', params.version);
+  if (params.releaseNotes) {
+    formData.append('releaseNotes', params.releaseNotes);
+  }
+  const response = await apiClient.post('/admin/ota/packages/upload', formData, {
+    headers: { 'Content-Type': undefined },
+  });
+  return response.data.result;
+};
+
 export const registerOtaPackage = async (data: Partial<FirmwarePackage>): Promise<FirmwarePackage> => {
   const response = await apiClient.post('/admin/ota/packages', data);
   return response.data.result;
