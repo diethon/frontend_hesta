@@ -14,7 +14,11 @@ export interface AutomationTemplate {
   };
   sampleAction?: {
     action: string;
+    /** Pre-pick the first device of this type, e.g. LIGHT. */
+    deviceType?: string;
   };
+  /** Pre-filled run time for SCHEDULE templates, "HH:mm". */
+  sampleTime?: string;
 }
 
 export const AUTOMATION_TEMPLATES: AutomationTemplate[] = [
@@ -42,7 +46,8 @@ export const AUTOMATION_TEMPLATES: AutomationTemplate[] = [
     description: 'Hằng ngày lúc 18:00, tự động bật đèn phòng khách',
     triggerType: 'SCHEDULE',
     icon: 'clock',
-    sampleAction: { action: 'TURN_ON' },
+    sampleAction: { action: 'TURN_ON', deviceType: 'LIGHT' },
+    sampleTime: '18:00',
   },
 ];
 

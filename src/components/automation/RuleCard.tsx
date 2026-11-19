@@ -18,34 +18,37 @@ export interface RuleCardProps {
 }
 
 const TRIGGER_ICONS: Record<string, IconName> = { SENSOR: 'activity', EVENT: 'zap', SCHEDULE: 'clock' };
+const TRIGGER_LABELS: Record<string, string> = { SENSOR: 'Cảm biến', EVENT: 'Sự kiện', SCHEDULE: 'Lịch' };
 
 function describeTrigger(rule: AutomationRule, devices: DeviceSummary[]): string {
   if (rule.triggerType === 'SCHEDULE') return 'Tự chạy vào giờ đã hẹn';
   if (rule.triggerType === 'EVENT') {
     const raw = String(rule.conditions[0]?.expectedValue || '');
-    const source = devices.find((d) => d.id === rule.conditions[0]?.deviceId)?.name;
+    const source = devices.find((d) => d.id === rule.conditions[0]?.deviceId)?.name ?? rule.conditions[0]?.deviceName;
     const event = EVENT_FRIENDLY_NAMES[raw] || 'thiết bị báo có sự kiện';
     return `Khi ${event}${source ? ` (${source})` : ''}`;
   }
   const first = rule.conditions[0];
   if (!first) return 'Chưa có điều kiện';
-  const device = devices.find((d) => d.id === first.deviceId)?.name;
+  const device = devices.find((d) => d.id === first.deviceId)?.name ?? first.deviceName;
   const more = rule.conditions.length > 1 ? ` và ${rule.conditions.length - 1} điều kiện khác` : '';
   return `Khi ${describeCondition(first.attribute, first.operator, first.expectedValue, device)}${more}`;
 }
 
-function describeActions(rule: AutomationRule, devices: DeviceSummary[], scenes: SceneResponse[]): string {
-  const items = rule.actions.map((action) => {
+function actionNodes(rule: AutomationRule, devices: DeviceSummary[], scenes: SceneResponse[]) {
+  return rule.actions.map((action) => {
     if (action.sceneId || action.action === 'EXECUTE_SCENE') {
-      return `Chạy ${scenes.find((s) => s.id === action.sceneId)?.name || 'kịch bản'}`;
+      const name = scenes.find((s) => s.id === action.sceneId)?.name || action.sceneName || 'kịch bản';
+      return { id: action.id, icon: 'sparkles' as IconName, text: `Chạy ${name}` };
     }
-    const device = devices.find((d) => d.id === action.deviceId)?.name || 'thiết bị';
-    return `${actionLabels[action.action] || action.action} ${device}`;
+    const device = devices.find((d) => d.id === action.deviceId)?.name || action.deviceName || 'thiết bị';
+    return { id: action.id, icon: 'power' as IconName, text: `${actionLabels[action.action] || action.action} ${device}` };
   });
-  return items.slice(0, 2).join(', ') + (items.length > 2 ? ` +${items.length - 2}` : '');
 }
 
-/** One automation rule as a list row: trigger → actions, with toggle and actions menu. */
+const MAX_NODES = 3;
+
+/** One automation rule drawn as a circuit: trigger node ── wire ──▶ action nodes. */
 export const RuleCard: React.FC<RuleCardProps> = ({
   rule,
   devices = [],
@@ -87,43 +90,51 @@ export const RuleCard: React.FC<RuleCardProps> = ({
     </button>
   );
 
+  const nodes = actionNodes(rule, devices, scenes);
+
   return (
     <div
       role="button"
       tabIndex={0}
       onClick={onEdit}
       onKeyDown={(e) => e.key === 'Enter' && e.target === e.currentTarget && onEdit?.()}
-      className={`st-rule ${rule.enabled ? '' : 'is-off'}`}
+      className={`st-circuit ${rule.enabled ? 'is-on' : 'is-off'}`}
       aria-label={`Quy tắc ${rule.name}`}
     >
-      <span className="st-rule-icon">
-        <Icon name={TRIGGER_ICONS[rule.triggerType] || 'zap'} />
-      </span>
-
-      <div className="st-rule-main">
-        <div className="st-rule-title">
-          <h4 title={rule.name}>{rule.name}</h4>
-          {isIncomplete && <span className="st-tag warn">Thiếu hành động</span>}
-          {lastRunFailed && <span className="st-tag err">Lần chạy gần nhất lỗi</span>}
-        </div>
-        <div className="st-flow">
-          <span>{describeTrigger(rule, devices)}</span>
-          {!isIncomplete && (
-            <>
-              <Icon name="chevronDown" />
-              <span>
-                <b>{describeActions(rule, devices, scenes)}</b>
-              </span>
-            </>
-          )}
-        </div>
+      <div className="st-circuit-id">
+        <h4 title={rule.name}>{rule.name}</h4>
+        <span className="st-status">
+          <i className={`st-dot ${lastRunFailed ? 'err' : rule.enabled ? 'on' : ''}`} />
+          {rule.enabled ? 'Đang bật' : 'Đang tắt'} · {TRIGGER_LABELS[rule.triggerType] || rule.triggerType}
+          {isSchedule ? '' : ` · ${rule.conditions.length} điều kiện`}
+        </span>
       </div>
 
-      <div className="st-rule-side" onClick={(e) => e.stopPropagation()}>
-        <span className="st-rule-meta">
-          {isSchedule ? '' : `${rule.conditions.length} điều kiện · `}
-          {rule.actions.length} hành động
+      <div className="st-pipe">
+        <span className="st-node trigger" title={describeTrigger(rule, devices)}>
+          <i className="st-node-icon">
+            <Icon name={TRIGGER_ICONS[rule.triggerType] || 'zap'} />
+          </i>
+          <span>{describeTrigger(rule, devices)}</span>
         </span>
+        <span className="st-wire" aria-hidden="true" />
+        {isIncomplete ? (
+          <span className="st-node missing">Thiếu hành động</span>
+        ) : (
+          <span className="st-node-stack">
+            {nodes.slice(0, MAX_NODES).map((node) => (
+              <span key={node.id} className="st-node action" title={node.text}>
+                <Icon name={node.icon} />
+                <span>{node.text}</span>
+              </span>
+            ))}
+            {nodes.length > MAX_NODES && <span className="st-node more">+{nodes.length - MAX_NODES}</span>}
+          </span>
+        )}
+        {lastRunFailed && <span className="st-tag err">Lần chạy gần nhất lỗi</span>}
+      </div>
+
+      <div className="st-circuit-side" onClick={(e) => e.stopPropagation()}>
         <button
           type="button"
           disabled={isIncomplete}
