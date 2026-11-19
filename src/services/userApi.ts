@@ -1,6 +1,16 @@
 import type { ApiResponse, UserResponse } from '../types/auth';
-import type { UpdateProfileRequest, ChangePasswordRequest } from '../types/user';
+import type { UpdateProfileRequest, ChangePasswordRequest, NotificationPreferences } from '../types/user';
 import { apiClient } from './apiClient';
+
+export async function getNotificationPreferences(): Promise<NotificationPreferences> {
+  const response = await apiClient.get<ApiResponse<NotificationPreferences>>('/users/me/notification-preferences');
+  return response.data.result as NotificationPreferences;
+}
+
+export async function updateNotificationPreferences(data: NotificationPreferences): Promise<NotificationPreferences> {
+  const response = await apiClient.put<ApiResponse<NotificationPreferences>>('/users/me/notification-preferences', data);
+  return response.data.result as NotificationPreferences;
+}
 
 export async function updateProfile(data: UpdateProfileRequest): Promise<ApiResponse<UserResponse>> {
   const response = await apiClient.put('/users/me/profile', data);
