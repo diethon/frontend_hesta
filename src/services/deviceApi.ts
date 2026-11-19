@@ -143,10 +143,11 @@ export const getGateState = async (deviceId: string): Promise<{ deviceId: string
 
 // ===== Admin Device Onboarding & QR API =====
 export interface AdminCreateDevicePayload {
-  name: string;
+  name?: string;
   deviceType: string;
   model?: string;
   serialNumber: string;
+  nodeCode?: string;
   localId?: string;
   icon?: string;
   capabilities?: Record<string, string[]>;
