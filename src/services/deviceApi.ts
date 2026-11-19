@@ -336,10 +336,11 @@ export const extendDeviceAutomation = async (deviceId: string, hours = 1): Promi
 
 // ===== Admin Device Onboarding & QR API =====
 export interface AdminCreateDevicePayload {
-  name: string;
+  name?: string;
   deviceType: string;
   model?: string;
   serialNumber: string;
+  nodeCode?: string;
   localId?: string;
   icon?: string;
   capabilities?: Record<string, string[]>;
