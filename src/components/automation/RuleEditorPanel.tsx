@@ -955,7 +955,7 @@ export const RuleEditorPanel: React.FC<RuleEditorPanelProps> = ({
 
         {/* ── Sticky Footer ── */}
         <footer className="scene-panel-footer shrink-0 p-4 border-t border-[var(--border)] bg-[var(--solid)]/80 backdrop-blur-md space-y-2">
-          {validationError && activeTab === 'setup' && (
+          {validationError && activeTab === 'setup' && !(showTemplateGrid && !currentRuleId) && (
             <p className="text-center text-xs text-amber-600 font-medium">
               {validationError}
             </p>

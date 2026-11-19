@@ -95,6 +95,7 @@ export const ConditionCard: React.FC<ConditionCardProps> = ({
     () => COMMON_ATTRIBUTES.find((a) => a.key.toLowerCase() === (condition.attribute || '').toLowerCase()),
     [condition.attribute]
   );
+  const isBooleanCondition = currentAttr?.kind === 'boolean' || typeof condition.expectedValue === 'boolean';
 
   // Live value from device store
   const liveValue = useMemo(() => {
@@ -110,7 +111,9 @@ export const ConditionCard: React.FC<ConditionCardProps> = ({
 
   return (
     <div
-      className={`action-step-card glass-g1 transition-all rounded-2xl border border-[var(--border)] overflow-hidden ${
+      className={`action-step-card glass-g1 transition-all rounded-2xl border border-[var(--border)] ${
+        menuOpen ? 'relative z-30' : 'overflow-hidden'
+      } ${
         isExpanded ? 'ring-2 ring-[var(--accent)]/30' : ''
       }`}
     >
@@ -129,7 +132,7 @@ export const ConditionCard: React.FC<ConditionCardProps> = ({
                 {device?.name || 'Chọn cảm biến...'}
               </strong>
               {device?.roomName && (
-                <span className="text-[10px] text-[var(--tertiary)] bg-[var(--solid)] px-1.5 py-0.5 rounded-md border border-[var(--border)]">
+                <span className="shrink-0 whitespace-nowrap text-[10px] text-[var(--tertiary)] bg-[var(--solid)] px-1.5 py-0.5 rounded-md border border-[var(--border)]">
                   {device.roomName}
                 </span>
               )}
@@ -251,6 +254,8 @@ export const ConditionCard: React.FC<ConditionCardProps> = ({
                       onChange({
                         ...condition,
                         attribute: attr.key,
+                        // Yes/no readings only compare by equality; > or < would never match.
+                        operator: attr.kind === 'boolean' ? 'EQ' : condition.operator,
                         expectedValue: nextExpected,
                       });
                     }}
@@ -282,7 +287,8 @@ export const ConditionCard: React.FC<ConditionCardProps> = ({
             )}
           </div>
 
-          {/* (c) Comparison Operators */}
+          {/* (c) Comparison Operators: hidden for yes/no readings, which always use EQ */}
+          {!isBooleanCondition && (
           <div className="space-y-1.5">
             <label className="text-[11px] font-bold text-[var(--secondary)] uppercase tracking-wider block">
               Điều kiện so sánh
@@ -309,6 +315,7 @@ export const ConditionCard: React.FC<ConditionCardProps> = ({
               })}
             </div>
           </div>
+          )}
 
           {/* (d) Ngưỡng giá trị */}
           <div className="space-y-1.5">
@@ -323,7 +330,7 @@ export const ConditionCard: React.FC<ConditionCardProps> = ({
               )}
             </div>
 
-            {currentAttr?.kind === 'boolean' || typeof condition.expectedValue === 'boolean' ? (
+            {isBooleanCondition ? (
               <div className="grid grid-cols-2 gap-2 bg-[var(--solid)] p-1 rounded-2xl border border-[var(--border)]">
                 {[
                   { value: true, label: condition.attribute === 'motion' ? 'Có chuyển động' : 'Bật (ON)' },
