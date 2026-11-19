@@ -28,6 +28,9 @@ import { ConfirmModal } from '../ui/ConfirmModal';
 import { notify } from '../ui/notify';
 import { useRealtimeRefetch } from '../../realtime/useRealtimeRefetch';
 
+// Last list per home: revisiting the page paints it at once while a fresh copy loads.
+const rulesCache = new Map<string, AutomationRule[]>();
+
 const AUTOMATION_REFRESH_EVENTS = ['AUTOMATION_RULE_CHANGED', 'SCENE_CHANGED'] as const;
 
 const TRIGGER_GROUPS = [
@@ -50,10 +53,10 @@ export function AutomationRulePage() {
   }, [dispatch, homeId]);
   const userInitial = authUser?.fullName?.charAt(0) || authUser?.email?.charAt(0) || 'U';
 
-  const [rules, setRules] = useState<AutomationRule[]>([]);
+  const [rules, setRules] = useState<AutomationRule[]>(() => rulesCache.get(homeId) ?? []);
   const [devices, setDevices] = useState<DeviceSummary[]>([]);
   const [scenes, setScenes] = useState<SceneResponse[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !rulesCache.has(homeId));
   const [error, setError] = useState<string | null>(null);
 
   // Filters and search
@@ -71,15 +74,17 @@ export function AutomationRulePage() {
   const loadData = useCallback(async () => {
     if (!homeId) return;
     setError(null);
+    // Rules carry device/scene names, so the list renders from them alone; devices and scenes only feed the editor.
+    void Promise.all([getDevices(homeId), getScenes(homeId)])
+      .then(([fetchedDevices, fetchedScenes]) => {
+        setDevices(fetchedDevices || []);
+        setScenes(fetchedScenes || []);
+      })
+      .catch((err) => console.warn('Load devices/scenes warning:', err));
     try {
-      const [fetchedRules, fetchedDevices, fetchedScenes] = await Promise.all([
-        getAutomationRules(homeId),
-        getDevices(homeId),
-        getScenes(homeId),
-      ]);
-      setRules(fetchedRules || []);
-      setDevices(fetchedDevices || []);
-      setScenes(fetchedScenes || []);
+      const fetched = (await getAutomationRules(homeId)) || [];
+      rulesCache.set(homeId, fetched);
+      setRules(fetched);
     } catch (err: unknown) {
       console.warn('Load automation rules warning:', err);
       setError(err instanceof Error ? err.message : 'Không thể tải danh sách quy tắc tự động.');
@@ -111,9 +116,13 @@ export function AutomationRulePage() {
 
       // Search query
       if (q) {
-        const matchName = rule.name.toLowerCase().includes(q);
-        const matchDesc = rule.description?.toLowerCase().includes(q);
-        if (!matchName && !matchDesc) return false;
+        const haystack = [
+          rule.name,
+          rule.description,
+          ...rule.conditions.map((c) => c.deviceName),
+          ...rule.actions.map((a) => a.deviceName ?? a.sceneName),
+        ];
+        if (!haystack.some((text) => text?.toLowerCase().includes(q))) return false;
       }
       return true;
     });
@@ -266,14 +275,20 @@ export function AutomationRulePage() {
             ))}
           </div>
 
-          <label className="st-search">
+          <label className="st-search st-search-slim">
             <Icon name="search" />
             <input
+              type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Tìm quy tắc"
+              placeholder="Tìm quy tắc, thiết bị, kịch bản…"
               aria-label="Tìm quy tắc"
             />
+            {query && (
+              <button type="button" className="st-icon-btn" onClick={() => setQuery('')} aria-label="Xóa tìm kiếm">
+                <Icon name="x" size={16} />
+              </button>
+            )}
           </label>
 
           <div className="st-toolbar-end">
@@ -318,9 +333,9 @@ export function AutomationRulePage() {
         )}
 
         {loading ? (
-          <div className="st-list" aria-busy="true">
-            {Array.from({ length: 4 }).map((_, idx) => (
-              <div key={idx} className="st-skeleton st-rule-skeleton" />
+          <div className="st-circuits" aria-busy="true">
+            {Array.from({ length: 6 }).map((_, idx) => (
+              <div key={idx} className="st-skeleton st-circuit-skeleton" />
             ))}
           </div>
         ) : rules.length === 0 ? (
@@ -349,7 +364,7 @@ export function AutomationRulePage() {
                 <small>{group.rules.length}</small>
                 <p>{group.hint}</p>
               </header>
-              <div className="st-list">{group.rules.map(ruleRow)}</div>
+              <div className="st-circuits">{group.rules.map(ruleRow)}</div>
             </section>
           ))
         )}

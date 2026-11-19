@@ -38,7 +38,7 @@ export const SummarySentence: React.FC<SummarySentenceProps> = ({
   actions,
   devices,
   scenes,
-  scheduleTime = '07:00',
+  scheduleTime,
   scheduleDays = 'hằng ngày',
   globalLogicalOperator = 'AND',
   className = '',
@@ -51,7 +51,7 @@ export const SummarySentence: React.FC<SummarySentenceProps> = ({
     triggerPhrase = (
       <span>
         {isEveryday ? 'Mỗi ngày' : scheduleDays} lúc{' '}
-        <strong className="text-[var(--text)]">{scheduleTime}</strong>
+        <strong className="text-[var(--text)]">{scheduleTime || 'giờ bạn chọn'}</strong>
       </span>
     );
   } else if (triggerType === 'EVENT') {

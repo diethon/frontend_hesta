@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useCallback } from 'react';
 import { HexColorPicker } from 'react-colorful';
 import type { DeviceSummary } from '../../types/automation';
 import type { SceneResponse, SceneActionType } from '../../types/scene';
@@ -13,6 +13,8 @@ import { getFigmaIconForDevice, getFigmaIconForScene, SceneHistory } from './Sce
 import { DevicePickerSheet, isDeviceControllable } from './DevicePickerSheet';
 import { SceneScheduleSection } from './SceneScheduleSection';
 import { createScene, updateScene } from '../../services/sceneApi';
+import { saveSchedule } from '../../services/scheduleApi';
+import type { Schedule } from '../../types/schedule';
 import { notify } from '../ui/notify';
 import { buildSceneTemplate, type SceneTemplateKey } from './sceneTemplates';
 
@@ -128,6 +130,9 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
   const [actions, setActions] = useState<DraftSceneAction[]>(
     scene ? sceneActionsToDraft(scene.actions) : []
   );
+  // Times added before the scene exists; saved right after it is created.
+  const [pendingSchedules, setPendingSchedules] = useState<Schedule[]>([]);
+  const handleSchedulesChange = useCallback((next: Schedule[]) => setPendingSchedules(next), []);
 
   // Active tab: 'Thiết lập' | 'Lịch sử'
   const [activeTab, setActiveTab] = useState<'setup' | 'history'>('setup');
@@ -297,6 +302,15 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
           actions: payloadActions,
         });
         notify.success(`Đã tạo kịch bản "${name}"`);
+        const created = result;
+        const failed = (await Promise.allSettled(pendingSchedules.map((s) =>
+          saveSchedule(homeId, 'scenes', created.id, {
+            scheduledTime: s.scheduledTime,
+            repeatDays: s.repeatDays,
+            active: s.active,
+          })
+        ))).filter((r) => r.status === 'rejected').length;
+        if (failed > 0) notify.error(`Không lưu được ${failed} lịch chạy · Mở kịch bản để thêm lại`);
       }
 
       onSaved(result);
@@ -1264,6 +1278,8 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
                 <SceneScheduleSection
                   homeId={homeId}
                   sceneId={scene?.id}
+                  draft={!isEdit}
+                  onSchedulesChange={isEdit ? undefined : handleSchedulesChange}
                 />
               </section>
             </>
