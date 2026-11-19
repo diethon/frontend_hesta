@@ -112,7 +112,8 @@ export const SummarySentence: React.FC<SummarySentenceProps> = ({
 
       const dev = devices.find((d) => d.id === act.deviceId);
       const devName = dev?.name || 'thiết bị';
-      const actLabel = actionLabels[act.action || ''] || act.action || 'điều khiển';
+      // Mid-sentence ("…, thì bật đèn"), so lower-case the label.
+      const actLabel = (actionLabels[act.action || ''] || act.action || 'điều khiển').toLocaleLowerCase('vi');
 
       let paramSummary = '';
       if (act.parameters) {

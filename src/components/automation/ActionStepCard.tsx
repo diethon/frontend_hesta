@@ -37,11 +37,11 @@ export function formatActionSummaryHuman(
     return scene ? `Chạy kịch bản: ${scene.name}` : 'Chạy kịch bản (chưa chọn)';
   }
 
-  const devName = device?.name || 'Thiết bị';
+  const devName = device?.name || 'thiết bị';
   const code = act.action;
   if (code === 'TURN_ON') return `Bật ${devName}`;
   if (code === 'TURN_OFF') return `Tắt ${devName}`;
-  if (code === 'TOGGLE') return `Đảo trạng thái (Bật/Tắt) ${devName}`;
+  if (code === 'TOGGLE') return `Đảo trạng thái bật/tắt ${devName}`;
   if (code === 'OPEN') return `Mở cổng/cửa ${devName}`;
   if (code === 'CLOSE') return `Đóng cổng/cửa ${devName}`;
   if (code === 'STOP') return `Dừng cổng/cửa ${devName}`;
@@ -149,7 +149,9 @@ export const ActionStepCard: React.FC<ActionStepCardProps> = ({
 
   return (
     <div
-      className={`action-step-card glass-g1 transition-all rounded-2xl border border-[var(--border)] overflow-hidden ${
+      className={`action-step-card glass-g1 transition-all rounded-2xl border border-[var(--border)] ${
+        menuOpen ? 'relative z-30' : 'overflow-hidden'
+      } ${
         isExpanded ? 'ring-2 ring-[var(--accent)]/30' : ''
       }`}
     >

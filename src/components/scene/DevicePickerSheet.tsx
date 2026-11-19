@@ -37,6 +37,8 @@ export function getDeviceTypeLabel(device: DeviceSummary): string {
   if (type.includes('LOCK')) return 'Khóa thông minh';
   if (type.includes('SOCKET') || type.includes('PLUG')) return 'Ổ cắm điện';
   if (type.includes('SENSOR') || type.includes('TEMP')) return 'Cảm biến';
+  if (type.includes('CURTAIN') || type.includes('BLIND')) return 'Rèm cửa';
+  if (type === 'TV' || type.includes('TELEVISION')) return 'Tivi';
   return device.deviceType || 'Thiết bị';
 }
 
