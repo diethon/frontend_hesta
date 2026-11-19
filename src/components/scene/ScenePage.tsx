@@ -202,20 +202,6 @@ function ScenarioCard({
           {status.text}
         </span>
 
-        <button
-          type="button"
-          className={`st-run ${runSuccess ? 'done' : ''}`}
-          disabled={!actions.length || running || !scene.enabled}
-          onClick={(e) => {
-            e.stopPropagation();
-            onRun();
-          }}
-          title={scene.enabled ? 'Chạy kịch bản ngay' : 'Bật kịch bản để chạy'}
-        >
-          {running ? <i className="st-spin" /> : <Icon name={runSuccess ? 'check' : 'play'} />}
-          {runSuccess ? 'Xong' : 'Chạy'}
-        </button>
-
         <span className="st-menu-wrap">
           <button
             type="button"
@@ -239,6 +225,19 @@ function ScenarioCard({
             </span>
           )}
         </span>
+        <button
+          type="button"
+          className={`st-run ${runSuccess ? 'done' : ''}`}
+          disabled={!actions.length || running || !scene.enabled}
+          onClick={(e) => {
+            e.stopPropagation();
+            onRun();
+          }}
+          title={scene.enabled ? 'Chạy kịch bản ngay' : 'Bật kịch bản để chạy'}
+        >
+          {running ? <i className="st-spin" /> : <Icon name={runSuccess ? 'check' : 'play'} />}
+          {runSuccess ? 'Xong' : 'Chạy'}
+        </button>
       </footer>
     </article>
   );
@@ -868,14 +867,6 @@ export function ScenePage() {
                 hasFailed={failedIds[scene.id]}
               />
             ))}
-            {filter !== 'Đang tắt' && !query && (
-              <button type="button" className="st-scene-new" onClick={handleCreateScene}>
-                <span>
-                  <Icon name="plus" />
-                </span>
-                Kịch bản mới
-              </button>
-            )}
           </div>
         )}
       </main>

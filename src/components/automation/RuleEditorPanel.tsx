@@ -184,7 +184,12 @@ export const RuleEditorPanel: React.FC<RuleEditorPanelProps> = ({
     setName(tmpl.id === 'blank' ? '' : tmpl.name);
     setTriggerType(draft.triggerType);
     setConditions(draft.conditions);
-    setActions(draft.actions);
+    const preferType = tmpl.sampleAction?.deviceType;
+    const preferred = preferType ? devices.find((d) => d.deviceType === preferType) : undefined;
+    setActions(preferred ? draft.actions.map((a) => (a.deviceId ? a : { ...a, deviceId: preferred.id })) : draft.actions);
+    setDraftSchedules(tmpl.sampleTime
+      ? [{ id: `temp_${Date.now()}`, scheduledTime: tmpl.sampleTime, repeatDays: [], active: true }]
+      : []);
     setExpandedCondIndex(draft.conditions.length > 0 ? 0 : null);
     setExpandedActIndex(draft.actions.length > 0 ? 0 : null);
   };
@@ -609,7 +614,7 @@ export const RuleEditorPanel: React.FC<RuleEditorPanelProps> = ({
                 }))}
                 devices={devices}
                 scenes={scenes}
-                scheduleTime={draftSchedules[0]?.scheduledTime || '07:00'}
+                scheduleTime={draftSchedules[0]?.scheduledTime?.slice(0, 5)}
                 scheduleDays={formatRepeatDays(draftSchedules[0]?.repeatDays || [])}
                 globalLogicalOperator={globalLogicalOp}
               />
@@ -884,6 +889,7 @@ export const RuleEditorPanel: React.FC<RuleEditorPanelProps> = ({
                       targetId={scheduleTargetId}
                       targetKind="automation-rules"
                       onSchedulesChange={handleSchedulesChange}
+                      initialSchedules={draftSchedules}
                       draft
                     />
                   </div>
