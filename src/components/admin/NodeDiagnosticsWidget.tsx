@@ -144,8 +144,11 @@ export const NodeDiagnosticsWidget: React.FC = () => {
       const updated = await pingNode(nodeId);
       setNodes((prev) => prev.map((n) => (n.nodeId === nodeId ? updated : n)));
       notify(`Ping ${nodeCode}: ${updated.averageLatencyMs}ms (Thành công)`, 'success');
-    } catch {
-      notify(`Lỗi ping đến ${nodeCode}`, 'error');
+      void fetchData();
+    } catch (err: unknown) {
+      const msg = err instanceof Error && err.message ? err.message : `Lỗi ping đến ${nodeCode}`;
+      notify(`Ping ${nodeCode}: ${msg}`, 'error');
+      void fetchData();
     } finally {
       setPingingId(null);
     }
@@ -224,15 +227,19 @@ export const NodeDiagnosticsWidget: React.FC = () => {
         <div className="rounded-3xl border border-line bg-surface shadow-xs group p-5 transition hover:-translate-y-0.5">
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-semibold text-muted">MQTT broker</span>
-            <div className="w-9 h-9 bg-emerald-500/10 text-emerald-600 rounded-xl flex items-center justify-center">
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${
+              summary?.brokerConnected ? 'bg-emerald-500/10 text-emerald-600' : 'bg-rose-500/10 text-rose-600'
+            }`}>
               <Server className="w-5 h-5" />
             </div>
           </div>
           <div className="flex items-baseline gap-2">
             <h3 className="text-2xl font-bold text-text">
-              {summary?.brokerConnected ? 'CONNECTED' : 'STANDBY'}
+              {summary ? (summary.brokerConnected ? 'CONNECTED' : 'DISCONNECTED') : '...'}
             </h3>
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span className={`w-2.5 h-2.5 rounded-full ${
+              summary?.brokerConnected ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'
+            }`} />
           </div>
           <p className="text-xs text-muted mt-1 truncate" title={summary?.brokerUrl}>
             {summary?.brokerUrl || 'tcp://broker:1883'}
@@ -290,8 +297,8 @@ export const NodeDiagnosticsWidget: React.FC = () => {
             </div>
           </div>
           <LatencyGaugeArc
-            avgLatencyMs={summary?.averageLatencyMs ?? 28}
-            p95LatencyMs={nodes[0]?.p95LatencyMs}
+            avgLatencyMs={summary?.averageLatencyMs ?? 0}
+            p95LatencyMs={summary?.p95LatencyMs}
           />
         </div>
       </div>

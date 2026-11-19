@@ -32,7 +32,7 @@ export const MqttSnifferConsole: React.FC = () => {
     try {
       setLoading(true);
       const res = await getMqttPackets();
-      if (Array.isArray(res) && res.length > 0) {
+      if (Array.isArray(res)) {
         setPackets(res);
       }
     } catch {
