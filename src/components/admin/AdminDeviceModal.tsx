@@ -15,22 +15,29 @@ interface AdminDeviceModalProps {
 }
 
 const DEVICE_TYPES = [
-  { value: 'LIGHT', label: 'Đèn Relay (LIGHT)' },
+  { value: 'GATE', label: 'Cổng tự động (GATE)' },
+  { value: 'AIR_CONDITIONER', label: 'Điều hòa / Máy lạnh (AIR_CONDITIONER)' },
+  { value: 'LIGHT', label: 'Đèn Relay / Công tắc (LIGHT)' },
   { value: 'LED_RGB', label: 'Đèn LED RGB (LED_RGB)' },
   { value: 'SMART_PLUG', label: 'Ổ cắm thông minh (SMART_PLUG)' },
+  { value: 'ROLLING_DOOR', label: 'Cửa cuốn (ROLLING_DOOR)' },
+  { value: 'FAN', label: 'Quạt thông minh (FAN)' },
+  { value: 'TV', label: 'Tivi thông minh (TV)' },
+  { value: 'CURTAIN', label: 'Rèm cửa tự động (CURTAIN)' },
+  { value: 'CAMERA_AI', label: 'Camera AI (CAMERA_AI)' },
+  { value: 'IR_REMOTE', label: 'Bộ điều khiển hồng ngoại (IR_REMOTE)' },
   { value: 'TEMP_HUMID_SENSOR', label: 'Cảm biến Nhiệt/Ẩm (TEMP_HUMID_SENSOR)' },
   { value: 'MOTION_SENSOR', label: 'Cảm biến Chuyển động (MOTION_SENSOR)' },
   { value: 'SMOKE_SENSOR', label: 'Cảm biến Khói (SMOKE_SENSOR)' },
-  { value: 'IR_REMOTE', label: 'Bộ điều khiển hồng ngoại (IR_REMOTE)' },
-  { value: 'CAMERA_AI', label: 'Camera AI (CAMERA_AI)' },
+  { value: 'WATER_LEAK_SENSOR', label: 'Cảm biến Rò rỉ nước (WATER_LEAK_SENSOR)' },
+  { value: 'DOOR_SENSOR', label: 'Cảm biến Cửa (DOOR_SENSOR)' },
 ];
 
 export const AdminDeviceModal: React.FC<AdminDeviceModalProps> = ({ isOpen, onClose }) => {
   const [formData, setFormData] = useState<AdminCreateDevicePayload>({
-    name: 'SYNA RGB Light',
-    deviceType: 'LED_RGB',
-    model: 'SYNA-RGB-001',
-    serialNumber: `SYNA-RGB-001-${Math.floor(1000 + Math.random() * 9000)}`,
+    deviceType: 'GATE',
+    model: '',
+    serialNumber: '',
   });
 
   const [loading, setLoading] = useState(false);
@@ -57,6 +64,10 @@ export const AdminDeviceModal: React.FC<AdminDeviceModalProps> = ({ isOpen, onCl
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formData.serialNumber.trim()) {
+      notify.error('Vui lòng nhập Serial Number', '');
+      return;
+    }
     setLoading(true);
     try {
       const res = await adminCreateDevice(formData);
@@ -82,7 +93,6 @@ export const AdminDeviceModal: React.FC<AdminDeviceModalProps> = ({ isOpen, onCl
     } catch (err) {
       notify.error(getErrorMessage(err, 'Không thể làm mới mã QR'), '');
     } finally {
-
       setLoading(false);
     }
   };
@@ -173,10 +183,9 @@ export const AdminDeviceModal: React.FC<AdminDeviceModalProps> = ({ isOpen, onCl
     setCreatedData(null);
     setQrDataUrl('');
     setFormData({
-      name: 'SYNA RGB Light',
-      deviceType: 'LED_RGB',
-      model: 'SYNA-RGB-001',
-      serialNumber: `SYNA-RGB-001-${Math.floor(1000 + Math.random() * 9000)}`,
+      deviceType: 'GATE',
+      model: '',
+      serialNumber: '',
     });
   };
 
@@ -210,21 +219,7 @@ export const AdminDeviceModal: React.FC<AdminDeviceModalProps> = ({ isOpen, onCl
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-xs font-semibold text-text uppercase tracking-wider mb-1">
-                Tên Thiết Bị
-              </label>
-              <input
-                type="text"
-                required
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="VD: SYNA RGB Light"
-                className="w-full rounded-xl border border-line bg-surface px-4 py-2.5 text-sm text-text focus:border-primary focus:outline-none"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-text uppercase tracking-wider mb-1">
-                Loại Thiết Bị (Device Type)
+                Loại Thiết Bị (Device Type) <span className="text-rose-500">*</span>
               </label>
               <select
                 value={formData.deviceType}
@@ -237,9 +232,12 @@ export const AdminDeviceModal: React.FC<AdminDeviceModalProps> = ({ isOpen, onCl
                   </option>
                 ))}
               </select>
+              <p className="mt-1.5 text-[11px] text-muted">
+                💡 Tên thiết bị sẽ do người dùng tự đặt khi quét mã QR ghép nối vào phòng.
+              </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-semibold text-text uppercase tracking-wider mb-1">
                   Model
@@ -248,21 +246,35 @@ export const AdminDeviceModal: React.FC<AdminDeviceModalProps> = ({ isOpen, onCl
                   type="text"
                   value={formData.model || ''}
                   onChange={(e) => setFormData({ ...formData, model: e.target.value })}
-                  placeholder="VD: SYNA-RGB-001"
+                  placeholder="VD: SYNA-GATE-01, DAIKIN-64..."
                   className="w-full rounded-xl border border-line bg-surface px-4 py-2.5 text-sm text-text focus:border-primary focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-text uppercase tracking-wider mb-1">
-                  Serial Number
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-semibold text-text uppercase tracking-wider">
+                    Serial Number <span className="text-rose-500">*</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setFormData({
+                        ...formData,
+                        serialNumber: `SYNA-${formData.deviceType}-${Math.floor(1000 + Math.random() * 9000)}`,
+                      })
+                    }
+                    className="text-[11px] text-primary hover:underline font-medium"
+                  >
+                    Tạo ngẫu nhiên
+                  </button>
+                </div>
                 <input
                   type="text"
                   required
                   value={formData.serialNumber}
                   onChange={(e) => setFormData({ ...formData, serialNumber: e.target.value })}
-                  placeholder="VD: SYNA-RGB-001-0001"
+                  placeholder="VD: SN-2026-GATE-0001"
                   className="w-full rounded-xl border border-line bg-surface px-4 py-2.5 text-sm text-text focus:border-primary focus:outline-none font-mono"
                 />
               </div>
@@ -302,7 +314,10 @@ export const AdminDeviceModal: React.FC<AdminDeviceModalProps> = ({ isOpen, onCl
                       <div className="h-44 w-44 animate-pulse rounded-lg bg-slate-100" />
                     )}
                   </div>
-                  <h2 className="text-sm font-bold text-slate-800">{createdData.device.name}</h2>
+                  <h2 className="text-sm font-bold text-slate-800">
+                    {createdData.device.name || createdData.device.deviceType}
+                  </h2>
+                  <p className="text-xs text-slate-500 font-medium">Loại: {createdData.device.deviceType}</p>
                   <p className="text-xs text-slate-500 font-medium">Model: {createdData.device.model || 'N/A'}</p>
                   <p className="text-xs text-slate-500 font-mono">Serial: {createdData.device.serialNumber}</p>
                   <p className="footer mt-3 text-[11px] font-bold text-sky-600 tracking-wider">
