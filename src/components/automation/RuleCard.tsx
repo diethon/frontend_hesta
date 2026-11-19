@@ -93,16 +93,23 @@ export const RuleCard: React.FC<RuleCardProps> = ({
   const nodes = actionNodes(rule, devices, scenes);
 
   return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={onEdit}
-      onKeyDown={(e) => e.key === 'Enter' && e.target === e.currentTarget && onEdit?.()}
-      className={`st-circuit ${rule.enabled ? 'is-on' : 'is-off'}`}
-      aria-label={`Quy tắc ${rule.name}`}
-    >
+    // Whole card opens on mouse click; keyboard/screen readers use the name button
+    // (a role="button" wrapper around the toggle and ⋯ buttons was invalid nesting).
+    <div onClick={onEdit} className={`st-circuit ${rule.enabled ? 'is-on' : 'is-off'}`}>
       <div className="st-circuit-id">
-        <h4 title={rule.name}>{rule.name}</h4>
+        <h4 title={rule.name}>
+          <button
+            type="button"
+            className="st-circuit-open"
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit?.();
+            }}
+            aria-label={`Quy tắc ${rule.name}`}
+          >
+            {rule.name}
+          </button>
+        </h4>
         <span className="st-status">
           <i className={`st-dot ${lastRunFailed ? 'err' : rule.enabled ? 'on' : ''}`} />
           {rule.enabled ? 'Đang bật' : 'Đang tắt'} · {TRIGGER_LABELS[rule.triggerType] || rule.triggerType}

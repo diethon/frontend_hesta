@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { HexColorPicker } from 'react-colorful';
 import type { DeviceSummary } from '../../types/automation';
 import type { SceneResponse, SceneActionType } from '../../types/scene';
@@ -70,9 +70,9 @@ export function formatActionSummary(
   _dev?: DeviceSummary
 ): string {
   const code = act.action;
-  if (code === 'TURN_ON') return 'Bật thiết bị';
-  if (code === 'TURN_OFF') return 'Tắt thiết bị';
-  if (code === 'TOGGLE') return 'Đảo trạng thái (Bật/Tắt)';
+  if (code === 'TURN_ON') return 'Bật nguồn';
+  if (code === 'TURN_OFF') return 'Tắt nguồn';
+  if (code === 'TOGGLE') return 'Đảo trạng thái bật/tắt';
   if (code === 'OPEN') return 'Mở cửa';
   if (code === 'CLOSE') return 'Đóng cửa';
   if (code === 'STOP') return 'Dừng hành trình';
@@ -193,12 +193,26 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
     }
   };
 
+  // Escape closes the editor like the rule editor (still asks first when there are unsaved changes).
+  useEffect(() => {
+    if (pickingDeviceForIndex !== null) return; // the device sheet owns Escape
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (showUnsavedDialog) setShowUnsavedDialog(false); // = "Tiếp tục chỉnh sửa"
+      else if (isDirty) setShowUnsavedDialog(true);
+      else onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [showUnsavedDialog, pickingDeviceForIndex, isDirty, onClose]);
+
   // Template select handlers
   const handleSelectTemplate = (templateKey: SceneTemplateKey) => {
     const template = buildSceneTemplate(templateKey, devices);
     setName(template.name);
     setIcon(template.icon);
     setDescription(template.description);
+    setShowDescriptionInput(Boolean(template.description)); // otherwise it is saved while the editor shows "+ Thêm mô tả"
     setActions(template.actions);
     setTemplateStep(false);
   };
@@ -341,7 +355,7 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
         aria-label="Đóng"
       />
 
-      <aside className="scene-editor-panel glass-g2">
+      <aside className="scene-editor-panel glass-g2" role="dialog" aria-modal="true" aria-label={scene ? `Chỉnh sửa kịch bản ${scene.name}` : 'Tạo kịch bản mới'}>
         <div className="sheet-handle" />
 
         {/* ── HEADER ── */}
@@ -1345,7 +1359,7 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
 
       {/* ── UNSAVED CHANGES CONFIRMATION DIALOG ── */}
       {showUnsavedDialog && (
-        <div className="delete-dialog glass-g2">
+        <div className="delete-dialog glass-g2" role="alertdialog" aria-modal="true" aria-label="Bỏ thay đổi?">
           <strong>Bỏ thay đổi?</strong>
           <p>Các thay đổi trong kịch bản chưa được lưu sẽ bị mất.</p>
           <div>

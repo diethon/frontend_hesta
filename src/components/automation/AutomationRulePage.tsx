@@ -51,7 +51,8 @@ export function AutomationRulePage() {
       dispatch(currentHomeCleared());
     };
   }, [dispatch, homeId]);
-  const userInitial = authUser?.fullName?.charAt(0) || authUser?.email?.charAt(0) || 'U';
+  // Given name (last word) like the nav rail and Scene page: "Việt Đức" → "Đ".
+  const userInitial = (authUser?.fullName?.trim().split(' ').pop() || authUser?.email || 'U').charAt(0).toUpperCase();
 
   const [rules, setRules] = useState<AutomationRule[]>(() => rulesCache.get(homeId) ?? []);
   const [devices, setDevices] = useState<DeviceSummary[]>([]);
@@ -238,7 +239,7 @@ export function AutomationRulePage() {
 
       <main>
         <AutomationTopBar
-          caption={`${rules.length} quy tắc · ${activeCount} đang bật`}
+          caption={loading && rules.length === 0 ? 'Đang tải quy tắc...' : `${rules.length} quy tắc · ${activeCount} đang bật`}
           title={<>Tự động hóa <span className="sr-only">Quy tắc tự động</span></>}
           subtitle="Để ngôi nhà tự phản ứng với cảm biến, sự kiện của thiết bị hoặc giờ hẹn."
           userInitial={userInitial}

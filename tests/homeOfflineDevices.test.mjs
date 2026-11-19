@@ -132,6 +132,12 @@ function loadHomeFavoriteDevices({ onSendCommand } = {}) {
     if (id === '../device/devicePageHelpers') {
       return { mapDeviceToUI };
     }
+    if (id === '../../services/apiClient') {
+      return { clearAllCache: () => {} };
+    }
+    if (id === '../../services/queryCache') {
+      return { clearAllCache: () => {} };
+    }
     throw new Error(`Unexpected require from HomeFavoriteDevices.tsx: ${id}`);
   };
   runInThisContext(`(function(require, module, exports) { ${outputText}\n})`, { filename })(
@@ -271,7 +277,7 @@ test('HomeFavoriteDevices renders offline Light, AC, and Gate with disabled cont
 
   assert.match(html, /Ngoại tuyến/);
   assert.doesNotMatch(html, /Đang bật · 65%/);
-  assert.match(html, /class="brightness disabled"/);
+  assert.match(html, /class="brightness disabled(?:\s|")/);
   assert.match(html, /aria-disabled="true"/);
   assert.match(html, /<button[^>]*disabled=""[^>]*title="Giảm nhiệt độ"/);
   assert.match(html, /<button[^>]*disabled=""[^>]*title="Tăng nhiệt độ"/);

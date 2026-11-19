@@ -25,6 +25,8 @@ export const SplitButton: React.FC<SplitButtonProps> = ({
     };
     if (open) {
       document.addEventListener('mousedown', handleOutsideClick);
+      // The button sits at the bottom of the scrolling editor: bring the menu above the footer.
+      containerRef.current?.lastElementChild?.scrollIntoView({ block: 'nearest' });
     }
     return () => {
       document.removeEventListener('mousedown', handleOutsideClick);
@@ -47,7 +49,7 @@ export const SplitButton: React.FC<SplitButtonProps> = ({
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-1.5 w-48 rounded-2xl border border-[var(--border)] bg-[var(--solid)] p-1.5 shadow-lg z-30 animate-in fade-in zoom-in-95">
+        <div className="absolute left-0 top-full mt-1.5 w-48 rounded-2xl border border-[var(--border)] bg-[var(--solid)] p-1.5 shadow-lg z-30 animate-in fade-in zoom-in-95">
           <button
             type="button"
             onClick={() => {

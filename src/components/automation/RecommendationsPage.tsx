@@ -21,7 +21,8 @@ export function RecommendationsPage() {
   const { homeId = '' } = useParams();
   const navigate = useNavigate();
   const authUser = useAppSelector((state) => state.auth.user);
-  const userInitial = authUser?.fullName?.charAt(0) || authUser?.email?.charAt(0) || 'U';
+  // Given name (last word) like the nav rail and Scene page: "Việt Đức" → "Đ".
+  const userInitial = (authUser?.fullName?.trim().split(' ').pop() || authUser?.email || 'U').charAt(0).toUpperCase();
   const [items, setItems] = useState<Recommendation[]>([]);
   const [modelStatus, setModelStatus] = useState<MlModelStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -30,6 +31,7 @@ export function RecommendationsPage() {
   const [activeTab, setActiveTab] = useState<'pending' | 'history'>('pending');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [info, setInfo] = useState(''); // neutral outcome, e.g. no habit found yet
 
   const loadAll = async () => {
     try {
@@ -59,6 +61,7 @@ export function RecommendationsPage() {
     setWorkingId('generate');
     setError('');
     setSuccess('');
+    setInfo('');
     try {
       const to = new Date();
       const from = new Date(to.getTime() - 30 * 24 * 60 * 60 * 1000);
@@ -67,7 +70,7 @@ export function RecommendationsPage() {
       if (created.length > 0) {
         setSuccess(`Đã tìm thấy ${created.length} thói quen mới của gia đình bạn.`);
       } else {
-        setSuccess('Chưa thấy thói quen nào lặp lại đủ thường xuyên. Cứ dùng nhà như bình thường, HESTA sẽ tự nhận ra.');
+        setInfo('Chưa thấy thói quen nào lặp lại đủ thường xuyên. Cứ dùng nhà như bình thường, HESTA sẽ tự nhận ra.');
       }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Chưa tìm được thói quen lúc này, bạn thử lại sau nhé.');
@@ -81,6 +84,7 @@ export function RecommendationsPage() {
     setModelLoading(true);
     setError('');
     setSuccess('');
+    setInfo('');
     try {
       const newStatus = await retrainModel(homeId);
       setModelStatus(newStatus);
@@ -104,6 +108,7 @@ export function RecommendationsPage() {
     setWorkingId(item.id);
     setError('');
     setSuccess('');
+    setInfo('');
     try {
       await resolveRecommendation(homeId, item.id, action);
       await refreshRecs();
@@ -179,6 +184,12 @@ export function RecommendationsPage() {
           <div role="status" className="st-alert ok">
             <Icon name="check" size={18} />
             <span>{success}</span>
+          </div>
+        )}
+        {info && (
+          <div role="status" className="st-alert info">
+            <Icon name="sparkles" size={18} />
+            <span>{info}</span>
           </div>
         )}
 

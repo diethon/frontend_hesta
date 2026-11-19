@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { Icon } from './HomeIcons';
 import { notify } from '../ui/notify';
-import { fallDetectionService } from '../../services/fallDetectionService';
+import { AI_VIDEO_FEED_URL, fallDetectionService } from '../../services/fallDetectionService';
 
 export type CameraState = 'live' | 'loading' | 'offline' | 'empty';
 
@@ -47,6 +47,18 @@ export const HomeHeroLiveCamera: React.FC<HomeHeroLiveCameraProps> = ({
 
   const cameras = ['Camera phòng khách', 'Camera sân trước', 'Camera ban công'];
 
+  // Ensure browser exits document-level fullscreen if user navigated back via browser history
+  useEffect(() => {
+    if (
+      typeof document !== 'undefined' &&
+      document.fullscreenElement === document.documentElement
+    ) {
+      void document.exitFullscreen().catch(() => {
+        // Ignore exitFullscreen rejection in restricted browser contexts
+      });
+    }
+  }, []);
+
   // Poll local AI Fall Detection status
   useEffect(() => {
     let isMounted = true;
@@ -86,11 +98,20 @@ export const HomeHeroLiveCamera: React.FC<HomeHeroLiveCameraProps> = ({
   };
 
   const handleFullscreen = () => {
-    if (homeId) {
-      navigate(`/home/${encodeURIComponent(homeId)}/digital-twin`);
-    } else {
-      notify.info('Mở mô hình 3D toàn màn hình.');
+    if (
+      typeof document !== 'undefined' &&
+      document.fullscreenEnabled &&
+      !document.fullscreenElement
+    ) {
+      void document.documentElement.requestFullscreen().catch(() => {
+        // Ignore fullscreen rejection in restricted browser contexts
+      });
     }
+    navigate(
+      homeId
+        ? `/home/${encodeURIComponent(homeId)}/fall-detection`
+        : '/fall-detection'
+    );
   };
 
   const handleQuickTurnOff = () => {
@@ -106,14 +127,10 @@ export const HomeHeroLiveCamera: React.FC<HomeHeroLiveCameraProps> = ({
       <div className="camera-viewport">
         {state === 'live' && (
           <>
-            {/* Ambient background blur to soften video edges */}
+            {/* Ambient background blur using static backdrop to avoid opening a second MJPEG stream */}
             <img
               className="camera-ambient-blur"
-              src={
-                selectedCamera === 'Camera phòng khách'
-                  ? 'http://localhost:5000/video_feed'
-                  : '/camera_living_room.jpg'
-              }
+              src="/camera_living_room.jpg"
               alt=""
               aria-hidden="true"
             />
@@ -125,7 +142,7 @@ export const HomeHeroLiveCamera: React.FC<HomeHeroLiveCameraProps> = ({
               }`}
               src={
                 selectedCamera === 'Camera phòng khách'
-                  ? 'http://localhost:5000/video_feed'
+                  ? AI_VIDEO_FEED_URL
                   : '/camera_living_room.jpg'
               }
               alt="Hình ảnh trực tiếp camera an ninh"
@@ -316,8 +333,8 @@ export const HomeHeroLiveCamera: React.FC<HomeHeroLiveCameraProps> = ({
               <button
                 type="button"
                 className="camera-control-btn"
-                aria-label="Toàn màn hình Digital Twin"
-                title="Toàn màn hình Digital Twin"
+                aria-label="Xem camera toàn màn hình"
+                title="Xem camera toàn màn hình"
                 onClick={handleFullscreen}
               >
                 <Icon name="maximize" size={17} />
