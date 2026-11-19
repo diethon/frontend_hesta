@@ -454,7 +454,7 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
                 {/* Interactive Controls per Device Type */}
                 {device.type === 'Đèn' ? (
                   <div
-                    className={`brightness ${device.offline ? 'disabled' : ''} ${isViewOnly ? 'opacity-60 cursor-default' : ''}`}
+                    className={['brightness', device.offline && 'disabled', isViewOnly && 'opacity-60 cursor-default'].filter(Boolean).join(' ')}
                     role="slider"
                     aria-valuemin={10}
                     aria-valuemax={100}

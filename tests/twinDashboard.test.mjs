@@ -167,6 +167,12 @@ test('dashboard metric ignores stale/offline readings even if they are newer', (
     sensor({ healthStatus: 'OFFLINE', observedAt: '2026-10-20T09:03:00Z' })], 'temperature'), active);
 });
 
+test('dashboard metric falls back to latest stale/offline reading when no active reading exists', () => {
+  const stale = sensor({ healthStatus: 'STALE', observedAt: '2026-10-20T09:02:00Z', latestValue: 27 });
+  const offline = sensor({ healthStatus: 'OFFLINE', observedAt: '2026-10-20T09:03:00Z', latestValue: 28 });
+  assert.equal(latestDashboardMetric([stale, offline], 'temperature'), offline);
+});
+
 test('dashboard metric rejects null, non-finite, invalid timestamps and incompatible units', () => {
   const invalid = [sensor({ latestValue: null }), sensor({ latestValue: Infinity }), sensor({ latestValue: NaN }),
     sensor({ unit: null }), sensor({ unit: '%' }), sensor({ observedAt: null }), sensor({ observedAt: 'invalid' })];
