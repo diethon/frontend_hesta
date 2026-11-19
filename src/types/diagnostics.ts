@@ -9,6 +9,10 @@ export interface DiagnosticsSummary {
   quarantinedNodes: number;
   systemReliabilityPct: number;
   averageLatencyMs: number;
+  minLatencyMs?: number;
+  maxLatencyMs?: number;
+  avgLatencyMs?: number;
+  p95LatencyMs?: number;
 }
 
 export interface NodeDiagnostics {
@@ -63,7 +67,21 @@ export interface FirmwarePackage {
   checksumSha256: string;
   fileSizeBytes?: number;
   releaseNotes?: string;
+  uploaded?: boolean;
+  originalFileName?: string;
   createdAt?: string;
+}
+
+export interface OtaCampaignNodeExecution {
+  id: string;
+  nodeId?: string;
+  nodeCode: string;
+  wave: number;
+  status: string;
+  reportedVersion?: string;
+  errorMessage?: string;
+  dispatchedAt?: string;
+  completedAt?: string;
 }
 
 export interface OtaCampaign {
@@ -75,6 +93,7 @@ export interface OtaCampaign {
   status: string;
   rolloutStrategy: string;
   failureThresholdPercent: number;
+  currentWave?: number;
   totalNodes: number;
   attemptedNodes: number;
   successNodes: number;
@@ -82,4 +101,5 @@ export interface OtaCampaign {
   abortReason?: string;
   createdAt?: string;
   updatedAt?: string;
+  nodeExecutions?: OtaCampaignNodeExecution[];
 }
