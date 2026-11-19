@@ -257,10 +257,10 @@ function PanelShell({
   return (
     <div className="scene-layer">
       <button className="detail-scrim" onClick={onClose} aria-label="Đóng" type="button" />
-      <aside className="scene-panel glass-g2">
+      <aside className="scene-panel glass-g2" role="dialog" aria-modal="true" aria-label={title}>
         <div className="sheet-handle" />
         <header className="scene-panel-header">
-          <button className="detail-icon-button" onClick={onClose} type="button">
+          <button className="detail-icon-button" onClick={onClose} type="button" aria-label="Đóng">
             ×
           </button>
           <div>
@@ -782,7 +782,7 @@ export function ScenePage() {
 
       <main>
         <AutomationTopBar
-          caption={`${scenes.length} kịch bản · ${activeCount} đang bật`}
+          caption={loading && scenes.length === 0 ? 'Đang tải kịch bản...' : `${scenes.length} kịch bản · ${activeCount} đang bật`}
           title="Kịch bản"
           subtitle="Gom nhiều thao tác thành một lần chạm: chạy ngay, theo lịch hoặc từ quy tắc tự động."
           userInitial={userInitial}
