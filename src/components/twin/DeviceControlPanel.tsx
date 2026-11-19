@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
-import { getDeviceDetail } from '../../services/deviceApi';
+import { getDeviceCapabilities, getDeviceDetail } from '../../services/deviceApi';
 import { twinDeviceActions } from '../../services/deviceCommandService';
 import { executeTwinCommand } from '../../store/twinCommandSlice';
 import { TwinDeviceControls } from './TwinDeviceControls';
@@ -22,10 +22,11 @@ export function DeviceControlPanel({ deviceId, presentation = 'card' }: { device
   const [retry, setRetry] = useState(0);
   useEffect(() => {
     let active = true;
-    getDeviceDetail(deviceId).then((result) => {
+    // Stored capabilities are often empty; the capabilities endpoint resolves them from the device type like command validation does.
+    Promise.all([getDeviceDetail(deviceId), getDeviceCapabilities(deviceId)]).then(([result, info]) => {
       if (active) {
         if (result?.id !== deviceId || result.homeId !== homeId) setError('Thông tin thiết bị không hợp lệ.');
-        else setDetail(result);
+        else setDetail({ ...result, capabilities: { RESOLVED: info?.supportedActions ?? [] } });
       }
     }).catch(() => { if (active) setError('Không thể tải điều khiển của thiết bị.'); });
     return () => { active = false; };
