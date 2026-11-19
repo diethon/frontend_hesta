@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { Icon } from './HomeIcons';
 import { notify } from '../ui/notify';
-import { fallDetectionService } from '../../services/fallDetectionService';
+import { AI_VIDEO_FEED_URL, fallDetectionService } from '../../services/fallDetectionService';
 
 export type CameraState = 'live' | 'loading' | 'offline' | 'empty';
 
@@ -127,14 +127,10 @@ export const HomeHeroLiveCamera: React.FC<HomeHeroLiveCameraProps> = ({
       <div className="camera-viewport">
         {state === 'live' && (
           <>
-            {/* Ambient background blur to soften video edges */}
+            {/* Ambient background blur using static backdrop to avoid opening a second MJPEG stream */}
             <img
               className="camera-ambient-blur"
-              src={
-                selectedCamera === 'Camera phòng khách'
-                  ? 'http://localhost:5000/video_feed'
-                  : '/camera_living_room.jpg'
-              }
+              src="/camera_living_room.jpg"
               alt=""
               aria-hidden="true"
             />
@@ -146,7 +142,7 @@ export const HomeHeroLiveCamera: React.FC<HomeHeroLiveCameraProps> = ({
               }`}
               src={
                 selectedCamera === 'Camera phòng khách'
-                  ? 'http://localhost:5000/video_feed'
+                  ? AI_VIDEO_FEED_URL
                   : '/camera_living_room.jpg'
               }
               alt="Hình ảnh trực tiếp camera an ninh"

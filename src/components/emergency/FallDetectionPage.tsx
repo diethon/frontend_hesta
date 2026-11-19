@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Camera, Minimize2, RefreshCw } from 'lucide-react';
+import { AI_VIDEO_FEED_URL } from '../../services/fallDetectionService';
 
 export const FallDetectionPage: React.FC = () => {
   const navigate = useNavigate();
@@ -53,8 +54,8 @@ export const FallDetectionPage: React.FC = () => {
 
   const streamUrl =
     reloadKey === 0
-      ? 'http://localhost:5000/video_feed'
-      : `http://localhost:5000/video_feed?t=${reloadKey}`;
+      ? AI_VIDEO_FEED_URL
+      : `${AI_VIDEO_FEED_URL}?t=${reloadKey}`;
 
   return (
     <div

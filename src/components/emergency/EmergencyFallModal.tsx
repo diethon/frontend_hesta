@@ -10,6 +10,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import {
+  AI_VIDEO_FEED_URL,
   fallDetectionService,
   type FallIncidentDTO,
   type FallIncidentType,
@@ -198,7 +199,7 @@ export const EmergencyFallModal: React.FC = () => {
                 state: 'DETECTED',
                 confidenceScore: 0.96,
                 metrics: status.metrics,
-                snapshotUrl: 'http://localhost:5000/video_feed',
+                snapshotUrl: AI_VIDEO_FEED_URL,
               };
             }
             return {
@@ -353,7 +354,7 @@ export const EmergencyFallModal: React.FC = () => {
                 <div className="relative rounded-2xl overflow-hidden bg-[#090d16] aspect-video border border-[#1e293b] shadow-inner flex items-center justify-center">
                   {showLiveStream ? (
                     <img
-                      src="http://localhost:5000/video_feed"
+                      src={AI_VIDEO_FEED_URL}
                       alt="Luồng hình ảnh AI trực tiếp"
                       className="w-full h-full object-contain"
                       onError={() => setShowLiveStream(false)}

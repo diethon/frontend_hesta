@@ -57,7 +57,20 @@ export interface CameraHealthDTO {
   timestamp?: number;
 }
 
-const AI_EDGE_BASE_URL = 'http://localhost:5000';
+const configuredAiCameraUrl = import.meta.env?.VITE_AI_CAMERA_URL?.trim();
+const configuredVoiceUrl = import.meta.env?.VITE_VOICE_SERVICE_URL?.trim();
+const fallbackFromVoice =
+  configuredVoiceUrl && configuredVoiceUrl.startsWith('https://')
+    ? `${configuredVoiceUrl.replace(/\/+$/, '')}/camera`
+    : '';
+
+export const AI_EDGE_BASE_URL = (
+  configuredAiCameraUrl ||
+  fallbackFromVoice ||
+  'http://localhost:5000'
+).replace(/\/+$/, '');
+
+export const AI_VIDEO_FEED_URL = `${AI_EDGE_BASE_URL}/video_feed`;
 
 export const fallDetectionService = {
   // --- Backend Spring Boot APIs ---
@@ -108,7 +121,7 @@ export const fallDetectionService = {
     camera_health?: CameraHealthDTO;
   } | null> {
     try {
-      const res = await axios.get(`${AI_EDGE_BASE_URL}/api/status`, { timeout: 1500 });
+      const res = await axios.get(`${AI_EDGE_BASE_URL}/api/status`, { timeout: 3000 });
       return res.data;
     } catch {
       return null;
@@ -126,7 +139,7 @@ export const fallDetectionService = {
 
   async dismissAiLocal(): Promise<boolean> {
     try {
-      const res = await axios.post(`${AI_EDGE_BASE_URL}/api/dismiss`, {}, { timeout: 1500 });
+      const res = await axios.post(`${AI_EDGE_BASE_URL}/api/dismiss`, {}, { timeout: 3000 });
       return Boolean(res.data?.success || res.data?.status === 'ok');
     } catch {
       return false;
