@@ -53,6 +53,8 @@ export async function processVoiceCommand(request: VoiceCommandRequest): Promise
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      // voice.hesta.homes is public: nginx only forwards requests carrying a valid user JWT.
+      ...(localStorage.getItem('accessToken') ? { Authorization: `Bearer ${localStorage.getItem('accessToken')}` } : {}),
     },
     body: JSON.stringify(request),
   });
