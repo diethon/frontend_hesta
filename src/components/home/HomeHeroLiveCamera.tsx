@@ -47,6 +47,18 @@ export const HomeHeroLiveCamera: React.FC<HomeHeroLiveCameraProps> = ({
 
   const cameras = ['Camera phòng khách', 'Camera sân trước', 'Camera ban công'];
 
+  // Ensure browser exits document-level fullscreen if user navigated back via browser history
+  useEffect(() => {
+    if (
+      typeof document !== 'undefined' &&
+      document.fullscreenElement === document.documentElement
+    ) {
+      void document.exitFullscreen().catch(() => {
+        // Ignore exitFullscreen rejection in restricted browser contexts
+      });
+    }
+  }, []);
+
   // Poll local AI Fall Detection status
   useEffect(() => {
     let isMounted = true;
@@ -86,11 +98,20 @@ export const HomeHeroLiveCamera: React.FC<HomeHeroLiveCameraProps> = ({
   };
 
   const handleFullscreen = () => {
-    if (homeId) {
-      navigate(`/home/${encodeURIComponent(homeId)}/digital-twin`);
-    } else {
-      notify.info('Mở mô hình 3D toàn màn hình.');
+    if (
+      typeof document !== 'undefined' &&
+      document.fullscreenEnabled &&
+      !document.fullscreenElement
+    ) {
+      void document.documentElement.requestFullscreen().catch(() => {
+        // Ignore fullscreen rejection in restricted browser contexts
+      });
     }
+    navigate(
+      homeId
+        ? `/home/${encodeURIComponent(homeId)}/fall-detection`
+        : '/fall-detection'
+    );
   };
 
   const handleQuickTurnOff = () => {
@@ -316,8 +337,8 @@ export const HomeHeroLiveCamera: React.FC<HomeHeroLiveCameraProps> = ({
               <button
                 type="button"
                 className="camera-control-btn"
-                aria-label="Toàn màn hình Digital Twin"
-                title="Toàn màn hình Digital Twin"
+                aria-label="Xem camera toàn màn hình"
+                title="Xem camera toàn màn hình"
                 onClick={handleFullscreen}
               >
                 <Icon name="maximize" size={17} />
