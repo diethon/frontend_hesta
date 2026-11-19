@@ -12,6 +12,7 @@ jobs:
     env:
       # Backend lives on its own host; the realtime ws URL is derived from this.
       VITE_API_BASE_URL: https://api.hesta.homes/api/v1
+      VITE_VOICE_SERVICE_URL: https://voice.hesta.homes
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
