@@ -15,6 +15,8 @@ interface SceneScheduleSectionProps {
   onSchedulesChange?: (schedules: Schedule[], edited: boolean) => void;
   /** Load the saved times but keep every change local; the parent saves them (or drops them on cancel). */
   draft?: boolean;
+  /** Draft times to show on mount (e.g. from a template) before anything is saved. */
+  initialSchedules?: Schedule[];
 }
 
 const DAY_LABELS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
@@ -39,11 +41,12 @@ export const SceneScheduleSection: React.FC<SceneScheduleSectionProps> = ({
   onScheduleCountChange,
   onSchedulesChange,
   draft = false,
+  initialSchedules,
 }) => {
   const effectiveTargetId = targetId || sceneId;
   // Changes go to the server right away only when there is a saved target and the parent did not ask for a draft.
   const live = Boolean(effectiveTargetId) && !draft;
-  const [schedules, setSchedules] = useState<Schedule[]>([]);
+  const [schedules, setSchedules] = useState<Schedule[]>(initialSchedules ?? []);
   const [loading, setLoading] = useState(false);
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
