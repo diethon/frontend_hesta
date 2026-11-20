@@ -63,6 +63,7 @@ export const HomeHeroLiveCamera: React.FC<HomeHeroLiveCameraProps> = ({
   useEffect(() => {
     let isMounted = true;
     const fetchStatus = async () => {
+      if (typeof document !== 'undefined' && document.hidden) return;
       try {
         const data = await fallDetectionService.checkAiStatus();
         if (!isMounted) return;

@@ -8,6 +8,7 @@ import {
   Eye,
   Activity,
   ShieldCheck,
+  Minimize2,
 } from 'lucide-react';
 import {
   AI_VIDEO_FEED_URL,
@@ -23,6 +24,7 @@ import { selectAccessToken } from '../../store/selectors';
 export const EmergencyFallModal: React.FC = () => {
   const accessToken = useAppSelector(selectAccessToken);
   const [activeIncident, setActiveIncident] = useState<FallIncidentDTO | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [countdown, setCountdown] = useState<number>(30);
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [showLiveStream, setShowLiveStream] = useState<boolean>(true);
@@ -151,6 +153,7 @@ export const EmergencyFallModal: React.FC = () => {
             const data = JSON.parse(msg.body) as FallIncidentDTO;
             if (data.state === 'FALSE_ALARM' || data.state === 'RESOLVED') {
               setActiveIncident(null);
+              setIsModalOpen(false);
               stopSiren();
             } else {
               setActiveIncident(data);
@@ -179,6 +182,7 @@ export const EmergencyFallModal: React.FC = () => {
   // --- Local AI Edge Engine Polling (Dual-Link Failover) ---
   useEffect(() => {
     const pollInterval = window.setInterval(async () => {
+      if (typeof document !== 'undefined' && document.hidden) return;
       const status = await fallDetectionService.checkAiStatus();
       if (status) {
         if (status.alert && status.state === 'CONFIRMED_FALL') {
@@ -212,16 +216,29 @@ export const EmergencyFallModal: React.FC = () => {
           setActiveIncident((prev) => {
             if (prev && prev.id.startsWith('local-fall-')) {
               stopSiren();
+              setIsModalOpen(false);
               return null;
             }
             return prev;
           });
         }
       }
-    }, 1500);
+    }, 2500);
 
     return () => clearInterval(pollInterval);
   }, [startSiren, stopSiren]);
+
+  // --- Collapse modal with Escape key back to SOS bubble ---
+  useEffect(() => {
+    if (!isModalOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsModalOpen(false);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isModalOpen]);
 
   // --- Countdown Timer Logic ---
   useEffect(() => {
@@ -243,6 +260,7 @@ export const EmergencyFallModal: React.FC = () => {
   // --- Action Handlers ---
   const handleDismiss = async () => {
     stopSiren();
+    setIsModalOpen(false);
     await fallDetectionService.dismissAiLocal();
     if (activeIncident) {
       await fallDetectionService.dismissIncident(activeIncident.id, 'Người dùng bấm xác nhận an toàn (Tôi ổn)');
@@ -279,12 +297,53 @@ export const EmergencyFallModal: React.FC = () => {
 
   return (
     <>
-      {/* Emergency Full-Screen Modal */}
-      {activeIncident && (
+      {/* Pulsing Red Viewport-Edge Alert Border (always active while incident is open) */}
+      <div
+        aria-hidden="true"
+        data-testid="sos-screen-edge"
+        className="sos-screen-edge fixed inset-0 z-[85] pointer-events-none"
+      />
+
+      {/* Floating Bottom-Right SOS Bubble (shown when full modal is collapsed) */}
+      {!isModalOpen && (
+        <div className="fixed bottom-24 right-4 sm:bottom-6 sm:right-6 z-[86] flex items-center">
+          <button
+            type="button"
+            data-testid="sos-floating-bubble"
+            onClick={() => {
+              setShowLiveStream(true);
+              setIsModalOpen(true);
+            }}
+            aria-label={`Mở cảnh báo té ngã khẩn cấp SOS (${countdown} giây)`}
+            title="Nhấn để mở CẢNH BÁO TÉ NGÃ KHẨN CẤP (EMERGENCY SOS)"
+            className="group relative flex flex-col items-center justify-center w-16 h-16 sm:w-[70px] sm:h-[70px] rounded-full bg-gradient-to-br from-rose-500 via-rose-600 to-red-700 text-white shadow-[0_10px_30px_rgba(225,29,72,0.55)] border-2 border-white/85 hover:scale-105 active:scale-95 transition-transform cursor-pointer focus:outline-none focus:ring-4 focus:ring-rose-400/70"
+          >
+            <span
+              aria-hidden="true"
+              className="absolute inset-0 rounded-full bg-rose-500/50 animate-ping pointer-events-none"
+            />
+            <AlertTriangle className="relative z-10 w-5 h-5 text-amber-200" />
+            <span className="relative z-10 text-xs font-black tracking-wider leading-none mt-0.5">
+              SOS
+            </span>
+            <span className="absolute -top-1.5 -right-1.5 z-20 px-1.5 py-0.5 rounded-full bg-[#090d16] text-rose-300 border border-rose-400/70 text-[10px] font-mono font-bold tabular-nums shadow">
+              {countdown < 10 ? `0${countdown}` : countdown}s
+            </span>
+          </button>
+        </div>
+      )}
+
+      {/* Emergency Full-Screen Modal (opens only when user clicks the SOS bubble) */}
+      {isModalOpen && (
         <div
           role="dialog"
           aria-modal="true"
           aria-label="Cảnh báo té ngã khẩn cấp"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setIsModalOpen(false);
+            }
+          }}
           className="fixed inset-0 z-[90] flex items-center justify-center p-4 bg-[#090d16]/80 backdrop-blur-md animate-in fade-in duration-200"
         >
           <div className="relative w-full max-w-4xl bg-[var(--solid)] border-2 border-rose-500 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
@@ -308,20 +367,33 @@ export const EmergencyFallModal: React.FC = () => {
                 </div>
               </div>
 
-              {/* Siren Audio Controls */}
-              <button
-                type="button"
-                onClick={() => setIsMuted(!isMuted)}
-                className="px-3 py-1.5 rounded-xl bg-black/25 hover:bg-black/40 border border-white/20 text-white transition-colors flex items-center gap-1.5 text-xs font-bold cursor-pointer"
-                title={isMuted ? 'Bật còi' : 'Tắt còi tạm thời'}
-              >
-                {isMuted ? (
-                  <VolumeX className="w-4 h-4 text-white/80" />
-                ) : (
-                  <Volume2 className="w-4 h-4 text-amber-200 animate-pulse" />
-                )}
-                <span>{isMuted ? 'Đã tắt còi' : 'Còi đang hú'}</span>
-              </button>
+              {/* Siren Audio & Collapse Controls */}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsMuted(!isMuted)}
+                  className="px-3 py-1.5 rounded-xl bg-black/25 hover:bg-black/40 border border-white/20 text-white transition-colors flex items-center gap-1.5 text-xs font-bold cursor-pointer"
+                  title={isMuted ? 'Bật còi' : 'Tắt còi tạm thời'}
+                >
+                  {isMuted ? (
+                    <VolumeX className="w-4 h-4 text-white/80" />
+                  ) : (
+                    <Volume2 className="w-4 h-4 text-amber-200 animate-pulse" />
+                  )}
+                  <span>{isMuted ? 'Đã tắt còi' : 'Còi đang hú'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  data-testid="sos-collapse-btn"
+                  onClick={() => setIsModalOpen(false)}
+                  className="p-2 rounded-xl bg-black/25 hover:bg-black/40 border border-white/20 text-white transition-colors cursor-pointer"
+                  aria-label="Thu gọn về bong bóng SOS"
+                  title="Thu gọn về bong bóng SOS"
+                >
+                  <Minimize2 className="w-4 h-4" />
+                </button>
+              </div>
             </div>
 
             {/* Countdown Progress Bar */}
