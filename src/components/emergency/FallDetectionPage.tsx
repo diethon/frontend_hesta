@@ -52,6 +52,16 @@ export const FallDetectionPage: React.FC = () => {
     };
   }, [exitToHome]);
 
+  useEffect(() => {
+    if (!streamError) return;
+    const retryTimer = window.setTimeout(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      setReloadKey((prev) => prev + 1);
+      setStreamError(false);
+    }, 3500);
+    return () => window.clearTimeout(retryTimer);
+  }, [streamError]);
+
   const streamUrl =
     reloadKey === 0
       ? AI_VIDEO_FEED_URL

@@ -33,6 +33,8 @@ export const HomeHeroLiveCamera: React.FC<HomeHeroLiveCameraProps> = ({
   const [selectedCamera, setSelectedCamera] = useState('Camera phòng khách');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isSnapping, setIsSnapping] = useState(false);
+  const [streamError, setStreamError] = useState(false);
+  const [streamReloadKey, setStreamReloadKey] = useState(0);
   const [aiInfo, setAiInfo] = useState<{
     isOnline: boolean;
     fps: number;
@@ -90,6 +92,29 @@ export const HomeHeroLiveCamera: React.FC<HomeHeroLiveCameraProps> = ({
     };
   }, []);
 
+  // Auto-retry live MJPEG stream after transient disconnect (avoids permanent static fallback)
+  useEffect(() => {
+    if (state !== 'live' || selectedCamera !== 'Camera phòng khách' || !streamError) return;
+    const retryTimer = window.setTimeout(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      setStreamReloadKey((prev) => prev + 1);
+      setStreamError(false);
+    }, 3500);
+    return () => window.clearTimeout(retryTimer);
+  }, [state, selectedCamera, streamError]);
+
+  useEffect(() => {
+    if (aiInfo.isOnline && streamError && selectedCamera === 'Camera phòng khách') {
+      setStreamReloadKey((prev) => prev + 1);
+      setStreamError(false);
+    }
+  }, [aiInfo.isOnline, streamError, selectedCamera]);
+
+  const liveVideoUrl =
+    streamReloadKey === 0
+      ? AI_VIDEO_FEED_URL
+      : `${AI_VIDEO_FEED_URL}?r=${streamReloadKey}`;
+
   const handleSnapshot = () => {
     setIsSnapping(true);
     setTimeout(() => {
@@ -142,13 +167,15 @@ export const HomeHeroLiveCamera: React.FC<HomeHeroLiveCameraProps> = ({
                 isSnapping ? 'brightness-125' : ''
               }`}
               src={
-                selectedCamera === 'Camera phòng khách'
-                  ? AI_VIDEO_FEED_URL
+                selectedCamera === 'Camera phòng khách' && !streamError
+                  ? liveVideoUrl
                   : '/camera_living_room.jpg'
               }
               alt="Hình ảnh trực tiếp camera an ninh"
-              onError={(e) => {
-                e.currentTarget.src = '/camera_living_room.jpg';
+              onError={() => {
+                if (selectedCamera === 'Camera phòng khách') {
+                  setStreamError(true);
+                }
               }}
             />
           </>
@@ -232,6 +259,8 @@ export const HomeHeroLiveCamera: React.FC<HomeHeroLiveCameraProps> = ({
                           type="button"
                           onClick={() => {
                             setSelectedCamera(cam);
+                            setStreamError(false);
+                            setStreamReloadKey((prev) => prev + 1);
                             setIsDropdownOpen(false);
                             notify.info(`Đã chuyển sang ${cam}`);
                           }}
