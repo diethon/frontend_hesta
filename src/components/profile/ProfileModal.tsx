@@ -1,9 +1,9 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import type { UserResponse } from '../../types/auth';
-import { updateProfile, changePassword, uploadAvatar } from '../../services/userApi';
-import { getErrorMessage } from '../../utils/errors';
-import { notify } from '../ui/notify';
-import { UserAvatar } from '../ui/UserAvatar';
+import { AvatarUploader } from './AvatarUploader';
+import { ProfileInfoForm } from './ProfileInfoForm';
+import { ChangePasswordForm } from './ChangePasswordForm';
+import { NotificationPreferencesTab } from './NotificationPreferencesTab';
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -12,113 +12,19 @@ interface ProfileModalProps {
   onProfileUpdate: (updatedUser: UserResponse) => void;
 }
 
+type Tab = 'info' | 'security' | 'notifications';
+
+const TABS: Array<{ id: Tab; label: string }> = [
+  { id: 'info', label: 'Thông tin cơ bản' },
+  { id: 'security', label: 'Bảo mật' },
+  { id: 'notifications', label: 'Thông báo' },
+];
+
+/** Admin pages keep this modal; home users get the full /profile page. */
 export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, user, onProfileUpdate }) => {
-  const [activeTab, setActiveTab] = useState<'info' | 'security'>('info');
-
-  // Info Tab State
-  const [fullName, setFullName] = useState(user.fullName);
-  const [phoneNumber, setPhoneNumber] = useState(user.phoneNumber || '');
-  const [isUpdatingInfo, setIsUpdatingInfo] = useState(false);
-  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
-  const [infoError, setInfoError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Security Tab State
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [isChangingPassword, setIsChangingPassword] = useState(false);
-  const [securityError, setSecurityError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<Tab>('info');
 
   if (!isOpen) return null;
-
-  const handleUpdateInfo = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!fullName.trim()) {
-      setInfoError('Họ và tên không được để trống.');
-      return;
-    }
-
-    setInfoError(null);
-    setIsUpdatingInfo(true);
-
-    try {
-      const response = await updateProfile({ fullName, phoneNumber });
-      if (response.result) {
-        onProfileUpdate(response.result);
-        notify.success('Cập nhật thông tin thành công');
-      }
-    } catch (error: unknown) {
-      notify.error(getErrorMessage(error, 'Cập nhật thất bại. Vui lòng thử lại.'));
-    } finally {
-      setIsUpdatingInfo(false);
-    }
-  };
-
-  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // Validate file type and size (max 5MB)
-    if (!file.type.startsWith('image/')) {
-      setInfoError('Vui lòng chọn một file hình ảnh hợp lệ.');
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      setInfoError('Dung lượng ảnh không được vượt quá 5MB.');
-      return;
-    }
-
-    setInfoError(null);
-    setIsUploadingAvatar(true);
-
-    try {
-      const response = await uploadAvatar(file);
-      if (response.result) {
-        onProfileUpdate(response.result);
-        notify.success('Cập nhật ảnh đại diện thành công');
-      }
-    } catch (error: unknown) {
-      notify.error(getErrorMessage(error, 'Tải ảnh thất bại. Vui lòng thử lại.'));
-    } finally {
-      setIsUploadingAvatar(false);
-      // Reset input value so the same file can be selected again
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-    }
-  };
-
-  const handleChangePassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!currentPassword) {
-      setSecurityError('Vui lòng nhập mật khẩu hiện tại.');
-      return;
-    }
-    if (newPassword.length < 6) {
-      setSecurityError('Mật khẩu mới phải có ít nhất 6 ký tự.');
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      setSecurityError('Mật khẩu xác nhận không khớp.');
-      return;
-    }
-
-    setSecurityError(null);
-    setIsChangingPassword(true);
-
-    try {
-      await changePassword({ currentPassword, newPassword });
-      notify.success('Đổi mật khẩu thành công');
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
-    } catch (error: unknown) {
-      notify.error(getErrorMessage(error, 'Đổi mật khẩu thất bại. Vui lòng thử lại.'));
-    } finally {
-      setIsChangingPassword(false);
-    }
-  };
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
@@ -128,11 +34,9 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
         aria-labelledby="profile-modal-title"
         className="auth-surface gentle-rise flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden overscroll-contain shadow-float"
       >
-        
-        {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-line">
           <h2 id="profile-modal-title" className="text-lg font-bold text-text">Hồ sơ cá nhân</h2>
-          <button 
+          <button
             type="button"
             aria-label="Đóng hồ sơ cá nhân"
             onClick={onClose}
@@ -144,227 +48,35 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
           </button>
         </div>
 
-        {/* Tabs */}
         <div className="flex border-b border-line">
-          <button
-            onClick={() => setActiveTab('info')}
-            className={`flex-1 py-4 text-sm font-semibold transition-colors border-b-2 ${
-              activeTab === 'info' 
-                ? 'border-primary text-primary' 
-                : 'border-transparent text-muted hover:text-text hover:bg-sidebar-hover/50'
-            }`}
-          >
-            Thông tin cơ bản
-          </button>
-          <button
-            onClick={() => setActiveTab('security')}
-            className={`flex-1 py-4 text-sm font-semibold transition-colors border-b-2 ${
-              activeTab === 'security' 
-                ? 'border-primary text-primary' 
-                : 'border-transparent text-muted hover:text-text hover:bg-sidebar-hover/50'
-            }`}
-          >
-            Bảo mật
-          </button>
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex-1 py-4 text-sm font-semibold transition-colors border-b-2 ${
+                activeTab === tab.id
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-muted hover:text-text hover:bg-sidebar-hover/50'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
 
-        {/* Content */}
         <div className="p-6 overflow-y-auto custom-scrollbar">
-          
-          {/* INFO TAB */}
           {activeTab === 'info' && (
-            <form onSubmit={handleUpdateInfo} className="space-y-4 animate-in slide-in-from-right-4 duration-300">
-              
-              {infoError && (
-                <div role="alert" aria-live="polite" className="bg-rose-500/10 border border-rose-500/30 text-rose-700 dark:text-rose-300 px-4 py-3 rounded-xl text-xs flex items-center gap-2">
-                  <svg aria-hidden={true} className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <span>{infoError}</span>
-                </div>
-              )}
-
-              <div className="flex flex-col items-center justify-center mb-6">
-                <button
-                  type="button"
-                  aria-label="Thay đổi ảnh đại diện"
-                  disabled={isUploadingAvatar}
-                  className="relative w-20 h-20 rounded-full bg-gradient-to-tr from-cyan-500 to-primary flex items-center justify-center text-white text-3xl font-bold shadow-lg shadow-primary/20 mb-3 cursor-pointer group overflow-hidden"
-                  onClick={() => !isUploadingAvatar && fileInputRef.current?.click()}
-                >
-                  <UserAvatar
-                    src={user.avatarUrl}
-                    name={user.fullName}
-                    size={80}
-                    fallbackClassName="text-3xl font-bold text-white"
-                  />
-                  
-                  {/* Hover Overlay */}
-                  <div className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                    <svg aria-hidden={true} className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                  </div>
-
-                  {/* Loading State Overlay */}
-                  {isUploadingAvatar && (
-                    <div className="absolute inset-0 bg-slate-900/80 flex items-center justify-center">
-                      <svg aria-hidden={true} className="animate-spin w-6 h-6 text-primary" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                      </svg>
-                    </div>
-                  )}
-                </button>
-                <p className="text-xs text-muted">Nhấn vào để thay đổi ảnh</p>
-                <input 
-                  type="file" 
-                  accept="image/*" 
-                  hidden 
-                  ref={fileInputRef}
-                  onChange={handleAvatarChange}
-                />
+            <div className="space-y-4">
+              <div className="flex flex-col items-center mb-2">
+                <AvatarUploader user={user} onProfileUpdate={onProfileUpdate} />
+                <p className="mt-3 text-xs text-muted">Nhấn vào để thay đổi ảnh</p>
               </div>
-
-              <div>
-                <label htmlFor="profile-email" className="block text-xs font-medium text-text mb-1">Email (Không thể thay đổi)</label>
-                <input
-                  id="profile-email"
-                  type="email"
-                  value={user.email}
-                  disabled
-                  className="w-full bg-sidebar border border-line rounded-xl px-4 py-2.5 text-sm text-muted cursor-not-allowed"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="profile-name" className="block text-xs font-medium text-text mb-1">Họ và tên <span className="text-error">*</span></label>
-                <input
-                  id="profile-name"
-                  type="text"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  required
-                  autoComplete="name"
-                  className="w-full bg-surface border border-line rounded-xl px-4 py-2.5 text-sm text-text focus:border-primary outline-none transition"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="profile-phone" className="block text-xs font-medium text-text mb-1">Số điện thoại</label>
-                <input
-                  id="profile-phone"
-                  type="tel"
-                  value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
-                  placeholder="Nhập số điện thoại…"
-                  autoComplete="tel"
-                  className="w-full bg-surface border border-line rounded-xl px-4 py-2.5 text-sm text-text placeholder-muted focus:border-primary outline-none transition"
-                />
-              </div>
-
-              <div className="pt-4">
-                <button
-                  type="submit"
-                  disabled={isUpdatingInfo}
-                  className="w-full py-2.5 px-4 bg-primary hover:bg-primary-hover text-white font-semibold text-sm rounded-xl transition shadow-xs active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {isUpdatingInfo ? (
-                    <span className="flex items-center gap-2">
-                      <svg aria-hidden={true} className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                      </svg>
-                      Đang lưu…
-                    </span>
-                  ) : 'Lưu thay đổi'}
-                </button>
-              </div>
-            </form>
+              <ProfileInfoForm user={user} onProfileUpdate={onProfileUpdate} />
+            </div>
           )}
-
-          {/* SECURITY TAB */}
-          {activeTab === 'security' && (
-            <form onSubmit={handleChangePassword} className="space-y-4 animate-in slide-in-from-right-4 duration-300">
-              
-              {securityError && (
-                <div role="alert" aria-live="polite" className="bg-rose-500/10 border border-rose-500/30 text-rose-700 dark:text-rose-300 px-4 py-3 rounded-xl text-xs flex items-center gap-2">
-                  <svg aria-hidden={true} className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <span>{securityError}</span>
-                </div>
-              )}
-
-              {user.provider === 'GOOGLE' && (
-                <div className="bg-primary/10 border border-primary/30 p-4 rounded-xl mb-4 text-xs text-primary">
-                  <p>Tài khoản của bạn được đăng nhập thông qua Google. Tính năng đổi mật khẩu có thể không khả dụng nếu bạn chưa từng đặt mật khẩu cục bộ.</p>
-                </div>
-              )}
-
-              <div>
-                <label htmlFor="current-password" className="block text-xs font-medium text-text mb-1">Mật khẩu hiện tại <span className="text-error">*</span></label>
-                <input
-                  id="current-password"
-                  type="password"
-                  value={currentPassword}
-                  onChange={(e) => setCurrentPassword(e.target.value)}
-                  placeholder="••••••••"
-                  required
-                  autoComplete="current-password"
-                  className="w-full bg-surface border border-line rounded-xl px-4 py-2.5 text-sm text-text placeholder-muted focus:border-primary outline-none transition"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="new-password" className="block text-xs font-medium text-text mb-1">Mật khẩu mới <span className="text-error">*</span></label>
-                <input
-                  id="new-password"
-                  type="password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="••••••••"
-                  required
-                  autoComplete="new-password"
-                  className="w-full bg-surface border border-line rounded-xl px-4 py-2.5 text-sm text-text placeholder-muted focus:border-primary outline-none transition"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="confirm-new-password" className="block text-xs font-medium text-text mb-1">Xác nhận mật khẩu mới <span className="text-error">*</span></label>
-                <input
-                  id="confirm-new-password"
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="••••••••"
-                  required
-                  autoComplete="new-password"
-                  className="w-full bg-surface border border-line rounded-xl px-4 py-2.5 text-sm text-text placeholder-muted focus:border-primary outline-none transition"
-                />
-              </div>
-
-              <div className="pt-4">
-                <button
-                  type="submit"
-                  disabled={isChangingPassword}
-                  className="w-full py-2.5 px-4 bg-primary hover:bg-primary-hover text-white font-semibold text-sm rounded-xl transition shadow-xs active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {isChangingPassword ? (
-                    <span className="flex items-center gap-2">
-                      <svg aria-hidden={true} className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                      </svg>
-                      Đang xử lý…
-                    </span>
-                  ) : 'Đổi mật khẩu'}
-                </button>
-              </div>
-            </form>
-          )}
-
+          {activeTab === 'security' && <ChangePasswordForm user={user} />}
+          {activeTab === 'notifications' && <NotificationPreferencesTab />}
         </div>
       </div>
     </div>

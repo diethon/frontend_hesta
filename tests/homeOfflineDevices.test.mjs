@@ -119,6 +119,13 @@ function loadHomeFavoriteDevices({ onSendCommand } = {}) {
     if (id === '../../utils/errors') {
       return loadSource('src/utils/errors.ts');
     }
+    if (id === '../../services/apiClient') {
+      // HomeFavoriteDevices only checks `instanceof ApiError`; the real module pulls in the HTTP client.
+      return { ApiError: class ApiError extends Error {} };
+    }
+    if (id === '../../services/queryCache') {
+      return { invalidateCache: () => {} };
+    }
     if (id === '../device/DeviceDetailModal') {
       return { DeviceDetailModal: () => null };
     }

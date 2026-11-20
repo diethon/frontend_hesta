@@ -24,19 +24,24 @@ const compatibleUnits: Record<DashboardMetric, readonly string[]> = {
   motion: ['boolean', 'bool', ''],
 };
 
-/** Pick one actual reading, never average sensors with different locations or units. */
+/** Pick one actual reading, preferring ACTIVE readings over stale/offline ones, never average sensors with different locations or units. */
 export function latestDashboardMetric(sensors: TwinSensorSnapshotResponse[], metric: DashboardMetric) {
-  let latest: TwinSensorSnapshotResponse | undefined;
+  let latestActive: TwinSensorSnapshotResponse | undefined;
+  let latestAny: TwinSensorSnapshotResponse | undefined;
   for (const sensor of sensors) {
-    if (sensor.healthStatus !== 'ACTIVE' || sensorVisualKind(sensor.metricType) !== metric || sensor.latestValue === null || !Number.isFinite(sensor.latestValue)) continue;
+    if (sensorVisualKind(sensor.metricType) !== metric || sensor.latestValue === null || !Number.isFinite(sensor.latestValue)) continue;
     const unit = sensor.unit?.trim().toLowerCase() ?? '';
     if (!compatibleUnits[metric].includes(unit)) continue;
     if (metric === 'motion' && sensor.latestValue !== 0 && sensor.latestValue !== 1) continue;
     const timestamp = sensor.observedAt ? Date.parse(sensor.observedAt) : NaN;
     if (!Number.isFinite(timestamp)) continue;
-    if (!latest || timestamp > Date.parse(latest.observedAt!)) latest = sensor;
+    if (sensor.healthStatus === 'ACTIVE') {
+      if (!latestActive || timestamp > Date.parse(latestActive.observedAt!)) latestActive = sensor;
+    } else {
+      if (!latestAny || timestamp > Date.parse(latestAny.observedAt!)) latestAny = sensor;
+    }
   }
-  return latest;
+  return latestActive ?? latestAny;
 }
 
 export function deviceAlert(device: TwinDeviceSnapshotResponse) {
