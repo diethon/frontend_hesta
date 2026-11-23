@@ -152,6 +152,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout, 
       onClick: () => navigate('/admin/diagnostics'),
       active: false,
     },
+    {
+      id: 'maintenance',
+      icon: 'wrench' as const,
+      label: 'Bảo trì thiết bị',
+      onClick: () => navigate('/admin/maintenance'),
+      active: false,
+    },
   ];
 
   const adminBottomNavItems = [
@@ -174,6 +181,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout, 
       icon: 'activity' as const,
       label: 'Hạ tầng',
       onClick: () => navigate('/admin/diagnostics'),
+      active: false,
+    },
+    {
+      id: 'maintenance',
+      icon: 'wrench' as const,
+      label: 'Bảo trì',
+      onClick: () => navigate('/admin/maintenance'),
       active: false,
     },
   ];
