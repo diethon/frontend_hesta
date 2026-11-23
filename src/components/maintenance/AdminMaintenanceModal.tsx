@@ -3,12 +3,13 @@ import { Plus, Trash2 } from 'lucide-react';
 import {
   adminCompleteMaintenance,
   adminGetMaintenanceTicket,
+  adminRateDiagnosisQuality,
   adminRejectMaintenance,
   adminScheduleMaintenance,
   adminStartInspection,
   adminSubmitQuote,
 } from '../../services/maintenanceApi';
-import type { MaintenanceItemType, MaintenanceOutcome, MaintenanceTicket } from '../../types/maintenance';
+import type { MaintenanceDiagnosisQuality, MaintenanceItemType, MaintenanceOutcome, MaintenanceTicket } from '../../types/maintenance';
 import { getErrorMessage } from '../../utils/errors';
 import { notify } from '../ui/notify';
 import { MaintenanceModal, btnDanger, btnGhost, btnPrimary, fieldClass, labelClass } from './MaintenanceModal';
@@ -45,9 +46,14 @@ export function AdminMaintenanceModal({ ticketId, onClose, onChanged }: Props) {
   const [finalNote, setFinalNote] = useState('');
   const [rejectNote, setRejectNote] = useState('');
   const [showReject, setShowReject] = useState(false);
+  // Diagnosis quality rating (for CHATBOT tickets)
+  const [diagQuality, setDiagQuality] = useState<MaintenanceDiagnosisQuality | ''>('');
+  const [diagQualityNote, setDiagQualityNote] = useState('');
 
   const hydrate = (t: MaintenanceTicket) => {
     setTicket(t);
+    setDiagQuality(t.diagnosisQuality ?? '');
+    setDiagQualityNote(t.diagnosisQualityNote ?? '');
     const first = t.scheduledStart ? { s: t.scheduledStart, e: t.scheduledEnd ?? t.scheduledStart } : t.slots[0] && { s: t.slots[0].startAt, e: t.slots[0].endAt };
     if (first) applySlot(first.s, first.e);
     if (t.quote) {
@@ -240,6 +246,52 @@ export function AdminMaintenanceModal({ ticketId, onClose, onChanged }: Props) {
           <input className={fieldClass} maxLength={2000} value={finalNote} onChange={(e) => setFinalNote(e.target.value)} placeholder="Ghi chú tổng kết (tuỳ chọn)" />
           <p className="text-xs text-muted">Thiết bị kết luận "Đã sửa / Thay mới / Không phát hiện lỗi" sẽ tự đóng các cảnh báo bất thường đang mở.</p>
           <div className="flex justify-end"><button type="button" className={btnPrimary} disabled={busy} onClick={submitComplete}>Hoàn tất ticket</button></div>
+        </section>
+      )}
+
+      {ticket.source === 'CHATBOT' && (
+        <section className="rounded-2xl border border-indigo-500/30 bg-indigo-500/5 p-4 space-y-3">
+          <h3 className="text-sm font-bold">Đánh giá chất lượng chẩn đoán Trợ lý AI</h3>
+          <div className="flex flex-wrap gap-2">
+            {([
+              ['HELPFUL', 'Hữu ích'],
+              ['PARTIAL', 'Hữu ích một phần'],
+              ['MISLEADING', 'Gây hiểu nhầm'],
+            ] as const).map(([val, label]) => (
+              <button
+                key={val}
+                type="button"
+                onClick={() => setDiagQuality(val)}
+                className={`rounded-xl border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  diagQuality === val
+                    ? 'border-indigo-600 bg-indigo-600 text-white'
+                    : 'border-line bg-surface text-text hover:border-indigo-500'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <input
+            className={fieldClass}
+            maxLength={500}
+            value={diagQualityNote}
+            onChange={(e) => setDiagQualityNote(e.target.value)}
+            placeholder="Ghi chú thêm về chất lượng chẩn đoán (tùy chọn, tối đa 500 ký tự)"
+          />
+          <div className="flex justify-end">
+            <button
+              type="button"
+              className={btnPrimary}
+              disabled={busy || !diagQuality}
+              onClick={() => diagQuality && void run(
+                () => adminRateDiagnosisQuality(ticket.id, diagQuality, diagQualityNote.trim() || undefined),
+                'Đã lưu đánh giá chất lượng chẩn đoán',
+              )}
+            >
+              Lưu đánh giá
+            </button>
+          </div>
         </section>
       )}
 
