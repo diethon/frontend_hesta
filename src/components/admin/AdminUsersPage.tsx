@@ -300,6 +300,13 @@ export const AdminUsersPage: React.FC<AdminUsersPageProps> = ({
       onClick: () => navigate('/admin/diagnostics'),
       active: false,
     },
+    {
+      id: 'maintenance',
+      icon: 'wrench' as const,
+      label: 'Bảo trì thiết bị',
+      onClick: () => navigate('/admin/maintenance'),
+      active: false,
+    },
   ];
 
   const adminBottomNavItems = [
@@ -322,6 +329,13 @@ export const AdminUsersPage: React.FC<AdminUsersPageProps> = ({
       icon: 'activity' as const,
       label: 'Hạ tầng',
       onClick: () => navigate('/admin/diagnostics'),
+      active: false,
+    },
+    {
+      id: 'maintenance',
+      icon: 'wrench' as const,
+      label: 'Bảo trì',
+      onClick: () => navigate('/admin/maintenance'),
       active: false,
     },
   ];
