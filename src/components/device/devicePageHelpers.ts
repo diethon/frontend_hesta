@@ -1,6 +1,11 @@
 import type { DeviceResponse } from '../../types/device';
 import type { FigmaDeviceType } from './DeviceDetailModal';
 import type { IconName } from '../home/HomeIcons';
+import {
+  AC_MODE_CODE_TO_LABEL,
+  extractSensorMetrics,
+  resolveFanSpeedLevel,
+} from './deviceHelpers';
 
 export interface UIMappedDevice {
   id: string;
@@ -69,14 +74,19 @@ export function mapDeviceToUI(
 
   const typeUpper = (d.deviceType || '').toUpperCase();
   const nameLower = (d.name || '').toLowerCase();
+  const sensorMetrics = extractSensorMetrics(d.currentState);
 
-  if (typeUpper.includes('LIGHT') || typeUpper.includes('LED')) {
+  if (typeUpper.includes('LIGHT') && !typeUpper.includes('SENSOR')) {
+    type = 'Đèn';
+    icon = 'lamp';
+  } else if (typeUpper.includes('LED')) {
     type = 'Đèn';
     icon = 'lamp';
   } else if (
     typeUpper.includes('AIR') ||
     typeUpper.includes('CLIMATE') ||
-    typeUpper.includes('AC') ||
+    typeUpper === 'AC' ||
+    typeUpper === 'AC_REMOTE' ||
     nameLower.includes('điều hòa') ||
     nameLower.includes('casper')
   ) {
@@ -85,6 +95,7 @@ export function mapDeviceToUI(
     const temp = d.currentState?.temperature;
     valueStr = temp !== undefined ? `${temp}°C` : undefined;
   } else if (
+    typeUpper === 'DOOR' ||
     typeUpper.includes('GATE') ||
     typeUpper.includes('ROLLING') ||
     typeUpper.includes('CURTAIN') ||
@@ -98,8 +109,12 @@ export function mapDeviceToUI(
     type = 'Cảm biến';
     icon = 'thermometer';
     isSensor = true;
-    const temp = d.currentState?.temperature;
-    valueStr = temp !== undefined ? `${temp}°C` : undefined;
+    valueStr =
+      sensorMetrics.temperature !== undefined
+        ? `${sensorMetrics.temperature}°C`
+        : sensorMetrics.humidity !== undefined
+          ? `${sensorMetrics.humidity}%`
+          : undefined;
   } else if (
     typeUpper.includes('LUX') ||
     typeUpper.includes('SUN') ||
@@ -108,31 +123,54 @@ export function mapDeviceToUI(
     type = 'Cảm biến';
     icon = 'sun';
     isSensor = true;
-    const lux = d.currentState?.lux;
     valueStr =
-      lux !== undefined
-        ? `${lux} lx`
-        : d.currentState?.LIGHT_SENSOR !== undefined
-        ? Number(d.currentState.LIGHT_SENSOR) === 1
-          ? 'Sáng'
-          : 'Tối'
-        : undefined;
+      sensorMetrics.lux !== undefined
+        ? `${sensorMetrics.lux} lx`
+        : sensorMetrics.lightBinary !== undefined
+          ? sensorMetrics.lightBinary
+            ? 'Sáng'
+            : 'Tối'
+          : undefined;
   } else if (typeUpper.includes('MOTION')) {
     type = 'Cảm biến';
     icon = 'activity';
     isSensor = true;
-    valueStr = d.currentState?.motion ? 'Chuyển động' : 'Tĩnh';
-  } else if (typeUpper.includes('SMOKE')) {
+    if (sensorMetrics.motion !== undefined) {
+      valueStr = sensorMetrics.motion ? 'Chuyển động' : 'Tĩnh';
+    }
+  } else if (typeUpper.includes('SMOKE') || typeUpper.includes('GAS')) {
     type = 'Cảm biến';
     icon = 'shield';
     isSensor = true;
-    valueStr = d.currentState?.smoke ? 'Cảnh báo' : 'An toàn';
+    if (sensorMetrics.gasPpm !== undefined) {
+      valueStr = `${sensorMetrics.gasPpm} ppm`;
+    } else if (sensorMetrics.smoke !== undefined) {
+      valueStr =
+        typeof sensorMetrics.smoke === 'number'
+          ? `${sensorMetrics.smoke} ppm`
+          : sensorMetrics.smoke
+            ? 'Cảnh báo'
+            : 'An toàn';
+    }
+  } else if (typeUpper.includes('FLAME')) {
+    type = 'Cảm biến';
+    icon = 'flame';
+    isSensor = true;
+    if (sensorMetrics.flame !== undefined) {
+      valueStr = sensorMetrics.flame ? 'Phát hiện lửa!' : 'An toàn';
+    }
   } else if (typeUpper.includes('CAMERA')) {
     type = 'Camera';
     icon = 'camera';
-  } else if (nameLower.includes('bơm')) {
+  } else if (typeUpper.includes('PUMP') || nameLower.includes('bơm')) {
     type = 'Công tắc';
     icon = 'droplet';
+  } else if (typeUpper === 'FAN' || nameLower.includes('quạt')) {
+    type = 'Công tắc';
+    icon = 'wind';
+  } else if (typeUpper === 'TV') {
+    type = 'Công tắc';
+    icon = 'tv';
   } else if (typeUpper.includes('LOCK') || nameLower.includes('khóa')) {
     type = 'Công tắc';
     icon = 'lock';
@@ -147,28 +185,53 @@ export function mapDeviceToUI(
     if (type === 'Đèn') {
       statusText = isPowerOn ? `Đang bật · ${brightness}%` : 'Đã tắt';
     } else if (type === 'Điều hòa') {
-      statusText = isPowerOn ? 'Lạnh · Quạt tự động' : 'Đã tắt';
+      const modeCode = String(d.currentState?.mode ?? 'COOL').toUpperCase();
+      const modeLabel = AC_MODE_CODE_TO_LABEL[modeCode] ?? (typeof d.currentState?.mode === 'string' ? d.currentState.mode : 'Lạnh');
+      statusText = isPowerOn ? `${modeLabel} · ${d.currentState?.temperature ?? 24}°C` : 'Đã tắt';
     } else if (type === 'Cảm biến' && icon === 'thermometer') {
-      const hum = d.currentState?.humidity;
       statusText =
-        hum !== undefined
-          ? `Độ ẩm ${hum}%`
-          : d.currentState?.temperature !== undefined
-          ? `Nhiệt độ ${d.currentState.temperature}°C`
-          : 'Chưa có dữ liệu';
+        sensorMetrics.humidity !== undefined
+          ? `Độ ẩm ${sensorMetrics.humidity}%`
+          : sensorMetrics.temperature !== undefined
+            ? `Nhiệt độ ${sensorMetrics.temperature}°C`
+            : 'Chưa có dữ liệu';
     } else if (type === 'Cảm biến' && icon === 'sun') {
-      if (d.currentState?.lux !== undefined) {
-        statusText = Number(d.currentState.lux) > 200 ? 'Trời sáng' : 'Trời tối';
-      } else if (d.currentState?.LIGHT_SENSOR !== undefined) {
-        statusText =
-          Number(d.currentState.LIGHT_SENSOR) === 1 ? 'Trời sáng' : 'Trời tối';
+      if (sensorMetrics.lightBinary !== undefined) {
+        statusText = sensorMetrics.lightBinary ? 'Trời sáng' : 'Trời tối';
       } else {
         statusText = 'Chưa có dữ liệu';
       }
+    } else if (type === 'Cảm biến' && icon === 'flame') {
+      statusText = sensorMetrics.flame ? 'Cảnh báo cháy!' : 'An toàn';
+    } else if (type === 'Cảm biến' && icon === 'shield') {
+      const smokeAlert =
+        typeof sensorMetrics.smoke === 'boolean'
+          ? sensorMetrics.smoke
+          : typeof sensorMetrics.smoke === 'number'
+            ? sensorMetrics.smoke > 50
+            : false;
+      const gasAlert = (sensorMetrics.gasPpm ?? 0) > 200;
+      statusText = smokeAlert || gasAlert ? 'Cảnh báo khói/gas!' : 'An toàn';
+    } else if (type === 'Cảm biến' && icon === 'activity') {
+      statusText = sensorMetrics.motion === undefined ? 'Chưa có dữ liệu' : sensorMetrics.motion ? 'Có chuyển động' : 'Không có chuyển động';
     } else if (type === 'Cảm biến') {
       statusText = 'Bình thường';
+    } else if (typeUpper.includes('PUMP') || nameLower.includes('bơm')) {
+      statusText = isPowerOn ? 'Đang bơm nước' : 'Đã dừng';
+    } else if (typeUpper === 'FAN' || nameLower.includes('quạt')) {
+      const fanSpeed = resolveFanSpeedLevel(d.currentState);
+      statusText = isPowerOn ? (fanSpeed > 0 ? `Đang bật · Mức ${fanSpeed}` : 'Đang bật') : 'Đã tắt';
+    } else if (typeUpper === 'TV') {
+      const ch = d.currentState?.channel;
+      statusText = isPowerOn ? (ch !== undefined ? `Đang bật · Kênh ${ch}` : 'Đang bật') : 'Đã tắt';
     } else if (type === 'Cổng') {
-      statusText = isPowerOn ? 'Đang mở' : 'Đã dừng';
+      const gateStr = String(d.currentState?.state ?? '').trim().toUpperCase();
+      if (gateStr === 'OPENING') statusText = 'Đang mở...';
+      else if (gateStr === 'CLOSING') statusText = 'Đang đóng...';
+      else if (gateStr === 'OPEN') statusText = 'Đã mở';
+      else if (gateStr === 'CLOSED' || gateStr === 'CLOSE') statusText = 'Đã đóng';
+      else if (gateStr === 'STOPPED' || gateStr === 'STOP') statusText = 'Đã dừng';
+      else statusText = 'Sẵn sàng';
     }
   }
 

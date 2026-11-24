@@ -216,6 +216,18 @@ export const setAcSwing = async (deviceId: string, enabled: boolean): Promise<De
   return unwrapCommandResult(response);
 };
 
+export const setAcTimer = async (deviceId: string, hour: number, halfHour = false): Promise<DeviceCommandResult> => {
+  const response = await apiClient.post(`/devices/${deviceId}/air-conditioner/timer?hour=${hour}&halfHour=${halfHour}`);
+  invalidateDeviceMutations(deviceId);
+  return unwrapCommandResult(response);
+};
+
+export const cancelAcTimer = async (deviceId: string): Promise<DeviceCommandResult> => {
+  const response = await apiClient.post(`/devices/${deviceId}/air-conditioner/timer/cancel`);
+  invalidateDeviceMutations(deviceId);
+  return unwrapCommandResult(response);
+};
+
 export const getAcState = async (deviceId: string): Promise<DeviceCommandResult> => {
   const response = await apiClient.get(`/devices/${deviceId}/air-conditioner/state`);
   return response.data.result;

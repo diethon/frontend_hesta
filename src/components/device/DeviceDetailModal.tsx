@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { X, MoreHorizontal, Sparkles, Wrench } from 'lucide-react';
+import { X, Sparkles, Wrench } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import type { DeviceResponse, DeviceShadowResponse } from '../../types/device';
 import {
@@ -69,13 +69,35 @@ const DeviceDetailInner: React.FC<DeviceDetailModalProps & { device: DetailDevic
   // Active tab state (resets to 'control' when device id changes inside DetailTabs)
   const [activeTab, setActiveTab] = useState<DetailTabType>('control');
 
-  // Header Rename and Menu states
+  // Header Rename state
   const [prevDevice, setPrevDevice] = useState(device);
   const [name, setName] = useState(device?.name || '');
   const [rename, setRename] = useState(false);
-  const [menu, setMenu] = useState(false);
   const [confirm, setConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Lock background page scroll while modal is open so scrolling inside detail modal never scrolls the page underneath
+  useEffect(() => {
+    if (typeof document === 'undefined' || typeof window === 'undefined') return;
+    const htmlEl = document.documentElement;
+    const bodyEl = document.body;
+    const prevHtmlOverflow = htmlEl.style.overflow;
+    const prevBodyOverflow = bodyEl.style.overflow;
+    const prevBodyPaddingRight = bodyEl.style.paddingRight;
+    const scrollbarWidth = window.innerWidth - htmlEl.clientWidth;
+
+    htmlEl.style.overflow = 'hidden';
+    bodyEl.style.overflow = 'hidden';
+    if (scrollbarWidth > 0) {
+      bodyEl.style.paddingRight = `${scrollbarWidth}px`;
+    }
+
+    return () => {
+      htmlEl.style.overflow = prevHtmlOverflow;
+      bodyEl.style.overflow = prevBodyOverflow;
+      bodyEl.style.paddingRight = prevBodyPaddingRight;
+    };
+  }, []);
 
   // Power and light level states
   const [isOn, setIsOn] = useState(() => Boolean(device?.on));
@@ -84,28 +106,6 @@ const DeviceDetailInner: React.FC<DeviceDetailModalProps & { device: DetailDevic
     if (device?.currentState?.brightness) return Number(device.currentState.brightness);
     return 80;
   });
-
-  // Adjust state when device prop changes (official React pattern)
-  if (device !== prevDevice) {
-    setPrevDevice(device);
-    setName(device?.name || '');
-    setIsOn(Boolean(device?.on));
-    if (typeof device?.brightness === 'number') {
-      setLightLevel(device.brightness);
-    } else if (device?.currentState?.brightness) {
-      setLightLevel(Number(device.currentState.brightness));
-    }
-  }
-
-  const handleToggleCurrent = () => {
-    if (isReadOnly) {
-      notify.warning('Bạn chỉ có quyền xem thiết bị này');
-      return;
-    }
-    if (disabled) return;
-    setIsOn((prev) => !prev);
-    onTogglePower?.();
-  };
 
   // AC Temp & Mode
   const [acTemp, setAcTemp] = useState<number>(() => {
@@ -120,8 +120,37 @@ const DeviceDetailInner: React.FC<DeviceDetailModalProps & { device: DetailDevic
   // Gate State
   const [gateState, setGateState] = useState<string>(() => {
     const raw = String(device?.raw?.currentState?.state ?? device?.currentState?.state ?? '').toUpperCase();
-    return raw === 'OPEN' || raw === 'OPENING' ? 'Mở' : raw === 'CLOSED' || raw === 'CLOSING' ? 'Đóng' : 'Dừng';
+    return raw === 'OPEN' || raw === 'OPENING' ? 'Mở' : raw === 'CLOSED' || raw === 'CLOSE' || raw === 'CLOSING' ? 'Đóng' : 'Dừng';
   });
+
+  if (device !== prevDevice) {
+    setPrevDevice(device);
+    setName(device?.name || '');
+    setIsOn(Boolean(device?.on));
+    if (typeof device?.brightness === 'number') {
+      setLightLevel(device.brightness);
+    } else if (device?.currentState?.brightness) {
+      setLightLevel(Number(device.currentState.brightness));
+    }
+    const nextGateRaw = String(device?.raw?.currentState?.state ?? device?.currentState?.state ?? '').toUpperCase();
+    setGateState(
+      nextGateRaw === 'OPEN' || nextGateRaw === 'OPENING'
+        ? 'Mở'
+        : nextGateRaw === 'CLOSED' || nextGateRaw === 'CLOSE' || nextGateRaw === 'CLOSING'
+        ? 'Đóng'
+        : 'Dừng'
+    );
+  }
+
+  const handleToggleCurrent = () => {
+    if (isReadOnly) {
+      notify.warning('Bạn chỉ có quyền xem thiết bị này');
+      return;
+    }
+    if (disabled) return;
+    setIsOn((prev) => !prev);
+    onTogglePower?.();
+  };
 
   // Unified Data Hook (fetch once per device with cancellation)
   const {
@@ -445,65 +474,7 @@ const DeviceDetailInner: React.FC<DeviceDetailModalProps & { device: DetailDevic
                 </button>
               </>
             )}
-
-            {!isReadOnly && (
-              <button
-                type="button"
-                className="detail-icon-button"
-                onClick={() => setMenu(!menu)}
-                aria-label="Tùy chọn thiết bị"
-              >
-                <MoreHorizontal className="w-5 h-5" />
-              </button>
-            )}
           </div>
-
-          {menu && !isReadOnly && (
-            <div className="detail-menu glass-g2">
-              <button
-                type="button"
-                onClick={() => {
-                  setMenu(false);
-                  setRename(true);
-                }}
-              >
-                Đổi tên thiết bị
-              </button>
-              {isOverrideActive ? (
-                <button
-                  type="button"
-                  disabled={isResumingAutomation}
-                  onClick={() => {
-                    setMenu(false);
-                    void handleResumeAutomation();
-                  }}
-                >
-                  Khôi phục tự động hóa
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  disabled={isCancellingAutomation}
-                  onClick={() => {
-                    setMenu(false);
-                    void handleCancelAutomation(30);
-                  }}
-                >
-                  Tạm dừng tự động (30 phút)
-                </button>
-              )}
-              <button
-                type="button"
-                className="danger"
-                onClick={() => {
-                  setMenu(false);
-                  setConfirm(true);
-                }}
-              >
-                Xóa thiết bị
-              </button>
-            </div>
-          )}
         </header>
 
         {/* 2. Scrollable Body containing Hero, Sticky Tabs, and Active Tab Panel */}
@@ -552,6 +523,7 @@ const DeviceDetailInner: React.FC<DeviceDetailModalProps & { device: DetailDevic
           {/* Tab Views */}
           {activeTab === 'control' && (
             <ControlTab
+              key={devId}
               device={device}
               resolvedType={resolvedType}
               disabled={disabled}

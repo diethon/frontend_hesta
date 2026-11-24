@@ -9,7 +9,9 @@ import {
   WifiOff,
   Pencil,
 } from 'lucide-react';
-import { Icon, type IconName } from '../../home/HomeIcons';
+import { type IconName } from '../../home/HomeIcons';
+import { DeviceVisual } from '../DeviceVisual';
+import { isRgbLightDevice, resolveDeviceRgb, rgbToHex } from '../deviceHelpers';
 import type { FigmaDeviceType, DetailDeviceInput } from './detailTypes';
 import { formatRelativeTime } from './detailTypes';
 import { notify } from '../../ui/notify';
@@ -154,6 +156,14 @@ export const DetailHero: React.FC<DetailHeroProps> = ({
   const isPowerDevice = ['Đèn', 'Điều hòa', 'Công tắc'].includes(resolvedType);
   const lastSeenStr = device?.raw?.lastSeen || device?.raw?.updatedAt || device?.lastSeen;
   const relativeTime = formatRelativeTime(lastSeenStr);
+  const rawHeroState = (device?.raw?.currentState || device?.currentState) as Record<string, unknown> | undefined;
+  const isRgbLight = isRgbLightDevice(device);
+  const resolvedHeroRgb = isRgbLight ? resolveDeviceRgb(rawHeroState) : undefined;
+  const heroRgbHex = isRgbLight
+    ? resolvedHeroRgb
+      ? rgbToHex(resolvedHeroRgb.r, resolvedHeroRgb.g, resolvedHeroRgb.b)
+      : (typeof rawHeroState?.rgbHex === 'string' ? rawHeroState.rgbHex : undefined)
+    : undefined;
 
   return (
     <section className="detail-hero-section">
@@ -162,9 +172,32 @@ export const DetailHero: React.FC<DetailHeroProps> = ({
           {/* Tinted icon tile with glow */}
           <div
             className={`detail-hero-icon-tile ${typeClass} ${isOn && !disabled ? 'glowing' : ''}`}
+            style={
+              isRgbLight && isOn && !disabled && heroRgbHex
+                ? {
+                    background: `color-mix(in srgb, ${heroRgbHex} 16%, transparent)`,
+                    borderColor: `color-mix(in srgb, ${heroRgbHex} 40%, transparent)`,
+                    boxShadow: `0 0 28px color-mix(in srgb, ${heroRgbHex} 42%, transparent)`,
+                  }
+                : undefined
+            }
             aria-hidden="true"
           >
-            <Icon name={iconName} size={28} />
+            <DeviceVisual
+              uid={`hero-${device?.id || 'dev'}`}
+              deviceType={device?.raw?.deviceType || device?.deviceType}
+              figmaType={resolvedType}
+              name={device?.name}
+              icon={iconName}
+              isOn={isOn}
+              offline={disabled || device?.offline}
+              brightness={lightLevel ?? device?.brightness ?? 80}
+              rgbColor={isRgbLight ? heroRgbHex : undefined}
+              acMode={acMode}
+              gateState={String(device?.raw?.currentState?.state ?? gateState ?? '')}
+              sensorState={rawHeroState}
+              size={68}
+            />
           </div>
 
           {/* Primary Readout */}
@@ -215,19 +248,12 @@ export const DetailHero: React.FC<DetailHeroProps> = ({
           </span>
         )}
 
-        <span className="detail-hero-chip" title="Thời gian nhận tín hiệu gần nhất">
-          {disabled || device?.offline ? (
-            <>
-              <WifiOff className="w-3 h-3 text-offline" />
-              <span className="text-offline">Ngoại tuyến{relativeTime !== 'Chưa có dữ liệu' ? ` · ${relativeTime}` : ''}</span>
-            </>
-          ) : (
-            <>
-              <Clock className="w-3 h-3" />
-              <span>{relativeTime}</span>
-            </>
-          )}
-        </span>
+        {relativeTime !== 'Chưa có dữ liệu' && (
+          <span className="detail-hero-chip" title="Thời gian nhận tín hiệu gần nhất">
+            <Clock className="w-3 h-3" />
+            <span>{relativeTime}</span>
+          </span>
+        )}
       </div>
 
       {/* Action Banners below Hero */}
@@ -236,17 +262,17 @@ export const DetailHero: React.FC<DetailHeroProps> = ({
         {isOverrideActive && (
           <div className="detail-banner-card override-banner animate-in fade-in slide-in-from-top-1">
             <div className="flex items-center gap-2 min-w-0">
-              <span className="w-7 h-7 rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+              <span className="w-7 h-7 rounded-xl bg-[#fef3c7] text-[#b45309] border border-[#d97706]/35 flex items-center justify-center shrink-0">
                 <Lock className="w-3.5 h-3.5" />
               </span>
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5 flex-wrap">
-                  <strong className="font-bold text-xs">Ghi đè thủ công</strong>
-                  <span className="px-1.5 py-0.2 rounded-md bg-amber-500/20 text-amber-900 dark:text-amber-200 font-mono font-bold text-[10px]">
+                  <strong className="font-bold text-xs text-[#78350f]">Ghi đè thủ công</strong>
+                  <span className="px-1.5 py-0.5 rounded-md bg-white text-[#78350f] border border-[#d97706]/45 font-mono font-bold text-[10px]">
                     {formattedTime}
                   </span>
                 </div>
-                <span className="text-[10px] opacity-90 block truncate">
+                <span className="text-[10px] text-[#92400e] block truncate">
                   Ưu tiên thủ công · Tạm ngưng kịch bản tự động
                 </span>
               </div>
@@ -257,7 +283,7 @@ export const DetailHero: React.FC<DetailHeroProps> = ({
                 type="button"
                 disabled={isExtendingAutomation}
                 onClick={() => onExtendAutomation(0.5)}
-                className="px-2 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-900 dark:text-amber-200 font-bold transition text-[11px] cursor-pointer disabled:opacity-50"
+                className="px-2 py-1 rounded-lg bg-white hover:bg-[#fef3c7] text-[#78350f] border border-[#d97706]/50 font-bold transition text-[11px] cursor-pointer disabled:opacity-50"
                 title="Gia hạn thêm 30 phút"
               >
                 +30p
@@ -266,7 +292,7 @@ export const DetailHero: React.FC<DetailHeroProps> = ({
                 type="button"
                 disabled={isExtendingAutomation}
                 onClick={() => onExtendAutomation(1)}
-                className="px-2 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-900 dark:text-amber-200 font-bold transition text-[11px] cursor-pointer disabled:opacity-50"
+                className="px-2 py-1 rounded-lg bg-white hover:bg-[#fef3c7] text-[#78350f] border border-[#d97706]/50 font-bold transition text-[11px] cursor-pointer disabled:opacity-50"
                 title="Gia hạn thêm 1 giờ"
               >
                 +1h
@@ -275,7 +301,7 @@ export const DetailHero: React.FC<DetailHeroProps> = ({
                 type="button"
                 disabled={isResumingAutomation}
                 onClick={onResumeAutomation}
-                className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold transition shadow-2xs disabled:opacity-50 cursor-pointer text-xs"
+                className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-[#d97706] hover:bg-[#b45309] text-white font-bold transition shadow-2xs disabled:opacity-50 cursor-pointer text-xs"
                 title="Khôi phục tự động hóa ngay"
               >
                 <RotateCw className={`w-3 h-3 ${isResumingAutomation ? 'animate-spin' : ''}`} />
@@ -310,12 +336,12 @@ export const DetailHero: React.FC<DetailHeroProps> = ({
         {isOutOfSync && (
           <div className="detail-banner-card sync-banner animate-in fade-in slide-in-from-top-1">
             <div className="flex items-center gap-2 min-w-0">
-              <span className="w-7 h-7 rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+              <span className="w-7 h-7 rounded-xl bg-[#fef3c7] text-[#b45309] border border-[#d97706]/35 flex items-center justify-center shrink-0">
                 <AlertTriangle className="w-3.5 h-3.5" />
               </span>
               <div className="min-w-0">
-                <strong className="block text-xs font-bold truncate">Chưa đồng bộ lệnh</strong>
-                <span className="text-[10px] opacity-90 block truncate">
+                <strong className="block text-xs font-bold text-[#78350f] truncate">Chưa đồng bộ lệnh</strong>
+                <span className="text-[10px] text-[#92400e] block truncate">
                   Lệch {deltaKeysCount} trạng thái với thiết bị thực tế
                 </span>
               </div>
@@ -324,7 +350,7 @@ export const DetailHero: React.FC<DetailHeroProps> = ({
               type="button"
               disabled={isReconcilingShadow}
               onClick={onReconcileShadow}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold transition shadow-2xs disabled:opacity-50 cursor-pointer text-xs shrink-0"
+              className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-[#d97706] hover:bg-[#b45309] text-white font-bold transition shadow-2xs disabled:opacity-50 cursor-pointer text-xs shrink-0"
               title="Gửi lại lệnh để đồng bộ ngay"
             >
               <RotateCw className={`w-3 h-3 ${isReconcilingShadow ? 'animate-spin' : ''}`} />
