@@ -70,7 +70,33 @@ export function mapDeviceToUI(
   const typeUpper = (d.deviceType || '').toUpperCase();
   const nameLower = (d.name || '').toLowerCase();
 
-  if (typeUpper.includes('LIGHT') || typeUpper.includes('LED')) {
+  if (typeUpper === 'FAN' || typeUpper === 'SMART_FAN') {
+    type = 'Quạt';
+    icon = 'automation';
+    const spd = Number(d.currentState?.speed ?? 0);
+    valueStr = isPowerOn && spd > 0 ? `Mức ${spd}` : undefined;
+  } else if (typeUpper === 'TV' || typeUpper === 'SMART_TV') {
+    type = 'TV';
+    icon = 'film';
+  } else if (typeUpper.includes('FLAME')) {
+    type = 'Cảm biến';
+    icon = 'flame';
+    isSensor = true;
+    valueStr = Number(d.currentState?.FLAME_SENSOR ?? d.currentState?.flame ?? 0) ? 'Có lửa' : 'An toàn';
+  } else if (typeUpper.includes('LIGHT_SENSOR') || typeUpper.includes('LUX') || typeUpper.includes('SUN')) {
+    type = 'Cảm biến';
+    icon = 'sun';
+    isSensor = true;
+    const lux = d.currentState?.lux;
+    valueStr =
+      lux !== undefined
+        ? `${lux} lx`
+        : d.currentState?.LIGHT_SENSOR !== undefined
+        ? Number(d.currentState.LIGHT_SENSOR) === 1
+          ? 'Sáng'
+          : 'Tối'
+        : undefined;
+  } else if (typeUpper.includes('LIGHT') || typeUpper.includes('LED')) {
     type = 'Đèn';
     icon = 'lamp';
   } else if (
@@ -86,6 +112,7 @@ export function mapDeviceToUI(
     valueStr = temp !== undefined ? `${temp}°C` : undefined;
   } else if (
     typeUpper.includes('GATE') ||
+    typeUpper.includes('DOOR') ||
     typeUpper.includes('ROLLING') ||
     typeUpper.includes('CURTAIN') ||
     nameLower.includes('cổng') ||
@@ -100,23 +127,6 @@ export function mapDeviceToUI(
     isSensor = true;
     const temp = d.currentState?.temperature;
     valueStr = temp !== undefined ? `${temp}°C` : undefined;
-  } else if (
-    typeUpper.includes('LUX') ||
-    typeUpper.includes('SUN') ||
-    typeUpper.includes('LIGHT_SENSOR')
-  ) {
-    type = 'Cảm biến';
-    icon = 'sun';
-    isSensor = true;
-    const lux = d.currentState?.lux;
-    valueStr =
-      lux !== undefined
-        ? `${lux} lx`
-        : d.currentState?.LIGHT_SENSOR !== undefined
-        ? Number(d.currentState.LIGHT_SENSOR) === 1
-          ? 'Sáng'
-          : 'Tối'
-        : undefined;
   } else if (typeUpper.includes('MOTION')) {
     type = 'Cảm biến';
     icon = 'activity';
@@ -168,7 +178,10 @@ export function mapDeviceToUI(
     } else if (type === 'Cảm biến') {
       statusText = 'Bình thường';
     } else if (type === 'Cổng') {
-      statusText = isPowerOn ? 'Đang mở' : 'Đã dừng';
+      const st = String(d.currentState?.state ?? '').toUpperCase();
+      statusText = st.startsWith('OPEN') ? 'Đang mở' : st.startsWith('CLOS') ? 'Đã đóng' : 'Đã dừng';
+    } else if (type === 'Quạt') {
+      statusText = isPowerOn ? `Đang chạy · mức ${d.currentState?.speed ?? 1}` : 'Đã tắt';
     }
   }
 
@@ -277,6 +290,10 @@ export function getDeviceTypeColorClass(type: FigmaDeviceType): string {
       return 'violet';
     case 'Camera':
       return 'slate';
+    case 'Quạt':
+      return 'sky';
+    case 'TV':
+      return 'violet';
     case 'Công tắc':
     default:
       return 'indigo';
