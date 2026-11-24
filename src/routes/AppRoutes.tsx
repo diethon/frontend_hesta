@@ -55,9 +55,6 @@ export function AppRoutes() {
 
   return (
     <Routes>
-      <Route path="/fall-detection" element={<FallDetectionPage />} />
-      <Route path="/camera-ai" element={<FallDetectionPage />} />
-      <Route path="/home/:homeId/fall-detection" element={<FallDetectionPage />} />
       <Route path="/twin-demo" element={<Suspense fallback={<p role="status" className="p-8 text-muted">Đang mở căn hộ mẫu…</p>}><TwinDemoPage /></Suspense>} />
       <Route path="/login" element={
         <LoginForm
@@ -114,6 +111,9 @@ export function AppRoutes() {
         <Route path="/home/:homeId/members" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <MemberPage />} />
         <Route path="/home/:homeId/devices" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <DevicePage />} />
         <Route path="/home/:homeId/energy" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <EnergyDashboardPage />} />
+        <Route path="/home/:homeId/fall-detection" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <FallDetectionPage />} />
+        <Route path="/fall-detection" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <FallDetectionPage />} />
+        <Route path="/camera-ai" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <FallDetectionPage />} />
         <Route path="/home/:homeId/digital-twin" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <Suspense fallback={<p role="status" className="p-8 text-muted">Đang tải Digital Twin…</p>}><DigitalTwinPage /></Suspense>} />
         <Route element={<RequireAdmin initialized={initialized} user={user} />}>
           <Route path="/admin" element={<AdminDashboard user={user!} onLogout={logout} onProfileUpdate={updateUser} />} />

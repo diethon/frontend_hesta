@@ -23,6 +23,31 @@ export interface EnergyTabProps {
   onDeviceUpdated?: (updated: DeviceResponse) => void;
 }
 
+function resolveDefaultWattage(rawType?: string, resolvedType?: FigmaDeviceType): number {
+  const t = (rawType || '').trim().toUpperCase();
+  if (t) {
+    if (t === 'AIR_CONDITIONER' || t === 'AC' || t === 'AC_REMOTE') return 1500;
+    if (t === 'HEATER' || t === 'WATER_HEATER') return 2500;
+    if (t === 'SMART_PLUG' || t === 'SOCKET') return 500;
+    if (t === 'WATER_PUMP') return 370;
+    if (t === 'GATE' || t === 'GATE_MOTOR' || t === 'ROLLING_DOOR' || t === 'DOOR') return 350;
+    if (t === 'FRIDGE') return 150;
+    if (t === 'TV') return 120;
+    if (t === 'FAN') return 65;
+    if (t === 'CURTAIN') return 60;
+    if (t === 'LIGHT' || t === 'LED') return 40;
+    if (t === 'LED_RGB') return 24;
+    if (t === 'CAMERA_AI' || t === 'CAMERA') return 15;
+    if (t === 'ROUTER') return 12;
+    if (t === 'IR_REMOTE') return 3;
+    if (t.includes('SENSOR')) return 2;
+  }
+  if (resolvedType === 'Điều hòa') return 1500;
+  if (resolvedType === 'Cổng') return 350;
+  if (resolvedType === 'Cảm biến') return 2;
+  return 40;
+}
+
 export const EnergyTab: React.FC<EnergyTabProps> = ({
   device,
   resolvedType,
@@ -38,7 +63,6 @@ export const EnergyTab: React.FC<EnergyTabProps> = ({
 }) => {
   const isGate = resolvedType === 'Cổng';
   const isSensor = resolvedType === 'Cảm biến';
-  const isAc = resolvedType === 'Điều hòa';
 
   const devId = device?.raw?.id || device?.id;
   const [range, setRange] = useState<'7 ngày' | '30 ngày'>('30 ngày');
@@ -69,12 +93,13 @@ export const EnergyTab: React.FC<EnergyTabProps> = ({
 
   // Wattage Configuration
   const rawCustomWattage = device?.raw?.settings?.wattage ?? device?.settings?.wattage;
+  const rawDeviceType = device?.raw?.deviceType || device?.deviceType;
   const currentWattage =
     propWattage !== undefined
       ? propWattage
       : rawCustomWattage !== undefined
       ? Number(rawCustomWattage)
-      : (energyData?.wattage ?? (isAc ? 750 : isSensor ? 2 : 40));
+      : (energyData?.wattage ?? resolveDefaultWattage(rawDeviceType, resolvedType));
   const hasCustomWattage =
     propHasCustomWattage !== undefined ? propHasCustomWattage : rawCustomWattage !== undefined;
 
@@ -116,9 +141,6 @@ export const EnergyTab: React.FC<EnergyTabProps> = ({
         ...existingSettings,
         wattage: parsedWatt,
       };
-      if (typeof window !== 'undefined') {
-        window.localStorage.setItem(`hesta_wattage_${targetId}`, String(parsedWatt));
-      }
       const updated = await updateDeviceConfig(targetId, {
         name: device?.raw?.name || device?.name,
         settings: updatedSettings,
