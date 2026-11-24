@@ -1,14 +1,18 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import type { DeviceSummary, RuleConditionInput } from '../../types/automation';
+import type { DeviceGroupResponse } from '../../types/deviceGroup';
 import { Icon } from '../ui/LucideIcon';
 import { PickerField } from './PickerField';
 import { StepperInput } from './StepperInput';
 import { describeCondition } from './ruleLabels';
 
 export interface ConditionCardProps {
-  condition: RuleConditionInput & { id?: string; deviceName?: string };
+  condition: RuleConditionInput & { id?: string; deviceName?: string; groupName?: string };
   index: number;
   devices: DeviceSummary[];
+  groups?: DeviceGroupResponse[];
+  /** Switches the condition to watch a group (any member) instead of one device. */
+  onPickGroup?: () => void;
   isExpanded: boolean;
   onToggleExpand: () => void;
   onChange: (updated: RuleConditionInput) => void;
@@ -35,9 +39,11 @@ const OPERATORS = [
 
 export function formatConditionHuman(
   cond: RuleConditionInput,
-  dev?: DeviceSummary
+  dev?: DeviceSummary,
+  groupName?: string,
 ): string {
-  const text = describeCondition(cond.attribute, cond.operator, cond.expectedValue, dev?.name || 'cảm biến');
+  const source = cond.groupId !== undefined ? `một thiết bị trong nhóm ${groupName || '(chưa chọn)'}` : dev?.name || 'cảm biến';
+  const text = describeCondition(cond.attribute, cond.operator, cond.expectedValue, source);
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
@@ -51,6 +57,8 @@ export const ConditionCard: React.FC<ConditionCardProps> = ({
   onDuplicate,
   onDelete,
   onPickDevice,
+  groups = [],
+  onPickGroup,
 }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [customAttrOpen, setCustomAttrOpen] = useState(false);
@@ -71,10 +79,18 @@ export const ConditionCard: React.FC<ConditionCardProps> = ({
     [devices, condition.deviceId]
   );
 
+  const isGroup = condition.groupId !== undefined;
+  const group = useMemo(() => groups.find((g) => g.id === condition.groupId), [groups, condition.groupId]);
+  const groupName = group?.name || condition.groupName;
+
   // Available attributes based on sensor type
   const availableAttrs = useMemo(() => {
     if (!device) return COMMON_ATTRIBUTES;
     const type = (device.deviceType || '').toUpperCase();
+    // A light, fan, plug…: "when it turns on/off" (its reported power ON/OFF).
+    if (device.actionable && !device.sensor && !type.includes('SENSOR')) {
+      return [{ key: 'power', label: 'Bật / tắt', unit: '', kind: 'boolean' }];
+    }
     if (type.includes('TEMP') || type.includes('DHT')) {
       return COMMON_ATTRIBUTES.filter((a) => ['temperature', 'humidity'].includes(a.key));
     }
@@ -129,7 +145,7 @@ export const ConditionCard: React.FC<ConditionCardProps> = ({
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <strong className="text-xs text-[var(--text)] block truncate">
-                {device?.name || 'Chọn cảm biến...'}
+                {isGroup ? (groupName ? `Nhóm ${groupName}` : 'Chọn nhóm...') : device?.name || 'Chọn thiết bị...'}
               </strong>
               {device?.roomName && (
                 <span className="shrink-0 whitespace-nowrap text-[10px] text-[var(--tertiary)] bg-[var(--solid)] px-1.5 py-0.5 rounded-md border border-[var(--border)]">
@@ -138,7 +154,7 @@ export const ConditionCard: React.FC<ConditionCardProps> = ({
               )}
             </div>
             <span className="text-[11px] text-[var(--secondary)] block truncate mt-0.5">
-              {formatConditionHuman(condition, device)}
+              {formatConditionHuman(condition, device, groupName)}
             </span>
           </div>
         </div>
@@ -198,11 +214,46 @@ export const ConditionCard: React.FC<ConditionCardProps> = ({
         <div className="action-step-expanded p-4 pt-1 border-t border-[var(--border)] bg-[var(--solid)]/50 space-y-4">
           {/* (a) Sensor PickerField */}
           <div className="space-y-1">
-            <label className="text-[11px] font-bold text-[var(--secondary)] uppercase tracking-wider block">
-              Cảm biến nguồn
-            </label>
+            <div className="flex items-center justify-between">
+              <label className="text-[11px] font-bold text-[var(--secondary)] uppercase tracking-wider block">
+                Theo dõi
+              </label>
+              {/* One device, or a group: true when ANY member matches. */}
+              <div className="flex items-center gap-0.5 p-0.5 rounded-lg bg-[var(--muted)] border border-[var(--border)]">
+                {([['device', 'Thiết bị'], ['group', 'Nhóm']] as const).map(([mode, text]) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    aria-pressed={(mode === 'group') === isGroup}
+                    onClick={() => {
+                      if ((mode === 'group') === isGroup) return;
+                      if (mode === 'group') {
+                        onChange({ ...condition, deviceId: undefined, groupId: '' });
+                        onPickGroup?.();
+                      } else {
+                        onChange({ ...condition, groupId: undefined });
+                      }
+                    }}
+                    className={`px-2 py-0.5 rounded-md text-[11px] font-bold cursor-pointer ${
+                      (mode === 'group') === isGroup ? 'bg-[var(--solid)] text-[var(--text)] shadow-xs' : 'text-[var(--secondary)]'
+                    }`}
+                  >
+                    {text}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {isGroup ? (
+              <PickerField
+                label={groupName || 'Chọn nhóm'}
+                caption={group ? `Đúng khi bất kỳ thiết bị nào trong ${group.deviceCount} thiết bị thỏa điều kiện` : 'Nhấn để chọn nhóm'}
+                icon="grid"
+                hasError={!condition.groupId}
+                onClick={() => onPickGroup?.()}
+              />
+            ) : (
             <PickerField
-              label={device ? device.name : 'Chọn cảm biến'}
+              label={device ? device.name : 'Chọn thiết bị'}
               caption={
                 !device
                   ? 'Nhấn để chọn cảm biến kích hoạt'
@@ -215,7 +266,8 @@ export const ConditionCard: React.FC<ConditionCardProps> = ({
               hasError={!device}
               onClick={onPickDevice}
             />
-            {isOffline && (
+            )}
+            {!isGroup && isOffline && (
               <p className="text-[10px] text-amber-600 font-medium">
                 Cảm biến đang ngoại tuyến · Quy tắc vẫn có thể lưu nhưng cần thiết bị online để hoạt động.
               </p>

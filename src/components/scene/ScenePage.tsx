@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { sceneRunMessage } from './sceneRunMessage';
 import { useNavigate, useParams } from 'react-router';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { currentHomeChanged, currentHomeCleared } from '../../store/homeSlice';
@@ -8,6 +9,8 @@ import {
   updateScene,
   deleteScene,
   executeScene,
+  runSceneLater,
+  cancelSceneRunLater,
   getSceneExecutions,
   getDevices,
   getSceneActionTypes,
@@ -37,6 +40,84 @@ function runSucceeded(run: SceneExecutionResponse): boolean {
   if (run.status === 'SUCCESS') return true;
   if (run.status === 'PENDING' || !run.resultDetail?.length) return false;
   return run.resultDetail.every((r) => r.success);
+}
+
+// Same presets as the mobile app (scene_timer.dart).
+const RUN_LATER_PRESETS = [
+  { label: '10 giây', seconds: 10 },
+  { label: '1 phút', seconds: 60 },
+  { label: '5 phút', seconds: 300 },
+  { label: '15 phút', seconds: 900 },
+  { label: '30 phút', seconds: 1800 },
+  { label: '1 giờ', seconds: 3600 },
+];
+const RUN_LATER_UNITS = [
+  { label: 'giây', seconds: 1 },
+  { label: 'phút', seconds: 60 },
+  { label: 'giờ', seconds: 3600 },
+];
+const MAX_RUN_LATER_SECONDS = 24 * 3600;
+
+/** "1:05:09" / "4:07" countdown to `runAt`. */
+export function formatCountdown(runAt: string, now: number): string {
+  const total = Math.max(0, Math.ceil((new Date(runAt).getTime() - now) / 1000));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const sec = String(total % 60).padStart(2, '0');
+  return h ? `${h}:${String(m).padStart(2, '0')}:${sec}` : `${m}:${sec}`;
+}
+
+/** Re-renders every second while `active`, for countdowns. */
+function useNow(active: boolean): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!active) return;
+    setNow(Date.now());
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [active]);
+  return now;
+}
+
+function RunLaterForm({ onSubmit }: { onSubmit: (seconds: number) => Promise<void> }) {
+  const [amount, setAmount] = useState('2');
+  const [unit, setUnit] = useState(60);
+  const [busy, setBusy] = useState(false);
+  const seconds = Math.round(Number(amount) * unit);
+  const valid = Number.isFinite(seconds) && seconds >= 1 && seconds <= MAX_RUN_LATER_SECONDS;
+  const submit = async (value: number) => {
+    setBusy(true);
+    try {
+      await onSubmit(value);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="st-run-later">
+      <p className="st-subtitle">Kịch bản sẽ tự chạy một lần sau khoảng thời gian bạn chọn. Đặt lại sẽ thay hẹn giờ cũ.</p>
+      <div className="st-run-later-presets">
+        {RUN_LATER_PRESETS.map((preset) => (
+          <button key={preset.seconds} type="button" className="st-btn st-btn-sm" disabled={busy}
+            onClick={() => void submit(preset.seconds)}>
+            {preset.label}
+          </button>
+        ))}
+      </div>
+      <form className="st-run-later-custom" onSubmit={(e) => { e.preventDefault(); if (valid) void submit(seconds); }}>
+        <label>
+          <span>Hoặc tự nhập</span>
+          <input type="number" min={1} step="any" inputMode="decimal" value={amount}
+            aria-label="Số lượng" onChange={(e) => setAmount(e.target.value)} />
+        </label>
+        <select aria-label="Đơn vị" value={unit} onChange={(e) => setUnit(Number(e.target.value))}>
+          {RUN_LATER_UNITS.map((u) => <option key={u.seconds} value={u.seconds}>{u.label}</option>)}
+        </select>
+        <button type="submit" className="st-btn st-btn-primary" disabled={!valid || busy}>Hẹn giờ</button>
+      </form>
+      {!valid && <small className="st-run-later-error">Chọn từ 1 giây đến 24 giờ.</small>}
+    </div>
+  );
 }
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -95,6 +176,8 @@ function ScenarioCard({
   onDuplicate,
   onDelete,
   onRun,
+  onRunLater,
+  onCancelRunLater,
   running,
   runSuccess,
   hasFailed,
@@ -106,6 +189,8 @@ function ScenarioCard({
   onDuplicate: () => void;
   onDelete: () => void;
   onRun: () => void;
+  onRunLater: () => void;
+  onCancelRunLater: () => void;
   running: boolean;
   runSuccess: boolean;
   hasFailed?: boolean;
@@ -115,8 +200,12 @@ function ScenarioCard({
   const sceneIcon = getFigmaIconForScene(scene.name, scene.icon);
   const hue = SCENE_HUES[sceneIcon];
 
+  const pendingRunAt = scene.pendingRunAt ?? null;
+  const now = useNow(!!pendingRunAt);
   const status = running
     ? { dot: 'on', text: 'Đang chạy…' }
+    : pendingRunAt
+    ? { dot: 'on', text: new Date(pendingRunAt).getTime() <= now ? 'Đang chạy…' : `Chạy sau ${formatCountdown(pendingRunAt, now)}` }
     : hasFailed
     ? { dot: 'err', text: 'Lần chạy gần nhất lỗi' }
     : scene.enabled
@@ -218,6 +307,8 @@ function ScenarioCard({
           {menu && (
             <span className="st-menu up" onClick={(e) => e.stopPropagation()}>
               {menuItem('Chỉnh sửa', 'pencil', onOpen)}
+              {scene.enabled && actions.length > 0 && menuItem(pendingRunAt ? 'Đổi hẹn giờ chạy' : 'Chạy sau…', 'clock', onRunLater)}
+              {pendingRunAt && menuItem('Hủy hẹn giờ chạy', 'x', onCancelRunLater)}
               {menuItem('Xem lịch sử', 'clock', onHistory)}
               {menuItem('Nhân bản', 'copy', onDuplicate)}
               <hr />
@@ -329,6 +420,7 @@ export function SceneHistory({
     switch (trigger) {
       case 'MANUAL': return 'Bạn bấm chạy';
       case 'SCHEDULE': return 'Tự chạy theo giờ hẹn';
+      case 'TIMER': return 'Hẹn giờ chạy một lần';
       case 'AUTOMATION': return 'Do quy tắc tự động';
       case 'VOICE': return 'Ra lệnh bằng giọng nói';
       default: return 'Tự chạy';
@@ -582,6 +674,7 @@ export function ScenePage() {
     | null
     | { type: 'editor'; scene?: SceneResponse | null }
     | { type: 'history'; scene: SceneResponse }
+    | { type: 'timer'; scene: SceneResponse }
     | { type: 'ai' };
 
   const [sheet, setSheet] = useState<SheetType>(null);
@@ -677,17 +770,42 @@ export function ScenePage() {
       if (isOk) {
         setSuccessId(scene.id);
         setFailedIds((prev) => ({ ...prev, [scene.id]: false }));
-        notify.success(`Đã kích hoạt "${scene.name}" thành công`);
+        notify.success(sceneRunMessage(scene, res).text);
         window.setTimeout(() => setSuccessId(null), 1400);
       } else {
         setFailedIds((prev) => ({ ...prev, [scene.id]: true }));
-        notify.warning(`Kịch bản "${scene.name}" chạy với một số lỗi`);
+        const msg = sceneRunMessage(scene, res);
+        notify[msg.kind](msg.text);
       }
     } catch (err: unknown) {
       setFailedIds((prev) => ({ ...prev, [scene.id]: true }));
       notify.error(getErrorMessage(err, 'Lỗi khi kích hoạt kịch bản'));
     } finally {
       setRunningId(null);
+    }
+  };
+
+  const setPendingRun = (sceneId: string, pendingRunAt: string | null) =>
+    setScenes((prev) => prev.map((s) => (s.id === sceneId ? { ...s, pendingRunAt } : s)));
+
+  const handleRunLater = async (scene: SceneResponse, seconds: number) => {
+    try {
+      const runAt = await runSceneLater(homeId, scene.id, seconds);
+      setPendingRun(scene.id, runAt);
+      setSheet(null);
+      notify.success(`"${scene.name}" sẽ chạy lúc ${new Date(runAt).toLocaleTimeString('vi-VN', { hour12: false })}`);
+    } catch (err: unknown) {
+      notify.error(getErrorMessage(err, 'Không hẹn giờ được kịch bản'));
+    }
+  };
+
+  const handleCancelRunLater = async (scene: SceneResponse) => {
+    try {
+      await cancelSceneRunLater(homeId, scene.id);
+      setPendingRun(scene.id, null);
+      notify.info(`Đã hủy hẹn giờ "${scene.name}"`);
+    } catch (err: unknown) {
+      notify.error(getErrorMessage(err, 'Không hủy được hẹn giờ'));
     }
   };
 
@@ -862,6 +980,8 @@ export function ScenePage() {
                 onDuplicate={() => handleDuplicate(scene)}
                 onDelete={() => setDeletingScene(scene)}
                 onRun={() => handleRun(scene)}
+                onRunLater={() => setSheet({ type: 'timer', scene })}
+                onCancelRunLater={() => void handleCancelRunLater(scene)}
                 running={runningId === scene.id}
                 runSuccess={successId === scene.id}
                 hasFailed={failedIds[scene.id]}
@@ -883,6 +1003,11 @@ export function ScenePage() {
             />
           )}
 
+          {sheet.type === 'timer' && (
+            <PanelShell title={sheet.scene.name} caption="Hẹn giờ chạy một lần" onClose={() => setSheet(null)}>
+              <RunLaterForm onSubmit={(seconds) => handleRunLater(sheet.scene, seconds)} />
+            </PanelShell>
+          )}
           {sheet.type === 'history' && (
             <PanelShell
               title={sheet.scene.name}

@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { DELAY_ACTION } from '../../types/automation';
+import { formatDuration } from './ruleTiming';
 import type { AutomationRule, AutomationExecution, DeviceSummary } from '../../types/automation';
 import type { SceneResponse } from '../../types/scene';
 import { getAutomationExecutions } from '../../services/automationApi';
@@ -149,6 +151,15 @@ export const RuleHistoryPanel: React.FC<RuleHistoryPanelProps> = ({
               <Icon name="x" size={12} className="text-rose-600" />
             </span>
             <span>Thất bại</span>
+          </span>
+        );
+      case 'PENDING':
+        return (
+          <span className="flex items-center gap-1.5 text-xs font-semibold text-[var(--accent)]">
+            <span className="w-5 h-5 rounded-full bg-[var(--accent-soft)] flex items-center justify-center">
+              <Icon name="clock" size={12} className="text-[var(--accent)]" />
+            </span>
+            <span>Đang chạy (có bước chờ)</span>
           </span>
         );
       case 'SKIPPED':
@@ -319,7 +330,9 @@ export const RuleHistoryPanel: React.FC<RuleHistoryPanelProps> = ({
                           ) : (
                             details.map((detail, dIdx) => {
                               let targetName = 'Thiết bị';
-                              if (detail.sceneId) {
+                              if (detail.action === DELAY_ACTION) {
+                                targetName = `Chờ ${formatDuration(detail.seconds || 0)}`;
+                              } else if (detail.sceneId) {
                                 const sc = scenes.find((s) => s.id === detail.sceneId);
                                 targetName = sc ? sc.name : 'Kịch bản đã bị xóa';
                               } else if (detail.deviceId) {
@@ -329,7 +342,7 @@ export const RuleHistoryPanel: React.FC<RuleHistoryPanelProps> = ({
 
                               const isDeleted =
                                 targetName.includes('đã bị xóa') ||
-                                (!detail.deviceId && !detail.sceneId);
+                                (!detail.deviceId && !detail.sceneId && detail.action !== DELAY_ACTION);
 
                               return (
                                 <div

@@ -4,6 +4,8 @@ import { Icon } from '../ui/LucideIcon';
 export interface SplitButtonProps {
   onAddDevice: () => void;
   onAddScene: () => void;
+  onAddGroup?: () => void;
+  onAddDelay?: () => void;
   disabled?: boolean;
   className?: string;
 }
@@ -11,6 +13,8 @@ export interface SplitButtonProps {
 export const SplitButton: React.FC<SplitButtonProps> = ({
   onAddDevice,
   onAddScene,
+  onAddGroup,
+  onAddDelay,
   disabled = false,
   className = '',
 }) => {
@@ -77,6 +81,26 @@ export const SplitButton: React.FC<SplitButtonProps> = ({
             </span>
             <span>Chạy kịch bản</span>
           </button>
+
+          {[
+            onAddGroup && { key: 'group', icon: 'grid' as const, label: 'Điều khiển cả nhóm', run: onAddGroup },
+            onAddDelay && { key: 'delay', icon: 'clock' as const, label: 'Chờ một lúc', run: onAddDelay },
+          ].filter((item): item is { key: string; icon: 'grid' | 'clock'; label: string; run: () => void } => Boolean(item)).map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                item.run();
+              }}
+              className="w-full px-3 py-2 rounded-xl text-left text-xs font-semibold text-[var(--text)] hover:bg-[var(--g1)] transition-colors flex items-center gap-2.5 cursor-pointer mt-0.5"
+            >
+              <span className="w-6 h-6 rounded-lg bg-[var(--muted)] flex items-center justify-center text-[var(--accent)] shrink-0">
+                <Icon name={item.icon} size={13} />
+              </span>
+              <span>{item.label}</span>
+            </button>
+          ))}
         </div>
       )}
     </div>

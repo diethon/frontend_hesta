@@ -1,4 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { getHomeDeviceGroups } from '../../services/deviceGroupApi';
+import type { DeviceGroupResponse } from '../../types/deviceGroup';
 import { useNavigate, useParams } from 'react-router';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { currentHomeChanged, currentHomeCleared } from '../../store/homeSlice';
@@ -30,6 +32,21 @@ import { useRealtimeRefetch } from '../../realtime/useRealtimeRefetch';
 
 // Last list per home: revisiting the page paints it at once while a fresh copy loads.
 const rulesCache = new Map<string, AutomationRule[]>();
+
+/**
+ * Whether a rule watches or controls the picked device or group. A device counts through any group it is in,
+ * and a group counts through any of its devices.
+ */
+function ruleTouches(rule: AutomationRule, target: string, groups: DeviceGroupResponse[]): boolean {
+  const [kind, id] = [target.slice(0, 1), target.slice(2)];
+  const refs = [...rule.conditions, ...rule.actions];
+  if (kind === 'g') {
+    const members = groups.find((g) => g.id === id)?.deviceIds ?? [];
+    return refs.some((r) => r.groupId === id || (r.deviceId !== undefined && members.includes(r.deviceId)));
+  }
+  const groupsOfDevice = groups.filter((g) => g.deviceIds.includes(id)).map((g) => g.id);
+  return refs.some((r) => r.deviceId === id || (r.groupId !== undefined && groupsOfDevice.includes(r.groupId)));
+}
 
 const AUTOMATION_REFRESH_EVENTS = ['AUTOMATION_RULE_CHANGED', 'SCENE_CHANGED'] as const;
 
@@ -64,6 +81,9 @@ export function AutomationRulePage() {
   const [statusFilter, setStatusFilter] = useState<'Tất cả' | 'Đang bật' | 'Đang tắt'>('Tất cả');
   const [typeFilter, setTypeFilter] = useState<'ALL' | 'SENSOR' | 'EVENT' | 'SCHEDULE'>('ALL');
   const [query, setQuery] = useState('');
+  // "d:<deviceId>" or "g:<groupId>": rules that watch or control that device / group.
+  const [targetFilter, setTargetFilter] = useState('');
+  const [deviceGroups, setDeviceGroups] = useState<DeviceGroupResponse[]>([]);
 
   // Modals & Panels
   const [editorRule, setEditorRule] = useState<AutomationRule | null | undefined>(undefined); // undefined = closed
@@ -76,6 +96,7 @@ export function AutomationRulePage() {
     if (!homeId) return;
     setError(null);
     // Rules carry device/scene names, so the list renders from them alone; devices and scenes only feed the editor.
+    void getHomeDeviceGroups(homeId).then((list) => setDeviceGroups(list || [])).catch(() => undefined);
     void Promise.all([getDevices(homeId), getScenes(homeId)])
       .then(([fetchedDevices, fetchedScenes]) => {
         setDevices(fetchedDevices || []);
@@ -115,6 +136,8 @@ export function AutomationRulePage() {
       // Type filter
       if (typeFilter !== 'ALL' && rule.triggerType !== typeFilter) return false;
 
+      if (targetFilter && !ruleTouches(rule, targetFilter, deviceGroups)) return false;
+
       // Search query
       if (q) {
         const haystack = [
@@ -127,7 +150,7 @@ export function AutomationRulePage() {
       }
       return true;
     });
-  }, [rules, statusFilter, typeFilter, query]);
+  }, [rules, statusFilter, typeFilter, query, targetFilter, deviceGroups]);
 
   // Optimistic Toggle
   const handleToggleRule = async (ruleId: string, nextEnabled: boolean) => {
@@ -154,8 +177,10 @@ export function AutomationRulePage() {
         description: rule.description,
         triggerType: rule.triggerType,
         enabled: false,
+        holdSeconds: rule.holdSeconds || 0,
         conditions: (rule.conditions || []).map((c, i) => ({
           deviceId: c.deviceId,
+          groupId: c.groupId ?? undefined,
           attribute: c.attribute,
           operator: c.operator,
           expectedValue: c.expectedValue,
@@ -165,6 +190,7 @@ export function AutomationRulePage() {
         actions: (rule.actions || []).map((a, i) => ({
           deviceId: a.deviceId,
           sceneId: a.sceneId,
+          groupId: a.groupId ?? undefined,
           action: a.action,
           parameters: a.parameters || {},
           order: i,
@@ -276,6 +302,27 @@ export function AutomationRulePage() {
             ))}
           </div>
 
+          <select
+            className="st-target-filter"
+            value={targetFilter}
+            onChange={(e) => setTargetFilter(e.target.value)}
+            aria-label="Lọc theo thiết bị hoặc nhóm"
+          >
+            <option value="">Mọi thiết bị</option>
+            {deviceGroups.length > 0 && (
+              <optgroup label="Nhóm thiết bị">
+                {deviceGroups.map((g) => (
+                  <option key={g.id} value={`g:${g.id}`}>{g.name}</option>
+                ))}
+              </optgroup>
+            )}
+            <optgroup label="Thiết bị">
+              {devices.map((d) => (
+                <option key={d.id} value={`d:${d.id}`}>{d.name}</option>
+              ))}
+            </optgroup>
+          </select>
+
           <label className="st-search st-search-slim">
             <Icon name="search" />
             <input
@@ -355,6 +402,7 @@ export function AutomationRulePage() {
               setQuery('');
               setStatusFilter('Tất cả');
               setTypeFilter('ALL');
+              setTargetFilter('');
             }}
           />
         ) : (
