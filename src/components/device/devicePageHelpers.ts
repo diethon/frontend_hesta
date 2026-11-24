@@ -76,10 +76,34 @@ export function mapDeviceToUI(
   const nameLower = (d.name || '').toLowerCase();
   const sensorMetrics = extractSensorMetrics(d.currentState);
 
-  if (typeUpper.includes('LIGHT') && !typeUpper.includes('SENSOR')) {
-    type = 'Đèn';
-    icon = 'lamp';
-  } else if (typeUpper.includes('LED')) {
+  if (typeUpper === 'FAN' || typeUpper === 'SMART_FAN') {
+    type = 'Quạt';
+    icon = 'wind';
+    const spd = resolveFanSpeedLevel(d.currentState);
+    valueStr = isPowerOn && spd > 0 ? `Mức ${spd}` : undefined;
+  } else if (typeUpper === 'TV' || typeUpper === 'SMART_TV') {
+    type = 'TV';
+    icon = 'tv';
+  } else if (typeUpper.includes('FLAME')) {
+    type = 'Cảm biến';
+    icon = 'flame';
+    isSensor = true;
+    if (sensorMetrics.flame !== undefined) {
+      valueStr = sensorMetrics.flame ? 'Phát hiện lửa!' : 'An toàn';
+    }
+  } else if (typeUpper.includes('LIGHT_SENSOR') || typeUpper.includes('LUX') || typeUpper.includes('SUN')) {
+    type = 'Cảm biến';
+    icon = 'sun';
+    isSensor = true;
+    valueStr =
+      sensorMetrics.lux !== undefined
+        ? `${sensorMetrics.lux} lx`
+        : sensorMetrics.lightBinary !== undefined
+          ? sensorMetrics.lightBinary
+            ? 'Sáng'
+            : 'Tối'
+          : undefined;
+  } else if ((typeUpper.includes('LIGHT') && !typeUpper.includes('SENSOR')) || typeUpper.includes('LED')) {
     type = 'Đèn';
     icon = 'lamp';
   } else if (
@@ -97,6 +121,7 @@ export function mapDeviceToUI(
   } else if (
     typeUpper === 'DOOR' ||
     typeUpper.includes('GATE') ||
+    typeUpper.includes('DOOR') ||
     typeUpper.includes('ROLLING') ||
     typeUpper.includes('CURTAIN') ||
     nameLower.includes('cổng') ||
@@ -114,22 +139,6 @@ export function mapDeviceToUI(
         ? `${sensorMetrics.temperature}°C`
         : sensorMetrics.humidity !== undefined
           ? `${sensorMetrics.humidity}%`
-          : undefined;
-  } else if (
-    typeUpper.includes('LUX') ||
-    typeUpper.includes('SUN') ||
-    typeUpper.includes('LIGHT_SENSOR')
-  ) {
-    type = 'Cảm biến';
-    icon = 'sun';
-    isSensor = true;
-    valueStr =
-      sensorMetrics.lux !== undefined
-        ? `${sensorMetrics.lux} lx`
-        : sensorMetrics.lightBinary !== undefined
-          ? sensorMetrics.lightBinary
-            ? 'Sáng'
-            : 'Tối'
           : undefined;
   } else if (typeUpper.includes('MOTION')) {
     type = 'Cảm biến';
@@ -232,6 +241,12 @@ export function mapDeviceToUI(
       else if (gateStr === 'CLOSED' || gateStr === 'CLOSE') statusText = 'Đã đóng';
       else if (gateStr === 'STOPPED' || gateStr === 'STOP') statusText = 'Đã dừng';
       else statusText = 'Sẵn sàng';
+    } else if (type === 'Quạt') {
+      const fanSpeed = resolveFanSpeedLevel(d.currentState);
+      statusText = isPowerOn ? (fanSpeed > 0 ? `Đang bật · Mức ${fanSpeed}` : 'Đang bật') : 'Đã tắt';
+    } else if (type === 'TV') {
+      const ch = d.currentState?.channel;
+      statusText = isPowerOn ? (ch !== undefined ? `Đang bật · Kênh ${ch}` : 'Đang bật') : 'Đã tắt';
     }
   }
 
@@ -340,6 +355,10 @@ export function getDeviceTypeColorClass(type: FigmaDeviceType): string {
       return 'violet';
     case 'Camera':
       return 'slate';
+    case 'Quạt':
+      return 'sky';
+    case 'TV':
+      return 'violet';
     case 'Công tắc':
     default:
       return 'indigo';

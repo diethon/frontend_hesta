@@ -963,6 +963,10 @@
 .st-circuit-side .toggle {
   margin: 0 6px;
 }
+/* A flex row must not squeeze a switch into a bare circle (happened on phones). */
+.st-theme .toggle {
+  flex-shrink: 0;
+}
 .st-circuit-skeleton {
   height: 62px;
   border-radius: 14px;
@@ -2563,4 +2567,61 @@ select.gd-input {
   opacity: 0.4;
   cursor: not-allowed;
   background: transparent;
+}
+
+/* Scene "run after X" panel */
+.st-theme .st-run-later {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 4px 0;
+}
+.st-theme .st-run-later-presets {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.st-theme .st-run-later-custom {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.st-theme .st-run-later-custom label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1 1 100px;
+  font-size: 12px;
+  color: var(--secondary);
+}
+.st-theme .st-run-later-custom input,
+.st-theme .st-run-later-custom select {
+  height: 40px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--solid);
+  color: var(--text);
+  font-size: 14px;
+}
+.st-theme .st-run-later-error {
+  color: var(--danger);
+  font-size: 12px;
+}
+
+/* Automation list: filter by device or group */
+.st-theme .st-target-filter {
+  height: 40px;
+  max-width: 220px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--solid);
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+}
+@media (max-width: 640px) {
+  .st-theme .st-target-filter { max-width: 100%; flex: 1 1 100%; }
 }

@@ -22,6 +22,12 @@ interface SceneScheduleSectionProps {
 const DAY_LABELS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
 const DAY_NAMES = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ nhật'];
 
+/** "HH:mm:ss" whatever the server sent ("07:30" or "07:30:15"). */
+export function formatScheduleTime(time?: string | null): string {
+  const [h = '00', m = '00', s = '00'] = (time || '').split(':');
+  return `${h.padStart(2, '0')}:${m.padStart(2, '0')}:${s.slice(0, 2).padStart(2, '0')}`;
+}
+
 export function formatRepeatDays(days: number[]): string {
   if (!days || days.length === 0 || days.length === 7) return 'Hằng ngày';
   if (days.length === 5 && [1, 2, 3, 4, 5].every((d) => days.includes(d))) return 'Ngày thường (T2–T6)';
@@ -54,6 +60,7 @@ export const SceneScheduleSection: React.FC<SceneScheduleSectionProps> = ({
   // Form states for inline add/edit card
   const [hour, setHour] = useState('07');
   const [minute, setMinute] = useState('00');
+  const [second, setSecond] = useState('00');
   const [selectedDays, setSelectedDays] = useState<number[]>([]);
   const [saving, setSaving] = useState(false);
 
@@ -84,6 +91,7 @@ export const SceneScheduleSection: React.FC<SceneScheduleSectionProps> = ({
     setEditingId(null);
     setHour('07');
     setMinute('00');
+    setSecond('00');
     setSelectedDays([]);
     setAdding(true);
   };
@@ -91,9 +99,10 @@ export const SceneScheduleSection: React.FC<SceneScheduleSectionProps> = ({
   // Open inline edit form
   const handleOpenEdit = (sch: Schedule) => {
     setEditingId(sch.id);
-    const parts = (sch.scheduledTime || '07:00').slice(0, 5).split(':');
+    const parts = (sch.scheduledTime || '07:00:00').slice(0, 8).split(':');
     setHour(parts[0] || '07');
     setMinute(parts[1] || '00');
+    setSecond(parts[2] || '00');
     setSelectedDays(sch.repeatDays || []);
     setAdding(true);
   };
@@ -105,10 +114,10 @@ export const SceneScheduleSection: React.FC<SceneScheduleSectionProps> = ({
   };
 
   // Check overlap with other schedules
-  const currentFormattedTime = `${hour.padStart(2, '0')}:${minute.padStart(2, '0')}`;
+  const currentFormattedTime = `${hour.padStart(2, '0')}:${minute.padStart(2, '0')}:${second.padStart(2, '0')}`;
   const overlappingSchedule = schedules.find((s) => {
     if (editingId && s.id === editingId) return false;
-    const sTime = (s.scheduledTime || '').slice(0, 5);
+    const sTime = formatScheduleTime(s.scheduledTime);
     if (sTime !== currentFormattedTime) return false;
 
     // Both every day
@@ -138,7 +147,7 @@ export const SceneScheduleSection: React.FC<SceneScheduleSectionProps> = ({
   // Save schedule
   const handleSaveSchedule = async (e: React.FormEvent) => {
     e.preventDefault();
-    const timeString = `${hour.padStart(2, '0')}:${minute.padStart(2, '0')}`;
+    const timeString = currentFormattedTime;
     const payload: ScheduleInput = {
       scheduledTime: timeString,
       repeatDays: selectedDays,
@@ -217,7 +226,7 @@ export const SceneScheduleSection: React.FC<SceneScheduleSectionProps> = ({
 
   // Delete schedule
   const handleDeleteSchedule = async (sch: Schedule) => {
-    if (!await confirmDialog({ title: `Xóa lịch chạy ${sch.scheduledTime.slice(0, 5)}?`, description: 'Kịch bản sẽ không còn tự chạy vào giờ này.', confirmText: 'Xóa lịch', variant: 'danger' })) return;
+    if (!await confirmDialog({ title: `Xóa lịch chạy ${formatScheduleTime(sch.scheduledTime)}?`, description: 'Kịch bản sẽ không còn tự chạy vào giờ này.', confirmText: 'Xóa lịch', variant: 'danger' })) return;
 
     setSchedules((prev) => {
       const next = prev.filter((s) => s.id !== sch.id);
@@ -245,7 +254,7 @@ export const SceneScheduleSection: React.FC<SceneScheduleSectionProps> = ({
       ) : schedules.length > 0 ? (
         <div className="space-y-2">
           {schedules.map((sch) => {
-            const timeStr = (sch.scheduledTime || '').slice(0, 5);
+            const timeStr = formatScheduleTime(sch.scheduledTime);
             return (
               <div
                 key={sch.id}
@@ -317,7 +326,7 @@ export const SceneScheduleSection: React.FC<SceneScheduleSectionProps> = ({
           {/* Time Picker 24h */}
           <div className="space-y-1">
             <label className="text-[10px] font-bold text-[var(--secondary)] uppercase tracking-wider block">
-              Giờ kích hoạt (24h)
+              Giờ kích hoạt (giờ : phút : giây)
             </label>
             <div className="flex items-center gap-2 justify-center py-2 bg-[var(--solid)] rounded-xl border border-[var(--border)]">
               <input
@@ -327,6 +336,7 @@ export const SceneScheduleSection: React.FC<SceneScheduleSectionProps> = ({
                 value={hour}
                 onChange={(e) => setHour(e.target.value.slice(-2))}
                 className="w-12 text-center text-lg font-bold bg-transparent text-[var(--text)] focus:outline-none"
+                aria-label="Giờ"
               />
               <span className="text-lg font-bold text-[var(--tertiary)]">:</span>
               <input
@@ -336,6 +346,17 @@ export const SceneScheduleSection: React.FC<SceneScheduleSectionProps> = ({
                 value={minute}
                 onChange={(e) => setMinute(e.target.value.slice(-2))}
                 className="w-12 text-center text-lg font-bold bg-transparent text-[var(--text)] focus:outline-none"
+                aria-label="Phút"
+              />
+              <span className="text-lg font-bold text-[var(--tertiary)]">:</span>
+              <input
+                type="number"
+                min="0"
+                max="59"
+                value={second}
+                onChange={(e) => setSecond(e.target.value.slice(-2))}
+                className="w-12 text-center text-lg font-bold bg-transparent text-[var(--text)] focus:outline-none"
+                aria-label="Giây"
               />
             </div>
           </div>
@@ -389,7 +410,7 @@ export const SceneScheduleSection: React.FC<SceneScheduleSectionProps> = ({
 
           {overlappingSchedule && (
             <p className="text-[10px] text-amber-600 font-medium">
-              Trùng giờ với một lịch chạy hiện có ({overlappingSchedule.scheduledTime.slice(0, 5)}).
+              Trùng giờ với một lịch chạy hiện có ({formatScheduleTime(overlappingSchedule.scheduledTime)}).
             </p>
           )}
 

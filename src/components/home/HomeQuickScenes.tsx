@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { sceneRunMessage } from '../scene/sceneRunMessage';
 import { useNavigate } from 'react-router';
 import { Icon, type IconName } from './HomeIcons';
 import type { SceneResponse } from '../../types/scene';
@@ -47,8 +48,8 @@ export const HomeQuickScenes: React.FC<HomeQuickScenesProps> = ({
     setExecutingSceneId(scene.id);
     try {
       const res = await executeScene(homeId, scene.id);
-      if (res.status === 'SUCCESS') notify.success(`Đã kích hoạt kịch bản "${scene.name}"`);
-      else notify.warning(`Kịch bản "${scene.name}" chạy với một số lỗi`);
+      const msg = sceneRunMessage(scene, res);
+      notify[msg.kind](msg.text);
     } catch (err: unknown) {
       notify.error(getErrorMessage(err, `Lỗi khi kích hoạt "${scene.name}"`));
     } finally {

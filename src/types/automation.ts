@@ -77,6 +77,8 @@ export type SceneUpdateInput = Omit<SceneInput, 'actions'> & { actions?: SceneAc
 
 export interface RuleConditionInput {
   deviceId?: string;
+  /** Condition on a device group: true when ANY member matches. */
+  groupId?: string;
   attribute: string;
   operator: 'EQ' | 'NE' | 'GT' | 'GTE' | 'LT' | 'LTE';
   expectedValue: unknown;
@@ -87,6 +89,8 @@ export interface RuleConditionInput {
 export interface RuleActionInput {
   deviceId?: string;
   sceneId?: string;
+  /** Command every member of the group that supports the action. */
+  groupId?: string;
   action: string;
   parameters: Record<string, unknown>;
   order: number;
@@ -99,15 +103,27 @@ export interface AutomationRule {
   description?: string;
   triggerType: 'SENSOR' | 'EVENT' | 'SCHEDULE';
   enabled: boolean;
-  conditions: Array<RuleConditionInput & { id: string; deviceName?: string }>;
-  actions: Array<RuleActionInput & { id: string; deviceName?: string; sceneName?: string }>;
+  /** Seconds the conditions must stay true before the rule runs (0 = at once). */
+  holdSeconds?: number;
+  conditions: Array<RuleConditionInput & { id: string; deviceName?: string; groupName?: string }>;
+  actions: Array<RuleActionInput & { id: string; deviceName?: string; sceneName?: string; groupName?: string }>;
+  /** Times of a SCHEDULE rule ("HH:mm:ss", ISO days 1=Mon…7=Sun, empty = every day). */
+  schedules?: Array<{ id: string; scheduledTime: string; repeatDays: number[]; active: boolean }>;
 }
+
+/** A wait step (`action: 'DELAY'`, `parameters.seconds`) and the optional auto-off on a turn-on/open step. */
+export const DELAY_ACTION = 'DELAY';
+export const AUTO_OFF_KEY = 'autoOffSeconds';
+export const MAX_DELAY_SECONDS = 3600;
+export const MAX_AUTO_OFF_SECONDS = 24 * 3600;
+export const MAX_HOLD_SECONDS = 3600;
 
 export interface AutomationRuleInput {
   name: string;
   description?: string;
   triggerType: 'SENSOR' | 'EVENT' | 'SCHEDULE';
   enabled: boolean;
+  holdSeconds?: number;
   conditions: RuleConditionInput[];
   actions: RuleActionInput[];
   /** All times of a SCHEDULE rule, saved in the same request (at least one must be active). Omit to keep the saved ones. */
@@ -124,5 +140,5 @@ export interface AutomationExecution {
   matchedAt: string;
   startedAt?: string;
   completedAt?: string;
-  resultDetail: Array<{ deviceId?: string; sceneId?: string; action: string; success: boolean; status: string }>;
+  resultDetail: Array<{ deviceId?: string; sceneId?: string; groupId?: string; seconds?: number; autoOffSeconds?: number; action: string; success: boolean; status: string }>;
 }

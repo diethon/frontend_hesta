@@ -97,6 +97,14 @@ export const DetailHero: React.FC<DetailHeroProps> = ({
       iconName = 'camera';
       typeClass = 'type-camera';
       break;
+    case 'Quạt':
+      iconName = 'automation';
+      typeClass = 'type-dieu-hoa';
+      break;
+    case 'TV':
+      iconName = 'film';
+      typeClass = 'type-cong';
+      break;
     case 'Công tắc':
     default:
       iconName =
@@ -140,7 +148,21 @@ export const DetailHero: React.FC<DetailHeroProps> = ({
         : gateState === 'Đóng'
         ? 'Đã đóng'
         : 'Dừng';
-    subtitle = 'Cổng tự động HESTA';
+    const t = String(device?.raw?.deviceType || device?.deviceType || '').toUpperCase();
+    subtitle = t.includes('ROLLING')
+      ? 'Cửa cuốn thông minh'
+      : t.includes('CURTAIN')
+      ? 'Rèm tự động'
+      : t.includes('DOOR')
+      ? 'Cửa chính thông minh'
+      : 'Cổng tự động HESTA';
+  } else if (resolvedType === 'Quạt') {
+    const spd = Number((device?.raw?.currentState ?? device?.currentState)?.speed ?? 0);
+    primaryReadout = isOn ? `Bật · mức ${spd || 1}` : 'Tắt';
+    subtitle = isOn ? 'Quạt đang chạy' : 'Chạm nút nguồn để bật';
+  } else if (resolvedType === 'TV') {
+    primaryReadout = isOn ? 'Đang bật' : 'Tắt';
+    subtitle = 'Điều khiển hồng ngoại';
   } else if (resolvedType === 'Camera') {
     primaryReadout = disabled ? 'Ngoại tuyến' : 'Sẵn sàng';
     subtitle = disabled ? 'Không nhận tín hiệu hình ảnh' : 'Đang kết nối luồng HD';
@@ -150,10 +172,10 @@ export const DetailHero: React.FC<DetailHeroProps> = ({
     subtitle = isOn ? 'Đang cấp điện' : 'Đang ngắt điện';
   }
 
-  const isToggleable = ['Đèn', 'Điều hòa', 'Công tắc'].includes(resolvedType);
+  const isToggleable = ['Đèn', 'Điều hòa', 'Công tắc', 'Quạt', 'TV'].includes(resolvedType);
 
   // Chips
-  const isPowerDevice = ['Đèn', 'Điều hòa', 'Công tắc'].includes(resolvedType);
+  const isPowerDevice = ['Đèn', 'Điều hòa', 'Công tắc', 'Quạt', 'TV'].includes(resolvedType);
   const lastSeenStr = device?.raw?.lastSeen || device?.raw?.updatedAt || device?.lastSeen;
   const relativeTime = formatRelativeTime(lastSeenStr);
   const rawHeroState = (device?.raw?.currentState || device?.currentState) as Record<string, unknown> | undefined;

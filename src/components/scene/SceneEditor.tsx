@@ -14,6 +14,8 @@ import { DevicePickerSheet, isDeviceControllable } from './DevicePickerSheet';
 import { SceneScheduleSection } from './SceneScheduleSection';
 import { createScene, updateScene } from '../../services/sceneApi';
 import { saveSchedule } from '../../services/scheduleApi';
+import { getRooms } from '../../services/roomApi';
+import type { RoomResponse } from '../../types/room';
 import type { Schedule } from '../../types/schedule';
 import { notify } from '../ui/notify';
 import { buildSceneTemplate, type SceneTemplateKey } from './sceneTemplates';
@@ -142,6 +144,17 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
 
   // Sub-sheets
   const [pickingDeviceForIndex, setPickingDeviceForIndex] = useState<number | null>(null);
+
+  // Rooms (with their floor) for the device picker's floor/room filter; the picker still works without them.
+  const [homeRooms, setHomeRooms] = useState<RoomResponse[]>([]);
+  useEffect(() => {
+    if (!homeId) return;
+    let alive = true;
+    getRooms(homeId).then((list) => alive && setHomeRooms(list ?? [])).catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [homeId]);
 
   // Dialogs
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
@@ -1331,6 +1344,7 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
         {pickingDeviceForIndex !== null && (
           <DevicePickerSheet
             devices={devices}
+            rooms={homeRooms}
             selectedDeviceId={actions[pickingDeviceForIndex]?.deviceId}
             onSelect={(selectedDev) => {
               const idx = pickingDeviceForIndex;

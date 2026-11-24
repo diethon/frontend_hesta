@@ -1,4 +1,5 @@
 import { confirmDialog } from '../ui/confirmDialog';
+import { formatScheduleTime } from '../scene/SceneScheduleSection';
 import React, { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router';
 import {
@@ -92,7 +93,7 @@ export const SpotlightRecommendationBanner: React.FC<SpotlightRecommendationBann
 
   if (loading) {
     return (
-      <div className="w-full mb-6 p-4 rounded-3xl bg-surface/60 border border-line/60 backdrop-blur-md animate-pulse">
+      <div className="col-span-full w-full p-4 rounded-3xl bg-surface/60 border border-line/60 backdrop-blur-md animate-pulse">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-line/40" />
@@ -122,7 +123,7 @@ export const SpotlightRecommendationBanner: React.FC<SpotlightRecommendationBann
     : null;
 
   const scheduledTime = recommendation.triggerCondition?.time
-    ? recommendation.triggerCondition.time.slice(0, 5)
+    ? formatScheduleTime(recommendation.triggerCondition.time)
     : '07:00';
 
   const confidencePct = Math.round((recommendation.confidence || 0.8) * 100);
@@ -131,7 +132,7 @@ export const SpotlightRecommendationBanner: React.FC<SpotlightRecommendationBann
     <div
       role="region"
       aria-label="Đề xuất thói quen thông minh"
-      className="relative overflow-hidden w-full mb-6 p-5 sm:p-6 rounded-3xl border border-primary/30 bg-gradient-to-r from-primary/10 via-surface/90 to-accent/10 shadow-lg backdrop-blur-md transition-all duration-300 hover:shadow-xl hover:border-primary/50"
+      className="relative overflow-hidden col-span-full w-full p-5 sm:p-6 rounded-3xl border border-primary/30 bg-gradient-to-r from-primary/10 via-surface/90 to-accent/10 shadow-lg backdrop-blur-md transition-all duration-300 hover:shadow-xl hover:border-primary/50"
     >
       {/* Decorative accent orb */}
       <div className="absolute -top-12 -right-12 w-36 h-36 bg-primary/20 rounded-full blur-2xl pointer-events-none" />

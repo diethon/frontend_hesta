@@ -199,6 +199,25 @@ export const executeScene = (homeId: string, sceneId: string): Promise<SceneExec
       .catch(fail);
   });
 
+const setCachedPendingRun = (homeId: string, sceneId: string, pendingRunAt: string | null) => {
+  const cached = getCachedScenes(homeId);
+  if (cached) setCachedScenes(homeId, cached.map((s) => (s.id === sceneId ? { ...s, pendingRunAt } : s)));
+};
+
+/** Runs the scene once after `delaySeconds` (1s..24h), replacing any pending timer. Resolves with the run time. */
+export const runSceneLater = async (homeId: string, sceneId: string, delaySeconds: number) => {
+  const runAt = await featureRequest<string>(`${scenePath(homeId)}/${sceneId}/run-later?delaySeconds=${delaySeconds}`, {
+    method: 'POST',
+  });
+  setCachedPendingRun(homeId, sceneId, runAt);
+  return runAt;
+};
+
+export const cancelSceneRunLater = async (homeId: string, sceneId: string) => {
+  await featureRequest<void>(`${scenePath(homeId)}/${sceneId}/run-later`, { method: 'DELETE' });
+  setCachedPendingRun(homeId, sceneId, null);
+};
+
 export const getSceneExecutions = (homeId: string, sceneId: string) =>
   featureRequest<SceneExecutionResponse[]>(`${scenePath(homeId)}/${sceneId}/executions`);
 
