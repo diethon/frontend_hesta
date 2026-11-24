@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { X, MoreHorizontal } from 'lucide-react';
+import { X, MoreHorizontal, Sparkles, Wrench } from 'lucide-react';
+import { useNavigate } from 'react-router';
 import type { DeviceResponse, DeviceShadowResponse } from '../../types/device';
 import {
   updateDeviceConfig,
@@ -57,6 +58,8 @@ const DeviceDetailInner: React.FC<DeviceDetailModalProps & { device: DetailDevic
   onBrightnessChange,
 }) => {
   const devId = device?.raw?.id || device?.id;
+  const reportHomeId = device?.raw?.homeId;
+  const navigate = useNavigate();
   const resolvedType = resolveFigmaDeviceType(device);
   const isReadOnly = device?.accessLevel === 'VIEW' || device?.raw?.accessLevel === 'VIEW';
   const isUnknown = device?.raw?.status === 'UNKNOWN' || device?.status === 'UNKNOWN';
@@ -418,16 +421,42 @@ const DeviceDetailInner: React.FC<DeviceDetailModalProps & { device: DetailDevic
             </span>
           </div>
 
-          {!isReadOnly && (
-            <button
-              type="button"
-              className="detail-icon-button"
-              onClick={() => setMenu(!menu)}
-              aria-label="Tùy chọn thiết bị"
-            >
-              <MoreHorizontal className="w-5 h-5" />
-            </button>
-          )}
+          <div className="detail-header-actions">
+            {reportHomeId && devId && (
+              // VIEW members may report or consult the diagnostic assistant; the backend checks device access.
+              <>
+                <button
+                  type="button"
+                  className="detail-icon-button"
+                  title="Hỏi trợ lý chẩn đoán"
+                  aria-label="Hỏi trợ lý chẩn đoán"
+                  onClick={() => navigate(`/homes/${encodeURIComponent(reportHomeId)}/maintenance?assistant=1&deviceId=${encodeURIComponent(devId)}`)}
+                >
+                  <Sparkles className="w-5 h-5" />
+                </button>
+                <button
+                  type="button"
+                  className="detail-icon-button"
+                  title="Báo hỏng / yêu cầu kiểm tra"
+                  aria-label="Báo hỏng thiết bị"
+                  onClick={() => navigate(`/homes/${encodeURIComponent(reportHomeId)}/maintenance?create=1&deviceId=${encodeURIComponent(devId)}`)}
+                >
+                  <Wrench className="w-5 h-5" />
+                </button>
+              </>
+            )}
+
+            {!isReadOnly && (
+              <button
+                type="button"
+                className="detail-icon-button"
+                onClick={() => setMenu(!menu)}
+                aria-label="Tùy chọn thiết bị"
+              >
+                <MoreHorizontal className="w-5 h-5" />
+              </button>
+            )}
+          </div>
 
           {menu && !isReadOnly && (
             <div className="detail-menu glass-g2">

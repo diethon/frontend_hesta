@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Camera, Minimize2, RefreshCw } from 'lucide-react';
+import { AI_VIDEO_FEED_URL } from '../../services/fallDetectionService';
 
 export const FallDetectionPage: React.FC = () => {
   const navigate = useNavigate();
@@ -51,10 +52,20 @@ export const FallDetectionPage: React.FC = () => {
     };
   }, [exitToHome]);
 
+  useEffect(() => {
+    if (!streamError) return;
+    const retryTimer = window.setTimeout(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      setReloadKey((prev) => prev + 1);
+      setStreamError(false);
+    }, 3500);
+    return () => window.clearTimeout(retryTimer);
+  }, [streamError]);
+
   const streamUrl =
     reloadKey === 0
-      ? 'http://localhost:5000/video_feed'
-      : `http://localhost:5000/video_feed?t=${reloadKey}`;
+      ? AI_VIDEO_FEED_URL
+      : `${AI_VIDEO_FEED_URL}?t=${reloadKey}`;
 
   return (
     <div

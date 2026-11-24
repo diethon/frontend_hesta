@@ -2176,7 +2176,7 @@ html.dark .segments button.active,
   flex: 0 0 auto;
   padding: 18px 16px;
   display: grid;
-  grid-template-columns: 44px 1fr 44px;
+  grid-template-columns: 44px 1fr auto;
   align-items: center;
   gap: 8px;
   border-bottom: 1px solid var(--border);
@@ -2224,6 +2224,10 @@ html.dark .segments button.active,
   padding: 0 10px;
   color: var(--text);
   font-weight: 600;
+}
+.detail-header-actions {
+  display: flex;
+  gap: 4px;
 }
 .detail-icon-button {
   width: 40px;

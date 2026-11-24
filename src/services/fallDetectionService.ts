@@ -57,7 +57,42 @@ export interface CameraHealthDTO {
   timestamp?: number;
 }
 
-const AI_EDGE_BASE_URL = 'http://localhost:5000';
+const configuredAiCameraUrl = import.meta.env?.VITE_AI_CAMERA_URL?.trim();
+const configuredVoiceUrl = import.meta.env?.VITE_VOICE_SERVICE_URL?.trim();
+const fallbackFromVoice =
+  configuredVoiceUrl && configuredVoiceUrl.startsWith('https://')
+    ? `${configuredVoiceUrl.replace(/\/+$/, '')}/camera`
+    : '';
+
+export const AI_EDGE_BASE_URL = (
+  configuredAiCameraUrl ||
+  fallbackFromVoice ||
+  'http://localhost:5000'
+).replace(/\/+$/, '');
+
+export const AI_VIDEO_FEED_URL = `${AI_EDGE_BASE_URL}/video_feed`;
+
+export interface AiEdgeStatusResponse {
+  state: string;
+  alert: boolean;
+  incident_type: string;
+  metrics: FallMetrics;
+  safe_zone: string;
+  fps: number;
+  is_camera_online?: boolean;
+  camera_health?: CameraHealthDTO;
+}
+
+const STATUS_CACHE_TTL_MS = 1500;
+let lastStatusValue: AiEdgeStatusResponse | null = null;
+let lastStatusAt = 0;
+let inFlightStatusPromise: Promise<AiEdgeStatusResponse | null> | null = null;
+
+export function resetAiStatusCache(): void {
+  lastStatusValue = null;
+  lastStatusAt = 0;
+  inFlightStatusPromise = null;
+}
 
 export const fallDetectionService = {
   // --- Backend Spring Boot APIs ---
@@ -97,25 +132,38 @@ export const fallDetectionService = {
   },
 
   // --- Local AI Edge Engine APIs (Port 5000) ---
-  async checkAiStatus(): Promise<{
-    state: string;
-    alert: boolean;
-    incident_type: string;
-    metrics: FallMetrics;
-    safe_zone: string;
-    fps: number;
-    is_camera_online?: boolean;
-    camera_health?: CameraHealthDTO;
-  } | null> {
-    try {
-      const res = await axios.get(`${AI_EDGE_BASE_URL}/api/status`, { timeout: 1500 });
-      return res.data;
-    } catch {
-      return null;
+  async checkAiStatus(): Promise<AiEdgeStatusResponse | null> {
+    const now = Date.now();
+    if (lastStatusValue && now - lastStatusAt < STATUS_CACHE_TTL_MS) {
+      return lastStatusValue;
     }
+    if (inFlightStatusPromise) {
+      return inFlightStatusPromise;
+    }
+
+    inFlightStatusPromise = (async () => {
+      try {
+        const res = await axios.get<AiEdgeStatusResponse>(`${AI_EDGE_BASE_URL}/api/status`, {
+          timeout: 4000,
+        });
+        if (res.data) {
+          lastStatusValue = res.data;
+          lastStatusAt = Date.now();
+          return res.data;
+        }
+        return null;
+      } catch {
+        return null;
+      } finally {
+        inFlightStatusPromise = null;
+      }
+    })();
+
+    return inFlightStatusPromise;
   },
 
   async triggerDemoFall(): Promise<boolean> {
+    resetAiStatusCache();
     try {
       const res = await axios.post(`${AI_EDGE_BASE_URL}/api/trigger_demo_fall`, {}, { timeout: 2000 });
       return Boolean(res.data?.success || res.data?.status === 'ok');
@@ -125,8 +173,9 @@ export const fallDetectionService = {
   },
 
   async dismissAiLocal(): Promise<boolean> {
+    resetAiStatusCache();
     try {
-      const res = await axios.post(`${AI_EDGE_BASE_URL}/api/dismiss`, {}, { timeout: 1500 });
+      const res = await axios.post(`${AI_EDGE_BASE_URL}/api/dismiss`, {}, { timeout: 3000 });
       return Boolean(res.data?.success || res.data?.status === 'ok');
     } catch {
       return false;

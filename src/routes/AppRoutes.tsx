@@ -22,9 +22,13 @@ import { ScenePage } from '../components/scene/ScenePage';
 import { AutomationRulePage } from '../components/automation/AutomationRulePage';
 import { RecommendationsPage } from '../components/automation/RecommendationsPage';
 import { ParentalGuardianRouteWrapper } from '../components/guardian/ParentalGuardianRouteWrapper';
+import { SecurityCenterPage } from '../components/security/SecurityCenterPage';
+import { ProfilePage } from '../components/profile/ProfilePage';
 import { EnergyDashboardPage } from '../components/energy/EnergyDashboardPage';
 import { FallDetectionPage } from '../components/emergency/FallDetectionPage';
 import { MemberPage } from '../components/member/MemberPage';
+import { MaintenancePage } from '../components/maintenance/MaintenancePage';
+import { AdminMaintenancePage } from '../components/maintenance/AdminMaintenancePage';
 
 export function AppRoutes() {
   const { initialized, user, login, logout, updateUser } = useRouteSession();
@@ -96,12 +100,16 @@ export function AppRoutes() {
         <Navigate to={{ pathname: '/login', search: location.search, hash: location.hash }} state={state} replace />
       )} />
       <Route element={<RequireAuth initialized={initialized} user={user} />}>
-        <Route path="/home" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <HomePage user={user!} onLogout={logout} onProfileUpdate={updateUser} />} />
+        <Route path="/home" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <HomePage user={user!} onLogout={logout} />} />
+        <Route path="/profile" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <ProfilePage user={user!} onLogout={logout} onProfileUpdate={updateUser} />} />
         <Route path="/homes/:homeId/scenes" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <ScenePage />} />
         <Route path="/homes/:homeId/scenes/:sceneId" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <ScenePage />} />
         <Route path="/homes/:homeId/automation-rules" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <AutomationRulePage />} />
         <Route path="/homes/:homeId/recommendations" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <RecommendationsPage />} />
         <Route path="/homes/:homeId/guardian" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <ParentalGuardianRouteWrapper />} />
+        <Route path="/homes/:homeId/security" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <SecurityCenterPage />} />
+        <Route path="/homes/:homeId/anomalies" element={<Navigate to="../security?tab=anomalies" relative="path" replace />} />
+        <Route path="/homes/:homeId/maintenance" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin/maintenance" replace /> : <MaintenancePage />} />
         <Route path="/homes/:homeId/members" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <MemberPage />} />
         <Route path="/home/:homeId/members" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <MemberPage />} />
         <Route path="/home/:homeId/devices" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <DevicePage />} />
@@ -112,6 +120,7 @@ export function AppRoutes() {
           <Route path="/admin/devices" element={<Navigate to="/admin" replace />} />
           <Route path="/admin/users" element={<AdminUsersPage user={user!} onLogout={logout} onProfileUpdate={updateUser} />} />
           <Route path="/admin/diagnostics" element={<SystemDiagnosticsPage user={user!} onLogout={logout} onProfileUpdate={updateUser} />} />
+          <Route path="/admin/maintenance" element={<AdminMaintenancePage user={user!} onLogout={logout} onProfileUpdate={updateUser} />} />
         </Route>
       </Route>
       <Route path="*" element={

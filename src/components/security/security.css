@@ -1,0 +1,214 @@
+/* Security center: hero header, stat row, incident cards and recent strip.
+   Uses the studio (.st-theme) tokens so it matches the Scene/Automation pages. */
+
+.sec-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 28px;
+}
+.sec-stat {
+  --tone: var(--accent);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card, #fff);
+  box-shadow: var(--card-shadow);
+  text-align: left;
+}
+.sec-stat-icon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  color: var(--tone);
+  background: color-mix(in srgb, var(--tone) 12%, transparent);
+}
+.sec-stat small {
+  display: block;
+  font-size: 13px;
+  color: var(--secondary);
+}
+.sec-stat strong {
+  font-size: 28px;
+  line-height: 34px;
+  font-weight: 750;
+  color: var(--tone);
+}
+.sec-stat-link {
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--text);
+}
+.sec-stat-link span {
+  flex: 1;
+}
+.sec-stat-link:hover {
+  border-color: var(--accent);
+}
+.sec-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--success);
+}
+
+.tone-accent { --tone: var(--accent); }
+.tone-warn { --tone: color-mix(in srgb, var(--color-warning), var(--text) 45%); }
+.tone-danger { --tone: var(--danger); }
+.tone-ok { --tone: var(--success); }
+.tone-muted { --tone: var(--tertiary); }
+
+.sec-panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.sec-panel-tools {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sec-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 16px;
+}
+.sec-card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card, #fff);
+  box-shadow: var(--card-shadow);
+  overflow: hidden;
+}
+.sec-card-body {
+  display: flex;
+  gap: 14px;
+  padding: 18px;
+  flex: 1;
+}
+.sec-card-icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  color: var(--tone);
+  background: color-mix(in srgb, var(--tone) 12%, transparent);
+}
+.sec-card h3 {
+  margin: 0 0 4px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+}
+.sec-card p {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: var(--secondary);
+}
+.sec-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--tone);
+  background: color-mix(in srgb, var(--tone) 12%, transparent);
+}
+.sec-pill::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.sec-card footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 52px;
+  padding: 8px 18px;
+  border-top: 1px solid var(--border);
+}
+.sec-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  white-space: nowrap;
+  color: var(--tertiary);
+}
+.sec-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+.sec-more {
+  display: block;
+  margin: 20px auto 0;
+}
+
+.sec-recent {
+  margin-top: 28px;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card, #fff);
+  box-shadow: var(--card-shadow);
+}
+.sec-recent ul {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.sec-recent li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px;
+}
+.sec-recent li + li {
+  border-left: 1px solid var(--border);
+}
+.sec-recent-text {
+  flex: 1;
+  min-width: 0;
+}
+.sec-recent-text strong {
+  display: block;
+  font-size: 14px;
+  color: var(--text);
+}
+.sec-recent-text small {
+  font-size: 12px;
+  color: var(--tertiary);
+}
+
+@media (max-width: 1024px) {
+  .sec-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .sec-recent ul { grid-template-columns: 1fr; gap: 12px; }
+  .sec-recent li + li { border-left: 0; }
+}
+@media (max-width: 640px) {
+  .sec-stats { grid-template-columns: 1fr; }
+  .sec-panel-tools .st-search { width: 100%; }
+}
