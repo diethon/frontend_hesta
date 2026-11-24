@@ -54,10 +54,13 @@ const DeviceCardComponent: React.FC<DeviceCardProps> = (props) => {
     case 'SMOKE_SENSOR':
     case 'LUX_SENSOR':
     case 'LIGHT_SENSOR':
+    case 'FLAME_SENSOR':
       return <SensorCard device={props.device} onClick={props.onClick} />;
 
     case 'GATE':
     case 'ROLLING_DOOR':
+    case 'DOOR':
+    case 'CURTAIN':
       return (
         <GateCard
           device={props.device}
