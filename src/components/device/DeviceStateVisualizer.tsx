@@ -64,6 +64,10 @@ const LIGHT_EXCLUDED_KEYS = new Set([
   'mode', 'fan', 'swing', 'state', 'level'
 ]);
 
+const NON_RGB_LIGHT_EXCLUDED_KEYS = new Set([
+  'r', 'g', 'b', 'color', 'hex', 'hue', 'saturation', 'rgbhex'
+]);
+
 const AC_EXCLUDED_KEYS = new Set([
   'r', 'g', 'b', 'color', 'hex', 'hue', 'saturation', 'dimmer'
 ]);
@@ -79,6 +83,7 @@ export function isFieldAllowedForDeviceType(key: string, deviceType?: string): b
   
   if (dt === 'LIGHT' || dt === 'LED' || dt === 'LED_RGB' || dt === 'SMART_PLUG') {
     if (LIGHT_EXCLUDED_KEYS.has(lk)) return false;
+    if (dt !== 'LED_RGB' && NON_RGB_LIGHT_EXCLUDED_KEYS.has(lk)) return false;
   } else if (dt === 'AC' || dt === 'AIR_CONDITIONER') {
     if (AC_EXCLUDED_KEYS.has(lk)) return false;
   } else if (dt.includes('SENSOR')) {

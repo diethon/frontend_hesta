@@ -1,5 +1,6 @@
 import { useState, type CSSProperties } from 'react';
 import { actionOptions, type ActionOption } from '../deviceActionOptions';
+import { getApertureInterlock } from '../device/deviceHelpers';
 import { TwinLayoutButton } from './TwinLayoutButton';
 
 interface ControlProps {
@@ -63,6 +64,7 @@ export function TwinDeviceControls({ actions, currentValues, color, disabled, on
   actions: readonly string[]; currentValues: Record<string, unknown>; color: string;
 }) {
   const colorAction = actions.includes('SET_COLOR') ? 'SET_COLOR' : actions.includes('SET_RGB') ? 'SET_RGB' : null;
+  const interlock = getApertureInterlock(currentValues.state);
   const values = [...actionOptions, fanOption].filter((option) => actions.includes(option.code)
     && ['percentage', 'number', 'text'].includes(option.valueKind));
   return <>
@@ -72,8 +74,13 @@ export function TwinDeviceControls({ actions, currentValues, color, disabled, on
     })}
     {colorAction ? <ColorControl key={`${colorAction}:${color}`} action={colorAction} initialValue={color} disabled={disabled} onExecute={onExecute} /> : null}
     <div className="flex flex-wrap gap-2">{actionOptions.filter((option) => actions.includes(option.code)
-      && option.valueKind === 'none' && !['TURN_ON', 'TURN_OFF'].includes(option.code)).map((option) =>
-      <TwinLayoutButton key={option.code} disabled={disabled} onClick={() => onExecute(option.code)}>{option.label}</TwinLayoutButton>)}</div>
+      && option.valueKind === 'none' && !['TURN_ON', 'TURN_OFF'].includes(option.code)).map((option) => {
+      const actionLocked =
+        (option.code === 'OPEN' && interlock.disableOpen) ||
+        (option.code === 'CLOSE' && interlock.disableClose) ||
+        (option.code === 'STOP' && interlock.disableStop);
+      return <TwinLayoutButton key={option.code} disabled={disabled || actionLocked} onClick={() => onExecute(option.code)}>{option.label}</TwinLayoutButton>;
+    })}</div>
     {actions.includes('SET_STATE') ? <StateControl disabled={disabled} onExecute={onExecute} /> : null}
   </>;
 }

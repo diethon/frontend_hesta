@@ -24,6 +24,7 @@ import { DeviceFilterDropdown, DeviceMobileFilterModal } from './DeviceFilterDro
 import { AddDeviceModal } from './AddDeviceModal';
 import { RoomManagementModal } from './RoomManagementModal';
 import { DeviceDetailModal } from './DeviceDetailModal';
+import { DeviceVisual } from './DeviceVisual';
 import { DeviceGroupSection } from './DeviceGroupSection';
 import { DevicesOverviewStrip } from './DevicesOverviewStrip';
 import {
@@ -55,6 +56,18 @@ import {
   getDeviceRatedWattage,
   getDeviceTypeColorClass,
 } from './devicePageHelpers';
+import {
+  APERTURE_TRANSIT_LOCK_MS,
+  getApertureInterlock,
+  isRgbLightDevice,
+  resolveDeviceRgb,
+  isFanDevice,
+  isTvDevice,
+  extractSensorMetrics,
+  resolveFanSpeedLevel,
+  normalizeSensorReadingPatch,
+  AC_MODE_CODE_TO_LABEL,
+} from './deviceHelpers';
 import './devices-page.css';
 
 // Re-export interface and helper to maintain backwards compatibility
@@ -119,11 +132,11 @@ function RoomFilterStrip({
           role="tab"
           aria-selected={activeRoom === 'ALL'}
           onClick={() => onChange('ALL')}
-          className={`h-9 px-4 rounded-full text-xs font-medium shrink-0 inline-flex items-center gap-1.5 transition-colors cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
+          className={`h-9 px-4 rounded-full text-xs shrink-0 inline-flex items-center gap-1.5 transition-colors cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563eb] ${
             activeRoom === 'ALL'
-              ? 'bg-[var(--accent)] text-white shadow-xs'
-              : 'border border-[var(--border)] bg-[var(--surface)] text-[var(--secondary)] hover:text-[var(--text)] hover:bg-[var(--muted)]/50'
-          } ${totalCount === 0 ? 'opacity-60' : ''}`}
+              ? 'bg-[#2563eb] text-white border border-[#1d4ed8] shadow-xs font-semibold'
+              : 'bg-white border border-[#94a3b8]/75 text-[#0f172a] font-medium shadow-2xs hover:border-[#2563eb]/65 hover:bg-[#eff6ff] hover:text-[#1d4ed8]'
+          } ${totalCount === 0 ? 'opacity-65' : ''}`}
         >
           <span>Tất cả phòng</span>
           <span className="tabular-nums">({totalCount})</span>
@@ -139,11 +152,11 @@ function RoomFilterStrip({
               aria-selected={isSelected}
               onClick={() => onChange(room.id)}
               title={room.name}
-              className={`h-9 px-4 rounded-full text-xs font-medium shrink-0 inline-flex items-center gap-1.5 transition-colors cursor-pointer max-w-[200px] select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
+              className={`h-9 px-4 rounded-full text-xs shrink-0 inline-flex items-center gap-1.5 transition-colors cursor-pointer max-w-[200px] select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563eb] ${
                 isSelected
-                  ? 'bg-[var(--accent)] text-white shadow-xs'
-                  : 'border border-[var(--border)] bg-[var(--surface)] text-[var(--secondary)] hover:text-[var(--text)] hover:bg-[var(--muted)]/50'
-              } ${count === 0 ? 'opacity-60' : ''}`}
+                  ? 'bg-[#2563eb] text-white border border-[#1d4ed8] shadow-xs font-semibold'
+                  : 'bg-white border border-[#94a3b8]/75 text-[#0f172a] font-medium shadow-2xs hover:border-[#2563eb]/65 hover:bg-[#eff6ff] hover:text-[#1d4ed8]'
+              } ${count === 0 ? 'opacity-65' : ''}`}
             >
               <span className="truncate">{room.name}</span>
               <span className="tabular-nums shrink-0">({count})</span>
@@ -176,47 +189,47 @@ function QuickFilters({
     <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
       <button
         type="button"
-        className={`h-8 px-3 rounded-full text-xs font-medium inline-flex items-center gap-1.5 shrink-0 transition-colors cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
+        className={`h-9 px-3.5 rounded-full text-xs font-semibold inline-flex items-center gap-1.5 shrink-0 transition-colors cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563eb] ${
           active === 'on'
-            ? 'bg-[var(--accent)] text-white shadow-xs'
-            : 'border border-[var(--border)] bg-transparent text-[var(--secondary)] hover:text-[var(--text)] hover:bg-[var(--muted)]/40'
+            ? 'bg-[#2563eb] text-white border border-[#1d4ed8] shadow-xs'
+            : 'bg-white border border-[#3b82f6]/55 text-[#0f172a] shadow-2xs hover:bg-[#eff6ff] hover:border-[#2563eb]'
         }`}
         onClick={() => onChange(active === 'on' ? 'all' : 'on')}
       >
-        <Power className="w-3.5 h-3.5 shrink-0" />
+        <Power className={`w-3.5 h-3.5 shrink-0 ${active === 'on' ? 'text-white' : 'text-[#2563eb]'}`} />
         <span>Đang bật ({activeCount})</span>
       </button>
 
       <button
         type="button"
-        className={`h-8 px-3 rounded-full text-xs font-medium inline-flex items-center gap-1.5 shrink-0 transition-colors cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
+        className={`h-9 px-3.5 rounded-full text-xs font-semibold inline-flex items-center gap-1.5 shrink-0 transition-colors cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#475569] ${
           active === 'offline'
-            ? 'bg-[var(--accent)] text-white shadow-xs'
-            : 'border border-[var(--border)] bg-transparent text-[var(--secondary)] hover:text-[var(--text)] hover:bg-[var(--muted)]/40'
+            ? 'bg-[#475569] text-white border border-[#334155] shadow-xs'
+            : 'bg-white border border-[#94a3b8]/75 text-[#0f172a] shadow-2xs hover:bg-[#f1f5f9] hover:border-[#64748b]'
         }`}
         onClick={() => onChange(active === 'offline' ? 'all' : 'offline')}
       >
-        <WifiOff className="w-3.5 h-3.5 shrink-0" />
+        <WifiOff className={`w-3.5 h-3.5 shrink-0 ${active === 'offline' ? 'text-white' : 'text-[#64748b]'}`} />
         <span>Ngoại tuyến ({offlineCount})</span>
       </button>
 
       <button
         type="button"
-        className={`h-8 px-3 rounded-full text-xs font-medium inline-flex items-center gap-1.5 shrink-0 transition-colors cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
+        className={`h-9 px-3.5 rounded-full text-xs font-semibold inline-flex items-center gap-1.5 shrink-0 transition-colors cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#059669] ${
           active === 'sensor'
-            ? 'bg-[var(--accent)] text-white shadow-xs'
-            : 'border border-[var(--border)] bg-transparent text-[var(--secondary)] hover:text-[var(--text)] hover:bg-[var(--muted)]/40'
+            ? 'bg-[#059669] text-white border border-[#047857] shadow-xs'
+            : 'bg-white border border-[#10b981]/55 text-[#0f172a] shadow-2xs hover:bg-[#ecfdf5] hover:border-[#059669]'
         }`}
         onClick={() => onChange(active === 'sensor' ? 'all' : 'sensor')}
       >
-        <Thermometer className="w-3.5 h-3.5 shrink-0" />
+        <Thermometer className={`w-3.5 h-3.5 shrink-0 ${active === 'sensor' ? 'text-white' : 'text-[#059669]'}`} />
         <span>Cảm biến ({sensorCount})</span>
       </button>
 
       {active === 'on' && lightsOnCount > 0 && (
         <button
           type="button"
-          className="h-8 px-3 rounded-full border border-[var(--border)] bg-[var(--surface)] text-[var(--secondary)] hover:text-[var(--text)] hover:bg-[var(--muted)]/50 text-xs font-medium inline-flex items-center gap-1.5 shrink-0 transition-colors cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+          className="h-9 px-3.5 rounded-full border border-[#f59e0b]/65 bg-white text-[#b45309] hover:bg-[#fffbeb] text-xs font-semibold shadow-2xs inline-flex items-center gap-1.5 shrink-0 transition-colors cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d97706]"
           onClick={onTurnOffAllLights}
         >
           <span>Tắt tất cả đèn ({lightsOnCount})</span>
@@ -251,11 +264,27 @@ function DevicesDeviceCard({
   const rawGateState = device.raw?.currentState?.state;
   const [prevRawGateState, setPrevRawGateState] = useState(rawGateState);
   const [gate, setGate] = useState(() => resolveGateLabel(rawGateState));
+  const [transitLocked, setTransitLocked] = useState(false);
+  const transitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   if (rawGateState !== prevRawGateState) {
     setPrevRawGateState(rawGateState);
     setGate(resolveGateLabel(rawGateState));
+    const upper = String(rawGateState ?? '').trim().toUpperCase();
+    if (upper === 'OPEN' || upper === 'CLOSED' || upper === 'STOPPED') {
+      if (transitTimerRef.current) {
+        clearTimeout(transitTimerRef.current);
+        transitTimerRef.current = null;
+      }
+      setTransitLocked(false);
+    }
   }
+
+  useEffect(() => () => {
+    if (transitTimerRef.current) clearTimeout(transitTimerRef.current);
+  }, []);
+
+  const gateInterlock = getApertureInterlock(rawGateState, transitLocked);
 
   const { isOverrideActive, formattedTime } = useOverrideCountdown(
     device.manualOverrideUntil
@@ -263,16 +292,34 @@ function DevicesDeviceCard({
   const isViewOnly = device.accessLevel === 'VIEW' || device.raw?.accessLevel === 'VIEW';
 
   const colorClass = getDeviceTypeColorClass(device.type);
+  const isRgbLight = isRgbLightDevice(device.raw);
+  const rawState = device.raw?.currentState;
+  const resolvedRgb = isRgbLight ? resolveDeviceRgb(rawState) : undefined;
+  const rgbHex = isRgbLight
+    ? resolvedRgb
+      ? `rgb(${resolvedRgb.r}, ${resolvedRgb.g}, ${resolvedRgb.b})`
+      : (typeof rawState?.rgbHex === 'string' ? rawState.rgbHex : undefined)
+    : undefined;
   const isPowerDevice =
     !device.sensor && device.type !== 'Cảm biến' && device.type !== 'Camera';
   const showKwh = isPowerDevice && !device.offline && (kwhToday ?? 0) > 0;
   const lastSeenText = formatLastSeenVi(device.raw?.lastSeen || device.raw?.updatedAt);
+  const bLevel = device.brightness ?? 80;
+  const cardAmbientBg =
+    device.on && !device.offline
+      ? isRgbLight && rgbHex
+        ? `radial-gradient(circle at 50% 46%, color-mix(in srgb, ${rgbHex} 16%, transparent) 0%, transparent 62%)`
+        : device.type === 'Đèn'
+          ? `radial-gradient(circle at 50% 46%, rgba(251, 191, 36, ${(0.1 + (bLevel / 100) * 0.1).toFixed(2)}) 0%, transparent 62%)`
+          : undefined
+      : undefined;
 
   return (
     <article
       className={`devices-device-card glass-g1 ${device.on ? 'on' : ''} ${
         device.offline ? 'offline' : ''
       }`}
+      style={cardAmbientBg ? { backgroundImage: cardAmbientBg } : undefined}
       tabIndex={0}
       role="button"
       aria-label={`${device.name}, ${device.room}, ${device.status}`}
@@ -285,29 +332,22 @@ function DevicesDeviceCard({
       }}
     >
       <div className="device-top">
-        <div className="icon-tile-wrap">
-          <span className={`device-icon type-${colorClass}`}>
-            <Icon name={device.icon} />
-            <span
-              className={`status-dot ${
-                device.raw?.status === 'UNKNOWN'
-                  ? 'unknown'
-                  : device.offline
-                  ? 'offline'
-                  : 'online'
-              }`}
-              title={
-                device.raw?.status === 'UNKNOWN'
-                  ? 'Không xác định'
-                  : device.offline
-                  ? 'Ngoại tuyến'
-                  : 'Trực tuyến'
-              }
-            />
-          </span>
+        <div className="device-copy device-card-header-copy">
+          <h3 title={device.name}>{device.name}</h3>
+          {!device.offline && device.status !== 'Ngoại tuyến' && (
+            <p>{device.status}</p>
+          )}
         </div>
 
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 shrink-0">
+          {isRgbLight && rgbHex && (
+            <span
+              data-rgb-indicator="true"
+              className="w-3 h-3 rounded-full border border-white/60 shadow-xs shrink-0"
+              style={{ backgroundColor: rgbHex }}
+              title={`Màu RGB: ${rgbHex}`}
+            />
+          )}
           {isViewOnly && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
               Chỉ xem
@@ -369,45 +409,156 @@ function DevicesDeviceCard({
         </div>
       </div>
 
-      {device.value && (
-        <strong className="devices-value">{device.value}</strong>
-      )}
-
-      <div className="device-copy">
-        <h3 title={device.name}>{device.name}</h3>
-        <p>{device.status}</p>
+      <div className="device-visual-center">
+        <div className="icon-tile-wrap">
+          <span
+            className={`device-icon device-visual-tile type-${colorClass}`}
+            style={
+              isRgbLight && device.on && !device.offline && rgbHex
+                ? {
+                    background: `color-mix(in srgb, ${rgbHex} 18%, transparent)`,
+                    boxShadow: `0 0 22px color-mix(in srgb, ${rgbHex} 48%, transparent)`,
+                  }
+                : undefined
+            }
+          >
+            <DeviceVisual
+              uid={`page-${device.id}`}
+              deviceType={device.raw?.deviceType}
+              figmaType={device.type}
+              name={device.name}
+              icon={device.icon}
+              isOn={Boolean(device.on)}
+              offline={device.offline}
+              brightness={bLevel}
+              rgbColor={isRgbLight ? rgbHex : undefined}
+              acMode={typeof rawState?.mode === 'string' ? rawState.mode : undefined}
+              gateState={typeof rawState?.state === 'string' ? rawState.state : undefined}
+              sensorState={rawState}
+              size={82}
+            />
+            <span
+              className={`status-dot ${
+                device.raw?.status === 'UNKNOWN'
+                  ? 'unknown'
+                  : device.offline
+                  ? 'offline'
+                  : 'online'
+              }`}
+              title={
+                device.raw?.status === 'UNKNOWN'
+                  ? 'Không xác định'
+                  : device.offline
+                  ? 'Ngoại tuyến'
+                  : 'Trực tuyến'
+              }
+            />
+          </span>
+        </div>
       </div>
 
-      {!device.offline && device.type === 'Đèn' && device.on && (
-        <div
-          className="brightness"
-          aria-label={`Độ sáng ${device.brightness || 80}%`}
-        >
-          <span style={{ width: `${device.brightness || 80}%` }} />
-          <b>{device.brightness || 80}%</b>
-        </div>
+      {device.type === 'Cảm biến' && device.value && (
+        <strong className="devices-value text-center">{device.value}</strong>
       )}
 
       {device.type === 'Cổng' && (
         <div className="gate-controls">
-          {(['Mở', 'Dừng', 'Đóng'] as const).map((item) => (
-            <button
-              type="button"
-              key={item}
-              disabled={device.offline || isViewOnly}
-              className={`${gate === item ? 'active' : ''} ${isViewOnly ? 'opacity-40 cursor-not-allowed' : ''}`}
-              onClick={(event) => {
-                event.stopPropagation();
-                if (device.offline || isViewOnly) return;
-                setGate(item);
-                onGateCommand(item);
-              }}
-            >
-              {item}
-            </button>
-          ))}
+          {(['Mở', 'Dừng', 'Đóng'] as const).map((item) => {
+            const itemLocked =
+              (item === 'Mở' && gateInterlock.disableOpen) ||
+              (item === 'Đóng' && gateInterlock.disableClose) ||
+              (item === 'Dừng' && gateInterlock.disableStop);
+            const isItemDisabled = Boolean(device.offline || isViewOnly || itemLocked);
+            return (
+              <button
+                type="button"
+                key={item}
+                disabled={isItemDisabled}
+                className={`${gate === item ? 'active' : ''} ${isItemDisabled ? 'opacity-40 cursor-not-allowed' : ''}`}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  if (isItemDisabled) return;
+                  if (item === 'Dừng') {
+                    if (transitTimerRef.current) {
+                      clearTimeout(transitTimerRef.current);
+                      transitTimerRef.current = null;
+                    }
+                    setTransitLocked(false);
+                  } else {
+                    if (transitTimerRef.current) clearTimeout(transitTimerRef.current);
+                    setTransitLocked(true);
+                    transitTimerRef.current = setTimeout(() => {
+                      setTransitLocked(false);
+                      transitTimerRef.current = null;
+                    }, APERTURE_TRANSIT_LOCK_MS);
+                  }
+                  setGate(item);
+                  onGateCommand(item);
+                }}
+              >
+                {item}
+              </button>
+            );
+          })}
         </div>
       )}
+
+      {isFanDevice(device.raw) && device.on && resolveFanSpeedLevel(rawState) > 0 && (
+        <div className="flex items-center justify-center w-full pt-2 mt-2 border-t border-[var(--border)]">
+          <span className="px-2.5 py-0.5 rounded-full bg-sky-500/10 border border-sky-500/35 text-[11px] font-semibold text-[#0f172a]">
+            Mức {resolveFanSpeedLevel(rawState)}
+          </span>
+        </div>
+      )}
+
+      {isTvDevice(device.raw) && device.on && (
+        <div className="flex items-center justify-center w-full pt-2 mt-2 border-t border-[var(--border)]">
+          <span className="px-2.5 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/35 text-[11px] font-semibold text-[#0f172a]">
+            {rawState?.muted
+              ? 'Tắt tiếng'
+              : rawState?.channel !== undefined
+                ? `Kênh ${rawState.channel}`
+                : 'Đang bật'}
+          </span>
+        </div>
+      )}
+
+      {device.type === 'Điều hòa' && (
+        <div className="flex items-center justify-center gap-1.5 w-full pt-2 mt-2 border-t border-[var(--border)]">
+          <strong className="text-sm font-extrabold text-[#0f172a] tabular-nums">
+            {rawState?.temperature !== undefined ? `${rawState.temperature}°C` : '24°C'}
+          </strong>
+          <span className="px-2 py-0.5 rounded-full bg-sky-500/10 border border-sky-500/35 text-[10px] font-semibold text-sky-700">
+            {AC_MODE_CODE_TO_LABEL[String(rawState?.mode ?? 'COOL').toUpperCase()] ?? 'Lạnh'}
+          </span>
+        </div>
+      )}
+
+      {device.type === 'Cảm biến' && (() => {
+        const sm = extractSensorMetrics(rawState);
+        const badges: string[] = [];
+        if (sm.temperature !== undefined) badges.push(`${sm.temperature}°C`);
+        if (sm.humidity !== undefined) badges.push(`${sm.humidity}%`);
+        if (sm.lux !== undefined) badges.push(`${sm.lux} lx`);
+        else if (sm.lightBinary !== undefined) badges.push(sm.lightBinary ? 'Sáng' : 'Tối');
+        if (sm.motion !== undefined) badges.push(sm.motion ? 'Chuyển động' : 'Tĩnh');
+        if (sm.gasPpm !== undefined) badges.push(`${sm.gasPpm} ppm`);
+        if (sm.flame !== undefined) badges.push(sm.flame ? 'Có lửa!' : 'An toàn');
+        const extraBadges = badges.filter((b) => b !== device.value);
+        if (extraBadges.length === 0) return null;
+        return (
+          <div className="flex flex-wrap items-center justify-center gap-1 w-full pt-2 mt-2 border-t border-[var(--border)]">
+            {extraBadges.map((b) => (
+              <span
+                key={b}
+                className="px-2 py-0.5 rounded-md bg-white border border-[#cbd5e1] text-[10px] font-semibold text-[#0f172a]"
+              >
+                {b}
+              </span>
+            ))}
+          </div>
+        );
+      })()}
 
       <div className="device-card-footer">
         <span className="footer-metric">
@@ -422,10 +573,12 @@ function DevicesDeviceCard({
               Không xác định{lastSeenText && lastSeenText !== 'Chưa có dữ liệu' ? ` · ${lastSeenText}` : ''}
             </span>
           ) : device.offline ? (
-            <span className="footer-time text-offline">
-              <WifiOff size={11} className="inline mr-1" />
-              Ngoại tuyến{lastSeenText && lastSeenText !== 'Chưa có dữ liệu' ? ` · ${lastSeenText}` : ''}
-            </span>
+            lastSeenText && lastSeenText !== 'Chưa có dữ liệu' ? (
+              <span className="footer-time">
+                <Clock size={11} className="inline mr-1" />
+                {lastSeenText}
+              </span>
+            ) : null
           ) : (
             <span className="footer-time">
               <Clock size={11} className="inline mr-1" />
@@ -691,11 +844,40 @@ export const DevicePage: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    return realtimeEventDispatcher.register(
+    const unregState = realtimeEventDispatcher.register(
       'DEVICE_STATE_CHANGED',
       handleDeviceStateChanged
     );
-  }, [handleDeviceStateChanged]);
+    const unregSensor = realtimeEventDispatcher.register<{
+      deviceId?: string;
+      metricType?: string;
+      value?: unknown;
+      recordedAt?: string;
+    }>('SENSOR_READING_UPDATED', (event) => {
+      if (!event || !event.data) return;
+      const targetId = event.deviceId || event.data.deviceId;
+      if (!targetId || !event.data.metricType) return;
+      const patch = normalizeSensorReadingPatch(event.data.metricType, event.data.value);
+      if (Object.keys(patch).length === 0) return;
+
+      const existing = pendingUpdatesRef.current.get(targetId);
+      pendingUpdatesRef.current.set(targetId, {
+        currentState: {
+          ...(existing?.currentState ?? {}),
+          ...patch,
+        },
+        status: 'ONLINE',
+        lastSeen: event.data.recordedAt ?? event.timestamp ?? existing?.lastSeen,
+      });
+      if (rafIdRef.current === null) {
+        rafIdRef.current = requestAnimationFrame(flushDeviceUpdates);
+      }
+    });
+    return () => {
+      unregState();
+      unregSensor();
+    };
+  }, [handleDeviceStateChanged, flushDeviceUpdates]);
 
   // Fetch rooms and devices
   const fetchRooms = useCallback(async () => {
@@ -927,12 +1109,24 @@ export const DevicePage: React.FC = () => {
       return;
     }
     const action = cmd === 'Mở' ? 'OPEN' : cmd === 'Đóng' ? 'CLOSE' : 'STOP';
+    const interlock = getApertureInterlock(dev.currentState?.state);
+    if ((action === 'OPEN' && interlock.disableOpen) || (action === 'CLOSE' && interlock.disableClose) || (action === 'STOP' && interlock.disableStop)) {
+      return;
+    }
     try {
       const command = await sendDeviceCommand(deviceId, action);
       if (command && command.success === false) {
         notify.error(command.message || `Không thể gửi lệnh ${cmd} ${dev.name}`);
         return;
       }
+      const nextState = action === 'OPEN' ? 'OPENING' : action === 'CLOSE' ? 'CLOSING' : 'STOPPED';
+      setDevices((prev) =>
+        prev.map((d) =>
+          d.id === deviceId
+            ? { ...d, currentState: { ...d.currentState, state: nextState } }
+            : d
+        )
+      );
       notify.success(`Đã gửi lệnh ${cmd} ${dev.name}`);
     } catch (e) {
       notify.error(getErrorMessage(e, `Lỗi điều khiển ${dev.name}`));
@@ -975,9 +1169,31 @@ export const DevicePage: React.FC = () => {
     const dev = devices.find((d) => d.id === deviceId);
     if (!dev || dev.status !== 'ONLINE') return;
     if (dev.accessLevel === 'VIEW') return;
+    if (!isRgbLightDevice(dev)) return;
     const brightness = localBrightness[deviceId] || 80;
     try {
-      await sendDeviceCommand(deviceId, 'SET_RGB', { r, g, b, brightness });
+      const command = await sendDeviceCommand(deviceId, 'SET_RGB', { r, g, b, brightness });
+      if (command && command.success === false) {
+        notify.error(command.message || 'Lỗi khi đổi màu đèn');
+        return;
+      }
+      const colorPatch = { r, g, b, color: { r, g, b }, ...(command?.acknowledgedState ?? {}) };
+      setDevices((prev) =>
+        prev.map((d) =>
+          d.id === deviceId
+            ? { ...d, currentState: { ...d.currentState, ...colorPatch } }
+            : d
+        )
+      );
+      setSelectedDevice((prev) =>
+        prev && prev.id === deviceId && prev.raw
+          ? mapDeviceToUI(
+              { ...prev.raw, currentState: { ...prev.raw.currentState, ...colorPatch } },
+              localPower,
+              localBrightness
+            )
+          : prev
+      );
     } catch (e) {
       notify.error(getErrorMessage(e, 'Lỗi khi đổi màu đèn'));
     }
@@ -1182,12 +1398,12 @@ export const DevicePage: React.FC = () => {
             {/* Mobile Quản lý phòng icon button */}
             <button
               type="button"
-              className="sm:hidden h-9 w-9 shrink-0 inline-flex items-center justify-center rounded-full border border-[var(--border)] bg-transparent text-[var(--text)] hover:bg-[var(--muted)]/50 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+              className="sm:hidden h-9 w-9 shrink-0 inline-flex items-center justify-center rounded-full bg-white border border-[#94a3b8]/75 text-[#0f172a] shadow-2xs hover:bg-[#f8fafc] hover:border-[#475569] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563eb]"
               onClick={() => setIsRoomModalOpen(true)}
               title="Quản lý phòng"
               aria-label="Quản lý phòng"
             >
-              <Settings2 className="w-4 h-4 text-[var(--secondary)]" />
+              <Settings2 className="w-4 h-4 text-[#475569]" />
             </button>
           </div>
 
@@ -1195,19 +1411,19 @@ export const DevicePage: React.FC = () => {
             {/* Desktop Quản lý phòng ghost button */}
             <button
               type="button"
-              className="hidden sm:inline-flex h-9 px-3.5 rounded-full border border-[var(--border)] bg-transparent hover:bg-[var(--muted)]/50 text-xs font-medium text-[var(--text)] items-center gap-1.5 cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+              className="hidden sm:inline-flex h-9 px-3.5 rounded-full bg-white border border-[#94a3b8]/75 hover:bg-[#f8fafc] hover:border-[#475569] text-xs font-semibold text-[#0f172a] shadow-2xs items-center gap-1.5 cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563eb]"
               onClick={() => setIsRoomModalOpen(true)}
               title="Quản lý danh sách phòng"
               aria-label="Quản lý danh sách phòng"
             >
-              <Settings2 className="w-4 h-4 text-[var(--secondary)] shrink-0" />
+              <Settings2 className="w-4 h-4 text-[#475569] shrink-0" />
               <span>Quản lý phòng</span>
             </button>
 
             {/* Exactly ONE Primary Button on the screen */}
             <button
               type="button"
-              className="w-full sm:w-auto h-9 px-4 rounded-full bg-[var(--accent)] hover:opacity-95 text-white text-xs font-medium inline-flex items-center justify-center gap-1.5 cursor-pointer shadow-xs transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+              className="w-full sm:w-auto h-9 px-4 rounded-full bg-[#2563eb] hover:bg-[#1d4ed8] border border-[#1d4ed8] text-white text-xs font-semibold inline-flex items-center justify-center gap-1.5 cursor-pointer shadow-xs transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563eb]"
               onClick={() => setIsAddModalOpen(true)}
               title="Thêm thiết bị mới"
               aria-label="Thêm thiết bị mới"
@@ -1231,7 +1447,7 @@ export const DevicePage: React.FC = () => {
           />
 
           <div className="relative flex-1 min-w-[200px] sm:max-w-xs">
-            <Search className="w-3.5 h-3.5 text-[var(--tertiary)] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <Search className="w-4 h-4 text-[#475569] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="search"
               value={searchQuery}
@@ -1241,14 +1457,14 @@ export const DevicePage: React.FC = () => {
               }}
               placeholder="Tìm thiết bị theo tên, phòng, loại..."
               aria-label="Tìm thiết bị"
-              className="w-full h-8 pl-8 pr-7 rounded-full border border-[var(--border)] bg-[var(--surface)] text-xs text-[var(--text)] placeholder:text-[var(--tertiary)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/20 transition-all"
+              className="w-full h-9 pl-9 pr-8 rounded-full border border-[#94a3b8]/80 bg-white text-xs font-medium text-[#0f172a] placeholder:text-[#64748b] shadow-2xs focus:outline-none focus:border-[#2563eb] focus:ring-2 focus:ring-[#2563eb]/20 transition-all"
             />
             {searchQuery && (
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
                 aria-label="Xóa tìm kiếm"
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--tertiary)] hover:text-[var(--text)] p-0.5 rounded-full cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-[#475569] hover:text-[#0f172a] p-0.5 rounded-full cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563eb]"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
@@ -1263,14 +1479,14 @@ export const DevicePage: React.FC = () => {
                 value={typeFilter}
                 options={DEVICE_TYPE_FILTER_OPTIONS}
                 onChange={setTypeFilter}
-                icon={<Filter className="w-3.5 h-3.5 text-[var(--secondary)] shrink-0" />}
+                icon={<Filter className="w-3.5 h-3.5 text-[#475569] shrink-0" />}
               />
               <DeviceFilterDropdown
                 labelPrefix="Sắp xếp"
                 value={sort}
                 options={SORT_OPTIONS}
                 onChange={setSort}
-                icon={<ArrowUpDown className="w-3.5 h-3.5 text-[var(--secondary)] shrink-0" />}
+                icon={<ArrowUpDown className="w-3.5 h-3.5 text-[#475569] shrink-0" />}
               />
             </div>
 
@@ -1278,10 +1494,10 @@ export const DevicePage: React.FC = () => {
             <button
               type="button"
               onClick={() => setMobileFilterOpen(true)}
-              className="sm:hidden h-8 px-3 rounded-lg border border-[var(--border)] bg-transparent hover:bg-[var(--muted)]/50 text-xs font-medium text-[var(--text)] inline-flex items-center gap-1.5 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+              className="sm:hidden h-9 px-3 rounded-xl border border-[#94a3b8]/80 bg-white hover:bg-[#f8fafc] text-xs font-semibold text-[#0f172a] shadow-2xs inline-flex items-center gap-1.5 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563eb]"
               aria-label="Bộ lọc và sắp xếp"
             >
-              <Filter className="w-3.5 h-3.5 text-[var(--secondary)]" />
+              <Filter className="w-3.5 h-3.5 text-[#475569]" />
               <span>Bộ lọc</span>
             </button>
           </div>
@@ -1417,8 +1633,10 @@ export const DevicePage: React.FC = () => {
           onBrightnessChange={(brightness) =>
             handleBrightnessChange(selectedDevice.id, brightness)
           }
-          onColorChange={(r, g, b) =>
-            handleColorChange(selectedDevice.id, r, g, b)
+          onColorChange={
+            isRgbLightDevice(selectedDevice.raw)
+              ? (r, g, b) => handleColorChange(selectedDevice.id, r, g, b)
+              : undefined
           }
         />
       )}

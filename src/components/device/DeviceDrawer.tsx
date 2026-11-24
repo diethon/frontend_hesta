@@ -347,7 +347,10 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
           />
         );
       case 'GATE':
+      case 'GATE_MOTOR':
       case 'ROLLING_DOOR':
+      case 'DOOR':
+      case 'CURTAIN':
         return <GateControl device={device} onStateChange={onDeviceUpdated} />;
       case 'TEMP_HUMID_SENSOR':
       case 'MOTION_SENSOR':
