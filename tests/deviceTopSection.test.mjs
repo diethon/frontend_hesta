@@ -5,7 +5,17 @@ import ts from 'typescript';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
-// 1. Transpile devicePageHelpers
+// 1. Transpile deviceHelpers & devicePageHelpers
+const deviceHelpersSource = readFileSync(
+  new URL('../src/components/device/deviceHelpers.ts', import.meta.url),
+  'utf8'
+);
+const { outputText: deviceHelpersJs } = ts.transpileModule(deviceHelpersSource, {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+});
+const deviceHelpersModule = { exports: {} };
+new Function('module', 'exports', deviceHelpersJs)(deviceHelpersModule, deviceHelpersModule.exports);
+
 const helpersSource = readFileSync(
   new URL('../src/components/device/devicePageHelpers.ts', import.meta.url),
   'utf8'
@@ -14,7 +24,11 @@ const { outputText: helpersJs } = ts.transpileModule(helpersSource, {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
 });
 const helpersModule = { exports: {} };
-new Function('module', 'exports', helpersJs)(helpersModule, helpersModule.exports);
+const helpersRequire = (id) => {
+  if (id === './deviceHelpers') return deviceHelpersModule.exports;
+  throw new Error(`Unexpected require from devicePageHelpers.ts: ${id}`);
+};
+new Function('module', 'exports', 'require', helpersJs)(helpersModule, helpersModule.exports, helpersRequire);
 const {
   formatWattage,
   SORT_OPTIONS,
@@ -96,6 +110,8 @@ test('Filter & Sort options contain all required values', () => {
     'Tất cả',
     'Đèn',
     'Điều hòa',
+    'Quạt',
+    'TV',
     'Cảm biến',
     'Cổng',
     'Công tắc',

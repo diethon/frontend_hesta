@@ -202,15 +202,21 @@ export const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
     }
   }, [isOpen, selectedRoomId, rooms, stopCameraScanner]);
 
-  // Handle ESC key to close modal
+  // Handle ESC key & body scroll lock while modal is open
   useEffect(() => {
+    if (!isOpen) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
+      if (e.key === 'Escape') {
         onClose();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
   }, [isOpen, onClose]);
 
   if (!isOpen) return null;
@@ -264,20 +270,20 @@ export const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-xl max-h-[92vh] flex flex-col rounded-3xl bg-[var(--solid)] border border-[var(--border)] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
+        className="relative w-full max-w-xl max-h-[92vh] flex flex-col rounded-3xl bg-white border border-[#cbd5e1] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 overscroll-contain"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
-        <div className="flex items-center justify-between border-b border-[var(--border)] px-6 py-4.5 bg-[var(--g1)]">
+        <div className="flex items-center justify-between border-b border-[#e2e8f0] px-6 py-4 bg-[#f8fafc]">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]/20 flex items-center justify-center shadow-xs">
+            <div className="w-10 h-10 rounded-2xl bg-[#eff6ff] text-[#1d4ed8] border border-[#3b82f6]/40 flex items-center justify-center shadow-2xs">
               <QrCode className="w-5 h-5" />
             </div>
             <div>
-              <h2 id="add-device-modal-title" className="text-lg font-bold text-[var(--text)]">
+              <h2 id="add-device-modal-title" className="text-lg font-bold text-[#0f172a]">
                 Ghép Nối Thiết Bị Mới
               </h2>
-              <p className="text-xs text-[var(--secondary)] mt-0.5">
+              <p className="text-xs text-[#475569] mt-0.5">
                 Quét mã QR từ camera hoặc nhập mã Onboarding Token
               </p>
             </div>
@@ -286,7 +292,7 @@ export const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
             type="button"
             onClick={onClose}
             aria-label="Đóng cửa sổ"
-            className="flex h-9 w-9 items-center justify-center rounded-xl text-[var(--secondary)] hover:bg-[var(--muted)] hover:text-[var(--text)] transition-colors cursor-pointer"
+            className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#cbd5e1] bg-white text-[#475569] hover:bg-[#f1f5f9] hover:text-[#0f172a] transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -297,14 +303,14 @@ export const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
           {!resolvedDevice ? (
             <div className="space-y-4">
               {/* Tab Selector: Camera vs Manual */}
-              <div className="flex p-1 rounded-2xl bg-[var(--g1)] border border-[var(--border)]">
+              <div className="flex p-1 rounded-2xl bg-[#f1f5f9] border border-[#cbd5e1]">
                 <button
                   type="button"
                   onClick={() => setActiveTab('camera')}
                   className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                     activeTab === 'camera'
-                      ? 'bg-[var(--accent)] text-white shadow-xs'
-                      : 'text-[var(--secondary)] hover:text-[var(--text)]'
+                      ? 'bg-[#2563eb] text-white shadow-xs'
+                      : 'text-[#334155] hover:text-[#0f172a] hover:bg-white/75'
                   }`}
                 >
                   <Camera className="w-4 h-4" />
@@ -315,8 +321,8 @@ export const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
                   onClick={() => setActiveTab('manual')}
                   className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                     activeTab === 'manual'
-                      ? 'bg-[var(--accent)] text-white shadow-xs'
-                      : 'text-[var(--secondary)] hover:text-[var(--text)]'
+                      ? 'bg-[#2563eb] text-white shadow-xs'
+                      : 'text-[#334155] hover:text-[#0f172a] hover:bg-white/75'
                   }`}
                 >
                   <Keyboard className="w-4 h-4" />
@@ -327,30 +333,41 @@ export const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
               {/* TAB 1: CAMERA SCANNER */}
               {activeTab === 'camera' && (
                 <div className="space-y-3">
-                  <div className="relative w-full rounded-2xl overflow-hidden bg-black/90 border border-[var(--accent)]/30 min-h-[260px] flex flex-col items-center justify-center">
+                  <div
+                    className={`relative w-full rounded-2xl overflow-hidden min-h-[260px] flex flex-col items-center justify-center ${
+                      cameraError
+                        ? 'bg-[#f8fafc] border border-[#cbd5e1]'
+                        : 'bg-[#0f172a] border border-[#334155]'
+                    }`}
+                  >
                     {/* Viewport for html5-qrcode */}
                     <div id="hesta-qr-reader" className="w-full h-full min-h-[260px]" />
 
                     {/* Loading Overlay */}
                     {isCameraStarting && (
-                      <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 text-white gap-2 z-10">
-                        <RotateCw className="w-7 h-7 text-[var(--accent)] animate-spin" />
+                      <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#0f172a]/90 text-white gap-2 z-10">
+                        <RotateCw className="w-7 h-7 text-[#38bdf8] animate-spin" />
                         <span className="text-xs font-medium">Đang khởi động Camera...</span>
                       </div>
                     )}
 
                     {/* Camera Error Display */}
                     {cameraError && (
-                      <div className="absolute inset-0 flex flex-col items-center justify-center p-6 bg-black/90 text-center z-10">
-                        <AlertCircle className="w-10 h-10 text-rose-500 mb-2" />
-                        <p className="text-xs text-rose-300 max-w-xs mb-4 leading-relaxed">
+                      <div className="absolute inset-0 flex flex-col items-center justify-center p-6 bg-[#f8fafc] text-center z-10">
+                        <span className="w-12 h-12 rounded-2xl bg-[#fff1f2] border border-[#f43f5e]/40 text-[#be123c] flex items-center justify-center mb-3 shadow-2xs">
+                          <AlertCircle className="w-6 h-6" />
+                        </span>
+                        <h3 className="text-sm font-bold text-[#0f172a] mb-1">
+                          Không thể khởi động Camera
+                        </h3>
+                        <p className="text-xs text-[#475569] max-w-sm mb-4 leading-relaxed">
                           {cameraError}
                         </p>
                         <div className="flex gap-2">
                           <button
                             type="button"
                             onClick={startCameraScanner}
-                            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[var(--solid)] border border-[var(--border)] text-xs font-semibold text-[var(--text)] hover:bg-[var(--muted)] transition-colors cursor-pointer"
+                            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white border border-[#cbd5e1] text-xs font-semibold text-[#0f172a] hover:bg-[#f1f5f9] transition-colors cursor-pointer"
                           >
                             <RotateCw className="w-3.5 h-3.5" />
                             <span>Thử lại</span>
@@ -358,7 +375,7 @@ export const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
                           <button
                             type="button"
                             onClick={() => setActiveTab('manual')}
-                            className="px-3.5 py-2 rounded-xl bg-[var(--accent)] text-white text-xs font-bold hover:opacity-95 transition-colors cursor-pointer"
+                            className="px-4 py-2 rounded-xl bg-[#2563eb] hover:bg-[#1d4ed8] text-white text-xs font-bold transition-colors shadow-xs cursor-pointer"
                           >
                             Nhập mã thủ công
                           </button>
@@ -369,12 +386,12 @@ export const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
                     {/* Reticle targeting overlay if camera active */}
                     {isCameraActive && !cameraError && (
                       <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                        <div className="relative w-52 h-52 border-2 border-[var(--accent)]/60 rounded-2xl shadow-inner">
+                        <div className="relative w-52 h-52 border-2 border-[#38bdf8]/60 rounded-2xl shadow-inner">
                           {/* 4 Corner Markers */}
-                          <div className="absolute -top-1 -left-1 w-5 h-5 border-t-3 border-l-3 border-[var(--accent)] rounded-tl-sm" />
-                          <div className="absolute -top-1 -right-1 w-5 h-5 border-t-3 border-r-3 border-[var(--accent)] rounded-tr-sm" />
-                          <div className="absolute -bottom-1 -left-1 w-5 h-5 border-b-3 border-l-3 border-[var(--accent)] rounded-bl-sm" />
-                          <div className="absolute -bottom-1 -right-1 w-5 h-5 border-b-3 border-r-3 border-[var(--accent)] rounded-br-sm" />
+                          <div className="absolute -top-1 -left-1 w-5 h-5 border-t-3 border-l-3 border-[#38bdf8] rounded-tl-sm" />
+                          <div className="absolute -top-1 -right-1 w-5 h-5 border-t-3 border-r-3 border-[#38bdf8] rounded-tr-sm" />
+                          <div className="absolute -bottom-1 -left-1 w-5 h-5 border-b-3 border-l-3 border-[#38bdf8] rounded-bl-sm" />
+                          <div className="absolute -bottom-1 -right-1 w-5 h-5 border-b-3 border-r-3 border-[#38bdf8] rounded-br-sm" />
                           {/* Animated Scan Beam */}
                           <div className="w-full h-0.5 bg-gradient-to-r from-transparent via-cyan-400 to-transparent shadow-[0_0_8px_rgba(34,211,238,0.8)] animate-pulse mt-24" />
                         </div>
@@ -383,15 +400,23 @@ export const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
                   </div>
 
                   {/* Camera tips */}
-                  <div className="flex items-center justify-between text-xs text-[var(--secondary)] px-1">
-                    <span className="flex items-center gap-1.5">
-                      <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                  <div className="flex items-center justify-between text-xs text-[#475569] px-1">
+                    <span className="flex items-center gap-2">
+                      <span
+                        className={`inline-block w-2 h-2 rounded-full shrink-0 ${
+                          isCameraActive
+                            ? 'bg-[#10b981] animate-pulse'
+                            : isCameraStarting
+                              ? 'bg-[#f59e0b] animate-pulse'
+                              : 'bg-[#94a3b8]'
+                        }`}
+                      />
                       Hướng camera vào mã QR in trên vỏ thiết bị hoặc tem dán.
                     </span>
                     <button
                       type="button"
                       onClick={startCameraScanner}
-                      className="text-[var(--accent)] hover:underline font-semibold flex items-center gap-1 cursor-pointer"
+                      className="text-[#2563eb] hover:underline font-bold flex items-center gap-1 cursor-pointer shrink-0"
                       title="Làm mới camera"
                     >
                       <RotateCw className="w-3 h-3" />
@@ -407,7 +432,7 @@ export const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
                   <div>
                     <label
                       htmlFor={tokenInputId}
-                      className="block text-xs font-bold uppercase tracking-wider text-[var(--secondary)] mb-1.5"
+                      className="block text-xs font-bold uppercase tracking-wider text-[#334155] mb-1.5"
                     >
                       Chuỗi mã Onboarding / QR text
                     </label>
@@ -419,14 +444,14 @@ export const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
                           value={qrTokenInput}
                           onChange={(e) => setQrTokenInput(e.target.value)}
                           placeholder="Nhập mã Token hoặc dán link syna://device/register?token=..."
-                          className="w-full px-3.5 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--g1)] text-sm text-[var(--text)] placeholder:text-[var(--tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 focus:border-[var(--accent)] shadow-xs transition"
+                          className="w-full px-3.5 py-2.5 rounded-xl border border-[#cbd5e1] hover:border-[#94a3b8] bg-white text-sm text-[#0f172a] placeholder:text-[#64748b] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/15 focus:border-[#2563eb] transition"
                           autoFocus
                         />
                       </div>
                       <button
                         type="submit"
                         disabled={isResolving || !qrTokenInput.trim()}
-                        className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--accent)] hover:opacity-95 text-white text-xs font-bold transition shadow-xs disabled:opacity-50 disabled:cursor-not-allowed shrink-0 cursor-pointer"
+                        className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#2563eb] hover:bg-[#1d4ed8] text-white text-xs font-bold transition shadow-xs disabled:opacity-50 disabled:cursor-not-allowed shrink-0 cursor-pointer"
                       >
                         {isResolving ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
@@ -439,21 +464,21 @@ export const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
                   </div>
 
                   {/* Gợi ý định dạng rõ ràng */}
-                  <div className="p-3.5 rounded-2xl bg-[var(--g1)] border border-[var(--border)] space-y-2 text-xs">
-                    <span className="font-bold text-[var(--text)] flex items-center gap-1.5">
-                      <Sparkles className="w-3.5 h-3.5 text-[var(--accent)]" />
+                  <div className="p-4 rounded-2xl bg-[#f8fafc] border border-[#cbd5e1] space-y-2.5 text-xs">
+                    <span className="font-bold text-[#0f172a] flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-[#2563eb]" />
                       Định dạng mã hợp lệ:
                     </span>
-                    <ul className="list-disc list-inside space-y-1 text-[var(--secondary)] text-[11px] leading-relaxed">
+                    <ul className="list-disc list-inside space-y-1.5 text-[#475569] text-[11px] leading-relaxed">
                       <li>
                         Chuỗi QR tiêu chuẩn:{' '}
-                        <code className="px-1.5 py-0.5 rounded bg-[var(--solid)] text-[var(--accent)] font-mono border border-[var(--border)]">
+                        <code className="px-2 py-0.5 rounded-lg bg-[#eff6ff] text-[#1d4ed8] font-mono font-semibold border border-[#3b82f6]/35">
                           syna://device/register?token=DEV_XXX
                         </code>
                       </li>
                       <li>
                         Mã Token xuất xưởng in trên tem thiết bị:{' '}
-                        <code className="px-1.5 py-0.5 rounded bg-[var(--solid)] text-[var(--accent)] font-mono border border-[var(--border)]">
+                        <code className="px-2 py-0.5 rounded-lg bg-[#eff6ff] text-[#1d4ed8] font-mono font-semibold border border-[#3b82f6]/35">
                           HESTA-IOT-9921
                         </code>
                       </li>
@@ -464,57 +489,57 @@ export const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
             </div>
           ) : (
             /* Resolved Device Preview & Claim configuration */
-            <div className="rounded-3xl border border-emerald-500/30 bg-emerald-500/5 p-5 sm:p-6 space-y-5 gentle-rise">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5 text-emerald-600 dark:text-emerald-400">
+            <div className="rounded-2xl border border-[#10b981]/45 bg-[#ecfdf5]/50 p-5 space-y-5 gentle-rise">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-[#047857] flex-wrap">
                   <CheckCircle2 className="w-5 h-5 shrink-0" />
                   <span className="text-sm font-bold">Xác thực thiết bị thành công!</span>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#ecfdf5] text-[#047857] border border-[#10b981]/45">
                     Sẵn sàng ghép nối
                   </span>
                 </div>
                 <button
                   type="button"
                   onClick={handleResetScan}
-                  className="text-xs text-[var(--secondary)] hover:text-[var(--accent)] font-semibold underline cursor-pointer"
+                  className="text-xs text-[#2563eb] hover:underline font-bold cursor-pointer shrink-0"
                 >
                   Quét thiết bị khác
                 </button>
               </div>
 
               {/* Thông tin thiết bị xác thực (bố cục 2 cột sắc nét) */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-[var(--solid)] p-4 rounded-2xl border border-[var(--border)] text-xs shadow-xs">
-                <div className="flex items-start gap-2.5 p-2 rounded-xl bg-[var(--g1)]">
-                  <Cpu className="w-4 h-4 text-[var(--accent)] shrink-0 mt-0.5" />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-white p-3.5 rounded-2xl border border-[#cbd5e1] text-xs shadow-2xs">
+                <div className="flex items-start gap-2.5 p-2.5 rounded-xl bg-[#f8fafc] border border-[#e2e8f0]">
+                  <Cpu className="w-4 h-4 text-[#2563eb] shrink-0 mt-0.5" />
                   <div className="min-w-0 flex-1">
-                    <span className="text-[var(--tertiary)] block text-[11px]">Tên xuất xưởng:</span>
-                    <span className="font-bold text-[var(--text)] truncate block">{resolvedDevice.name}</span>
+                    <span className="text-[#64748b] block text-[11px]">Tên xuất xưởng:</span>
+                    <span className="font-bold text-[#0f172a] truncate block">{resolvedDevice.name}</span>
                   </div>
                 </div>
 
-                <div className="flex items-start gap-2.5 p-2 rounded-xl bg-[var(--g1)]">
-                  <Tag className="w-4 h-4 text-[var(--accent)] shrink-0 mt-0.5" />
+                <div className="flex items-start gap-2.5 p-2.5 rounded-xl bg-[#f8fafc] border border-[#e2e8f0]">
+                  <Tag className="w-4 h-4 text-[#2563eb] shrink-0 mt-0.5" />
                   <div className="min-w-0 flex-1">
-                    <span className="text-[var(--tertiary)] block text-[11px]">Loại thiết bị:</span>
-                    <span className="font-semibold text-[var(--text)] truncate block">{resolvedDevice.deviceType}</span>
+                    <span className="text-[#64748b] block text-[11px]">Loại thiết bị:</span>
+                    <span className="font-semibold text-[#0f172a] truncate block">{resolvedDevice.deviceType}</span>
                   </div>
                 </div>
 
-                <div className="flex items-start gap-2.5 p-2 rounded-xl bg-[var(--g1)]">
-                  <Hash className="w-4 h-4 text-[var(--secondary)] shrink-0 mt-0.5" />
+                <div className="flex items-start gap-2.5 p-2.5 rounded-xl bg-[#f8fafc] border border-[#e2e8f0]">
+                  <Hash className="w-4 h-4 text-[#64748b] shrink-0 mt-0.5" />
                   <div className="min-w-0 flex-1">
-                    <span className="text-[var(--tertiary)] block text-[11px]">Model:</span>
-                    <span className="font-mono text-[var(--text)] truncate block">
+                    <span className="text-[#64748b] block text-[11px]">Model:</span>
+                    <span className="font-mono text-[#0f172a] truncate block">
                       {resolvedDevice.model || 'Chưa định danh'}
                     </span>
                   </div>
                 </div>
 
-                <div className="flex items-start gap-2.5 p-2 rounded-xl bg-[var(--g1)]">
-                  <Hash className="w-4 h-4 text-[var(--secondary)] shrink-0 mt-0.5" />
+                <div className="flex items-start gap-2.5 p-2.5 rounded-xl bg-[#f8fafc] border border-[#e2e8f0]">
+                  <Hash className="w-4 h-4 text-[#64748b] shrink-0 mt-0.5" />
                   <div className="min-w-0 flex-1">
-                    <span className="text-[var(--tertiary)] block text-[11px]">Serial Number:</span>
-                    <span className="font-mono text-[var(--text)] truncate block">
+                    <span className="text-[#64748b] block text-[11px]">Serial Number:</span>
+                    <span className="font-mono text-[#0f172a] truncate block">
                       {resolvedDevice.serialNumber || 'N/A'}
                     </span>
                   </div>
@@ -522,11 +547,11 @@ export const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
               </div>
 
               {/* Cấu hình trước khi Claim */}
-              <div className="space-y-4 pt-2 border-t border-[var(--border)]/60">
+              <div className="space-y-4 pt-3 border-t border-[#e2e8f0]">
                 <div className="space-y-1.5">
                   <label
                     htmlFor={customNameInputId}
-                    className="block text-xs font-bold text-[var(--text)]"
+                    className="block text-xs font-bold text-[#0f172a]"
                   >
                     Tên gọi hiển thị trong nhà
                   </label>
@@ -536,9 +561,9 @@ export const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
                     value={customName}
                     onChange={(e) => setCustomName(e.target.value)}
                     placeholder={resolvedDevice.name}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--solid)] text-sm text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 focus:border-[var(--accent)] shadow-xs transition"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-[#cbd5e1] hover:border-[#94a3b8] bg-white text-sm text-[#0f172a] placeholder:text-[#64748b] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/15 focus:border-[#2563eb] transition"
                   />
-                  <p className="text-[11px] text-[var(--secondary)]">
+                  <p className="text-[11px] text-[#475569]">
                     Đặt tên dễ nhận biết (VD: Điều hòa phòng khách, Đèn bàn làm việc...)
                   </p>
                 </div>
@@ -546,13 +571,13 @@ export const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
                 <div className="space-y-1.5">
                   <label
                     htmlFor={claimRoomSelectId}
-                    className="block text-xs font-bold text-[var(--text)] flex items-center gap-1.5"
+                    className="block text-xs font-bold text-[#0f172a] flex items-center gap-1.5"
                   >
-                    <MapPin className="w-3.5 h-3.5 text-[var(--accent)]" />
+                    <MapPin className="w-3.5 h-3.5 text-[#2563eb]" />
                     <span>Chọn phòng lắp đặt</span>
                   </label>
                   {rooms.length === 0 ? (
-                    <p className="text-xs text-amber-700 dark:text-amber-300 bg-amber-600/15 p-2.5 rounded-xl border border-amber-600/30">
+                    <p className="text-xs text-[#92400e] bg-[#fffbeb] p-3 rounded-xl border border-[#f59e0b]/45 font-medium">
                       Chưa có phòng nào trong ngôi nhà này. Vui lòng tạo phòng trước khi ghép nối!
                     </p>
                   ) : (
@@ -560,7 +585,7 @@ export const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
                       id={claimRoomSelectId}
                       value={claimRoomId}
                       onChange={(e) => setClaimRoomId(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--solid)] text-sm font-semibold text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 focus:border-[var(--accent)] shadow-xs transition cursor-pointer"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-[#cbd5e1] hover:border-[#94a3b8] bg-white text-sm font-semibold text-[#0f172a] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/15 focus:border-[#2563eb] transition cursor-pointer"
                     >
                       {rooms.map((r) => (
                         <option key={r.id} value={r.id}>
@@ -575,7 +600,7 @@ export const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
                   type="button"
                   disabled={isClaiming || !claimRoomId || rooms.length === 0}
                   onClick={handleClaimDevice}
-                  className="w-full mt-2 inline-flex items-center justify-center gap-2 py-3 rounded-2xl bg-[var(--accent)] hover:opacity-95 text-white text-sm font-bold shadow-md hover:shadow-lg transition active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                  className="w-full mt-2 inline-flex items-center justify-center gap-2 py-3 rounded-2xl bg-[#2563eb] hover:bg-[#1d4ed8] text-white text-sm font-bold shadow-sm hover:shadow-md transition active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                 >
                   {isClaiming ? (
                     <>

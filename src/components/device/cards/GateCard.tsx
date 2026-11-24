@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import type { DeviceResponse } from '../../../types/device';
 import {
@@ -12,12 +12,22 @@ import {
 import { openGate, closeGate, stopGate } from '../../../services/deviceApi';
 import { notify } from '../../ui/notify';
 import { getErrorMessage } from '../../../utils/errors';
+import { APERTURE_TRANSIT_LOCK_MS, getApertureInterlock } from '../deviceHelpers';
 
 interface GateCardProps {
   device: DeviceResponse;
   onClick?: (deviceId: string) => void;
   onStateChange?: (updatedDevice: DeviceResponse) => void;
 }
+
+const getApertureSubtitle = (deviceType?: string) => {
+  switch ((deviceType || '').toUpperCase()) {
+    case 'ROLLING_DOOR': return 'Cửa cuốn thông minh';
+    case 'CURTAIN': return 'Rèm cửa tự động';
+    case 'DOOR': return 'Cửa tự động';
+    default: return 'Cổng tự động';
+  }
+};
 
 const GateCardComponent: React.FC<GateCardProps> = ({
   device,
@@ -29,22 +39,58 @@ const GateCardComponent: React.FC<GateCardProps> = ({
   const state = String(currentState?.state || 'CLOSED').toUpperCase();
 
   const [pendingAction, setPendingAction] = useState<'OPEN' | 'STOP' | 'CLOSE' | null>(null);
+  const [transitLocked, setTransitLocked] = useState(false);
+  const transitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (state === 'OPEN' || state === 'CLOSED' || state === 'STOPPED') {
+      if (transitTimerRef.current) {
+        clearTimeout(transitTimerRef.current);
+        transitTimerRef.current = null;
+      }
+      setTransitLocked(false);
+    }
+  }, [state]);
+
+  useEffect(() => () => {
+    if (transitTimerRef.current) clearTimeout(transitTimerRef.current);
+  }, []);
+
+  const interlock = getApertureInterlock(state, transitLocked);
+
+  const armTransitLock = () => {
+    if (transitTimerRef.current) clearTimeout(transitTimerRef.current);
+    setTransitLocked(true);
+    transitTimerRef.current = setTimeout(() => {
+      setTransitLocked(false);
+      transitTimerRef.current = null;
+    }, APERTURE_TRANSIT_LOCK_MS);
+  };
 
   const handleAction = async (action: 'OPEN' | 'STOP' | 'CLOSE', e: React.MouseEvent) => {
     e.stopPropagation();
-    if (isOffline || pendingAction !== null) return;
+    if (isOffline || pendingAction !== null || device.accessLevel === 'VIEW') return;
+    if (action === 'OPEN' && interlock.disableOpen) return;
+    if (action === 'CLOSE' && interlock.disableClose) return;
+    if (action === 'STOP' && interlock.disableStop) return;
 
     setPendingAction(action);
     try {
       if (action === 'OPEN') {
         await openGate(device.id, device.nodeId);
-        notify.success('Đang mở cổng / cửa');
+        armTransitLock();
+        notify.success('Đang mở...');
         onStateChange?.({
           ...device,
-          currentState: { ...device.currentState, state: 'OPEN' },
+          currentState: { ...device.currentState, state: 'OPENING' },
         });
       } else if (action === 'STOP') {
         await stopGate(device.id, device.nodeId);
+        if (transitTimerRef.current) {
+          clearTimeout(transitTimerRef.current);
+          transitTimerRef.current = null;
+        }
+        setTransitLocked(false);
         notify.success('Đã dừng chuyển động');
         onStateChange?.({
           ...device,
@@ -52,10 +98,11 @@ const GateCardComponent: React.FC<GateCardProps> = ({
         });
       } else {
         await closeGate(device.id, device.nodeId);
-        notify.success('Đang đóng cổng / cửa');
+        armTransitLock();
+        notify.success('Đang đóng...');
         onStateChange?.({
           ...device,
-          currentState: { ...device.currentState, state: 'CLOSED' },
+          currentState: { ...device.currentState, state: 'CLOSING' },
         });
       }
     } catch (err) {
@@ -65,10 +112,7 @@ const GateCardComponent: React.FC<GateCardProps> = ({
     }
   };
 
-  const isOpen = state === 'OPEN';
-  const isOpening = state === 'OPENING';
-  const isClosing = state === 'CLOSING';
-  const isStopped = state === 'STOPPED';
+  const { isOpen, isClosed, isOpening, isClosing, isStopped, disableOpen, disableClose, disableStop } = interlock;
 
   return (
     <motion.article
@@ -118,7 +162,7 @@ const GateCardComponent: React.FC<GateCardProps> = ({
               )}
             </div>
             <p className="text-xs text-muted truncate mt-0.5">
-              {device.deviceType === 'ROLLING_DOOR' ? 'Cửa cuốn thông minh' : device.deviceType === 'DOOR' ? 'Cửa chính thông minh' : device.deviceType === 'CURTAIN' ? 'Rèm tự động' : 'Cổng tự động'}
+              {getApertureSubtitle(device.deviceType)}
             </p>
           </div>
         </div>
@@ -169,10 +213,10 @@ const GateCardComponent: React.FC<GateCardProps> = ({
       >
         <button
           type="button"
-          disabled={isOffline || pendingAction !== null || isOpen || device.accessLevel === 'VIEW'}
+          disabled={isOffline || pendingAction !== null || disableOpen || device.accessLevel === 'VIEW'}
           onClick={(e) => handleAction('OPEN', e)}
           className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition-all ${
-            isOpen
+            isOpen || isOpening
               ? 'bg-emerald-500 text-white shadow-xs'
               : 'bg-white text-emerald-700 hover:bg-emerald-50 active:scale-95 shadow-xs'
           } disabled:opacity-40 disabled:pointer-events-none`}
@@ -187,7 +231,7 @@ const GateCardComponent: React.FC<GateCardProps> = ({
 
         <button
           type="button"
-          disabled={isOffline || pendingAction !== null || device.accessLevel === 'VIEW'}
+          disabled={isOffline || pendingAction !== null || disableStop || device.accessLevel === 'VIEW'}
           onClick={(e) => handleAction('STOP', e)}
           className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition-all ${
             isStopped
@@ -205,10 +249,10 @@ const GateCardComponent: React.FC<GateCardProps> = ({
 
         <button
           type="button"
-          disabled={isOffline || pendingAction !== null || (!isOpen && !isStopped && !isOpening && !isClosing) || device.accessLevel === 'VIEW'}
+          disabled={isOffline || pendingAction !== null || disableClose || device.accessLevel === 'VIEW'}
           onClick={(e) => handleAction('CLOSE', e)}
           className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition-all ${
-            !isOpen && !isStopped && !isOpening && !isClosing
+            isClosed || isClosing
               ? 'bg-slate-700 text-white shadow-xs'
               : 'bg-white text-slate-700 hover:bg-slate-200 active:scale-95 shadow-xs'
           } disabled:opacity-40 disabled:pointer-events-none`}

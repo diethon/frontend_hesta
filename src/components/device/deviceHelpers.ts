@@ -7,17 +7,300 @@ export const KNOWN_NON_AC_TYPES = new Set([
   'TEMP_HUMID_SENSOR',
   'MOTION_SENSOR',
   'SMOKE_SENSOR',
+  'FLAME_SENSOR',
   'GATE',
+  'GATE_MOTOR',
   'ROLLING_DOOR',
+  'DOOR',
   'CURTAIN',
   'CAMERA_AI',
   'LUX_SENSOR',
   'FAN',
-  'DOOR',
-  'TV',
   'WATER_PUMP',
-  'FLAME_SENSOR',
+  'TV',
 ]);
+
+export const APERTURE_DEVICE_TYPES = new Set([
+  'DOOR',
+  'ROLLING_DOOR',
+  'GATE',
+  'GATE_MOTOR',
+  'CURTAIN',
+]);
+
+export const isApertureDeviceType = (type?: string | null): boolean =>
+  APERTURE_DEVICE_TYPES.has((type || '').trim().toUpperCase());
+
+export const isRgbLightDevice = (
+  device?: { deviceType?: string | null; raw?: { deviceType?: string | null } } | null,
+): boolean => {
+  const rawType = (device?.raw?.deviceType ?? device?.deviceType ?? '').trim().toUpperCase();
+  return rawType === 'LED_RGB';
+};
+
+export const isFanDevice = (
+  device?: { deviceType?: string | null; raw?: { deviceType?: string | null } } | null,
+): boolean => {
+  const rawType = (device?.raw?.deviceType ?? device?.deviceType ?? '').trim().toUpperCase();
+  return rawType === 'FAN' || rawType === 'SMART_FAN';
+};
+
+export const isTvDevice = (
+  device?: { deviceType?: string | null; raw?: { deviceType?: string | null } } | null,
+): boolean => {
+  const rawType = (device?.raw?.deviceType ?? device?.deviceType ?? '').trim().toUpperCase();
+  return rawType === 'TV' || rawType === 'SMART_TV';
+};
+
+export const isWaterPumpDevice = (
+  device?: { deviceType?: string | null; raw?: { deviceType?: string | null } } | null,
+): boolean => (device?.raw?.deviceType ?? device?.deviceType ?? '').trim().toUpperCase() === 'WATER_PUMP';
+
+export const isDoorDevice = (
+  device?: { deviceType?: string | null; raw?: { deviceType?: string | null } } | null,
+): boolean => (device?.raw?.deviceType ?? device?.deviceType ?? '').trim().toUpperCase() === 'DOOR';
+
+export const AC_MODE_LABEL_TO_CODE: Record<string, string> = {
+  'Lạnh': 'COOL',
+  'Hút ẩm': 'DRY',
+  'Sưởi': 'HEAT',
+  'Tự động': 'AUTO',
+  COOL: 'COOL',
+  DRY: 'DRY',
+  HEAT: 'HEAT',
+  AUTO: 'AUTO',
+};
+
+export const AC_MODE_CODE_TO_LABEL: Record<string, string> = {
+  COOL: 'Lạnh',
+  DRY: 'Hút ẩm',
+  HEAT: 'Sưởi',
+  AUTO: 'Tự động',
+};
+
+export const AC_FAN_LABEL_TO_CODE: Record<string, string> = {
+  'Tự động': 'AUTO',
+  'Thấp': 'LOW',
+  'Vừa': 'MID',
+  'Cao': 'HIGH',
+  AUTO: 'AUTO',
+  LOW: 'LOW',
+  MID: 'MID',
+  HIGH: 'HIGH',
+};
+
+export const AC_FAN_CODE_TO_LABEL: Record<string, string> = {
+  AUTO: 'Tự động',
+  LOW: 'Thấp',
+  MID: 'Vừa',
+  HIGH: 'Cao',
+};
+
+export const resolveFanSpeedLevel = (state?: Record<string, unknown> | null): 0 | 1 | 2 | 3 => {
+  if (!state) return 0;
+  const raw = state.speed ?? state.fan ?? state.fanSpeed;
+  if (raw === undefined || raw === null) return 0;
+  if (typeof raw === 'number') {
+    if (raw <= 0) return 0;
+    if (raw === 1) return 1;
+    if (raw === 2) return 2;
+    return 3;
+  }
+  const s = String(raw).trim().toUpperCase();
+  if (s === '0' || s === 'OFF') return 0;
+  if (s === '1' || s === 'LOW' || s === 'THẤP') return 1;
+  if (s === '2' || s === 'MED' || s === 'MID' || s === 'MEDIUM' || s === 'VỪA') return 2;
+  if (s === '3' || s === 'HIGH' || s === 'CAO') return 3;
+  const num = Number(s);
+  if (!Number.isNaN(num) && num > 0) return num >= 3 ? 3 : num >= 2 ? 2 : 1;
+  return 0;
+};
+
+export interface ExtractedSensorMetrics {
+  temperature?: number;
+  humidity?: number;
+  lux?: number;
+  lightBinary?: boolean;
+  motion?: boolean;
+  smoke?: boolean | number;
+  gasPpm?: number;
+  flame?: boolean;
+  co2?: number;
+  pm25?: number;
+  battery?: number;
+  rssi?: number;
+}
+
+const pickCaseInsensitive = (state: Record<string, unknown>, keys: string[]): unknown => {
+  for (const key of keys) {
+    if (state[key] !== undefined && state[key] !== null) return state[key];
+  }
+  const lowerMap = new Map<string, unknown>();
+  for (const [k, v] of Object.entries(state)) {
+    if (v !== undefined && v !== null) lowerMap.set(k.toLowerCase(), v);
+  }
+  for (const key of keys) {
+    const hit = lowerMap.get(key.toLowerCase());
+    if (hit !== undefined) return hit;
+  }
+  return undefined;
+};
+
+const toNumOrUndefined = (val: unknown): number | undefined => {
+  if (val === undefined || val === null || typeof val === 'boolean') return undefined;
+  const n = Number(val);
+  return Number.isNaN(n) ? undefined : n;
+};
+
+const toBoolOrUndefined = (val: unknown): boolean | undefined => {
+  if (val === undefined || val === null) return undefined;
+  if (typeof val === 'boolean') return val;
+  if (typeof val === 'number') return val > 0;
+  const s = String(val).trim().toUpperCase();
+  if (['TRUE', '1', 'ON', 'DETECTED', 'BRIGHT', 'ALERT', 'FIRE', 'YES'].includes(s)) return true;
+  if (['FALSE', '0', 'OFF', 'CLEAR', 'DARK', 'SAFE', 'NO'].includes(s)) return false;
+  return undefined;
+};
+
+export const extractSensorMetrics = (
+  state?: Record<string, unknown> | null,
+): ExtractedSensorMetrics => {
+  if (!state || typeof state !== 'object') return {};
+  const temperature = toNumOrUndefined(pickCaseInsensitive(state, ['temperature', 'temp']));
+  const humidity = toNumOrUndefined(pickCaseInsensitive(state, ['humidity', 'hum', 'humid']));
+
+  const rawLux = pickCaseInsensitive(state, ['lux', 'illuminance']);
+  const rawLightFlag = pickCaseInsensitive(state, ['LIGHT_SENSOR', 'light_sensor', 'light']);
+  let lux = toNumOrUndefined(rawLux);
+  let lightBinary: boolean | undefined;
+  if (rawLightFlag !== undefined) {
+    if (typeof rawLightFlag === 'string' && (rawLightFlag.toUpperCase() === 'BRIGHT' || rawLightFlag.toUpperCase() === 'DARK')) {
+      lightBinary = rawLightFlag.toUpperCase() === 'BRIGHT';
+    } else {
+      const n = Number(rawLightFlag);
+      if (!Number.isNaN(n)) {
+        if (n === 0 || n === 1) {
+          lightBinary = n === 1;
+        } else if (lux === undefined) {
+          lux = n;
+        }
+      } else {
+        lightBinary = toBoolOrUndefined(rawLightFlag);
+      }
+    }
+  }
+  if (lightBinary === undefined && lux !== undefined) {
+    lightBinary = lux > 200;
+  }
+
+  const rawMotion = pickCaseInsensitive(state, ['motion', 'MOTION_SENSOR', 'motion_sensor', 'motionDetected']);
+  const motion = toBoolOrUndefined(rawMotion);
+
+  const rawSmoke = pickCaseInsensitive(state, ['smoke', 'SMOKE_SENSOR', 'smoke_sensor', 'smokeDetected']);
+  let smoke: boolean | number | undefined;
+  if (rawSmoke !== undefined) {
+    if (typeof rawSmoke === 'boolean') smoke = rawSmoke;
+    else {
+      const n = Number(rawSmoke);
+      smoke = !Number.isNaN(n) ? n : toBoolOrUndefined(rawSmoke);
+    }
+  }
+
+  const gasPpm = toNumOrUndefined(pickCaseInsensitive(state, ['gas_ppm', 'gas', 'mq2']));
+  const flame = toBoolOrUndefined(pickCaseInsensitive(state, ['flame', 'FLAME_SENSOR', 'flame_sensor', 'fire', 'flameDetected']));
+  const co2 = toNumOrUndefined(pickCaseInsensitive(state, ['co2']));
+  const pm25 = toNumOrUndefined(pickCaseInsensitive(state, ['pm25', 'pm2_5']));
+  const battery = toNumOrUndefined(pickCaseInsensitive(state, ['battery']));
+  const rssi = toNumOrUndefined(pickCaseInsensitive(state, ['rssi']));
+
+  return {
+    temperature,
+    humidity,
+    lux,
+    lightBinary,
+    motion,
+    smoke,
+    gasPpm,
+    flame,
+    co2,
+    pm25,
+    battery,
+    rssi,
+  };
+};
+
+export const normalizeSensorReadingPatch = (
+  metricType?: string | null,
+  value?: unknown,
+): Record<string, unknown> => {
+  if (!metricType || value === undefined || value === null) return {};
+  const m = metricType.trim();
+  const ml = m.toLowerCase();
+  const patch: Record<string, unknown> = { [m]: value };
+  if (ml === 'temp' || ml === 'temperature') {
+    patch.temperature = value;
+  } else if (ml === 'hum' || ml === 'humid' || ml === 'humidity') {
+    patch.humidity = value;
+  } else if (ml === 'light' || ml === 'light_sensor' || ml === 'lux' || ml === 'illuminance') {
+    patch.lux = value;
+    if (ml === 'light' || ml === 'light_sensor') patch.LIGHT_SENSOR = value;
+  } else if (ml === 'motion' || ml === 'motion_sensor') {
+    patch.motion = toBoolOrUndefined(value) ?? Boolean(value);
+  } else if (ml === 'smoke' || ml === 'smoke_sensor') {
+    patch.smoke = value;
+  } else if (ml === 'gas' || ml === 'gas_ppm') {
+    patch.gas = value;
+    patch.gas_ppm = value;
+  } else if (ml === 'flame' || ml === 'flame_sensor' || ml === 'fire') {
+    patch.flame = toBoolOrUndefined(value) ?? Boolean(value);
+  }
+  return patch;
+};
+
+export const APERTURE_TRANSIT_LOCK_MS = 4500;
+
+export interface ApertureInterlockState {
+  state: string;
+  isOpen: boolean;
+  isClosed: boolean;
+  isOpening: boolean;
+  isClosing: boolean;
+  isStopped: boolean;
+  isMoving: boolean;
+  disableOpen: boolean;
+  disableClose: boolean;
+  disableStop: boolean;
+}
+
+/**
+ * Interlock state machine for limitless motorized apertures (DOOR, ROLLING_DOOR, GATE, GATE_MOTOR, CURTAIN).
+ * Locks OPEN when OPEN or moving, locks CLOSE when CLOSED or moving, and only enables STOP while moving.
+ */
+export const getApertureInterlock = (
+  rawState?: unknown,
+  transitLocked = false,
+): ApertureInterlockState => {
+  const state = String(rawState ?? '').trim().toUpperCase();
+  const isOpening = state === 'OPENING';
+  const isClosing = state === 'CLOSING';
+  const isStopped = state === 'STOPPED' || state === 'STOP';
+  const isMoving = isOpening || isClosing || transitLocked;
+  const isOpen = state === 'OPEN';
+  const isClosed = state === 'CLOSED' || state === 'CLOSE';
+
+  return {
+    state,
+    isOpen,
+    isClosed,
+    isOpening,
+    isClosing,
+    isStopped,
+    isMoving,
+    disableOpen: isOpen || isMoving,
+    disableClose: isClosed || isMoving,
+    disableStop: !isMoving,
+  };
+};
 
 /**
  * Detect if a device represents or controls an Air Conditioner.
@@ -102,7 +385,7 @@ export const isReadOnlyDevice = (device: DeviceResponse): boolean => {
  */
 export const isWideCard = (device: DeviceResponse): boolean => {
   const type = resolveEffectiveType(device);
-  return ['AIR_CONDITIONER', 'GATE', 'ROLLING_DOOR', 'DOOR', 'CAMERA_AI', 'CURTAIN'].includes(type);
+  return type === 'AIR_CONDITIONER' || type === 'CAMERA_AI' || isApertureDeviceType(type);
 };
 
 /**
@@ -346,9 +629,14 @@ export const getDeviceCapabilityMap = (device?: DeviceResponse | any): DeviceCap
     } else if (effectiveType === 'SOCKET' || effectiveType === 'SMART_PLUG') {
       hasPower = true;
       powerActions.push('TURN_ON', 'TURN_OFF', 'TOGGLE');
-    } else if (effectiveType === 'GATE' || effectiveType === 'ROLLING_DOOR') {
+    } else if (isApertureDeviceType(effectiveType)) {
       hasGate = true;
     }
+  }
+
+  if (effectiveType === 'LIGHT') {
+    hasColor = false;
+    colorActions.length = 0;
   }
 
   if (hasPower && powerActions.length === 0) {

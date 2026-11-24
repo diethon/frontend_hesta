@@ -31,12 +31,37 @@ interface DisplayBar {
   isCurrentOrHighlight?: boolean;
 }
 
+function getVnHour(dateStr?: string): number | null {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return null;
+  const hourStr = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    hour: '2-digit',
+    hour12: false,
+  }).format(d);
+  const parsed = Number.parseInt(hourStr, 10);
+  return Number.isNaN(parsed) ? null : parsed % 24;
+}
+
 function getWeekdayLabelFromDate(dateStr?: string, fallbackIndex = 0): string {
   if (dateStr) {
     const d = new Date(dateStr);
     if (!Number.isNaN(d.getTime())) {
-      const jsDay = d.getDay(); // 0 = Sun, 1 = Mon ... 6 = Sat
-      return jsDay === 0 ? 'CN' : `T${jsDay + 1}`;
+      const vnWd = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Ho_Chi_Minh',
+        weekday: 'short',
+      }).format(d);
+      const map: Record<string, string> = {
+        Mon: 'T2',
+        Tue: 'T3',
+        Wed: 'T4',
+        Thu: 'T5',
+        Fri: 'T6',
+        Sat: 'T7',
+        Sun: 'CN',
+      };
+      if (map[vnWd]) return map[vnWd];
     }
   }
   return WEEKDAY_LABELS[fallbackIndex % 7];
@@ -80,17 +105,22 @@ function buildDisplayBars(
     }
     const bucketLabels = ['00h', '04h', '08h', '12h', '16h', '20h'];
     const bucketRanges = ['00:00–03:59', '04:00–07:59', '08:00–11:59', '12:00–15:59', '16:00–19:59', '20:00–23:59'];
+    const currentVnHour = getVnHour(new Date().toISOString()) ?? new Date().getHours();
+    const currentBucketIdx = Math.min(5, Math.floor(currentVnHour / 4));
     const buckets: DisplayBar[] = bucketLabels.map((lbl, bIdx) => ({
       key: `day-bucket-${bIdx}`,
       label: lbl,
       detailLabel: `Khung ${bucketRanges[bIdx]}`,
       kwh: 0,
       costVnd: 0,
-      isCurrentOrHighlight: bIdx === bucketLabels.length - 1,
+      isCurrentOrHighlight: bIdx === currentBucketIdx,
     }));
 
     rawPoints.forEach((pt, idx) => {
-      const bIdx = Math.min(5, Math.floor((idx / Math.max(1, rawPoints.length)) * 6));
+      const vnHour = getVnHour(pt.timestamp);
+      const bIdx = vnHour !== null
+        ? Math.min(5, Math.floor(vnHour / 4))
+        : Math.min(5, Math.floor((idx / Math.max(1, rawPoints.length)) * 6));
       buckets[bIdx].kwh += Number(pt.kwh || 0);
       buckets[bIdx].costVnd += Number(pt.costVnd || 0);
     });

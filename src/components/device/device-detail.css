@@ -54,6 +54,8 @@ html.dark .detail-panel {
   flex: 1 1 auto;
   overflow-y: auto;
   overflow-x: hidden;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   display: flex;
   flex-direction: column;
   position: relative;
@@ -101,14 +103,17 @@ html.dark .detail-panel {
 
 /* Device type tile icons with tint & glow */
 .detail-panel .detail-hero-icon-tile {
-  width: 60px;
-  height: 60px;
+  width: 68px;
+  height: 68px;
   border-radius: 20px;
   display: grid;
   place-items: center;
   flex-shrink: 0;
+  overflow: visible;
+  background: #ffffff;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.07);
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  border: 1px solid var(--border);
+  border: 1px solid rgba(15, 23, 42, 0.08);
   position: relative;
 }
 
@@ -294,12 +299,12 @@ html.dark .detail-panel {
 }
 
 .detail-panel .detail-banner-card.override-banner {
-  background: var(--detail-amber-soft);
-  border: 1px solid rgba(245, 158, 11, 0.3);
-  color: #b45309;
+  background: #fffbeb;
+  border: 1px solid rgba(217, 119, 6, 0.42);
+  color: #78350f;
 }
 html.dark .detail-panel .detail-banner-card.override-banner {
-  color: #fcd34d;
+  color: #78350f;
 }
 
 .detail-panel .detail-banner-card.offline-banner {
@@ -309,12 +314,12 @@ html.dark .detail-panel .detail-banner-card.override-banner {
 }
 
 .detail-panel .detail-banner-card.sync-banner {
-  background: var(--detail-amber-soft);
-  border: 1px solid rgba(245, 158, 11, 0.3);
-  color: #b45309;
+  background: #fffbeb;
+  border: 1px solid rgba(217, 119, 6, 0.42);
+  color: #78350f;
 }
 html.dark .detail-panel .detail-banner-card.sync-banner {
-  color: #fcd34d;
+  color: #78350f;
 }
 
 /* Sticky Segmented Tabs Container */
@@ -487,8 +492,8 @@ html.dark .detail-panel .detail-tab-btn:hover:not(.active) {
     padding: 12px 14px 10px;
   }
   .detail-panel .detail-hero-icon-tile {
-    width: 48px;
-    height: 48px;
+    width: 56px;
+    height: 56px;
     border-radius: 16px;
   }
   .detail-panel .detail-hero-readout {

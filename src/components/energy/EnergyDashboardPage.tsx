@@ -47,18 +47,24 @@ export const EnergyDashboardPage: React.FC = () => {
   const { homeId } = useParams<{ homeId: string }>();
   const navigate = useNavigate();
   const authUser = useAppSelector((state) => state.auth.user);
-  const userInitial = authUser?.fullName ? authUser.fullName.charAt(0).toUpperCase() : 'U';
+  const userInitial = authUser?.fullName
+    ? authUser.fullName.trim().split(' ').slice(-1)[0]?.charAt(0).toUpperCase() || 'M'
+    : 'M';
 
   const [activeTab, setActiveTab] = useState<'overview' | 'protection'>('overview');
   const [period, setPeriod] = useState<'24H' | '7D' | '30D'>('30D');
   const [data, setData] = useState<EnergyAnalyticsResponse | null>(
     () => (homeId ? peekCache<EnergyAnalyticsResponse>(energyAnalyticsKey(homeId, '30D')) ?? null : null)
   );
+  const [monthlyTotalKwh, setMonthlyTotalKwh] = useState<number | undefined>(
+    () => (homeId ? peekCache<EnergyAnalyticsResponse>(energyAnalyticsKey(homeId, '30D'))?.summary?.totalKwh : undefined)
+  );
   const [loading, setLoading] = useState(
     () => !(homeId && peekCache(energyAnalyticsKey(homeId, '30D')))
   );
   const [error, setError] = useState('');
   const [hoveredBreakdown, setHoveredBreakdown] = useState<DeviceEnergyBreakdown | null>(null);
+  const [pinnedBreakdown, setPinnedBreakdown] = useState<DeviceEnergyBreakdown | null>(null);
   const [showZeroDevices, setShowZeroDevices] = useState(false);
 
   // Fetch energy data on mount and period changes
@@ -70,6 +76,9 @@ export const EnergyDashboardPage: React.FC = () => {
     const cached = peekCache<EnergyAnalyticsResponse>(energyAnalyticsKey(homeId, period));
     if (cached) {
       setData(cached);
+      if (period === '30D') {
+        setMonthlyTotalKwh(cached.summary?.totalKwh);
+      }
       setLoading(false);
     }
 
@@ -77,6 +86,9 @@ export const EnergyDashboardPage: React.FC = () => {
       .then((res) => {
         if (!active) return;
         setData(res);
+        if (period === '30D') {
+          setMonthlyTotalKwh(res.summary?.totalKwh);
+        }
         setError('');
         setLoading(false);
 
@@ -85,7 +97,13 @@ export const EnergyDashboardPage: React.FC = () => {
         setTimeout(() => {
           if (!active) return;
           otherPeriods.forEach((p) => {
-            getHomeEnergyAnalytics(homeId, p).catch(() => null);
+            getHomeEnergyAnalytics(homeId, p)
+              .then((otherRes) => {
+                if (active && p === '30D') {
+                  setMonthlyTotalKwh(otherRes.summary?.totalKwh);
+                }
+              })
+              .catch(() => null);
           });
         }, 150);
       })
@@ -102,6 +120,8 @@ export const EnergyDashboardPage: React.FC = () => {
 
   const handlePeriodChange = (newPeriod: '24H' | '7D' | '30D') => {
     if (newPeriod !== period) {
+      setHoveredBreakdown(null);
+      setPinnedBreakdown(null);
       const cached = homeId ? peekCache<EnergyAnalyticsResponse>(energyAnalyticsKey(homeId, newPeriod)) : undefined;
       if (cached) {
         setData(cached);
@@ -119,6 +139,9 @@ export const EnergyDashboardPage: React.FC = () => {
     try {
       const res = await getHomeEnergyAnalytics(homeId, period, true);
       setData(res);
+      if (period === '30D') {
+        setMonthlyTotalKwh(res.summary?.totalKwh);
+      }
       setError('');
     } catch (err: unknown) {
       setError(getErrorMessage(err, 'Không thể tải dữ liệu phân tích năng lượng'));
@@ -134,6 +157,14 @@ export const EnergyDashboardPage: React.FC = () => {
     () => [...breakdown].sort((a, b) => (b.kwh || 0) - (a.kwh || 0)),
     [breakdown]
   );
+  const deviceColorMap = useMemo(() => {
+    const map = new Map<string, string>();
+    sortedBreakdown.forEach((d, idx) => {
+      map.set(d.deviceId, DONUT_COLORS[idx % DONUT_COLORS.length]);
+    });
+    return map;
+  }, [sortedBreakdown]);
+  const activeBreakdown = hoveredBreakdown ?? pinnedBreakdown;
 
   // Compute average per point and peak point from timeSeries
   const { avgPointKwh, peakPoint } = useMemo(() => {
@@ -209,7 +240,7 @@ export const EnergyDashboardPage: React.FC = () => {
           {/* Right Action Tools */}
           <div className="scene-actions-right">
             {activeTab === 'overview' && (
-              <div className="flex items-center gap-1 bg-[var(--g1)] p-1 rounded-full border border-[var(--border)] shadow-xs">
+              <div className="flex items-center gap-1 bg-white/95 p-1 rounded-full border border-[#cbd5e1] shadow-xs">
                 {(['24H', '7D', '30D'] as const).map((p) => (
                   <button
                     key={p}
@@ -217,8 +248,8 @@ export const EnergyDashboardPage: React.FC = () => {
                     onClick={() => handlePeriodChange(p)}
                     className={`px-3 py-1 text-xs font-semibold rounded-full transition-all cursor-pointer ${
                       period === p
-                        ? 'bg-[var(--accent)] text-white shadow-xs'
-                        : 'text-[var(--secondary)] hover:text-[var(--text)]'
+                        ? 'bg-[#2563eb] text-white shadow-xs'
+                        : 'text-[#475569] hover:text-[#0f172a]'
                     }`}
                   >
                     {p === '24H' ? '24 Giờ' : p === '7D' ? '7 Ngày' : 'Tháng Này'}
@@ -231,7 +262,7 @@ export const EnergyDashboardPage: React.FC = () => {
               type="button"
               onClick={() => void handleRefresh()}
               disabled={loading}
-              className="scene-ghost flex items-center gap-1.5 cursor-pointer"
+              className="scene-ghost !border-[#cbd5e1] !bg-white/95 !text-[#0f172a] flex items-center gap-1.5 cursor-pointer"
               title="Làm mới dữ liệu"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
@@ -240,7 +271,7 @@ export const EnergyDashboardPage: React.FC = () => {
 
             <button
               type="button"
-              className="scene-ghost flex items-center gap-1.5 cursor-pointer"
+              className="scene-ghost !border-[#cbd5e1] !bg-white/95 !text-[#0f172a] flex items-center gap-1.5 cursor-pointer"
               onClick={() => navigate(homeId ? `/home/${homeId}/devices` : '/home')}
             >
               <Layers className="w-3.5 h-3.5" />
@@ -250,7 +281,7 @@ export const EnergyDashboardPage: React.FC = () => {
         </div>
 
         {error && (
-          <div className="p-4 mb-6 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-700 dark:text-rose-300 text-sm flex items-center gap-2.5 backdrop-blur-md">
+          <div className="p-4 mb-6 rounded-2xl bg-[#fff1f2] border border-[#f43f5e]/45 text-[#be123c] text-sm flex items-center gap-2.5">
             <AlertCircle className="h-5 w-5 shrink-0" />
             {error}
           </div>
@@ -265,45 +296,45 @@ export const EnergyDashboardPage: React.FC = () => {
                 {[1, 2, 3, 4].map((i) => (
                   <div
                     key={i}
-                    className="glass-card glass-g2 p-5 rounded-2xl h-36 border border-[var(--border)] flex flex-col justify-between"
+                    className="bg-white/95 p-5 rounded-2xl h-36 border border-[#cbd5e1] flex flex-col justify-between"
                   >
-                    <div className="h-3 w-24 bg-[var(--border)] rounded" />
-                    <div className="h-8 w-32 bg-[var(--border)] rounded" />
-                    <div className="h-3 w-40 bg-[var(--border)] rounded" />
+                    <div className="h-3 w-24 bg-[#e2e8f0] rounded" />
+                    <div className="h-8 w-32 bg-[#e2e8f0] rounded" />
+                    <div className="h-3 w-40 bg-[#e2e8f0] rounded" />
                   </div>
                 ))}
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 tabular-nums">
                 {/* KPI Card 1: Tổng điện năng tiêu thụ */}
-                <div className="glass-card glass-g2 p-5 rounded-2xl relative overflow-hidden shadow-xs border border-[var(--border)] transition-all duration-200 hover:-translate-y-0.5">
+                <div className="bg-white/95 p-5 rounded-2xl relative overflow-hidden shadow-sm border border-[#cbd5e1] hover:border-[#94a3b8] transition-all duration-200">
                   <div className="flex justify-between items-start">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--secondary)]">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-[#475569]">
                       Điện Năng Tiêu Thụ
                     </span>
-                    <span className="p-2 bg-amber-500/15 text-amber-500 rounded-xl border border-amber-500/20">
+                    <span className="p-2 bg-[#fffbeb] text-[#d97706] rounded-xl border border-[#f59e0b]/40">
                       <Zap className="h-4 w-4" />
                     </span>
                   </div>
                   <div className="mt-3 flex items-baseline gap-2">
-                    <span className="text-3xl font-extrabold text-[var(--text)] tracking-tight">
+                    <span className="text-3xl font-extrabold text-[#0f172a] tracking-tight">
                       {formatKwh(summary?.totalKwh)}
                     </span>
-                    <span className="text-sm font-bold text-amber-500">kWh</span>
+                    <span className="text-sm font-bold text-[#b45309]">kWh</span>
                   </div>
-                  <div className="mt-2 text-xs text-[var(--secondary)] flex items-center justify-between gap-1">
+                  <div className="mt-2 text-xs text-[#475569] flex items-center justify-between gap-1">
                     <div className="flex items-center gap-1.5 truncate">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#10b981] shrink-0" />
                       <span className="truncate">
                         Hoạt động: {summary?.activeDeviceCount ?? 0}/{summary?.totalDeviceCount ?? 0}
                       </span>
                     </div>
                     {summary?.comparisonLastPeriodPercent !== undefined && summary.comparisonLastPeriodPercent !== 0 && (
                       <span
-                        className={`inline-flex items-center gap-0.5 text-[11px] font-bold px-1.5 py-0.5 rounded-md shrink-0 ${
+                        className={`inline-flex items-center gap-0.5 text-[11px] font-bold px-1.5 py-0.5 rounded-md border shrink-0 ${
                           summary.comparisonLastPeriodPercent > 0
-                            ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400'
-                            : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                            ? 'bg-[#fff1f2] text-[#be123c] border-[#f43f5e]/40'
+                            : 'bg-[#ecfdf5] text-[#047857] border-[#10b981]/40'
                         }`}
                         title="So sánh với chu kỳ trước"
                       >
@@ -323,17 +354,17 @@ export const EnergyDashboardPage: React.FC = () => {
                 </div>
 
                 {/* KPI Card 2: Tiền điện tạm tính */}
-                <div className="glass-card glass-g2 p-5 rounded-2xl relative overflow-hidden shadow-xs border border-[var(--border)] transition-all duration-200 hover:-translate-y-0.5">
+                <div className="bg-white/95 p-5 rounded-2xl relative overflow-hidden shadow-sm border border-[#cbd5e1] hover:border-[#94a3b8] transition-all duration-200">
                   <div className="flex justify-between items-start">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--secondary)]">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-[#475569]">
                       Tiền Điện Tạm Tính
                     </span>
-                    <span className="p-2 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 rounded-xl border border-emerald-500/20">
+                    <span className="p-2 bg-[#ecfdf5] text-[#047857] rounded-xl border border-[#10b981]/40">
                       <DollarSign className="h-4 w-4" />
                     </span>
                   </div>
                   <div className="mt-3">
-                    <span className="text-2xl sm:text-3xl font-extrabold text-emerald-600 dark:text-emerald-400 tracking-tight">
+                    <span className="text-2xl sm:text-3xl font-extrabold text-[#047857] tracking-tight">
                       {formatVnd(summary?.estimatedCostVnd)}
                     </span>
                   </div>
@@ -343,54 +374,54 @@ export const EnergyDashboardPage: React.FC = () => {
                     >
                       Bậc {summary?.currentTier ?? 1}
                     </span>
-                    <span className="text-xs text-[var(--secondary)]">Đã gồm VAT 8%</span>
+                    <span className="text-xs text-[#475569]">Đã gồm VAT 8%</span>
                   </div>
                 </div>
 
                 {/* KPI Card 3: Dự báo cuối tháng */}
-                <div className="glass-card glass-g2 p-5 rounded-2xl relative overflow-hidden shadow-xs border border-[var(--border)] transition-all duration-200 hover:-translate-y-0.5">
+                <div className="bg-white/95 p-5 rounded-2xl relative overflow-hidden shadow-sm border border-[#cbd5e1] hover:border-[#94a3b8] transition-all duration-200">
                   <div className="flex justify-between items-start">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--secondary)]">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-[#475569]">
                       Dự Báo Cuối Tháng
                     </span>
-                    <span className="p-2 bg-[var(--accent-soft)] text-[var(--accent)] rounded-xl border border-[var(--accent)]/20">
+                    <span className="p-2 bg-[#eff6ff] text-[#1d4ed8] rounded-xl border border-[#3b82f6]/40">
                       <TrendingUp className="h-4 w-4" />
                     </span>
                   </div>
                   <div className="mt-3 flex items-baseline gap-2">
-                    <span className="text-3xl font-extrabold text-[var(--text)] tracking-tight">
+                    <span className="text-3xl font-extrabold text-[#0f172a] tracking-tight">
                       {formatKwh(summary?.projectedMonthKwh)}
                     </span>
-                    <span className="text-sm font-bold text-[var(--accent)]">kWh</span>
+                    <span className="text-sm font-bold text-[#2563eb]">kWh</span>
                   </div>
-                  <div className="mt-2 text-xs text-[var(--secondary)]">
+                  <div className="mt-2 text-xs text-[#475569]">
                     Ước tính:{' '}
-                    <span className="font-semibold text-[var(--text)] font-mono">
+                    <span className="font-semibold text-[#0f172a] font-mono">
                       {formatVnd(summary?.projectedMonthCostVnd)}
                     </span>
                   </div>
                 </div>
 
                 {/* KPI Card 4: Trung bình mỗi mốc / Đỉnh tiêu thụ */}
-                <div className="glass-card glass-g2 p-5 rounded-2xl relative overflow-hidden shadow-xs border border-[var(--border)] transition-all duration-200 hover:-translate-y-0.5">
+                <div className="bg-white/95 p-5 rounded-2xl relative overflow-hidden shadow-sm border border-[#cbd5e1] hover:border-[#94a3b8] transition-all duration-200">
                   <div className="flex justify-between items-start">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--secondary)]">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-[#475569]">
                       Trung Bình &amp; Đỉnh Mốc
                     </span>
-                    <span className="p-2 bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 rounded-xl border border-indigo-500/20">
+                    <span className="p-2 bg-[#eef2ff] text-[#4338ca] rounded-xl border border-[#6366f1]/40">
                       <Activity className="h-4 w-4" />
                     </span>
                   </div>
                   <div className="mt-3 flex items-baseline gap-2">
-                    <span className="text-3xl font-extrabold text-[var(--text)] tracking-tight">
+                    <span className="text-3xl font-extrabold text-[#0f172a] tracking-tight">
                       {formatKwh(avgPointKwh, 1)}
                     </span>
-                    <span className="text-sm font-bold text-indigo-500">kWh/mốc</span>
+                    <span className="text-sm font-bold text-[#4338ca]">kWh/mốc</span>
                   </div>
-                  <div className="mt-2 text-xs text-[var(--secondary)] truncate">
+                  <div className="mt-2 text-xs text-[#475569] truncate">
                     {peakPoint ? (
                       <span>
-                        Đỉnh: <strong className="text-rose-500 font-mono">{formatKwh(peakPoint.kwh)} kWh</strong> ({peakPoint.label})
+                        Đỉnh: <strong className="text-[#be123c] font-mono">{formatKwh(peakPoint.kwh)} kWh</strong> ({peakPoint.label})
                       </span>
                     ) : (
                       <span>Chưa có mốc phát sinh</span>
@@ -417,6 +448,7 @@ export const EnergyDashboardPage: React.FC = () => {
                   projectedMonthKwh={summary?.projectedMonthKwh ?? 0}
                   currentTier={summary?.currentTier ?? 1}
                   period={period}
+                  monthlyTotalKwh={monthlyTotalKwh}
                 />
               </div>
             </div>
@@ -425,248 +457,259 @@ export const EnergyDashboardPage: React.FC = () => {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
               {/* Device Breakdown Donut & List (span 7) */}
               <div className="lg:col-span-7 flex flex-col">
-                <div className="glass-card glass-g2 p-5 sm:p-6 rounded-3xl border border-[var(--border)] shadow-xs space-y-6 h-full flex flex-col justify-between">
-                  <div className="flex items-center justify-between gap-2 border-b border-[var(--border)]/60 pb-3">
-                    <div className="flex items-center gap-2">
-                      <span className="p-1.5 rounded-lg bg-amber-500/15 text-amber-500">
-                        <PieChart className="h-4 w-4" />
-                      </span>
-                      <h3 className="text-base sm:text-lg font-bold text-[var(--text)] tracking-tight">
-                        Theo Thiết Bị
-                      </h3>
-                    </div>
-                    {hoveredBreakdown && (
-                      <button
-                        type="button"
-                        onClick={() => setHoveredBreakdown(null)}
-                        className="scene-ghost text-xs px-2.5 py-1 cursor-pointer"
-                      >
-                        Bỏ chọn lọc
-                      </button>
-                    )}
-                  </div>
+                {(() => {
+                  const activeDevs = sortedBreakdown.filter((d) => (d.kwh || 0) > 0.001);
+                  const totalActiveKwh = activeDevs.reduce((sum, d) => sum + (d.kwh || 0), 0);
+                  const zeroCount = sortedBreakdown.length - activeDevs.length;
+                  const visibleDevs = showZeroDevices ? sortedBreakdown : activeDevs;
+                  const circumference = 2 * Math.PI * 90;
 
-                  {sortedBreakdown.length === 0 ? (
-                    <div className="py-12 text-center text-xs text-[var(--secondary)] flex flex-col items-center justify-center space-y-2">
-                      <Layers className="w-8 h-8 text-[var(--tertiary)] stroke-[1.5]" />
-                      <p>Chưa có dữ liệu tiêu thụ điện của thiết bị trong khoảng thời gian này.</p>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center my-auto">
-                      {/* Left: SVG Donut Chart */}
-                      <div className="md:col-span-5 flex flex-col items-center justify-center relative">
-                        <div className="relative w-56 h-56 sm:w-64 sm:h-64">
-                          <svg viewBox="0 0 280 280" className="w-full h-full transform -rotate-90">
-                            {/* Background track circle */}
-                            <circle
-                              cx="140"
-                              cy="140"
-                              r="90"
-                              fill="none"
-                              stroke="currentColor"
-                              className="text-[var(--border)] opacity-40"
-                              strokeWidth="32"
-                              style={{ pointerEvents: 'none' }}
-                            />
-                            {/* Slices */}
-                            {(() => {
-                              const activeBreakdown = sortedBreakdown.filter((d) => (d.kwh || 0) > 0.001);
-                              const totalActiveKwh = activeBreakdown.reduce((sum, d) => sum + (d.kwh || 0), 0);
-                              const circumference = 2 * Math.PI * 90;
-
-                              if (activeBreakdown.length === 0 || totalActiveKwh <= 0.001) {
-                                return (
-                                  <circle
-                                    cx="140"
-                                    cy="140"
-                                    r="90"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    className="text-[var(--border)] opacity-60"
-                                    strokeWidth="24"
-                                    strokeDasharray="6 8"
-                                    style={{ pointerEvents: 'none' }}
-                                  />
-                                );
-                              }
-
-                              if (activeBreakdown.length === 1) {
-                                const dev = activeBreakdown[0];
-                                const originalIdx = sortedBreakdown.findIndex((d) => d.deviceId === dev.deviceId);
-                                const color = DONUT_COLORS[(originalIdx >= 0 ? originalIdx : 0) % DONUT_COLORS.length];
-                                const isHovered = hoveredBreakdown?.deviceId === dev.deviceId;
-                                return (
-                                  <circle
-                                    key={dev.deviceId}
-                                    cx="140"
-                                    cy="140"
-                                    r="90"
-                                    fill="none"
-                                    stroke={color}
-                                    strokeWidth={isHovered ? 34 : 28}
-                                    strokeLinecap="butt"
-                                    className="transition-all duration-300 cursor-pointer"
-                                    style={{
-                                      pointerEvents: 'stroke',
-                                      opacity: hoveredBreakdown && !isHovered ? 0.35 : 1,
-                                      filter: isHovered ? `drop-shadow(0 0 10px ${color}80)` : undefined,
-                                    }}
-                                    onMouseEnter={() => setHoveredBreakdown(dev)}
-                                    onMouseLeave={() => setHoveredBreakdown(null)}
-                                  />
-                                );
-                              }
-
-                              let accumulated = 0;
-                              return activeBreakdown.map((dev) => {
-                                const originalIdx = sortedBreakdown.findIndex((d) => d.deviceId === dev.deviceId);
-                                const color = DONUT_COLORS[(originalIdx >= 0 ? originalIdx : 0) % DONUT_COLORS.length];
-                                const pct = (dev.kwh / totalActiveKwh) * 100;
-                                const sliceLen = (pct / 100) * circumference;
-                                const gap = 3;
-                                const dashLength = Math.max(sliceLen - gap, 1);
-                                const strokeDasharray = `${dashLength} ${circumference - dashLength}`;
-                                const strokeDashoffset = -accumulated;
-                                accumulated += sliceLen;
-
-                                const isHovered = hoveredBreakdown?.deviceId === dev.deviceId;
-
-                                return (
-                                  <circle
-                                    key={dev.deviceId}
-                                    cx="140"
-                                    cy="140"
-                                    r="90"
-                                    fill="none"
-                                    stroke={color}
-                                    strokeWidth={isHovered ? 34 : 28}
-                                    strokeDasharray={strokeDasharray}
-                                    strokeDashoffset={strokeDashoffset}
-                                    strokeLinecap="butt"
-                                    className="transition-all duration-300 cursor-pointer"
-                                    style={{
-                                      pointerEvents: 'stroke',
-                                      opacity: hoveredBreakdown && !isHovered ? 0.35 : 1,
-                                      filter: isHovered ? `drop-shadow(0 0 10px ${color}80)` : undefined,
-                                    }}
-                                    onMouseEnter={() => setHoveredBreakdown(dev)}
-                                    onMouseLeave={() => setHoveredBreakdown(null)}
-                                  />
-                                );
-                              });
-                            })()}
-                          </svg>
-
-                          {/* Center hole statistics */}
-                          <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-4 pointer-events-none tabular-nums">
-                            <span className="text-[11px] font-bold text-[var(--secondary)] uppercase tracking-wider truncate max-w-[130px]">
-                              {hoveredBreakdown ? hoveredBreakdown.deviceName : 'Tổng Tiêu Thụ'}
+                  return (
+                    <div className="bg-white/95 p-5 sm:p-6 rounded-3xl border border-[#cbd5e1] shadow-sm flex flex-col gap-5 h-full">
+                      <div className="flex items-center justify-between gap-2 border-b border-[#e2e8f0] pb-3 min-h-[44px]">
+                        <div className="flex items-center gap-2">
+                          <span className="p-1.5 rounded-lg bg-[#fffbeb] text-[#d97706] border border-[#f59e0b]/40">
+                            <PieChart className="h-4 w-4" />
+                          </span>
+                          <h3 className="text-base sm:text-lg font-bold text-[#0f172a] tracking-tight">
+                            Theo Thiết Bị
+                          </h3>
+                        </div>
+                        <div className="h-7 flex items-center shrink-0">
+                          {pinnedBreakdown ? (
+                            <button
+                              type="button"
+                              onClick={() => setPinnedBreakdown(null)}
+                              className="h-7 px-2.5 rounded-full text-[11px] font-semibold bg-[#eff6ff] text-[#1d4ed8] border border-[#3b82f6]/40 hover:bg-[#dbeafe] transition-colors cursor-pointer"
+                            >
+                              Bỏ ghim
+                            </button>
+                          ) : (
+                            <span className="h-7 inline-flex items-center px-2.5 rounded-full text-[11px] font-semibold bg-[#f8fafc] border border-[#cbd5e1] text-[#475569]">
+                              {activeDevs.length} thiết bị tiêu thụ
                             </span>
-                            <div className="flex items-baseline gap-1 my-0.5">
-                              <span className="text-2xl font-extrabold text-[var(--text)] tracking-tight">
-                                {formatKwh(hoveredBreakdown ? hoveredBreakdown.kwh : (summary?.totalKwh ?? 0))}
-                              </span>
-                              <span className="text-xs font-bold text-amber-500">kWh</span>
-                            </div>
-                            <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 truncate max-w-[140px]">
-                              {hoveredBreakdown
-                                ? `${hoveredBreakdown.percentage}% (${formatVnd(hoveredBreakdown.costVnd)})`
-                                : (summary?.totalKwh ?? 0) <= 0
-                                ? 'Chưa phát sinh tiêu thụ'
-                                : formatVnd(summary?.estimatedCostVnd)}
-                            </span>
-                          </div>
+                          )}
                         </div>
                       </div>
 
-                      {/* Right: Device list */}
-                      <div className="md:col-span-7 space-y-2">
-                        <div className="space-y-2 max-h-[340px] overflow-y-auto pr-1 energy-scroll-area">
-                          {(() => {
-                            const activeDevs = sortedBreakdown.filter((d) => (d.kwh || 0) > 0.001);
-                            const zeroCount = sortedBreakdown.length - activeDevs.length;
-                            const visibleDevs = showZeroDevices ? sortedBreakdown : activeDevs;
+                      {sortedBreakdown.length === 0 ? (
+                        <div className="py-12 text-center text-xs text-[#475569] flex flex-col items-center justify-center space-y-2">
+                          <Layers className="w-8 h-8 text-[#94a3b8] stroke-[1.5]" />
+                          <p>Chưa có dữ liệu tiêu thụ điện của thiết bị trong khoảng thời gian này.</p>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+                          {/* Left: SVG Donut Chart */}
+                          <div className="md:col-span-5 flex flex-col items-center justify-center relative pt-2">
+                            <div className="relative w-56 h-56 sm:w-64 sm:h-64">
+                              <svg viewBox="0 0 280 280" className="w-full h-full transform -rotate-90">
+                                {/* Background track circle */}
+                                <circle
+                                  cx="140"
+                                  cy="140"
+                                  r="90"
+                                  fill="none"
+                                  stroke="#e2e8f0"
+                                  strokeWidth="30"
+                                  style={{ pointerEvents: 'none' }}
+                                />
+                                {/* Slices */}
+                                {(() => {
+                                  if (activeDevs.length === 0 || totalActiveKwh <= 0.001) {
+                                    return (
+                                      <circle
+                                        cx="140"
+                                        cy="140"
+                                        r="90"
+                                        fill="none"
+                                        stroke="#cbd5e1"
+                                        strokeWidth="24"
+                                        strokeDasharray="6 8"
+                                        style={{ pointerEvents: 'none' }}
+                                      />
+                                    );
+                                  }
 
-                            return (
-                              <>
-                                {visibleDevs.map((dev, idx) => {
-                                  const color = DONUT_COLORS[idx % DONUT_COLORS.length];
-                                  const isHovered = hoveredBreakdown?.deviceId === dev.deviceId;
+                                  if (activeDevs.length === 1) {
+                                    const dev = activeDevs[0];
+                                    const color = deviceColorMap.get(dev.deviceId) ?? DONUT_COLORS[0];
+                                    const isActive = activeBreakdown?.deviceId === dev.deviceId;
+                                    return (
+                                      <circle
+                                        key={dev.deviceId}
+                                        cx="140"
+                                        cy="140"
+                                        r="90"
+                                        fill="none"
+                                        stroke={color}
+                                        strokeWidth={isActive ? 34 : 28}
+                                        strokeLinecap="butt"
+                                        className="transition-all duration-200 cursor-pointer"
+                                        style={{
+                                          pointerEvents: 'stroke',
+                                          opacity: activeBreakdown && !isActive ? 0.35 : 1,
+                                        }}
+                                        onMouseEnter={() => setHoveredBreakdown(dev)}
+                                        onMouseLeave={() => setHoveredBreakdown(null)}
+                                        onClick={() =>
+                                          setPinnedBreakdown((prev) =>
+                                            prev?.deviceId === dev.deviceId ? null : dev,
+                                          )
+                                        }
+                                      />
+                                    );
+                                  }
 
-                                  return (
-                                    <div
-                                      key={dev.deviceId}
-                                      onMouseEnter={() => setHoveredBreakdown(dev)}
-                                      onMouseLeave={() => setHoveredBreakdown(null)}
-                                      className={`p-3 rounded-2xl border transition-all cursor-pointer space-y-1.5 ${
-                                        isHovered
-                                          ? 'bg-[var(--solid)] border-[var(--accent)] shadow-md ring-1 ring-[var(--accent)]/30'
-                                          : 'bg-[var(--g1)] border-[var(--border)] hover:bg-[var(--solid)]/80'
-                                      }`}
-                                    >
-                                      <div className="flex items-center justify-between gap-2">
-                                        <div className="flex items-center gap-2 min-w-0">
-                                          <span
-                                            className="w-2.5 h-2.5 rounded-full shrink-0 shadow-xs"
-                                            style={{ backgroundColor: color }}
-                                          />
-                                          <div className="min-w-0">
-                                            <span className="text-xs font-bold text-[var(--text)] truncate block">
-                                              {dev.deviceName}
-                                            </span>
-                                            <span className="text-[10px] text-[var(--secondary)] truncate block">
-                                              {dev.roomName || dev.deviceType}
-                                              {dev.totalOnHours ? ` • ${dev.totalOnHours}h` : ''}
-                                            </span>
-                                          </div>
-                                        </div>
-                                        <div className="text-right shrink-0 font-mono">
-                                          <div className="flex items-baseline justify-end gap-1.5">
-                                            <span className="text-xs font-bold text-amber-500">
-                                              {formatKwh(dev.kwh)} kWh
-                                            </span>
-                                            <span className="text-[11px] font-semibold text-[var(--secondary)]">
-                                              ({dev.percentage}%)
-                                            </span>
-                                          </div>
-                                          <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 block">
-                                            {formatVnd(dev.costVnd)}
+                                  let accumulated = 0;
+                                  return activeDevs.map((dev) => {
+                                    const color = deviceColorMap.get(dev.deviceId) ?? DONUT_COLORS[0];
+                                    const pct = (dev.kwh / totalActiveKwh) * 100;
+                                    const sliceLen = (pct / 100) * circumference;
+                                    const gap = 3;
+                                    const dashLength = Math.max(sliceLen - gap, 1);
+                                    const strokeDasharray = `${dashLength} ${circumference - dashLength}`;
+                                    const strokeDashoffset = -accumulated;
+                                    accumulated += sliceLen;
+
+                                    const isActive = activeBreakdown?.deviceId === dev.deviceId;
+
+                                    return (
+                                      <circle
+                                        key={dev.deviceId}
+                                        cx="140"
+                                        cy="140"
+                                        r="90"
+                                        fill="none"
+                                        stroke={color}
+                                        strokeWidth={isActive ? 34 : 28}
+                                        strokeDasharray={strokeDasharray}
+                                        strokeDashoffset={strokeDashoffset}
+                                        strokeLinecap="butt"
+                                        className="transition-all duration-200 cursor-pointer"
+                                        style={{
+                                          pointerEvents: 'stroke',
+                                          opacity: activeBreakdown && !isActive ? 0.35 : 1,
+                                        }}
+                                        onMouseEnter={() => setHoveredBreakdown(dev)}
+                                        onMouseLeave={() => setHoveredBreakdown(null)}
+                                        onClick={() =>
+                                          setPinnedBreakdown((prev) =>
+                                            prev?.deviceId === dev.deviceId ? null : dev,
+                                          )
+                                        }
+                                      />
+                                    );
+                                  });
+                                })()}
+                              </svg>
+
+                              {/* Center hole statistics */}
+                              <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-4 pointer-events-none tabular-nums">
+                                <span className="text-[11px] font-bold text-[#475569] uppercase tracking-wider truncate max-w-[130px]">
+                                  {activeBreakdown ? activeBreakdown.deviceName : 'Tổng Tiêu Thụ'}
+                                </span>
+                                <div className="flex items-baseline gap-1 my-0.5">
+                                  <span className="text-2xl font-extrabold text-[#0f172a] tracking-tight">
+                                    {formatKwh(activeBreakdown ? activeBreakdown.kwh : (summary?.totalKwh ?? 0))}
+                                  </span>
+                                  <span className="text-xs font-bold text-[#b45309]">kWh</span>
+                                </div>
+                                <span className="text-[11px] font-semibold text-[#047857] truncate max-w-[140px]">
+                                  {activeBreakdown
+                                    ? `${activeBreakdown.percentage}% (${formatVnd(activeBreakdown.costVnd)})`
+                                    : (summary?.totalKwh ?? 0) <= 0
+                                    ? 'Chưa phát sinh tiêu thụ'
+                                    : formatVnd(summary?.estimatedCostVnd)}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Right: Device list */}
+                          <div className="md:col-span-7 space-y-2">
+                            <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1 energy-scroll-area">
+                              {visibleDevs.map((dev) => {
+                                const color = deviceColorMap.get(dev.deviceId) ?? DONUT_COLORS[0];
+                                const isActive = activeBreakdown?.deviceId === dev.deviceId;
+
+                                return (
+                                  <div
+                                    key={dev.deviceId}
+                                    onMouseEnter={() => setHoveredBreakdown(dev)}
+                                    onMouseLeave={() => setHoveredBreakdown(null)}
+                                    onClick={() =>
+                                      setPinnedBreakdown((prev) =>
+                                        prev?.deviceId === dev.deviceId ? null : dev,
+                                      )
+                                    }
+                                    className={`p-3 rounded-2xl border transition-colors cursor-pointer space-y-1.5 ${
+                                      isActive
+                                        ? 'bg-[#eff6ff]/80 border-[#2563eb] shadow-xs ring-1 ring-[#2563eb]/20'
+                                        : 'bg-[#f8fafc] border-[#cbd5e1] hover:bg-white hover:border-[#94a3b8]'
+                                    }`}
+                                  >
+                                    <div className="flex items-center justify-between gap-2">
+                                      <div className="flex items-center gap-2.5 min-w-0">
+                                        <span
+                                          className="w-2.5 h-2.5 rounded-full shrink-0 shadow-xs"
+                                          style={{ backgroundColor: color }}
+                                        />
+                                        <div className="min-w-0">
+                                          <span className="text-xs font-bold text-[#0f172a] truncate block leading-snug py-0.5">
+                                            {dev.deviceName}
+                                          </span>
+                                          <span className="text-[11px] text-[#475569] truncate block leading-snug">
+                                            {dev.roomName || dev.deviceType}
+                                            {dev.totalOnHours ? ` • ${dev.totalOnHours}h` : ''}
                                           </span>
                                         </div>
                                       </div>
-
-                                      <div className="w-full h-1.5 bg-[var(--muted)] rounded-full overflow-hidden">
-                                        <div
-                                          style={{
-                                            width: `${Math.min(dev.percentage, 100)}%`,
-                                            backgroundColor: color,
-                                          }}
-                                          className="h-full rounded-full transition-all duration-300"
-                                        />
+                                      <div className="text-right shrink-0 font-mono">
+                                        <div className="flex items-baseline justify-end gap-1.5">
+                                          <span className="text-xs font-bold text-[#b45309]">
+                                            {formatKwh(dev.kwh)} kWh
+                                          </span>
+                                          <span className="text-[11px] font-semibold text-[#475569]">
+                                            ({dev.percentage}%)
+                                          </span>
+                                        </div>
+                                        <span className="text-[11px] font-semibold text-[#047857] block">
+                                          {formatVnd(dev.costVnd)}
+                                        </span>
                                       </div>
                                     </div>
-                                  );
-                                })}
 
-                                {zeroCount > 0 && (
-                                  <button
-                                    type="button"
-                                    onClick={() => setShowZeroDevices((prev) => !prev)}
-                                    className="w-full py-2 text-[11px] font-semibold text-[var(--secondary)] hover:text-[var(--text)] transition-colors cursor-pointer text-center"
-                                  >
-                                    {showZeroDevices
-                                      ? 'Ẩn các thiết bị 0 kWh'
-                                      : `+ Xem thêm ${zeroCount} thiết bị chưa tiêu thụ điện (0 kWh)`}
-                                  </button>
-                                )}
-                              </>
-                            );
-                          })()}
+                                    <div className="w-full h-1.5 bg-[#e2e8f0] rounded-full overflow-hidden">
+                                      <div
+                                        style={{
+                                          width: `${Math.min(dev.percentage, 100)}%`,
+                                          backgroundColor: color,
+                                        }}
+                                        className="h-full rounded-full transition-all duration-300"
+                                      />
+                                    </div>
+                                  </div>
+                                );
+                              })}
+
+                              {zeroCount > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => setShowZeroDevices((prev) => !prev)}
+                                  className="w-full py-2 text-[11px] font-semibold text-[#475569] hover:text-[#0f172a] transition-colors cursor-pointer text-center"
+                                >
+                                  {showZeroDevices
+                                    ? 'Ẩn các thiết bị 0 kWh'
+                                    : `+ Xem thêm ${zeroCount} thiết bị chưa tiêu thụ điện (0 kWh)`}
+                                </button>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                      </div>
+                      )}
                     </div>
-                  )}
-                </div>
+                  );
+                })()}
               </div>
 
               {/* Room Breakdown Card (span 5) */}

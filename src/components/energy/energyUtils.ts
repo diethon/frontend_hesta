@@ -98,33 +98,33 @@ export function getTierColorClass(tier: number): {
     case 1:
     case 2:
       return {
-        badge: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30',
-        border: 'border-emerald-500/40',
-        accent: 'text-emerald-500',
-        bgLight: 'bg-emerald-500',
+        badge: 'bg-[#ecfdf5] text-[#047857] border-[#10b981]/45',
+        border: 'border-[#10b981]/60',
+        accent: 'text-[#047857]',
+        bgLight: 'bg-[#059669]',
       };
     case 3:
     case 4:
       return {
-        badge: 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30',
-        border: 'border-amber-500/40',
-        accent: 'text-amber-500',
-        bgLight: 'bg-amber-500',
+        badge: 'bg-[#fffbeb] text-[#b45309] border-[#f59e0b]/50',
+        border: 'border-[#d97706]/60',
+        accent: 'text-[#b45309]',
+        bgLight: 'bg-[#d97706]',
       };
     case 5:
     case 6:
       return {
-        badge: 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/30',
-        border: 'border-rose-500/40',
-        accent: 'text-rose-500',
-        bgLight: 'bg-rose-500',
+        badge: 'bg-[#fff1f2] text-[#be123c] border-[#f43f5e]/50',
+        border: 'border-[#e11d48]/55',
+        accent: 'text-[#be123c]',
+        bgLight: 'bg-[#e11d48]',
       };
     default:
       return {
-        badge: 'bg-slate-500/15 text-slate-600 dark:text-slate-400 border-slate-500/30',
-        border: 'border-slate-500/40',
-        accent: 'text-slate-500',
-        bgLight: 'bg-slate-500',
+        badge: 'bg-[#f1f5f9] text-[#334155] border-[#cbd5e1]',
+        border: 'border-[#cbd5e1]',
+        accent: 'text-[#475569]',
+        bgLight: 'bg-[#64748b]',
       };
   }
 }
@@ -141,7 +141,7 @@ export interface TierCostSplitItem {
   isCurrent: boolean;
 }
 
-export function computeEvnCostSplit(referenceKwh: number, currentTierNumber?: number): {
+export function computeEvnCostSplit(referenceKwh: number, _currentTierNumber?: number): {
   tiers: TierCostSplitItem[];
   totalKwh: number;
   totalCostWithoutVat: number;
@@ -153,7 +153,7 @@ export function computeEvnCostSplit(referenceKwh: number, currentTierNumber?: nu
 } {
   const kwh = Math.max(0, referenceKwh);
 
-  // Compute tier based on kWh
+  // Derive EVN tier strictly from actual kWh so tier, progress %, and remaining kWh stay consistent
   let computedTier: number;
   if (kwh > 400) computedTier = 6;
   else if (kwh > 300) computedTier = 5;
@@ -162,9 +162,7 @@ export function computeEvnCostSplit(referenceKwh: number, currentTierNumber?: nu
   else if (kwh > 50) computedTier = 2;
   else computedTier = 1;
 
-  const effectiveTier = currentTierNumber && currentTierNumber >= 1 && currentTierNumber <= 6
-    ? currentTierNumber
-    : computedTier;
+  const effectiveTier = computedTier;
 
   const tiers: TierCostSplitItem[] = [];
   let remaining = kwh;

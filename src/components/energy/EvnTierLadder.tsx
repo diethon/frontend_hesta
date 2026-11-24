@@ -13,30 +13,33 @@ interface EvnTierLadderProps {
   projectedMonthKwh: number;
   currentTier: number;
   period: '24H' | '7D' | '30D';
+  monthlyTotalKwh?: number;
 }
 
 export const EvnTierLadder: React.FC<EvnTierLadderProps> = ({
   totalKwh,
-  currentTier,
+  period,
+  monthlyTotalKwh,
 }) => {
   const [showCostSplit, setShowCostSplit] = useState(false);
 
-  // Reference kWh based on actual accumulated kWh of the selected period (from day 01 for current month)
-  const referenceKwh = totalKwh || 0;
+  // Use monthly accumulated kWh (30D) when inspecting shorter windows so EVN ladder matches billing cycle
+  const isMonthlyDerived = period !== '30D' && monthlyTotalKwh !== undefined;
+  const referenceKwh = isMonthlyDerived ? monthlyTotalKwh : (totalKwh || 0);
 
-  const splitData = computeEvnCostSplit(referenceKwh, currentTier);
+  const splitData = computeEvnCostSplit(referenceKwh);
   const tierColor = getTierColorClass(splitData.computedTier);
 
   return (
-    <div className="glass-card glass-g2 p-5 sm:p-6 rounded-3xl border border-[var(--border)] shadow-xs flex flex-col justify-between space-y-4">
+    <div className="bg-white/95 p-5 sm:p-6 rounded-3xl border border-[#cbd5e1] shadow-sm flex flex-col justify-between space-y-4 h-full">
       {/* Header */}
       <div>
-        <div className="flex items-center justify-between gap-2 border-b border-[var(--border)]/60 pb-3">
+        <div className="flex items-center justify-between gap-2 border-b border-[#e2e8f0] pb-3">
           <div className="flex items-center gap-2">
-            <span className="p-1.5 rounded-lg bg-indigo-500/15 text-indigo-500">
+            <span className="p-1.5 rounded-lg bg-[#eef2ff] text-[#4338ca] border border-[#6366f1]/40">
               <Layers className="h-4 w-4" />
             </span>
-            <h3 className="text-base sm:text-lg font-bold text-[var(--text)] tracking-tight">
+            <h3 className="text-base sm:text-lg font-bold text-[#0f172a] tracking-tight">
               Bậc Thang EVN
             </h3>
           </div>
@@ -48,15 +51,15 @@ export const EvnTierLadder: React.FC<EvnTierLadderProps> = ({
         </div>
 
         {/* Current Tier Guidance Box */}
-        <div className="mt-3.5 p-3.5 rounded-2xl bg-[var(--solid)] border border-[var(--border)] space-y-2.5">
+        <div className="mt-3.5 p-3.5 rounded-2xl bg-[#f8fafc] border border-[#cbd5e1] space-y-2.5">
           <div className="flex items-center justify-between text-xs">
-            <span className="font-semibold text-[var(--text)] flex items-center gap-1.5">
-              <span>Mức tích lũy:</span>
-              <strong className="text-amber-500 font-mono font-bold">
+            <span className="font-semibold text-[#0f172a] flex items-center gap-1.5">
+              <span>{isMonthlyDerived ? 'Tích lũy tháng này:' : 'Mức tích lũy:'}</span>
+              <strong className="text-[#b45309] font-mono font-bold">
                 {formatKwh(referenceKwh)} kWh
               </strong>
             </span>
-            <span className="text-[11px] text-[var(--secondary)] font-mono">
+            <span className="text-[11px] text-[#475569] font-mono font-semibold">
               {splitData.computedTier === 6
                 ? '100% (Bậc kịch trần)'
                 : `${Math.round(splitData.progressInCurrentTier)}% bậc hiện tại`}
@@ -64,10 +67,13 @@ export const EvnTierLadder: React.FC<EvnTierLadderProps> = ({
           </div>
 
           {/* Progress bar inside current tier */}
-          <div className="w-full h-2 bg-[var(--muted)] rounded-full overflow-hidden p-0.5 border border-[var(--border)]">
+          <div className="w-full h-2.5 bg-[#e2e8f0] rounded-full overflow-hidden">
             <div
               className={`h-full rounded-full transition-all duration-500 ${tierColor.bgLight}`}
-              style={{ width: `${splitData.progressInCurrentTier}%` }}
+              style={{
+                width: `${splitData.progressInCurrentTier}%`,
+                minWidth: referenceKwh > 0 ? '4px' : undefined,
+              }}
             />
           </div>
 
@@ -75,21 +81,21 @@ export const EvnTierLadder: React.FC<EvnTierLadderProps> = ({
           <div className="text-xs flex items-start gap-1.5 pt-0.5">
             {splitData.computedTier === 6 ? (
               <>
-                <AlertTriangle className="w-3.5 h-3.5 text-rose-500 shrink-0 mt-0.5" />
-                <span className="text-rose-600 dark:text-rose-400 font-medium">
+                <AlertTriangle className="w-3.5 h-3.5 text-[#e11d48] shrink-0 mt-0.5" />
+                <span className="text-[#be123c] font-medium">
                   Đang ở bậc cao nhất (Bậc 6: 3.302 đ/kWh). Hãy áp dụng các kịch bản cắt giảm phụ tải đỉnh.
                 </span>
               </>
             ) : splitData.kwhLeftToNextTier !== null && splitData.nextTierPrice !== null ? (
               <>
-                <Info className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
-                <span className="text-[var(--secondary)]">
+                <Info className="w-3.5 h-3.5 text-[#d97706] shrink-0 mt-0.5" />
+                <span className="text-[#475569]">
                   Còn{' '}
-                  <strong className="text-[var(--text)] font-semibold font-mono">
+                  <strong className="text-[#0f172a] font-semibold font-mono">
                     {formatKwh(splitData.kwhLeftToNextTier)} kWh
                   </strong>{' '}
                   nữa sẽ lên{' '}
-                  <strong className="text-amber-600 dark:text-amber-400 font-semibold">
+                  <strong className="text-[#b45309] font-semibold">
                     Bậc {splitData.computedTier + 1}
                   </strong>{' '}
                   ({splitData.nextTierPrice.toLocaleString('vi-VN')} đ/kWh)
@@ -112,10 +118,10 @@ export const EvnTierLadder: React.FC<EvnTierLadderProps> = ({
               key={t.tier}
               className={`ladder-step p-2.5 rounded-xl border flex items-center justify-between text-xs transition-all ${
                 isCurrent
-                  ? `bg-[var(--solid)] ${stepColor.border} shadow-sm ring-1 ring-amber-500/20`
+                  ? `bg-white ${stepColor.border} shadow-xs ring-1 ring-[#e2e8f0]`
                   : isPassed
-                  ? 'bg-[var(--g1)] border-[var(--border)] opacity-85'
-                  : 'bg-[var(--g1)]/40 border-transparent opacity-50'
+                  ? 'bg-[#f8fafc] border-[#cbd5e1]'
+                  : 'bg-white border-[#e2e8f0] opacity-85'
               }`}
             >
               <div className="flex items-center gap-2 min-w-0">
@@ -124,19 +130,19 @@ export const EvnTierLadder: React.FC<EvnTierLadderProps> = ({
                     isCurrent
                       ? `${stepColor.bgLight} text-white`
                       : isPassed
-                      ? 'bg-[var(--muted)] text-[var(--secondary)]'
-                      : 'bg-transparent border border-[var(--border)] text-[var(--tertiary)]'
+                      ? 'bg-[#ecfdf5] border border-[#10b981]/35 text-[#059669]'
+                      : 'bg-[#f8fafc] border border-[#cbd5e1] text-[#64748b]'
                   }`}
                 >
-                  {isPassed ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> : t.tier}
+                  {isPassed ? <CheckCircle2 className="w-3.5 h-3.5 text-[#059669]" /> : t.tier}
                 </span>
 
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5">
-                    <span className={`font-bold ${isCurrent ? 'text-[var(--text)]' : 'text-[var(--secondary)]'}`}>
+                    <span className={`font-bold ${isCurrent ? 'text-[#0f172a]' : 'text-[#334155]'}`}>
                       {t.label}
                     </span>
-                    <span className="text-[10px] text-[var(--tertiary)] font-mono">
+                    <span className="text-[10px] text-[#64748b] font-mono">
                       ({t.rangeLabel})
                     </span>
                   </div>
@@ -144,10 +150,10 @@ export const EvnTierLadder: React.FC<EvnTierLadderProps> = ({
               </div>
 
               <div className="text-right shrink-0">
-                <span className="font-mono font-bold text-[var(--text)]">
+                <span className="font-mono font-bold text-[#0f172a]">
                   {t.pricePerKwh.toLocaleString('vi-VN')} đ
                 </span>
-                <span className="text-[10px] text-[var(--tertiary)] block">/kWh</span>
+                <span className="text-[10px] text-[#64748b] block">/kWh</span>
               </div>
             </div>
           );
@@ -155,22 +161,22 @@ export const EvnTierLadder: React.FC<EvnTierLadderProps> = ({
       </div>
 
       {/* Collapsible Per-Tier Cost Split Breakdown */}
-      <div className="pt-2 border-t border-[var(--border)]/60">
+      <div className="pt-2 border-t border-[#e2e8f0]">
         <button
           type="button"
           onClick={() => setShowCostSplit((prev) => !prev)}
-          className="w-full flex items-center justify-between text-xs font-semibold text-[var(--secondary)] hover:text-[var(--text)] py-1 transition-colors cursor-pointer"
+          className="w-full flex items-center justify-between text-xs font-semibold text-[#334155] hover:text-[#0f172a] py-1 transition-colors cursor-pointer"
         >
           <span>Chi tiết tính tiền theo từng bậc</span>
-          <span className="flex items-center gap-1 text-[11px] text-amber-500">
+          <span className="flex items-center gap-1 text-[11px] font-bold text-[#b45309]">
             {showCostSplit ? 'Thu gọn' : 'Xem phân tách'}
             {showCostSplit ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
           </span>
         </button>
 
         {showCostSplit && (
-          <div className="mt-2 space-y-1.5 p-3 rounded-2xl bg-[var(--solid)] border border-[var(--border)] text-[11px] animate-in fade-in slide-in-from-top-1 duration-200">
-            <div className="grid grid-cols-12 gap-1 text-[var(--tertiary)] font-semibold border-b border-[var(--border)] pb-1">
+          <div className="mt-2 space-y-1.5 p-3 rounded-2xl bg-[#f8fafc] border border-[#cbd5e1] text-[11px] animate-in fade-in slide-in-from-top-1 duration-200">
+            <div className="grid grid-cols-12 gap-1 text-[#475569] font-semibold border-b border-[#e2e8f0] pb-1">
               <span className="col-span-4">Bậc EVN</span>
               <span className="col-span-3 text-right">Sản lượng</span>
               <span className="col-span-5 text-right">Thành tiền</span>
@@ -180,22 +186,22 @@ export const EvnTierLadder: React.FC<EvnTierLadderProps> = ({
               if (t.kwhInTier <= 0) return null;
               return (
                 <div key={t.tier} className="grid grid-cols-12 gap-1 font-mono items-center py-0.5">
-                  <span className="col-span-4 font-semibold text-[var(--text)]">
+                  <span className="col-span-4 font-semibold text-[#0f172a]">
                     {t.label}
                   </span>
-                  <span className="col-span-3 text-right text-[var(--secondary)]">
+                  <span className="col-span-3 text-right text-[#475569]">
                     {formatKwh(t.kwhInTier)} kWh
                   </span>
-                  <span className="col-span-5 text-right font-bold text-emerald-600 dark:text-emerald-400">
+                  <span className="col-span-5 text-right font-bold text-[#047857]">
                     {formatCurrencyVnd(t.costVndWithVat)}
                   </span>
                 </div>
               );
             })}
 
-            <div className="pt-2 mt-1 border-t border-[var(--border)] flex justify-between font-bold text-xs text-[var(--text)]">
+            <div className="pt-2 mt-1 border-t border-[#cbd5e1] flex justify-between font-bold text-xs text-[#0f172a]">
               <span>Tổng cộng (VAT {(VAT_RATE * 100).toFixed(0)}%):</span>
-              <span className="text-emerald-600 dark:text-emerald-400 font-mono">
+              <span className="text-[#047857] font-mono">
                 {formatCurrencyVnd(splitData.totalCostWithVat)}
               </span>
             </div>
