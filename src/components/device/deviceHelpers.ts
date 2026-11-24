@@ -40,11 +40,17 @@ export const isRgbLightDevice = (
 
 export const isFanDevice = (
   device?: { deviceType?: string | null; raw?: { deviceType?: string | null } } | null,
-): boolean => (device?.raw?.deviceType ?? device?.deviceType ?? '').trim().toUpperCase() === 'FAN';
+): boolean => {
+  const rawType = (device?.raw?.deviceType ?? device?.deviceType ?? '').trim().toUpperCase();
+  return rawType === 'FAN' || rawType === 'SMART_FAN';
+};
 
 export const isTvDevice = (
   device?: { deviceType?: string | null; raw?: { deviceType?: string | null } } | null,
-): boolean => (device?.raw?.deviceType ?? device?.deviceType ?? '').trim().toUpperCase() === 'TV';
+): boolean => {
+  const rawType = (device?.raw?.deviceType ?? device?.deviceType ?? '').trim().toUpperCase();
+  return rawType === 'TV' || rawType === 'SMART_TV';
+};
 
 export const isWaterPumpDevice = (
   device?: { deviceType?: string | null; raw?: { deviceType?: string | null } } | null,

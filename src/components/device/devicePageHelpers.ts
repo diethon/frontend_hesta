@@ -40,6 +40,8 @@ export const DEVICE_TYPE_FILTER_OPTIONS = [
   'Tất cả',
   'Đèn',
   'Điều hòa',
+  'Quạt',
+  'TV',
   'Cảm biến',
   'Cổng',
   'Công tắc',
@@ -174,12 +176,9 @@ export function mapDeviceToUI(
   } else if (typeUpper.includes('PUMP') || nameLower.includes('bơm')) {
     type = 'Công tắc';
     icon = 'droplet';
-  } else if (typeUpper === 'FAN' || nameLower.includes('quạt')) {
+  } else if (nameLower.includes('quạt')) {
     type = 'Công tắc';
     icon = 'wind';
-  } else if (typeUpper === 'TV') {
-    type = 'Công tắc';
-    icon = 'tv';
   } else if (typeUpper.includes('LOCK') || nameLower.includes('khóa')) {
     type = 'Công tắc';
     icon = 'lock';

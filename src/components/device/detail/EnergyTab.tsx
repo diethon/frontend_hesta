@@ -32,8 +32,8 @@ function resolveDefaultWattage(rawType?: string, resolvedType?: FigmaDeviceType)
     if (t === 'WATER_PUMP') return 370;
     if (t === 'GATE' || t === 'GATE_MOTOR' || t === 'ROLLING_DOOR' || t === 'DOOR') return 350;
     if (t === 'FRIDGE') return 150;
-    if (t === 'TV') return 120;
-    if (t === 'FAN') return 65;
+    if (t === 'TV' || t === 'SMART_TV') return 120;
+    if (t === 'FAN' || t === 'SMART_FAN') return 65;
     if (t === 'CURTAIN') return 60;
     if (t === 'LIGHT' || t === 'LED') return 40;
     if (t === 'LED_RGB') return 24;
@@ -44,6 +44,8 @@ function resolveDefaultWattage(rawType?: string, resolvedType?: FigmaDeviceType)
   }
   if (resolvedType === 'Điều hòa') return 1500;
   if (resolvedType === 'Cổng') return 350;
+  if (resolvedType === 'TV') return 120;
+  if (resolvedType === 'Quạt') return 65;
   if (resolvedType === 'Cảm biến') return 2;
   return 40;
 }

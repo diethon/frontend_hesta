@@ -11,7 +11,12 @@ import {
 } from 'lucide-react';
 import { type IconName } from '../../home/HomeIcons';
 import { DeviceVisual } from '../DeviceVisual';
-import { isRgbLightDevice, resolveDeviceRgb, rgbToHex } from '../deviceHelpers';
+import {
+  isRgbLightDevice,
+  resolveDeviceRgb,
+  resolveFanSpeedLevel,
+  rgbToHex,
+} from '../deviceHelpers';
 import type { FigmaDeviceType, DetailDeviceInput } from './detailTypes';
 import { formatRelativeTime } from './detailTypes';
 import { notify } from '../../ui/notify';
@@ -98,11 +103,11 @@ export const DetailHero: React.FC<DetailHeroProps> = ({
       typeClass = 'type-camera';
       break;
     case 'Quạt':
-      iconName = 'automation';
+      iconName = 'wind';
       typeClass = 'type-dieu-hoa';
       break;
     case 'TV':
-      iconName = 'film';
+      iconName = 'tv';
       typeClass = 'type-cong';
       break;
     case 'Công tắc':
@@ -121,6 +126,7 @@ export const DetailHero: React.FC<DetailHeroProps> = ({
   }
 
   // 2. Primary Readout
+  const rawHeroState = (device?.raw?.currentState || device?.currentState) as Record<string, unknown> | undefined;
   let primaryReadout: string;
   let subtitle: string;
 
@@ -152,16 +158,17 @@ export const DetailHero: React.FC<DetailHeroProps> = ({
     subtitle = t.includes('ROLLING')
       ? 'Cửa cuốn thông minh'
       : t.includes('CURTAIN')
-      ? 'Rèm tự động'
+      ? 'Rèm cửa tự động'
       : t.includes('DOOR')
-      ? 'Cửa chính thông minh'
+      ? 'Cửa tự động'
       : 'Cổng tự động HESTA';
   } else if (resolvedType === 'Quạt') {
-    const spd = Number((device?.raw?.currentState ?? device?.currentState)?.speed ?? 0);
-    primaryReadout = isOn ? `Bật · mức ${spd || 1}` : 'Tắt';
+    const spd = resolveFanSpeedLevel(rawHeroState);
+    primaryReadout = isOn ? (spd > 0 ? `Bật · Mức ${spd}` : 'Đang bật') : 'Tắt';
     subtitle = isOn ? 'Quạt đang chạy' : 'Chạm nút nguồn để bật';
   } else if (resolvedType === 'TV') {
-    primaryReadout = isOn ? 'Đang bật' : 'Tắt';
+    const ch = rawHeroState?.channel;
+    primaryReadout = isOn ? (ch !== undefined && ch !== null ? `Bật · Kênh ${ch}` : 'Đang bật') : 'Tắt';
     subtitle = 'Điều khiển hồng ngoại';
   } else if (resolvedType === 'Camera') {
     primaryReadout = disabled ? 'Ngoại tuyến' : 'Sẵn sàng';
@@ -178,7 +185,6 @@ export const DetailHero: React.FC<DetailHeroProps> = ({
   const isPowerDevice = ['Đèn', 'Điều hòa', 'Công tắc', 'Quạt', 'TV'].includes(resolvedType);
   const lastSeenStr = device?.raw?.lastSeen || device?.raw?.updatedAt || device?.lastSeen;
   const relativeTime = formatRelativeTime(lastSeenStr);
-  const rawHeroState = (device?.raw?.currentState || device?.currentState) as Record<string, unknown> | undefined;
   const isRgbLight = isRgbLightDevice(device);
   const resolvedHeroRgb = isRgbLight ? resolveDeviceRgb(rawHeroState) : undefined;
   const heroRgbHex = isRgbLight
@@ -214,6 +220,7 @@ export const DetailHero: React.FC<DetailHeroProps> = ({
               isOn={isOn}
               offline={disabled || device?.offline}
               brightness={lightLevel ?? device?.brightness ?? 80}
+              fanSpeed={resolveFanSpeedLevel(rawHeroState)}
               rgbColor={isRgbLight ? heroRgbHex : undefined}
               acMode={acMode}
               gateState={String(device?.raw?.currentState?.state ?? gateState ?? '')}

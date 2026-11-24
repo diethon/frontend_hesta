@@ -431,6 +431,7 @@ function DevicesDeviceCard({
               isOn={Boolean(device.on)}
               offline={device.offline}
               brightness={bLevel}
+              fanSpeed={resolveFanSpeedLevel(rawState)}
               rgbColor={isRgbLight ? rgbHex : undefined}
               acMode={typeof rawState?.mode === 'string' ? rawState.mode : undefined}
               gateState={typeof rawState?.state === 'string' ? rawState.state : undefined}
@@ -1027,9 +1028,10 @@ export const DevicePage: React.FC = () => {
     const onLights = devices.filter((d) => {
       if (d.status !== 'ONLINE') return false;
       if (d.accessLevel === 'VIEW' || d.accessLevel === 'NONE') return false;
+      const typeUpper = (d.deviceType || '').toUpperCase();
       const isLight =
-        (d.deviceType || '').toUpperCase().includes('LIGHT') ||
-        (d.deviceType || '').toUpperCase().includes('LED');
+        (typeUpper.includes('LIGHT') && !typeUpper.includes('SENSOR')) ||
+        typeUpper.includes('LED');
       if (!isLight) return false;
       const isPowerOn =
         localPower[d.id] !== undefined

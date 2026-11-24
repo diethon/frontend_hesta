@@ -233,6 +233,28 @@ test('mapDeviceToUI marks OFFLINE, UNKNOWN, ERROR, UNCLAIMED as offline with Vie
     assert.equal(mapped.offline, c.expectedOffline, `status=${c.status}`);
     assert.equal(mapped.status, c.expectedStatus, `status=${c.status}`);
   }
+
+  const plugNamedFan = mapDeviceToUI(
+    {
+      id: 'plug-fan',
+      homeId: 'home-1',
+      roomId: 'room-1',
+      roomName: 'Phòng ngủ',
+      name: 'Ổ cắm quạt',
+      deviceType: 'SMART_PLUG',
+      status: 'ONLINE',
+      currentState: { power: 'ON' },
+    },
+    {},
+    {}
+  );
+  assert.equal(plugNamedFan.type, 'Công tắc');
+
+  const { resolveDeviceVisualKind } = loadSource('src/components/device/DeviceVisual.tsx');
+  assert.equal(resolveDeviceVisualKind({ deviceType: 'SMART_FAN' }), 'fan');
+  assert.equal(resolveDeviceVisualKind({ deviceType: 'SMART_TV' }), 'tv');
+  assert.equal(resolveDeviceVisualKind({ figmaType: 'Quạt' }), 'fan');
+  assert.equal(resolveDeviceVisualKind({ figmaType: 'TV' }), 'tv');
 });
 
 test('HomeFavoriteDevices renders offline Light, AC, and Gate with read-only summaries and disabled aperture controls', () => {
@@ -1253,7 +1275,16 @@ test('DeviceVisual renders 21 distinct studio product renders for all device typ
 
 test('Test-HTTP device UI protocols (FAN, TV, AC, DOOR, WATER_PUMP) and sensor DB metric normalization work end-to-end', async () => {
   const { extractSensorMetrics, normalizeSensorReadingPatch } = loadSource('src/components/device/deviceHelpers.ts');
-  const { DeviceVisual, resolveDeviceVisualKind } = loadSource('src/components/device/DeviceVisual.tsx');
+  const {
+    DeviceVisual,
+    resolveDeviceVisualKind,
+    DEVICE_VISUAL_STATE_IMAGES,
+  } = loadSource('src/components/device/DeviceVisual.tsx');
+
+  for (const stateImg of Object.values(DEVICE_VISUAL_STATE_IMAGES)) {
+    const diskPath = resolve(root, 'public', stateImg.slice(1));
+    assert.ok(existsSync(diskPath), `Missing generated state image: ${diskPath}`);
+  }
 
   // 1. Visual kinds for TV, DOOR, WATER_PUMP, FAN
   assert.equal(resolveDeviceVisualKind({ deviceType: 'TV' }), 'tv');
@@ -1261,14 +1292,87 @@ test('Test-HTTP device UI protocols (FAN, TV, AC, DOOR, WATER_PUMP) and sensor D
   assert.equal(resolveDeviceVisualKind({ deviceType: 'WATER_PUMP' }), 'pump');
   assert.equal(resolveDeviceVisualKind({ deviceType: 'FAN' }), 'fan');
 
-  const doorHtml = renderToStaticMarkup(
+  const doorOpenHtml = renderToStaticMarkup(
     React.createElement(DeviceVisual, { uid: 'door-1', deviceType: 'DOOR', gateState: 'OPEN' })
   );
-  assert.match(doorHtml, /data-visual-kind="door"/);
-  const tvHtml = renderToStaticMarkup(
+  assert.match(doorOpenHtml, /data-visual-kind="door"/);
+  assert.match(doorOpenHtml, /data-visual-state="open"/);
+  assert.match(doorOpenHtml, /\/images\/devices\/door-open\.png/);
+
+  const doorClosedHtml = renderToStaticMarkup(
+    React.createElement(DeviceVisual, { uid: 'door-1', deviceType: 'DOOR', gateState: 'CLOSED' })
+  );
+  assert.match(doorClosedHtml, /data-visual-state="closed"/);
+  assert.match(doorClosedHtml, /\/images\/devices\/door\.png/);
+
+  const doorOpeningHtml = renderToStaticMarkup(
+    React.createElement(DeviceVisual, { uid: 'door-1', deviceType: 'DOOR', gateState: 'OPENING' })
+  );
+  assert.match(doorOpeningHtml, /data-visual-state="opening"/);
+  assert.match(doorOpeningHtml, /hesta-aperture-moving/);
+  assert.match(doorOpeningHtml, /hesta-aperture-sweep/);
+
+  const curtainClosedHtml = renderToStaticMarkup(
+    React.createElement(DeviceVisual, { uid: 'curtain-1', deviceType: 'CURTAIN', gateState: 'CLOSED' })
+  );
+  assert.match(curtainClosedHtml, /\/images\/devices\/curtain-closed\.png/);
+  const curtainOpenHtml = renderToStaticMarkup(
+    React.createElement(DeviceVisual, { uid: 'curtain-1', deviceType: 'CURTAIN', gateState: 'OPEN' })
+  );
+  assert.match(curtainOpenHtml, /\/images\/devices\/curtain\.png/);
+
+  const rollingOpenHtml = renderToStaticMarkup(
+    React.createElement(DeviceVisual, { uid: 'roll-1', deviceType: 'ROLLING_DOOR', gateState: 'OPEN' })
+  );
+  assert.match(rollingOpenHtml, /\/images\/devices\/rolling-door-open\.png/);
+  const rollingClosedHtml = renderToStaticMarkup(
+    React.createElement(DeviceVisual, { uid: 'roll-1', deviceType: 'ROLLING_DOOR', gateState: 'CLOSED' })
+  );
+  assert.match(rollingClosedHtml, /\/images\/devices\/rolling-door\.png/);
+
+  const tvOnHtml = renderToStaticMarkup(
     React.createElement(DeviceVisual, { uid: 'tv-1', deviceType: 'TV', isOn: true })
   );
-  assert.match(tvHtml, /data-visual-kind="tv"/);
+  assert.match(tvOnHtml, /data-visual-kind="tv"/);
+  assert.match(tvOnHtml, /\/images\/devices\/tv-on\.png/);
+  const tvOffHtml = renderToStaticMarkup(
+    React.createElement(DeviceVisual, { uid: 'tv-1', deviceType: 'TV', isOn: false })
+  );
+  assert.match(tvOffHtml, /\/images\/devices\/tv\.png/);
+
+  const fanSpeed1Html = renderToStaticMarkup(
+    React.createElement(DeviceVisual, { uid: 'fan-1', deviceType: 'FAN', isOn: true, fanSpeed: 1 })
+  );
+  const fanSpeed3Html = renderToStaticMarkup(
+    React.createElement(DeviceVisual, { uid: 'fan-1', deviceType: 'FAN', isOn: true, fanSpeed: 3 })
+  );
+  assert.match(fanSpeed1Html, /hesta-fan-rotor/);
+  assert.match(fanSpeed1Html, /0\.95s/);
+  assert.match(fanSpeed3Html, /0\.28s/);
+
+  const pumpOnHtml = renderToStaticMarkup(
+    React.createElement(DeviceVisual, { uid: 'pump-1', deviceType: 'WATER_PUMP', isOn: true })
+  );
+  assert.match(pumpOnHtml, /hesta-pump-pulse/);
+  assert.match(pumpOnHtml, /hesta-pump-hum/);
+
+  const luxBrightHtml = renderToStaticMarkup(
+    React.createElement(DeviceVisual, { uid: 'lux-1', deviceType: 'LUX_SENSOR', sensorState: { lux: 450 } })
+  );
+  const luxDarkHtml = renderToStaticMarkup(
+    React.createElement(DeviceVisual, { uid: 'lux-1', deviceType: 'LUX_SENSOR', sensorState: { lux: 20 } })
+  );
+  assert.match(luxBrightHtml, /251, 191, 36/);
+  assert.match(luxDarkHtml, /99, 102, 241/);
+
+  const tempHotHtml = renderToStaticMarkup(
+    React.createElement(DeviceVisual, { uid: 'temp-1', deviceType: 'TEMP_HUMID_SENSOR', sensorState: { temperature: 34 } })
+  );
+  const tempCoolHtml = renderToStaticMarkup(
+    React.createElement(DeviceVisual, { uid: 'temp-1', deviceType: 'TEMP_HUMID_SENSOR', sensorState: { temperature: 19 } })
+  );
+  assert.match(tempHotHtml, /249, 115, 22/);
+  assert.match(tempCoolHtml, /56, 189, 248/);
 
   // 2. Sensor metric normalization (DB aliases & realtime SENSOR_READING_UPDATED patches)
   const metrics = extractSensorMetrics({
@@ -1475,6 +1579,28 @@ test('Test-HTTP device UI protocols (FAN, TV, AC, DOOR, WATER_PUMP) and sensor D
   assert.equal(AC_MODE_LABEL_TO_CODE['Sưởi'], 'HEAT');
   assert.match(acCtrlHtml, /<button[^>]*aria-pressed="true"[^>]*>.*?Lạnh.*?<\/button>/);
 
+  const tvCtrlResolvedHtml = renderToStaticMarkup(
+    React.createElement(ControlTab, {
+      device: { id: 'tv-1', name: 'Smart TV TCL', deviceType: 'TV', raw: tvDev },
+      resolvedType: 'TV',
+      disabled: false,
+      isOn: true,
+      lightLevel: 80,
+      setLightLevel: () => {},
+      acTemp: 24,
+      setAcTemp: () => {},
+      acMode: 'Lạnh',
+      setAcMode: () => {},
+      gateState: 'Dừng',
+      setGateState: () => {},
+    })
+  );
+  assert.match(tvCtrlResolvedHtml, /Điều khiển nhanh TV/);
+  assert.match(tvCtrlResolvedHtml, /Bàn phím số \(0–9\)/);
+  assert.match(tvCtrlResolvedHtml, />OK</);
+  assert.doesNotMatch(tvCtrlResolvedHtml, /switch-detail-hero/);
+  assert.doesNotMatch(tvCtrlResolvedHtml, /Điều khiển từ xa/);
+
   const fanCtrlHtml = renderToStaticMarkup(
     React.createElement(ControlTab, {
       device: { id: 'fan-1', name: 'Quạt đứng', deviceType: 'FAN', raw: fanDev },
@@ -1493,6 +1619,27 @@ test('Test-HTTP device UI protocols (FAN, TV, AC, DOOR, WATER_PUMP) and sensor D
   );
   assert.match(fanCtrlHtml, /Tốc độ quạt/);
   assert.match(fanCtrlHtml, /Mức 3/);
+
+  const fanCtrlResolvedHtml = renderToStaticMarkup(
+    React.createElement(ControlTab, {
+      device: { id: 'fan-1', name: 'Quạt đứng', deviceType: 'FAN', raw: fanDev },
+      resolvedType: 'Quạt',
+      disabled: false,
+      isOn: true,
+      lightLevel: 80,
+      setLightLevel: () => {},
+      acTemp: 24,
+      setAcTemp: () => {},
+      acMode: 'Lạnh',
+      setAcMode: () => {},
+      gateState: 'Dừng',
+      setGateState: () => {},
+    })
+  );
+  assert.match(fanCtrlResolvedHtml, /Tốc độ quạt/);
+  assert.match(fanCtrlResolvedHtml, /Mức 3/);
+  assert.doesNotMatch(fanCtrlResolvedHtml, /switch-detail-hero/);
+  assert.doesNotMatch(fanCtrlResolvedHtml, />Thấp</);
 
   const sensorCtrlHtml = renderToStaticMarkup(
     React.createElement(ControlTab, {
