@@ -18,8 +18,14 @@ import { SplitButton } from './SplitButton';
 import { EventPickerSheet } from './EventPickerSheet';
 import { ScenePickerSheet } from './ScenePickerSheet';
 import { DevicePickerSheet } from '../scene/DevicePickerSheet';
-import { SceneScheduleSection, formatRepeatDays } from '../scene/SceneScheduleSection';
+import { SceneScheduleSection, formatRepeatDays, formatScheduleTime } from '../scene/SceneScheduleSection';
 import { ConfirmModal } from '../ui/ConfirmModal';
+import { GroupPickerSheet } from './GroupPickerSheet';
+import { formatDuration } from './ruleTiming';
+import { DurationInput } from './DurationInput';
+import { getHomeDeviceGroups } from '../../services/deviceGroupApi';
+import type { DeviceGroupResponse } from '../../types/deviceGroup';
+import { DELAY_ACTION, MAX_HOLD_SECONDS } from '../../types/automation';
 import { createAutomationRule, updateAutomationRule, deleteAutomationRule } from '../../services/automationApi';
 import { notify } from '../ui/notify';
 import { RuleHistoryPanel } from './RuleHistoryPanel';
@@ -105,6 +111,19 @@ export const RuleEditorPanel: React.FC<RuleEditorPanelProps> = ({
   >({ open: false });
   const [eventPickerOpen, setEventPickerOpen] = useState(false);
   const [scenePickerIndex, setScenePickerIndex] = useState<number | null>(null);
+  const [groupPicker, setGroupPicker] = useState<{ target: 'condition' | 'action'; index: number } | null>(null);
+  const [groups, setGroups] = useState<DeviceGroupResponse[]>([]);
+  // "Only when the conditions stay true for X seconds" (0 = run at once).
+  const [holdSeconds, setHoldSeconds] = useState(0);
+
+  useEffect(() => {
+    if (!isOpen || !homeId) return;
+    let active = true;
+    getHomeDeviceGroups(homeId).then((list) => active && setGroups(list || [])).catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [isOpen, homeId]);
 
   const nameInputRef = useRef<HTMLInputElement>(null);
 
@@ -126,6 +145,7 @@ export const RuleEditorPanel: React.FC<RuleEditorPanelProps> = ({
       setHasLegacyMixedOp(draft.mixedOps);
       setGlobalLogicalOp(draft.logicalOp);
       setActions(draft.actions);
+      setHoldSeconds(rule.holdSeconds || 0);
       setDraftSchedules([]);
       setExpandedActIndex(draft.actions.length > 0 ? 0 : null);
       setIsDirty(false);
@@ -140,6 +160,7 @@ export const RuleEditorPanel: React.FC<RuleEditorPanelProps> = ({
       setTriggerType('SENSOR');
       setConditions([]);
       setActions([]);
+      setHoldSeconds(0);
       setDraftSchedules([]);
       setExpandedCondIndex(null);
       setExpandedActIndex(null);
@@ -321,6 +342,21 @@ export const RuleEditorPanel: React.FC<RuleEditorPanelProps> = ({
     setExpandedActIndex(next.length - 1);
   };
 
+  const handleAddGroupAction = () => {
+    markDirty();
+    const next = [...actions, { action: 'TURN_ON', groupId: '', parameters: {}, order: actions.length }];
+    setActions(next);
+    setExpandedActIndex(next.length - 1);
+    setGroupPicker({ target: 'action', index: next.length - 1 });
+  };
+
+  const handleAddDelayAction = () => {
+    markDirty();
+    const next = [...actions, { action: DELAY_ACTION, parameters: { seconds: 30 }, order: actions.length }];
+    setActions(next);
+    setExpandedActIndex(next.length - 1);
+  };
+
   const handleUpdateAction = (index: number, updated: RuleActionInput) => {
     markDirty();
     setActions((prev) => prev.map((a, i) => (i === index ? updated : a)));
@@ -362,6 +398,7 @@ export const RuleEditorPanel: React.FC<RuleEditorPanelProps> = ({
       description: description.trim() || undefined,
       triggerType,
       enabled,
+      holdSeconds: triggerType === 'SCHEDULE' ? 0 : holdSeconds,
       conditions: triggerType === 'SCHEDULE' ? [] : conditions,
       actions,
       // The full list of times goes with the rule and is saved in one transaction; cancel simply drops the draft.
@@ -601,6 +638,7 @@ export const RuleEditorPanel: React.FC<RuleEditorPanelProps> = ({
                 triggerType={triggerType}
                 conditions={conditions.map((c) => ({
                   deviceId: c.deviceId,
+                  groupName: c.groupId !== undefined ? groups.find((g) => g.id === c.groupId)?.name ?? '' : undefined,
                   attribute: c.attribute,
                   operator: c.operator,
                   expected: c.expectedValue,
@@ -608,13 +646,14 @@ export const RuleEditorPanel: React.FC<RuleEditorPanelProps> = ({
                 }))}
                 actions={actions.map((a) => ({
                   deviceId: a.deviceId,
+                  groupName: a.groupId !== undefined ? groups.find((g) => g.id === a.groupId)?.name ?? '' : undefined,
                   sceneId: a.sceneId,
                   action: a.action,
                   parameters: a.parameters,
                 }))}
                 devices={devices}
                 scenes={scenes}
-                scheduleTime={draftSchedules[0]?.scheduledTime?.slice(0, 5)}
+                scheduleTime={draftSchedules[0] ? formatScheduleTime(draftSchedules[0].scheduledTime) : undefined}
                 scheduleDays={formatRepeatDays(draftSchedules[0]?.repeatDays || [])}
                 globalLogicalOperator={globalLogicalOp}
               />
@@ -782,6 +821,8 @@ export const RuleEditorPanel: React.FC<RuleEditorPanelProps> = ({
                           condition={cond}
                           index={idx}
                           devices={devices}
+                          groups={groups}
+                          onPickGroup={() => setGroupPicker({ target: 'condition', index: idx })}
                           isExpanded={expandedCondIndex === idx}
                           onToggleExpand={() =>
                             setExpandedCondIndex((cur) => (cur === idx ? null : idx))
@@ -806,8 +847,40 @@ export const RuleEditorPanel: React.FC<RuleEditorPanelProps> = ({
                       className="w-full py-2.5 rounded-2xl border border-dashed border-[var(--border)] text-xs font-bold text-[var(--accent)] hover:bg-[var(--accent-soft)] transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                     >
                       <Icon name="plus" size={14} />
-                      <span>Thêm điều kiện cảm biến</span>
+                      <span>Thêm điều kiện</span>
                     </button>
+
+                    {/* "True for X seconds": ignore readings that only jump over the threshold for a moment. */}
+                    <div className="p-3 rounded-2xl bg-[var(--solid)] border border-[var(--border)] space-y-2">
+                      <label className="flex items-center gap-2 text-xs font-semibold text-[var(--text)] cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={holdSeconds > 0}
+                          onChange={(e) => {
+                            markDirty();
+                            setHoldSeconds(e.target.checked ? 60 : 0);
+                          }}
+                          className="accent-[var(--accent)]"
+                        />
+                        Chỉ chạy khi điều kiện đúng liên tục
+                      </label>
+                      {holdSeconds > 0 && (
+                        <>
+                          <DurationInput
+                            label="Đúng liên tục trong"
+                            seconds={holdSeconds}
+                            max={MAX_HOLD_SECONDS}
+                            onChange={(seconds) => {
+                              markDirty();
+                              setHoldSeconds(seconds);
+                            }}
+                          />
+                          <p className="text-[10px] text-[var(--tertiary)]">
+                            Quy tắc chạy sau {formatDuration(holdSeconds)} nếu trong lúc đó điều kiện không bị sai.
+                          </p>
+                        </>
+                      )}
+                    </div>
                   </div>
                 )}
 
@@ -918,6 +991,8 @@ export const RuleEditorPanel: React.FC<RuleEditorPanelProps> = ({
                       totalCount={actions.length}
                       devices={devices}
                       scenes={scenes}
+                      groups={groups}
+                      onPickGroup={() => setGroupPicker({ target: 'action', index: idx })}
                       isExpanded={expandedActIndex === idx}
                       onToggleExpand={() =>
                         setExpandedActIndex((cur) => (cur === idx ? null : idx))
@@ -944,6 +1019,8 @@ export const RuleEditorPanel: React.FC<RuleEditorPanelProps> = ({
                   <SplitButton
                     onAddDevice={handleAddDeviceAction}
                     onAddScene={handleAddSceneAction}
+                    onAddGroup={handleAddGroupAction}
+                    onAddDelay={handleAddDelayAction}
                   />
                 </div>
               </section>
@@ -995,15 +1072,16 @@ export const RuleEditorPanel: React.FC<RuleEditorPanelProps> = ({
           <DevicePickerSheet
             devices={devices}
             filterMode={
+              // Conditions may watch any device: a sensor reading, or a light/plug turning on or off.
               devicePickerMode.target === 'condition'
-                ? 'sensors-only'
+                ? 'all'
                 : devicePickerMode.target === 'eventSource'
                 ? 'all'
                 : 'actionable-only'
             }
             title={
               devicePickerMode.target === 'condition'
-                ? 'Chọn cảm biến nguồn'
+                ? 'Chọn thiết bị nguồn'
                 : devicePickerMode.target === 'eventSource'
                 ? 'Chọn thiết bị phát sinh sự kiện'
                 : 'Chọn thiết bị điều khiển'
@@ -1055,6 +1133,26 @@ export const RuleEditorPanel: React.FC<RuleEditorPanelProps> = ({
               setEventPickerOpen(false);
             }}
             onClose={() => setEventPickerOpen(false)}
+          />
+        )}
+
+        {/* ── Sub-Sheet: GroupPickerSheet ── */}
+        {groupPicker && (
+          <GroupPickerSheet
+            groups={groups}
+            selectedGroupId={
+              groupPicker.target === 'condition' ? conditions[groupPicker.index]?.groupId : actions[groupPicker.index]?.groupId
+            }
+            onSelect={(group) => {
+              markDirty();
+              if (groupPicker.target === 'condition') {
+                handleUpdateCondition(groupPicker.index, { ...conditions[groupPicker.index], deviceId: undefined, groupId: group.id });
+              } else {
+                handleUpdateAction(groupPicker.index, { ...actions[groupPicker.index], deviceId: undefined, groupId: group.id });
+              }
+              setGroupPicker(null);
+            }}
+            onClose={() => setGroupPicker(null)}
           />
         )}
 
