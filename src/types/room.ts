@@ -7,6 +7,8 @@ export interface RoomResponse {
   layoutY?: number | null;
   deviceCount?: number;
   createdAt?: string;
+  /** Storey from the digital-twin layout; null when the room is not placed on one. */
+  floor?: number | null;
 }
 
 export interface RoomCreateRequest {

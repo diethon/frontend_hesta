@@ -118,7 +118,7 @@ const GateCardComponent: React.FC<GateCardProps> = ({
               )}
             </div>
             <p className="text-xs text-muted truncate mt-0.5">
-              {device.deviceType === 'ROLLING_DOOR' ? 'Cửa cuốn thông minh' : 'Cổng tự động'}
+              {device.deviceType === 'ROLLING_DOOR' ? 'Cửa cuốn thông minh' : device.deviceType === 'DOOR' ? 'Cửa chính thông minh' : device.deviceType === 'CURTAIN' ? 'Rèm tự động' : 'Cổng tự động'}
             </p>
           </div>
         </div>

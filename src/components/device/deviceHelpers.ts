@@ -13,6 +13,10 @@ export const KNOWN_NON_AC_TYPES = new Set([
   'CAMERA_AI',
   'LUX_SENSOR',
   'FAN',
+  'DOOR',
+  'TV',
+  'WATER_PUMP',
+  'FLAME_SENSOR',
 ]);
 
 /**
@@ -98,7 +102,7 @@ export const isReadOnlyDevice = (device: DeviceResponse): boolean => {
  */
 export const isWideCard = (device: DeviceResponse): boolean => {
   const type = resolveEffectiveType(device);
-  return ['AIR_CONDITIONER', 'GATE', 'ROLLING_DOOR', 'CAMERA_AI', 'CURTAIN'].includes(type);
+  return ['AIR_CONDITIONER', 'GATE', 'ROLLING_DOOR', 'DOOR', 'CAMERA_AI', 'CURTAIN'].includes(type);
 };
 
 /**

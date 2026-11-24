@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import type { DeviceSummary } from '../../types/automation';
+import type { RoomResponse } from '../../types/room';
 import { Icon, type IconName } from '../ui/LucideIcon';
 import { getFigmaIconForDevice } from './ScenePage';
 
@@ -10,6 +11,8 @@ interface DevicePickerSheetProps {
   onClose: () => void;
   filterMode?: 'all' | 'sensors-only' | 'actionable-only';
   title?: string;
+  /** Home rooms; their `floor` adds a floor filter when the home has 2+ floors. */
+  rooms?: RoomResponse[];
 }
 
 const SENSOR_TYPES = ['SENSOR', 'TEMP_HUMID', 'MOTION', 'SMOKE', 'DOOR_SENSOR', 'WATER_LEAK', 'DHT', 'PIR', 'LDR'];
@@ -49,19 +52,32 @@ export const DevicePickerSheet: React.FC<DevicePickerSheetProps> = ({
   onClose,
   filterMode = 'all',
   title,
+  rooms: homeRooms,
 }) => {
   const [search, setSearch] = useState('');
   const [selectedRoom, setSelectedRoom] = useState<string>('Tất cả');
+  const [selectedFloor, setSelectedFloor] = useState<number | null>(null);
 
-  // Extract available rooms
+  const floorOf = useMemo(() => {
+    const byRoom = new Map((homeRooms ?? []).map((r) => [r.id, r.floor ?? null]));
+    return (d: DeviceSummary) => (d.roomId ? byRoom.get(d.roomId) ?? null : null);
+  }, [homeRooms]);
+
+  const floors = useMemo(
+    () => Array.from(new Set((homeRooms ?? []).map((r) => r.floor).filter((f): f is number => f != null))).sort((a, b) => a - b),
+    [homeRooms]
+  );
+
+  // Extract available rooms (only those on the chosen floor)
   const rooms = useMemo(() => {
     const set = new Set<string>();
     devices.forEach((d) => {
+      if (selectedFloor !== null && floorOf(d) !== selectedFloor) return;
       const room = d.roomName || d.room || 'Khác';
       set.add(room);
     });
     return ['Tất cả', ...Array.from(set)];
-  }, [devices]);
+  }, [devices, selectedFloor, floorOf]);
 
   // Separate controllable devices vs read-only sensors
   const { controllable, sensors } = useMemo(() => {
@@ -76,7 +92,9 @@ export const DevicePickerSheet: React.FC<DevicePickerSheetProps> = ({
       const room = d.roomName || d.room || 'Khác';
       const matchRoom = selectedRoom === 'Tất cả' || room === selectedRoom;
 
-      return matchSearch && matchRoom;
+      const matchFloor = selectedFloor === null || floorOf(d) === selectedFloor;
+
+      return matchSearch && matchRoom && matchFloor;
     });
 
     const ctrl: DeviceSummary[] = [];
@@ -91,7 +109,7 @@ export const DevicePickerSheet: React.FC<DevicePickerSheetProps> = ({
     });
 
     return { controllable: ctrl, sensors: sens };
-  }, [devices, search, selectedRoom]);
+  }, [devices, search, selectedRoom, selectedFloor, floorOf]);
 
   // Choose selectable vs non-selectable based on filterMode
   const isSensorsMode = filterMode === 'sensors-only';
@@ -134,6 +152,26 @@ export const DevicePickerSheet: React.FC<DevicePickerSheetProps> = ({
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
+
+        {/* Floor Filter Strip (only for multi-floor homes) */}
+        {floors.length > 1 && (
+          <div className="picker-room-chips" role="group" aria-label="Lọc theo tầng">
+            {[null, ...floors].map((floor) => (
+              <button
+                key={floor ?? 'all'}
+                type="button"
+                className={`command-chip ${selectedFloor === floor ? 'active' : ''}`}
+                aria-pressed={selectedFloor === floor}
+                onClick={() => {
+                  setSelectedFloor(floor);
+                  setSelectedRoom('Tất cả');
+                }}
+              >
+                {floor === null ? 'Tất cả tầng' : `Tầng ${floor}`}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Room Filter Strip */}
         <div className="picker-room-chips">

@@ -3,9 +3,12 @@ import { actionLabels, describeCondition, EVENT_FRIENDLY_NAMES } from './ruleLab
 import { Icon } from '../ui/LucideIcon';
 import type { DeviceSummary } from '../../types/automation';
 import type { SceneResponse } from '../../types/scene';
+import { DELAY_ACTION } from '../../types/automation';
+import { formatDuration } from './ruleTiming';
 
 export interface SummaryCondition {
   deviceId?: string;
+  groupName?: string;
   attribute?: string;
   operator?: string;
   expected?: unknown;
@@ -14,6 +17,7 @@ export interface SummaryCondition {
 
 export interface SummaryAction {
   deviceId?: string;
+  groupName?: string;
   sceneId?: string;
   action?: string;
   value?: unknown;
@@ -76,7 +80,9 @@ export const SummarySentence: React.FC<SummarySentenceProps> = ({
       triggerPhrase = <span className="text-[var(--tertiary)] italic">…chọn cảm biến…</span>;
     } else {
       const parts = conditions.map((cond, idx) => {
-        const devName = devices.find((d) => d.id === cond.deviceId)?.name;
+        const devName = cond.groupName !== undefined
+          ? `một thiết bị trong nhóm ${cond.groupName}`.trim()
+          : devices.find((d) => d.id === cond.deviceId)?.name;
         const joinWord = cond.logicalOperator === 'OR' || globalLogicalOperator === 'OR' ? ' hoặc ' : ' và ';
 
         return (
@@ -100,6 +106,14 @@ export const SummarySentence: React.FC<SummarySentenceProps> = ({
     const actionParts = actions.map((act, idx) => {
       const prefix = idx === 0 ? '' : idx === actions.length - 1 ? ', rồi ' : ', ';
 
+      if (act.action === DELAY_ACTION) {
+        return (
+          <span key={idx}>
+            {prefix}chờ <strong className="text-[var(--text)]">{formatDuration(Number(act.parameters?.seconds) || 0)}</strong>
+          </span>
+        );
+      }
+
       if (act.action === 'EXECUTE_SCENE') {
         const sc = scenes.find((s) => s.id === act.sceneId);
         const scName = sc?.name || 'kịch bản';
@@ -111,7 +125,7 @@ export const SummarySentence: React.FC<SummarySentenceProps> = ({
       }
 
       const dev = devices.find((d) => d.id === act.deviceId);
-      const devName = dev?.name || 'thiết bị';
+      const devName = act.groupName !== undefined ? `nhóm ${act.groupName}`.trim() : dev?.name || 'thiết bị';
       // Mid-sentence ("…, thì bật đèn"), so lower-case the label.
       const actLabel = (actionLabels[act.action || ''] || act.action || 'điều khiển').toLocaleLowerCase('vi');
 

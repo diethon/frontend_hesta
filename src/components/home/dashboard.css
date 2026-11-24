@@ -2343,6 +2343,14 @@ html.dark .segments button.active,
   border: 1px solid #e2e8f0;
   border-radius: 12px;
 }
+.tv-remote {
+  display: grid;
+  gap: 6px;
+}
+.tv-remote .detail-segments button {
+  height: 34px;
+  padding: 0 6px;
+}
 .detail-segments button {
   flex: 1;
   height: 28px;
