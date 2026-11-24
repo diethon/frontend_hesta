@@ -110,6 +110,8 @@ test('Filter & Sort options contain all required values', () => {
     'Tất cả',
     'Đèn',
     'Điều hòa',
+    'Quạt',
+    'TV',
     'Cảm biến',
     'Cổng',
     'Công tắc',

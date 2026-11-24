@@ -47,6 +47,13 @@ export const DEVICE_VISUAL_IMAGE_MAP: Record<DeviceVisualKind, string> = {
   'sensor-motion': '/images/devices/sensor-motion.png',
 };
 
+export const DEVICE_VISUAL_STATE_IMAGES = {
+  doorOpen: '/images/devices/door-open.png',
+  curtainClosed: '/images/devices/curtain-closed.png',
+  rollingDoorOpen: '/images/devices/rolling-door-open.png',
+  tvOn: '/images/devices/tv-on.png',
+} as const;
+
 export interface DeviceVisualProps {
   uid?: string;
   deviceType?: string | null;
@@ -56,6 +63,7 @@ export interface DeviceVisualProps {
   isOn?: boolean;
   offline?: boolean;
   brightness?: number;
+  fanSpeed?: number;
   rgbColor?: string | null;
   acMode?: string | null;
   gateState?: string | null;
@@ -90,8 +98,8 @@ export function resolveDeviceVisualKind(props: {
   if (rawType === 'TEMP_HUMID_SENSOR') return 'sensor-temp';
   if (rawType === 'LUX_SENSOR' || rawType === 'LIGHT_SENSOR') return 'sensor-lux';
   if (rawType === 'MOTION_SENSOR') return 'sensor-motion';
-  if (rawType === 'TV') return 'tv';
-  if (rawType === 'FAN') return 'fan';
+  if (rawType === 'TV' || rawType === 'SMART_TV') return 'tv';
+  if (rawType === 'FAN' || rawType === 'SMART_FAN') return 'fan';
   if (rawType === 'WATER_PUMP') return 'pump';
   if (rawType === 'CAMERA_AI' || rawType === 'CAMERA') return 'camera';
   if (rawType === 'SMART_PLUG' || rawType === 'SOCKET') return 'plug';
@@ -101,6 +109,8 @@ export function resolveDeviceVisualKind(props: {
   // Stage 2: Heuristic fallback when deviceType is absent or generic
   if (figma === 'Điều hòa') return 'ac';
   if (figma === 'Camera') return 'camera';
+  if (figma === 'TV') return 'tv';
+  if (figma === 'Quạt') return 'fan';
   if (figma === 'Đèn' || icon === 'lamp') return 'light';
   if (nameLower.includes('cửa cuốn')) return 'rolling-door';
   if (nameLower.includes('rèm')) return 'curtain';
@@ -153,8 +163,10 @@ export const DeviceVisual: React.FC<DeviceVisualProps> = ({
   isOn = false,
   offline = false,
   brightness = 80,
+  fanSpeed,
   rgbColor,
   acMode,
+  gateState,
   sensorState,
   size = 64,
   className = '',
@@ -164,7 +176,38 @@ export const DeviceVisual: React.FC<DeviceVisualProps> = ({
   const bRatio = clampBrightness(brightness) / 100;
   const activeRgb = kind === 'led-rgb' ? (rgbColor || '#a855f7') : undefined;
   const acAccent = kind === 'ac' ? resolveAcAccent(acMode) : undefined;
-  const imageSrc = DEVICE_VISUAL_IMAGE_MAP[kind];
+
+  const normGate = (gateState || '').trim().toUpperCase();
+  const isApertureKind =
+    kind === 'door' || kind === 'curtain' || kind === 'rolling-door' || kind === 'gate';
+  const gateIsOpening = normGate === 'OPENING';
+  const gateIsClosing = normGate === 'CLOSING';
+  const gateIsStopped = normGate === 'STOPPED' || normGate === 'STOP';
+  const gateIsOpen = normGate === 'OPEN';
+  const gateIsClosed = normGate === 'CLOSED' || normGate === 'CLOSE';
+  const gateIsMoving = gateIsOpening || gateIsClosing;
+
+  let apertureStateAttr: string | undefined;
+  if (!offline && isApertureKind && normGate) {
+    if (gateIsOpening) apertureStateAttr = 'opening';
+    else if (gateIsClosing) apertureStateAttr = 'closing';
+    else if (gateIsStopped) apertureStateAttr = 'stopped';
+    else if (gateIsOpen) apertureStateAttr = 'open';
+    else if (gateIsClosed) apertureStateAttr = 'closed';
+  }
+
+  let imageSrc = DEVICE_VISUAL_IMAGE_MAP[kind];
+  if (!offline) {
+    if (kind === 'door' && (gateIsOpen || gateIsOpening || gateIsStopped)) {
+      imageSrc = DEVICE_VISUAL_STATE_IMAGES.doorOpen;
+    } else if (kind === 'curtain' && (gateIsClosed || gateIsClosing)) {
+      imageSrc = DEVICE_VISUAL_STATE_IMAGES.curtainClosed;
+    } else if (kind === 'rolling-door' && (gateIsOpen || gateIsOpening || gateIsStopped)) {
+      imageSrc = DEVICE_VISUAL_STATE_IMAGES.rollingDoorOpen;
+    } else if (kind === 'tv' && active) {
+      imageSrc = DEVICE_VISUAL_STATE_IMAGES.tvOn;
+    }
+  }
 
   const isControllable = CONTROLLABLE_KINDS.has(kind);
   const smokeVal = sensorState?.smoke ?? sensorState?.gas_ppm ?? sensorState?.gas;
@@ -177,11 +220,55 @@ export const DeviceVisual: React.FC<DeviceVisualProps> = ({
       (kind === 'sensor-flame' && hasFlame) ||
       (kind === 'sensor-motion' && hasMotion));
 
+  // Inline LUX_SENSOR brightness detection
+  let luxMood: 'bright' | 'dark' | undefined;
+  if (kind === 'sensor-lux' && !offline && sensorState) {
+    const rawLux = sensorState.lux ?? sensorState.illuminance;
+    const numLux = rawLux !== undefined && rawLux !== null ? Number(rawLux) : Number.NaN;
+    if (!Number.isNaN(numLux)) {
+      luxMood = numLux > 200 ? 'bright' : 'dark';
+    } else {
+      const rawLightFlag = sensorState.LIGHT_SENSOR ?? sensorState.light_sensor ?? sensorState.light;
+      if (rawLightFlag !== undefined && rawLightFlag !== null) {
+        const s = String(rawLightFlag).trim().toUpperCase();
+        if (['BRIGHT', '1', 'TRUE', 'ON'].includes(s) || Number(rawLightFlag) > 200) {
+          luxMood = 'bright';
+        } else if (['DARK', '0', 'FALSE', 'OFF'].includes(s)) {
+          luxMood = 'dark';
+        }
+      }
+    }
+  }
+
+  // Inline TEMP_HUMID_SENSOR thermal tint detection
+  let tempMood: 'hot' | 'cool' | 'mild' | undefined;
+  if (kind === 'sensor-temp' && !offline && sensorState) {
+    const rawTemp = sensorState.temperature ?? sensorState.temp;
+    const numTemp =
+      rawTemp !== undefined && rawTemp !== null && typeof rawTemp !== 'boolean'
+        ? Number(rawTemp)
+        : Number.NaN;
+    if (!Number.isNaN(numTemp)) {
+      tempMood = numTemp >= 30 ? 'hot' : numTemp <= 22 ? 'cool' : 'mild';
+    }
+  }
+
+  const effectiveFanSpeed =
+    kind === 'fan' && active
+      ? fanSpeed !== undefined && fanSpeed > 0
+        ? Math.min(3, Math.round(fanSpeed))
+        : 1
+      : 0;
+  const fanDuration =
+    effectiveFanSpeed >= 3 ? '0.28s' : effectiveFanSpeed === 2 ? '0.55s' : '0.95s';
+
   let imgFilter: string | undefined;
   if (offline) {
     imgFilter = 'grayscale(0.42) contrast(1.04) brightness(0.96)';
   } else if (!active && isControllable) {
     imgFilter = 'brightness(0.75) saturate(0.45) contrast(0.98)';
+  } else if (isApertureKind && gateIsClosed) {
+    imgFilter = 'brightness(0.93) saturate(0.88)';
   } else if (kind === 'light' && active) {
     imgFilter = `brightness(${(1.0 + 0.12 * bRatio).toFixed(2)}) saturate(${(1.05 + 0.1 * bRatio).toFixed(2)})`;
   } else if (kind === 'led-rgb' && active) {
@@ -190,12 +277,49 @@ export const DeviceVisual: React.FC<DeviceVisualProps> = ({
     imgFilter = 'brightness(1.02) saturate(1.1)';
   }
 
+  let wrapperBoxShadow: string | undefined;
+  if (sensorAlert) {
+    wrapperBoxShadow = 'inset 0 0 0 2px rgba(244, 63, 94, 0.8), 0 0 12px rgba(244, 63, 94, 0.35)';
+  } else if (!offline && isApertureKind && gateIsMoving) {
+    wrapperBoxShadow = '0 0 0 2px rgba(245, 158, 11, 0.55), 0 0 12px rgba(245, 158, 11, 0.28)';
+  } else if (!offline && isApertureKind && gateIsOpen) {
+    wrapperBoxShadow = '0 0 0 1.5px rgba(16, 185, 129, 0.48), 0 0 10px rgba(16, 185, 129, 0.22)';
+  } else if (!offline && isApertureKind && gateIsStopped) {
+    wrapperBoxShadow = '0 0 0 1.5px rgba(245, 158, 11, 0.52)';
+  } else if (kind === 'light' && active) {
+    wrapperBoxShadow = `0 0 ${Math.round(8 + 10 * bRatio)}px rgba(245, 158, 11, ${(0.25 + 0.3 * bRatio).toFixed(2)})`;
+  } else if (kind === 'led-rgb' && active && activeRgb) {
+    wrapperBoxShadow = `0 0 ${Math.round(8 + 10 * bRatio)}px ${activeRgb}`;
+  } else if (kind === 'tv' && active) {
+    wrapperBoxShadow = '0 0 12px rgba(99, 102, 241, 0.28)';
+  } else if (kind === 'fan' && active) {
+    wrapperBoxShadow = '0 0 10px rgba(56, 189, 248, 0.28)';
+  } else if (kind === 'pump' && active) {
+    wrapperBoxShadow = '0 0 12px rgba(6, 182, 212, 0.32)';
+  } else if (luxMood === 'bright') {
+    wrapperBoxShadow = '0 0 12px rgba(251, 191, 36, 0.32)';
+  } else if (luxMood === 'dark') {
+    wrapperBoxShadow = 'inset 0 0 0 1px rgba(99, 102, 241, 0.25)';
+  } else if (tempMood === 'hot') {
+    wrapperBoxShadow = '0 0 10px rgba(249, 115, 22, 0.26)';
+  } else if (tempMood === 'cool') {
+    wrapperBoxShadow = '0 0 10px rgba(56, 189, 248, 0.26)';
+  }
+
+  const stateClass = [
+    className,
+    !offline && isApertureKind && gateIsMoving ? 'hesta-aperture-moving' : '',
+    sensorAlert ? 'hesta-visual-alert' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+
   return (
     <span
       aria-hidden="true"
-      className={className}
+      className={stateClass}
       data-visual-kind={kind}
-      data-visual-state={offline ? 'offline' : active ? 'on' : 'off'}
+      data-visual-state={offline ? 'offline' : apertureStateAttr ?? (active ? 'on' : 'off')}
       data-visual-color={kind === 'led-rgb' && active ? activeRgb : undefined}
       style={{
         width: size,
@@ -209,13 +333,7 @@ export const DeviceVisual: React.FC<DeviceVisualProps> = ({
         background: '#ffffff',
         opacity: offline ? 0.9 : 1,
         transition: 'opacity 0.25s ease, box-shadow 0.25s ease',
-        boxShadow: sensorAlert
-          ? 'inset 0 0 0 2px rgba(244, 63, 94, 0.8), 0 0 12px rgba(244, 63, 94, 0.35)'
-          : kind === 'light' && active
-            ? `0 0 ${Math.round(8 + 10 * bRatio)}px rgba(245, 158, 11, ${(0.25 + 0.3 * bRatio).toFixed(2)})`
-            : kind === 'led-rgb' && active && activeRgb
-              ? `0 0 ${Math.round(8 + 10 * bRatio)}px ${activeRgb}`
-              : undefined,
+        boxShadow: wrapperBoxShadow,
       }}
     >
       <img
@@ -225,6 +343,7 @@ export const DeviceVisual: React.FC<DeviceVisualProps> = ({
         height={size}
         draggable={false}
         loading="lazy"
+        className={kind === 'pump' && active ? 'hesta-pump-hum' : undefined}
         style={{
           width: '100%',
           height: '100%',
@@ -242,6 +361,17 @@ export const DeviceVisual: React.FC<DeviceVisualProps> = ({
             position: 'absolute',
             inset: 0,
             background: 'rgba(15, 23, 42, 0.14)',
+            pointerEvents: 'none',
+          }}
+        />
+      )}
+
+      {!offline && isApertureKind && gateIsMoving && (
+        <span
+          className="hesta-aperture-sweep"
+          style={{
+            position: 'absolute',
+            inset: 0,
             pointerEvents: 'none',
           }}
         />
@@ -298,6 +428,67 @@ export const DeviceVisual: React.FC<DeviceVisualProps> = ({
             inset: 0,
             background: `radial-gradient(ellipse at 50% 78%, ${acAccent.main}55 0%, transparent 68%)`,
             mixBlendMode: 'multiply',
+            pointerEvents: 'none',
+          }}
+        />
+      )}
+
+      {kind === 'fan' && active && (
+        <span
+          className="hesta-fan-rotor"
+          style={{
+            position: 'absolute',
+            top: '7.5%',
+            left: '33.5%',
+            width: '27%',
+            height: '29%',
+            borderRadius: '50%',
+            background:
+              'conic-gradient(from 0deg, rgba(14, 165, 233, 0.28) 0deg 55deg, transparent 55deg 120deg, rgba(14, 165, 233, 0.28) 120deg 175deg, transparent 175deg 240deg, rgba(14, 165, 233, 0.28) 240deg 295deg, transparent 295deg 360deg)',
+            animationDuration: fanDuration,
+            pointerEvents: 'none',
+          }}
+        />
+      )}
+
+      {kind === 'pump' && active && (
+        <span
+          className="hesta-pump-pulse"
+          style={{
+            position: 'absolute',
+            inset: 2,
+            borderRadius: 'inherit',
+            border: '2px solid rgba(6, 182, 212, 0.5)',
+            pointerEvents: 'none',
+          }}
+        />
+      )}
+
+      {luxMood && (
+        <span
+          style={{
+            position: 'absolute',
+            inset: 0,
+            background:
+              luxMood === 'bright'
+                ? 'radial-gradient(circle at 50% 35%, rgba(251, 191, 36, 0.34) 0%, transparent 70%)'
+                : 'rgba(30, 41, 59, 0.16)',
+            pointerEvents: 'none',
+          }}
+        />
+      )}
+
+      {tempMood && (
+        <span
+          style={{
+            position: 'absolute',
+            inset: 0,
+            background:
+              tempMood === 'hot'
+                ? 'radial-gradient(circle at 50% 70%, rgba(249, 115, 22, 0.24) 0%, transparent 72%)'
+                : tempMood === 'cool'
+                  ? 'radial-gradient(circle at 50% 70%, rgba(56, 189, 248, 0.24) 0%, transparent 72%)'
+                  : 'radial-gradient(circle at 50% 70%, rgba(16, 185, 129, 0.14) 0%, transparent 72%)',
             pointerEvents: 'none',
           }}
         />

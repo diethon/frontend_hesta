@@ -463,6 +463,7 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
                         isOn={isOn}
                         offline={device.offline}
                         brightness={currentBrightness}
+                        fanSpeed={resolveFanSpeedLevel(rawState)}
                         rgbColor={isRgbLight ? rgbHex : undefined}
                         acMode={typeof rawState?.mode === 'string' ? rawState.mode : undefined}
                         gateState={typeof rawState?.state === 'string' ? rawState.state : undefined}

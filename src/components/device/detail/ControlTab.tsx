@@ -1099,17 +1099,41 @@ export const ControlTab: React.FC<ControlTabProps> = ({
     if (disabled) return;
     const targetId = device?.realDeviceId || device?.id;
     if (label === 'Tắt') {
+      const prevLevel = fanSpeedLevel;
       setFanSpeedLevel(0);
       if (isOn) onTogglePower?.();
-      else if (targetId) sendDeviceCommand(targetId, 'TURN_OFF').catch(console.warn);
+      else if (targetId) {
+        sendDeviceCommand(targetId, 'TURN_OFF')
+          .then((res) => {
+            if (res && res.success === false) {
+              setFanSpeedLevel(prevLevel);
+              notify.error(res.message || 'Không thể tắt quạt');
+            }
+          })
+          .catch(() => {
+            setFanSpeedLevel(prevLevel);
+            notify.error('Không thể tắt quạt');
+          });
+      }
       return;
     }
+    const prevLevel = fanSpeedLevel;
     const lvl = label.includes('1') ? 1 : label.includes('2') ? 2 : 3;
     setFanSpeedLevel(lvl);
     if (targetId) {
       sendDeviceCommand(targetId, 'SET_SPEED', { speed: lvl })
-        .then(() => notify.success(`Tốc độ quạt: Mức ${lvl}`))
-        .catch(() => notify.error('Không thể chỉnh tốc độ quạt'));
+        .then((res) => {
+          if (res && res.success === false) {
+            setFanSpeedLevel(prevLevel);
+            notify.error(res.message || 'Không thể chỉnh tốc độ quạt');
+            return;
+          }
+          notify.success(`Tốc độ quạt: Mức ${lvl}`);
+        })
+        .catch(() => {
+          setFanSpeedLevel(prevLevel);
+          notify.error('Không thể chỉnh tốc độ quạt');
+        });
     }
   };
 
@@ -1118,7 +1142,11 @@ export const ControlTab: React.FC<ControlTabProps> = ({
     const targetId = device?.realDeviceId || device?.id;
     if (!targetId) return;
     sendDeviceCommand(targetId, action)
-      .then(() => {
+      .then((res) => {
+        if (res && res.success === false) {
+          notify.error(res.message || `Không thể gửi lệnh ${label || action}`);
+          return;
+        }
         if (label) notify.success(`TV: ${label}`);
       })
       .catch(() => notify.error(`Không thể gửi lệnh ${label || action}`));
@@ -1209,69 +1237,6 @@ export const ControlTab: React.FC<ControlTabProps> = ({
       }
     }
   };
-
-  // ──────────────────────────────────────────────────────────────────────────
-  // Fan (SET_SPEED 0..3) & TV remote (VOL_UP, CH_UP, OK...)
-  // ──────────────────────────────────────────────────────────────────────────
-  const FAN_LEVELS = ['Tắt', 'Thấp', 'Vừa', 'Cao'];
-  const rawFanSpeed = Number((device?.raw?.currentState ?? device?.currentState)?.speed ?? 0);
-  const reportedFanSpeed = isOn ? Math.min(3, Math.max(0, rawFanSpeed)) : 0;
-  // Optimistic pick, dropped as soon as the device reports a new speed.
-  const [fanPick, setFanPick] = useState<{ speed: number; from: number } | null>(null);
-  const fanSpeed = fanPick && fanPick.from === reportedFanSpeed ? fanPick.speed : reportedFanSpeed;
-  const setFanSpeed = (speed: number) => setFanPick({ speed, from: reportedFanSpeed });
-
-  const sendSimple = async (action: string, params?: Record<string, unknown>, okMsg?: string) => {
-    const targetId = device?.realDeviceId || device?.id;
-    if (disabled || !targetId) return false;
-    try {
-      const res = await sendDeviceCommand(targetId, action, params);
-      if (res && res.success === false) {
-        notify.error(res.message || 'Thiết bị không phản hồi lệnh');
-        return false;
-      }
-      if (okMsg) notify.success(okMsg);
-      return true;
-    } catch (e) {
-      notify.error('Không thể gửi lệnh tới thiết bị');
-      console.warn(e);
-      return false;
-    }
-  };
-
-  const handleFanSpeed = async (label: string) => {
-    const speed = FAN_LEVELS.indexOf(label);
-    if (speed < 0) return;
-    const prev = fanSpeed;
-    setFanSpeed(speed);
-    const ok = await sendSimple('SET_SPEED', { speed }, speed === 0 ? 'Đã tắt quạt' : `Quạt chạy mức ${label.toLowerCase()}`);
-    if (!ok) setFanSpeed(prev);
-  };
-
-  const TV_KEYS: { action: string; label: string }[][] = [
-    [
-      { action: 'VOL_DOWN', label: 'Âm lượng −' },
-      { action: 'MUTE', label: 'Tắt tiếng' },
-      { action: 'VOL_UP', label: 'Âm lượng +' },
-    ],
-    [
-      { action: 'CH_DOWN', label: 'Kênh −' },
-      { action: 'INPUT', label: 'Nguồn vào' },
-      { action: 'CH_UP', label: 'Kênh +' },
-    ],
-    [
-      { action: 'LEFT', label: 'Trái' },
-      { action: 'UP', label: 'Lên' },
-      { action: 'OK', label: 'OK' },
-      { action: 'DOWN', label: 'Xuống' },
-      { action: 'RIGHT', label: 'Phải' },
-    ],
-    [
-      { action: 'BACK', label: 'Quay lại' },
-      { action: 'HOME', label: 'Home' },
-      { action: 'MENU', label: 'Menu' },
-    ],
-  ];
 
   // ──────────────────────────────────────────────────────────────────────────
   // Sensor Telemetry & Chart Computation
@@ -1940,61 +1905,6 @@ export const ControlTab: React.FC<ControlTabProps> = ({
             )}
           </DetailAccordion>
         </>
-      ) : resolvedType === 'Quạt' ? (
-        <>
-          <section className="switch-detail-hero glass-g1">
-            <span className="device-icon">
-              <Icon name="automation" size={34} />
-            </span>
-            <div>
-              <strong>{isOn && fanSpeed > 0 ? `Đang chạy · mức ${fanSpeed}` : 'Đang tắt'}</strong>
-              <small>{device?.name || 'Quạt thông minh'}</small>
-            </div>
-            <DetailToggle on={isOn} setOn={() => onTogglePower?.()} disabled={disabled} />
-          </section>
-          <section className="detail-section">
-            <h3>Tốc độ quạt</h3>
-            <SegmentedControl
-              items={FAN_LEVELS}
-              value={FAN_LEVELS[fanSpeed]}
-              setValue={handleFanSpeed}
-              disabled={disabled}
-            />
-          </section>
-        </>
-      ) : resolvedType === 'TV' ? (
-        <>
-          <section className="switch-detail-hero glass-g1">
-            <span className="device-icon">
-              <Icon name="film" size={34} />
-            </span>
-            <div>
-              <strong>{isOn ? 'Đang bật' : 'Đang tắt'}</strong>
-              <small>{device?.name || 'TV thông minh'}</small>
-            </div>
-            <DetailToggle on={isOn} setOn={() => onTogglePower?.()} disabled={disabled} />
-          </section>
-          <section className="detail-section">
-            <h3>Điều khiển từ xa</h3>
-            <div className="tv-remote">
-              {TV_KEYS.map((row, i) => (
-                <div className="detail-segments" key={i}>
-                  {row.map((k) => (
-                    <button
-                      key={k.action}
-                      type="button"
-                      disabled={disabled}
-                      aria-label={k.label}
-                      onClick={() => sendSimple(k.action)}
-                    >
-                      {k.label}
-                    </button>
-                  ))}
-                </div>
-              ))}
-            </div>
-          </section>
-        </>
       ) : resolvedType === 'Cảm biến' ? (
         <>
           <section className="sensor-detail-hero">
@@ -2059,7 +1969,7 @@ export const ControlTab: React.FC<ControlTabProps> = ({
             </div>
           )}
         </>
-      ) : isFan ? (
+      ) : (resolvedType === 'Quạt' || isFan) ? (
         <section className="detail-section">
           <h3>Tốc độ quạt</h3>
           <SegmentedControl
@@ -2069,7 +1979,7 @@ export const ControlTab: React.FC<ControlTabProps> = ({
             disabled={disabled}
           />
         </section>
-      ) : isTv ? (
+      ) : (resolvedType === 'TV' || isTv) ? (
         <>
           <section className="detail-section space-y-3">
             <h3>Điều khiển nhanh TV</h3>
