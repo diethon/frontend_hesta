@@ -53,4 +53,4 @@ jobs:
       - name: Upload dist
         run: rsync -az --delete dist/ "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/var/www/hesta/"
       - name: Smoke test
-        run: curl -fsS https://hesta.homes/ | grep -q '<div id="root">'
+        run: curl -fsS https://dashboard.hesta.homes/ | grep -q '<div id="root">'
