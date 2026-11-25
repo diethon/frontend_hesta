@@ -1,7 +1,7 @@
 import { confirmDialog } from '../ui/confirmDialog';
 import { formatScheduleTime } from '../scene/SceneScheduleSection';
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router';
+import { useNavigate, useParams, useSearchParams } from 'react-router';
 import {
   generateRecommendations,
   getRecommendations,
@@ -21,6 +21,9 @@ import { actionLabels } from './ruleLabels';
 export function RecommendationsPage() {
   const { homeId = '' } = useParams();
   const navigate = useNavigate();
+  // Model metrics and retraining are for demos/debugging: shown only with ?advanced=1.
+  const [searchParams] = useSearchParams();
+  const showAdvanced = searchParams.has('advanced');
   const authUser = useAppSelector((state) => state.auth.user);
   // Given name (last word) like the nav rail and Scene page: "Việt Đức" → "Đ".
   const userInitial = (authUser?.fullName?.trim().split(' ').pop() || authUser?.email || 'U').charAt(0).toUpperCase();
@@ -220,7 +223,7 @@ export function RecommendationsPage() {
             </button>
           </div>
 
-          {/* Technical details stay available for admins/demo but collapsed by default. */}
+          {showAdvanced && (
           <details className="st-tech">
             <summary>Chi tiết kỹ thuật</summary>
             {isReady && modelStatus && (
@@ -259,6 +262,7 @@ export function RecommendationsPage() {
               {modelLoading ? 'Đang huấn luyện…' : 'Huấn luyện lại mô hình'}
             </button>
           </details>
+          )}
         </section>
 
         <div className="st-tabs" role="tablist">

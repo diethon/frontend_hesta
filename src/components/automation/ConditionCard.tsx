@@ -278,7 +278,7 @@ export const ConditionCard: React.FC<ConditionCardProps> = ({
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
               <label className="text-[11px] font-bold text-[var(--secondary)] uppercase tracking-wider block">
-                Chỉ số theo dõi
+                Theo dõi gì
               </label>
               <button
                 type="button"
@@ -373,13 +373,8 @@ export const ConditionCard: React.FC<ConditionCardProps> = ({
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
               <label className="text-[11px] font-bold text-[var(--secondary)] uppercase tracking-wider block">
-                Ngưỡng kích hoạt
+                Điều kiện
               </label>
-              {liveValue && (
-                <span className="text-[11px] text-[var(--tertiary)] italic">
-                  Hiện tại: <strong className="text-[var(--text)] not-italic font-semibold">{liveValue}</strong>
-                </span>
-              )}
             </div>
 
             {isBooleanCondition ? (

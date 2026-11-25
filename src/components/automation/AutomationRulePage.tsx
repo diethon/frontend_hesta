@@ -56,6 +56,8 @@ const TRIGGER_GROUPS = [
   { id: 'SCHEDULE' as const, label: 'Lịch', hint: 'Chạy vào giờ đã hẹn' },
 ];
 
+const PAGE_SIZE = 8;
+
 export function AutomationRulePage() {
   const { homeId = '' } = useParams();
   const navigate = useNavigate();
@@ -84,6 +86,11 @@ export function AutomationRulePage() {
   // "d:<deviceId>" or "g:<groupId>": rules that watch or control that device / group.
   const [targetFilter, setTargetFilter] = useState('');
   const [deviceGroups, setDeviceGroups] = useState<DeviceGroupResponse[]>([]);
+  // The page belongs to one filter combination; changing any filter starts back at page 1.
+  const filterKey = [statusFilter, typeFilter, query, targetFilter].join('|');
+  const [pageState, setPageState] = useState({ key: filterKey, page: 1 });
+  const page = pageState.key === filterKey ? pageState.page : 1;
+  const setPage = (next: number) => setPageState({ key: filterKey, page: next });
 
   // Modals & Panels
   const [editorRule, setEditorRule] = useState<AutomationRule | null | undefined>(undefined); // undefined = closed
@@ -248,14 +255,26 @@ export function AutomationRulePage() {
     />
   );
 
+  // Paginate in group order so each page reads Cảm biến → Sự kiện → Lịch.
+  const orderedRules = TRIGGER_GROUPS.flatMap((group) =>
+    visibleRules.filter((rule) => rule.triggerType === group.id),
+  );
+  const pageCount = Math.max(1, Math.ceil(orderedRules.length / PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount); // a delete or filter can shrink the list under us
+  const pageRules = orderedRules.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
   // Rules grouped by what starts them; empty groups are hidden.
   const groups = TRIGGER_GROUPS.map((group) => ({
     ...group,
-    rules: visibleRules.filter((rule) => rule.triggerType === group.id),
+    total: visibleRules.filter((rule) => rule.triggerType === group.id).length,
+    rules: pageRules.filter((rule) => rule.triggerType === group.id),
   })).filter((group) => group.rules.length > 0);
 
   return (
     <div className="app-shell scenes-page studio st-theme st-pro">
+      <div className="mesh mesh-one" />
+      <div className="mesh mesh-two" />
+      <div className="mesh mesh-three" />
       <DashboardNavRail
         homeId={homeId}
         activeItem="automations"
@@ -410,12 +429,49 @@ export function AutomationRulePage() {
             <section className="st-group" key={group.id} aria-label={group.label}>
               <header className="st-group-head">
                 <h3>{group.label}</h3>
-                <small>{group.rules.length}</small>
+                <small>{group.total}</small>
                 <p>{group.hint}</p>
               </header>
               <div className="st-circuits">{group.rules.map(ruleRow)}</div>
             </section>
           ))
+        )}
+
+        {!loading && pageCount > 1 && (
+          <nav className="st-pager" aria-label="Phân trang quy tắc">
+            <button
+              type="button"
+              className="st-icon-btn"
+              disabled={currentPage === 1}
+              onClick={() => setPage(currentPage - 1)}
+              aria-label="Trang trước"
+            >
+              <Icon name="chevron" size={18} className="icon st-flip" />
+            </button>
+            {Array.from({ length: pageCount }, (_, i) => i + 1).map((n) => (
+              <button
+                key={n}
+                type="button"
+                className={n === currentPage ? 'active' : ''}
+                aria-current={n === currentPage ? 'page' : undefined}
+                onClick={() => setPage(n)}
+              >
+                {n}
+              </button>
+            ))}
+            <button
+              type="button"
+              className="st-icon-btn"
+              disabled={currentPage === pageCount}
+              onClick={() => setPage(currentPage + 1)}
+              aria-label="Trang sau"
+            >
+              <Icon name="chevron" size={18} />
+            </button>
+            <small>
+              {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, orderedRules.length)} / {orderedRules.length}
+            </small>
+          </nav>
         )}
       </main>
 
