@@ -29,9 +29,10 @@ import { Icon, type IconName } from '../ui/LucideIcon';
 import { AutomationTopBar } from '../automation/AutomationTopBar';
 import { notify } from '../ui/notify';
 import { getErrorMessage } from '../../utils/errors';
-import { SceneEditor } from './SceneEditor';
+import { SceneEditor, ICON_POPOVER_LIST } from './SceneEditor';
 import { ConfirmModal } from '../ui/ConfirmModal';
 import { useRealtimeRefetch } from '../../realtime/useRealtimeRefetch';
+import { iconHue } from '../automation/iconHue';
 
 const SCENE_REFRESH_EVENTS = ['SCENE_CHANGED'] as const;
 
@@ -125,6 +126,8 @@ function RunLaterForm({ onSubmit }: { onSubmit: (seconds: number) => Promise<voi
 // ──────────────────────────────────────────────────────────────────────────
 
 export function getFigmaIconForScene(name?: string, icon?: string | null): IconName {
+  // An icon picked in the editor wins; name keywords only cover old scenes saved without one.
+  if (icon && (ICON_POPOVER_LIST as string[]).includes(icon)) return icon as IconName;
   const text = `${name ?? ''} ${icon ?? ''}`.toLowerCase();
   if (text.includes('sáng') || text.includes('sun') || text.includes('morning')) return 'sun';
   if (text.includes('ngủ') || text.includes('moon') || text.includes('tối') || text.includes('night')) return 'moon';
@@ -156,18 +159,6 @@ export function getFigmaIconForDevice(action?: string, deviceName?: string): Ico
 // Subcomponents matching Figma Design v3
 // ──────────────────────────────────────────────────────────────────────────
 
-// One accent hue per kind of scene so tiles are recognisable at a glance.
-const SCENE_HUES: Partial<Record<IconName, string>> = {
-  sun: '#d17a0b',
-  moon: '#6a55e0',
-  door: '#5b6b82',
-  home: '#2a9456',
-  film: '#d9486e',
-  briefcase: '#1769d6',
-  lamp: '#b8860b',
-  energy: '#0d8f8a',
-};
-
 function ScenarioCard({
   scene,
   onToggle,
@@ -198,7 +189,6 @@ function ScenarioCard({
   const [menu, setMenu] = useState(false);
   const actions = scene.actions || [];
   const sceneIcon = getFigmaIconForScene(scene.name, scene.icon);
-  const hue = SCENE_HUES[sceneIcon];
 
   const pendingRunAt = scene.pendingRunAt ?? null;
   const now = useNow(!!pendingRunAt);
@@ -230,7 +220,6 @@ function ScenarioCard({
   return (
     <article
       className={`st-scene ${scene.enabled ? '' : 'is-off'}`}
-      style={hue ? ({ '--hue': hue } as React.CSSProperties) : undefined}
       onClick={onOpen}
       tabIndex={0}
       onKeyDown={(e) => e.key === 'Enter' && e.target === e.currentTarget && onOpen()}
@@ -243,7 +232,7 @@ function ScenarioCard({
       )}
 
       <div className="st-scene-head">
-        <span className="st-scene-icon">
+        <span className="st-scene-icon" style={iconHue(sceneIcon)}>
           <Icon name={sceneIcon} size={24} />
         </span>
         <button
@@ -269,7 +258,7 @@ function ScenarioCard({
       <ul className="st-scene-devices">
         {actions.length === 0 && <li className="more">Chưa có hành động nào</li>}
         {actions.slice(0, 3).map((action, index) => (
-          <li key={action.id || index}>
+          <li key={action.id || index} style={iconHue(getFigmaIconForDevice(action.action, action.targetDeviceName))}>
             <Icon name={getFigmaIconForDevice(action.action, action.targetDeviceName)} />
             <span title={action.targetDeviceName || undefined}>{action.targetDeviceName || 'Thiết bị'}</span>
             {(action.action === 'SET_RGB' || (action.action as string) === 'SET_COLOR') && typeof action.value === 'string' && /^#[0-9a-f]{3,8}$/i.test(action.value) ? (
@@ -510,87 +499,6 @@ export function SceneHistory({
   );
 }
 
-function AiSuggestions({
-  onClose,
-  onApplySuggestion,
-}: {
-  onClose: () => void;
-  onApplySuggestion: (name: string, description: string, icon: IconName) => void;
-}) {
-  const [list, setList] = useState<[IconName, string, string, string][]>([
-    [
-      'moon',
-      'Chuẩn bị đi ngủ',
-      'Bạn thường tắt đèn lúc 23:00',
-      'Tắt đèn · Khóa cửa',
-    ],
-    [
-      'energy',
-      'Tiết kiệm điện',
-      'Điều hòa thường bật khi không có người',
-      'Tắt điều hòa · Tắt đèn',
-    ],
-    [
-      'home',
-      'Chào đón về nhà',
-      'Bạn thường về nhà lúc 18:15',
-      'Mở đèn · Bật điều hòa',
-    ],
-    [
-      'film',
-      'Xem phim cuối tuần',
-      'Thường kích hoạt vào tối thứ Bảy',
-      'Đổi màu đèn sang Điện ảnh · Bật quạt',
-    ],
-  ]);
-
-  const handleDismiss = (name: string) => {
-    setList((prev) => prev.filter((item) => item[1] !== name));
-  };
-
-  return (
-    <PanelShell
-      title="Gợi ý cho bạn"
-      caption="Dựa trên thói quen gần đây"
-      onClose={onClose}
-    >
-      <div className="ai-list">
-        {list.map(([icon, name, reason, actions]) => (
-          <article className="ai-card glass-g1" key={name}>
-            <span>
-              <Icon name={icon} />
-            </span>
-            <div>
-              <strong>{name}</strong>
-              <p>{reason}</p>
-            </div>
-            <small>{actions}</small>
-            <footer>
-              <button type="button" onClick={() => handleDismiss(name)}>
-                Bỏ qua
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  onApplySuggestion(name, reason, icon);
-                  onClose();
-                }}
-              >
-                Thêm kịch bản
-              </button>
-            </footer>
-          </article>
-        ))}
-        {list.length === 0 && (
-          <div className="p-8 text-center text-xs text-slate-400">
-            Không còn gợi ý nào mới.
-          </div>
-        )}
-      </div>
-    </PanelShell>
-  );
-}
-
 
 
 
@@ -674,8 +582,7 @@ export function ScenePage() {
     | null
     | { type: 'editor'; scene?: SceneResponse | null }
     | { type: 'history'; scene: SceneResponse }
-    | { type: 'timer'; scene: SceneResponse }
-    | { type: 'ai' };
+    | { type: 'timer'; scene: SceneResponse };
 
   const [sheet, setSheet] = useState<SheetType>(null);
   const [deletingScene, setDeletingScene] = useState<SceneResponse | null>(null);
@@ -891,6 +798,9 @@ export function ScenePage() {
 
   return (
     <div className="app-shell scenes-page studio st-theme st-pro">
+      <div className="mesh mesh-one" />
+      <div className="mesh mesh-two" />
+      <div className="mesh mesh-three" />
       <DashboardNavRail
         homeId={homeId}
         activeItem="scenes"
@@ -940,10 +850,6 @@ export function ScenePage() {
             >
               <Icon name="automation" />
               <span>Quy tắc</span>
-            </button>
-            <button type="button" className="st-link" onClick={() => setSheet({ type: 'ai' })}>
-              <Icon name="sparkles" />
-              <span>Gợi ý</span>
             </button>
             <button type="button" className="st-btn st-btn-primary" onClick={handleCreateScene}>
               <Icon name="plus" size={18} />
@@ -996,13 +902,6 @@ export function ScenePage() {
       {/* Side Panels / Sheets */}
       {sheet && (
         <>
-          {sheet.type === 'ai' && (
-            <AiSuggestions
-              onClose={() => setSheet(null)}
-              onApplySuggestion={handleQuickCreate}
-            />
-          )}
-
           {sheet.type === 'timer' && (
             <PanelShell title={sheet.scene.name} caption="Hẹn giờ chạy một lần" onClose={() => setSheet(null)}>
               <RunLaterForm onSubmit={(seconds) => handleRunLater(sheet.scene, seconds)} />

@@ -22,10 +22,6 @@
   background: var(--bg-base);
 }
 
-.studio .mesh {
-  display: none;
-}
-
 .studio .glass-g1,
 .studio .glass-g2 {
   backdrop-filter: none !important;
@@ -815,18 +811,60 @@
   border-radius: 14px;
   background: var(--solid);
   cursor: pointer;
-  overflow: hidden;
   transition: border-color 0.15s var(--ease), box-shadow 0.15s var(--ease);
 }
-/* Left power rail: lit while the rule is live. */
+/* Pager under the rule list */
+.st-pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin-top: 20px;
+}
+.st-pager button:not(.st-icon-btn) {
+  min-width: 34px;
+  height: 34px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--secondary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.st-pager button:not(.st-icon-btn):hover {
+  background: var(--muted);
+  color: var(--text);
+}
+.st-pager button.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.st-pager button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.st-pager small {
+  margin-left: 8px;
+  color: var(--tertiary);
+  font-size: 12px;
+}
+.st-flip {
+  transform: scaleX(-1);
+}
+
+/* Left power rail: lit while the rule is live. Drawn as a rounded border, not clipped,
+   so the card needs no overflow: hidden and its "⋯" menu can spill out. */
 .st-circuit::before {
   content: '';
   position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 4px;
-  background: var(--live);
+  inset: -1px;
+  border-left: 5px solid var(--live);
+  border-radius: inherit;
+  pointer-events: none;
 }
 .st-circuit.is-off {
   --live: var(--border);
@@ -2072,12 +2110,13 @@ select.gd-input {
   --g1: #ffffff;
   --g2: #ffffff;
   --solid: #ffffff;
-  --border: rgba(15, 40, 70, 0.08);
-  --inner-border: rgba(15, 40, 70, 0.06);
-  --muted: #f3f6f9;
-  --text: #1f2d3d;
-  --secondary: #5b6b7c;
-  --tertiary: #8a98a8;
+  /* Contrast tuned for crisp text: secondary ≈ 8:1, tertiary ≈ 4.8:1 (AA) on white. */
+  --border: rgba(15, 40, 70, 0.14);
+  --inner-border: rgba(15, 40, 70, 0.1);
+  --muted: #f0f4f8;
+  --text: #0f1c2b;
+  --secondary: #3d4b5c;
+  --tertiary: #63738a;
   --accent: #2563eb;
   --accent-hover: #1d4fd0;
   --accent-bright: #2563eb;
@@ -2086,7 +2125,8 @@ select.gd-input {
   --card-shadow: 0 1px 2px rgba(15, 40, 70, 0.04), 0 8px 24px -12px rgba(15, 40, 70, 0.12);
   --hover-shadow: 0 2px 4px rgba(15, 40, 70, 0.05), 0 16px 32px -14px rgba(15, 40, 70, 0.2);
   --glass-shadow: 0 24px 56px -12px rgba(15, 40, 70, 0.24);
-  background: var(--bg-base);
+  /* Transparent like Home/Devices: the body gradient and the mesh blobs show through. */
+  background: transparent;
 }
 
 /* Header: Home-sized title, grey eyebrow. */
@@ -2297,9 +2337,16 @@ select.gd-input {
   background: #fbfcfd !important;
   box-shadow: none;
 }
+/* index.css forces every h1–h4 to #3a4a5a !important; studio headings use the crisper --text. */
+.app-shell.studio.st-theme :is(h1, h2, h3, h4) {
+  color: var(--text) !important;
+}
+
+/* Titles stay full-strength when off: the toggle and "Đang tắt" already say it. */
 .st-theme .st-scene.is-off h3,
-.st-theme .st-rule.is-off .st-rule-title h4 {
-  color: var(--secondary);
+.st-theme .st-rule.is-off .st-rule-title h4,
+.st-theme .st-circuit.is-off .st-circuit-id h4 {
+  color: var(--text);
 }
 .st-theme .st-scene.is-off .st-scene-icon,
 .st-theme .st-rule.is-off .st-rule-icon {
@@ -2624,4 +2671,18 @@ select.gd-input {
 }
 @media (max-width: 640px) {
   .st-theme .st-target-filter { max-width: 100%; flex: 1 1 100%; }
+}
+
+/* ── Coloured icons (iconHue.ts sets --ic per icon kind; accent when unmapped) ──
+   Kept in colour when an item is off: the toggle and "Đang tắt" already show the state. */
+.app-shell.st-theme .st-scene-icon,
+.app-shell.st-theme .st-scene.is-off .st-scene-icon,
+.app-shell.st-theme .st-node-icon,
+.app-shell.st-theme .st-circuit.is-off .st-node-icon {
+  color: var(--ic, var(--accent));
+  background: color-mix(in srgb, var(--ic, var(--accent)) 13%, #ffffff);
+}
+.app-shell.st-theme .st-scene-devices li .icon,
+.app-shell.st-theme .st-node.action .icon {
+  color: var(--ic, var(--tertiary));
 }

@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'react-router';
 import { AUTO_OFF_KEY, DELAY_ACTION, MAX_AUTO_OFF_SECONDS, MAX_DELAY_SECONDS } from '../../types/automation';
 import type { DeviceSummary, RuleActionInput } from '../../types/automation';
 import type { SceneResponse } from '../../types/scene';
@@ -56,7 +57,7 @@ function formatCommand(act: RuleActionInput, device?: DeviceSummary, scene?: Sce
   const code = act.action;
   if (code === 'TURN_ON') return `Bật ${devName}`;
   if (code === 'TURN_OFF') return `Tắt ${devName}`;
-  if (code === 'TOGGLE') return `Đảo trạng thái bật/tắt ${devName}`;
+  if (code === 'TOGGLE') return `Bật/Tắt ${devName}`;
   if (code === 'OPEN') return `Mở cổng/cửa ${devName}`;
   if (code === 'CLOSE') return `Đóng cổng/cửa ${devName}`;
   if (code === 'STOP') return `Dừng cổng/cửa ${devName}`;
@@ -139,17 +140,22 @@ export const ActionStepCard: React.FC<ActionStepCardProps> = ({
     return device ? getFigmaIconForDevice(device.deviceType, device.name) : 'power';
   }, [isSceneStep, isDelayStep, isGroupStep, scene, device]);
 
+  // Raw-JSON "SET_STATE" is for debugging: offered only with ?advanced=1, or kept when a rule already uses it.
+  const [searchParams] = useSearchParams();
+  const showRawState = searchParams.has('advanced') || action.action === 'SET_STATE';
   const deviceActions: ActionOption[] = useMemo(() => {
+    let options: ActionOption[] = [];
     if (isGroupStep) {
       // Every command any member supports; members that cannot do it are skipped when the rule runs.
       const seen = new Map<string, ActionOption>();
       devices.filter((d) => group?.deviceIds.includes(d.id))
         .forEach((d) => getDeviceActions(d).forEach((opt) => seen.has(opt.code) || seen.set(opt.code, opt)));
-      return [...seen.values()];
+      options = [...seen.values()];
+    } else if (device) {
+      options = getDeviceActions(device);
     }
-    if (!device) return [];
-    return getDeviceActions(device);
-  }, [device, devices, group, isGroupStep]);
+    return showRawState ? options : options.filter((opt) => opt.code !== 'SET_STATE');
+  }, [device, devices, group, isGroupStep, showRawState]);
   const autoOffSeconds = Number(action.parameters?.[AUTO_OFF_KEY]) || 0;
   const undoVerb = autoOffVerb(action.action, action.parameters);
 
