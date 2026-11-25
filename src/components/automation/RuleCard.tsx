@@ -6,6 +6,8 @@ import { actionLabels, describeCondition, EVENT_FRIENDLY_NAMES } from './ruleLab
 import { AUTO_OFF_KEY, DELAY_ACTION } from '../../types/automation';
 import { autoOffVerb, formatDuration } from './ruleTiming';
 import { formatRepeatDays, formatScheduleTime } from '../scene/SceneScheduleSection';
+import { getFigmaIconForDevice } from '../scene/ScenePage';
+import { iconHue } from './iconHue';
 
 export interface RuleCardProps {
   rule: AutomationRule;
@@ -63,7 +65,9 @@ function actionNodes(rule: AutomationRule, devices: DeviceSummary[], scenes: Sce
       return { id: action.id, icon: 'sparkles' as IconName, text: `Chạy ${name}` };
     }
     const device = devices.find((d) => d.id === action.deviceId)?.name || action.deviceName || 'thiết bị';
-    return { id: action.id, icon: 'power' as IconName, text: `${actionLabels[action.action] || action.action} ${device}${suffix}` };
+    // Device kind icon (đèn, điều hòa, cửa…); 'power' when the name says nothing.
+    const kind = getFigmaIconForDevice(action.action, device);
+    return { id: action.id, icon: kind === 'grid' ? ('power' as IconName) : kind, text: `${actionLabels[action.action] || action.action} ${device}${suffix}` };
   });
 }
 
@@ -83,6 +87,7 @@ export const RuleCard: React.FC<RuleCardProps> = ({
   onDelete,
 }) => {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [menuUp, setMenuUp] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -134,13 +139,12 @@ export const RuleCard: React.FC<RuleCardProps> = ({
         <span className="st-status">
           <i className={`st-dot ${lastRunFailed ? 'err' : rule.enabled ? 'on' : ''}`} />
           {rule.enabled ? 'Đang bật' : 'Đang tắt'} · {TRIGGER_LABELS[rule.triggerType] || rule.triggerType}
-          {isSchedule ? '' : ` · ${rule.conditions.length} điều kiện`}
         </span>
       </div>
 
       <div className="st-pipe">
         <span className="st-node trigger" title={describeTrigger(rule, devices)}>
-          <i className="st-node-icon">
+          <i className="st-node-icon" style={iconHue(TRIGGER_ICONS[rule.triggerType] || 'zap')}>
             <Icon name={TRIGGER_ICONS[rule.triggerType] || 'zap'} />
           </i>
           <span>{describeTrigger(rule, devices)}</span>
@@ -151,7 +155,7 @@ export const RuleCard: React.FC<RuleCardProps> = ({
         ) : (
           <span className="st-node-stack">
             {nodes.slice(0, MAX_NODES).map((node) => (
-              <span key={node.id} className="st-node action" title={node.text}>
+              <span key={node.id} className="st-node action" title={node.text} style={iconHue(node.icon)}>
                 <Icon name={node.icon} />
                 <span>{node.text}</span>
               </span>
@@ -178,14 +182,18 @@ export const RuleCard: React.FC<RuleCardProps> = ({
           <button
             type="button"
             className="st-icon-btn"
-            onClick={() => setMenuOpen((open) => !open)}
+            onClick={(e) => {
+              // Open upward when the card sits near the bottom (incl. the mobile bottom nav).
+              setMenuUp(window.innerHeight - e.currentTarget.getBoundingClientRect().bottom < 280);
+              setMenuOpen((open) => !open);
+            }}
             aria-label="Thao tác khác"
             aria-expanded={menuOpen}
           >
             <Icon name="more" size={18} />
           </button>
           {menuOpen && (
-            <div className="st-menu">
+            <div className={`st-menu${menuUp ? ' up' : ''}`}>
               {menuItem('Chỉnh sửa', 'pencil', onEdit)}
               {menuItem('Xem lịch sử', 'clock', onHistory)}
               {isSchedule && onSchedule && menuItem('Lịch chạy', 'clock', onSchedule)}
