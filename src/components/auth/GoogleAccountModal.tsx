@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useCallback } from 'react';
 
-const GOOGLE_CLIENT_ID = '962352236636-panbra9em73iofocv7r96hj200i40igl.apps.googleusercontent.com';
+const GOOGLE_CLIENT_ID =
+  import.meta.env.VITE_GOOGLE_CLIENT_ID ||
+  '962352236636-panbra9em73iofocv7r96hj200i40igl.apps.googleusercontent.com';
 
 // Augment window with Google Identity Services types
 declare global {

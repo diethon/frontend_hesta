@@ -116,6 +116,16 @@ export const ProfilePage: React.FC<{
               ))}
               <button
                 type="button"
+                onClick={() => navigate('/contracts')}
+                className="flex min-h-11 items-center gap-3 rounded-xl px-3 text-left text-sm font-semibold border border-transparent text-[#334155] hover:bg-[#f8fafc] hover:border-[#cbd5e1] hover:text-[#0f172a] transition-colors cursor-pointer"
+              >
+                <span className="text-[#2563eb]">
+                  <Icon name="briefcase" size={18} />
+                </span>
+                Hợp đồng lắp đặt
+              </button>
+              <button
+                type="button"
                 onClick={onLogout}
                 className="mt-2 flex min-h-11 items-center gap-3 rounded-xl bg-[#fff1f2] border border-[#f43f5e]/40 px-3 text-left text-sm font-bold text-[#be123c] transition-colors hover:bg-[#ffe4e6] hover:border-[#f43f5e]/60 cursor-pointer"
               >

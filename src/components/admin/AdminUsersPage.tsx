@@ -307,6 +307,13 @@ export const AdminUsersPage: React.FC<AdminUsersPageProps> = ({
       onClick: () => navigate('/admin/maintenance'),
       active: false,
     },
+    {
+      id: 'contracts',
+      icon: 'briefcase' as const,
+      label: 'Hợp đồng lắp đặt',
+      onClick: () => navigate('/admin/contracts'),
+      active: false,
+    },
   ];
 
   const adminBottomNavItems = [
@@ -336,6 +343,13 @@ export const AdminUsersPage: React.FC<AdminUsersPageProps> = ({
       icon: 'wrench' as const,
       label: 'Bảo trì',
       onClick: () => navigate('/admin/maintenance'),
+      active: false,
+    },
+    {
+      id: 'contracts',
+      icon: 'briefcase' as const,
+      label: 'Hợp đồng',
+      onClick: () => navigate('/admin/contracts'),
       active: false,
     },
   ];

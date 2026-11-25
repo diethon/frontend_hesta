@@ -6,7 +6,7 @@ import { bundleAnalysisPlugin } from './scripts/bundleAnalysisPlugin.js';
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss(), bundleAnalysisPlugin()],
-  server: { watch: { ignored: ['**/.tmp/**'] } },
+  server: { host: 'localhost', port: 5173, watch: { ignored: ['**/.tmp/**'] } },
   build: {
     rolldownOptions: {
       output: {

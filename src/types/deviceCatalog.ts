@@ -10,6 +10,8 @@ export interface DeviceCatalog {
   imageUrl?: string;
   icon?: string;
   defaultCapabilities?: Record<string, string[]>;
+  unitPrice?: number;
+  warrantyMonths?: number;
   isActive: boolean;
   totalDeviceCount: number;
   unclaimedCount: number;
@@ -27,6 +29,8 @@ export interface DeviceCatalogRequest {
   imageUrl?: string;
   icon?: string;
   defaultCapabilities?: Record<string, string[]>;
+  unitPrice?: number;
+  warrantyMonths?: number;
 }
 
 export interface QrItem {

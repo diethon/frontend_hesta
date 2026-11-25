@@ -91,6 +91,7 @@ export function AdminMaintenancePage({ user, onProfileUpdate }: Props) {
     { id: 'users', icon: 'users' as const, label: 'Quản lý người dùng', onClick: () => navigate('/admin/users'), active: false },
     { id: 'diagnostics', icon: 'activity' as const, label: 'Chẩn đoán hạ tầng IoT', onClick: () => navigate('/admin/diagnostics'), active: false },
     { id: 'maintenance', icon: 'wrench' as const, label: 'Bảo trì thiết bị', onClick: () => window.scrollTo({ top: 0, behavior: 'smooth' }), active: true },
+    { id: 'contracts', icon: 'briefcase' as const, label: 'Hợp đồng lắp đặt', onClick: () => navigate('/admin/contracts'), active: false },
   ];
 
   const ticketRow = (t: MaintenanceTicketSummary) => (

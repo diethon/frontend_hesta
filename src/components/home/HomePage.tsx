@@ -14,6 +14,7 @@ import { HomeFavoriteDevices } from "./HomeFavoriteDevices";
 import { HomeEnergyWidget } from "./HomeEnergyWidget";
 import { HomeActivityWidget } from "./HomeActivityWidget";
 import { SpotlightRecommendationBanner } from "./SpotlightRecommendationBanner";
+import { ActiveContractBanner } from "../contracts/ActiveContractBanner";
 import { DashboardNavRail } from "./DashboardNavRail";
 import { DashboardTopBar, type HomeOption } from "./DashboardTopBar";
 import { DashboardBottomNav } from "./DashboardBottomNav";
@@ -566,6 +567,7 @@ export const HomePage: React.FC<HomePageProps> = ({
         {/* ── Main Dashboard: Real Data Only ── */}
         {activeTabSection === 'dashboard' && (
           <div className="dashboard">
+            <ActiveContractBanner />
             <SpotlightRecommendationBanner
               homeId={userHome?.homeId}
               onApplied={() => {

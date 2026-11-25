@@ -56,6 +56,13 @@ export const SystemDiagnosticsPage: React.FC<SystemDiagnosticsPageProps> = ({
       onClick: () => navigate('/admin/maintenance'),
       active: false,
     },
+    {
+      id: 'contracts',
+      icon: 'briefcase' as const,
+      label: 'Hợp đồng lắp đặt',
+      onClick: () => navigate('/admin/contracts'),
+      active: false,
+    },
   ];
 
   const adminBottomNavItems = [
@@ -85,6 +92,13 @@ export const SystemDiagnosticsPage: React.FC<SystemDiagnosticsPageProps> = ({
       icon: 'wrench' as const,
       label: 'Bảo trì',
       onClick: () => navigate('/admin/maintenance'),
+      active: false,
+    },
+    {
+      id: 'contracts',
+      icon: 'briefcase' as const,
+      label: 'Hợp đồng',
+      onClick: () => navigate('/admin/contracts'),
       active: false,
     },
   ];

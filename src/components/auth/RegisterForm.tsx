@@ -17,15 +17,19 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
   const urlParams = new URLSearchParams(location.search);
   const initialInviteToken =
     urlParams.get("inviteToken") || urlParams.get("token") || "";
+  const initialEmail = urlParams.get("email") || "";
+  const initialName = urlParams.get("name") || "";
+  const initialPhone = urlParams.get("phone") || "";
+  const hasContractToken = Boolean(urlParams.get("contractToken"));
 
   const [formData, setFormData] = useState<
     RegisterRequest & { confirmPassword: string }
   >({
-    fullName: "",
-    email: "",
+    fullName: initialName,
+    email: initialEmail,
     password: "",
     confirmPassword: "",
-    phoneNumber: "",
+    phoneNumber: initialPhone,
     inviteCode: initialInviteToken,
   });
 
@@ -115,7 +119,9 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
             Tạo tài khoản HESTA
           </h1>
           <p className="mt-1 text-sm text-muted">
-            Đăng ký tài khoản hệ thống local-first
+            {hasContractToken
+              ? "Tạo tài khoản để theo dõi báo giá, ký hợp đồng và nhận bàn giao nhà HESTA"
+              : "Đăng ký tài khoản hệ thống local-first"}
           </p>
           {initialInviteToken && (
             <div className="mt-4 inline-block bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-3 py-1.5 rounded-lg text-xs font-medium">
