@@ -65,14 +65,14 @@ export const DeviceFilterDropdown = <T extends string>({
         aria-haspopup="listbox"
         aria-expanded={isOpen}
         aria-label={`${labelPrefix}: ${value}`}
-        className="h-8 px-3 rounded-lg border border-[var(--border)] bg-transparent hover:bg-[var(--muted)]/50 text-xs font-medium text-[var(--text)] inline-flex items-center gap-1.5 cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] select-none"
+        className="h-9 px-3.5 rounded-xl border border-[#94a3b8]/80 bg-white hover:bg-[#f8fafc] hover:border-[#475569] text-xs font-medium text-[#334155] shadow-2xs inline-flex items-center gap-1.5 cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563eb] select-none"
       >
         {icon}
         <span className="truncate max-w-[180px]">
-          {labelPrefix}: <strong className="font-semibold text-[var(--text)]">{value}</strong>
+          {labelPrefix}: <strong className="font-bold text-[#0f172a]">{value}</strong>
         </span>
         <ChevronDown
-          className={`w-3.5 h-3.5 text-[var(--secondary)] shrink-0 transition-transform duration-150 ${
+          className={`w-3.5 h-3.5 text-[#475569] shrink-0 transition-transform duration-150 ${
             isOpen ? 'rotate-180' : ''
           }`}
           aria-hidden="true"
@@ -84,7 +84,7 @@ export const DeviceFilterDropdown = <T extends string>({
           role="listbox"
           aria-label={`${labelPrefix} tùy chọn`}
           style={{ minWidth }}
-          className="absolute right-0 top-full mt-1.5 z-40 max-h-64 overflow-y-auto rounded-xl border border-[var(--border)] bg-[var(--solid)] p-1 shadow-lg backdrop-blur-md animate-in fade-in zoom-in-95 duration-100"
+          className="absolute right-0 top-full mt-1.5 z-40 max-h-64 overflow-y-auto rounded-xl border border-[#cbd5e1] bg-white p-1.5 shadow-xl backdrop-blur-md animate-in fade-in zoom-in-95 duration-100"
         >
           {options.map((opt) => {
             const isSelected = value === opt;
@@ -101,12 +101,12 @@ export const DeviceFilterDropdown = <T extends string>({
                 }}
                 className={`w-full text-left px-3 py-2 rounded-lg text-xs font-medium flex items-center justify-between gap-2 transition-colors cursor-pointer ${
                   isSelected
-                    ? 'bg-[var(--accent)]/10 text-[var(--accent)] font-semibold'
-                    : 'text-[var(--text)] hover:bg-[var(--muted)]/60'
+                    ? 'bg-[#eff6ff] text-[#1d4ed8] font-semibold'
+                    : 'text-[#0f172a] hover:bg-[#f1f5f9]'
                 }`}
               >
                 <span className="truncate">{opt}</span>
-                {isSelected && <Check className="w-3.5 h-3.5 shrink-0 text-[var(--accent)]" aria-hidden="true" />}
+                {isSelected && <Check className="w-3.5 h-3.5 shrink-0 text-[#2563eb]" aria-hidden="true" />}
               </button>
             );
           })}

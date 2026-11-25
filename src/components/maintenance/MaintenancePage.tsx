@@ -1,13 +1,19 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router';
-import { CalendarClock, Plus, RefreshCw, Search, Wrench } from 'lucide-react';
-import { listMaintenanceTickets } from '../../services/maintenanceApi';
+import { Bot, CalendarClock, Mail, MailX, Plus, RefreshCw, Search, Wrench } from 'lucide-react';
+import {
+  getMaintenanceEmailPreference,
+  listMaintenanceTickets,
+  updateMaintenanceEmailPreference,
+} from '../../services/maintenanceApi';
 import type { MaintenanceStatus, MaintenanceTicketSummary } from '../../types/maintenance';
 import { useAppSelector } from '../../store/hooks';
 import { getErrorMessage } from '../../utils/errors';
+import { notify } from '../ui/notify';
 import { DashboardNavRail } from '../home/DashboardNavRail';
 import { DashboardBottomNav } from '../home/DashboardBottomNav';
 import { CreateMaintenanceModal } from './CreateMaintenanceModal';
+import { MaintenanceAssistantDrawer } from './MaintenanceAssistantDrawer';
 import { MaintenanceDetailModal } from './MaintenanceDetailModal';
 import { btnGhost, btnPrimary, fieldClass } from './MaintenanceModal';
 import { PriorityPill, StatusPill } from './TicketDetailView';
@@ -33,9 +39,35 @@ export function MaintenancePage() {
   const [loadedKey, setLoadedKey] = useState('');
   const [error, setError] = useState('');
   const [version, setVersion] = useState(0);
+  const [emailEnabled, setEmailEnabled] = useState<boolean | null>(null);
+  const [emailBusy, setEmailBusy] = useState(false);
 
-  // ?create=1&deviceId=…&anomalyId=… opens the form pre-filled (from the device page or an anomaly card).
+  useEffect(() => {
+    let active = true;
+    getMaintenanceEmailPreference()
+      .then((res) => { if (active) setEmailEnabled(res.maintenanceEmailEnabled); })
+      .catch(() => { /* ignore if unavailable */ });
+    return () => { active = false; };
+  }, []);
+
+  const toggleEmailPreference = async () => {
+    if (emailEnabled == null || emailBusy) return;
+    setEmailBusy(true);
+    try {
+      const next = !emailEnabled;
+      const res = await updateMaintenanceEmailPreference(next);
+      setEmailEnabled(res.maintenanceEmailEnabled);
+      notify.success(res.maintenanceEmailEnabled ? 'Đã bật nhận email thông báo bảo trì' : 'Đã tắt nhận email thông báo bảo trì');
+    } catch (caught) {
+      notify.error(getErrorMessage(caught, 'Không cập nhật được cài đặt email.'));
+    } finally {
+      setEmailBusy(false);
+    }
+  };
+
+  // ?create=1&deviceId=…&anomalyId=… opens the form pre-filled; ?assistant=1&deviceId=… opens the diagnostic assistant.
   const creating = params.get('create') === '1';
+  const assistantOpen = params.get('assistant') === '1';
   const openTicketId = params.get('ticket');
 
   const requestKey = `${homeId}|${status}|${page}|${version}`;
@@ -79,9 +111,26 @@ export function MaintenancePage() {
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Yêu cầu bảo trì thiết bị</h1>
             <p className="text-sm text-muted">Báo hỏng thiết bị, chọn giờ rảnh, theo dõi lịch hẹn, duyệt báo giá và xem lịch sử sửa chữa.</p>
           </div>
-          <button type="button" className={btnPrimary} onClick={() => setParams({ create: '1' })}>
-            <Plus className="w-4 h-4" /> Báo hỏng thiết bị
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            {emailEnabled != null && (
+              <button
+                type="button"
+                className={btnGhost}
+                disabled={emailBusy}
+                onClick={() => void toggleEmailPreference()}
+                title={emailEnabled ? 'Đang bật nhận email cập nhật bảo trì — bấm để tắt' : 'Đang tắt nhận email cập nhật bảo trì — bấm để bật'}
+              >
+                {emailEnabled ? <Mail className="w-4 h-4 text-primary" /> : <MailX className="w-4 h-4 text-muted" />}
+                {emailEnabled ? 'Email bảo trì: Bật' : 'Email bảo trì: Tắt'}
+              </button>
+            )}
+            <button type="button" className={btnGhost} onClick={() => setParams({ assistant: '1' })}>
+              <Bot className="w-4 h-4 text-primary" /> Hỏi trợ lý chẩn đoán
+            </button>
+            <button type="button" className={btnPrimary} onClick={() => setParams({ create: '1' })}>
+              <Plus className="w-4 h-4" /> Báo hỏng thiết bị
+            </button>
+          </div>
         </header>
 
         <section className="grid grid-cols-1 sm:grid-cols-3 gap-3" aria-label="Tổng quan bảo trì">
@@ -121,6 +170,11 @@ export function MaintenancePage() {
                   <p className="text-sm text-muted mt-1 truncate">{t.deviceNames.join(', ')}</p>
                   <div className="flex flex-wrap items-center gap-2 mt-3 text-xs text-muted">
                     <PriorityPill priority={t.priority} />
+                    {t.source === 'CHATBOT' && (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-indigo-500/30 bg-indigo-500/10 px-2 py-0.5 text-[11px] font-semibold text-indigo-600">
+                        <Bot className="w-3 h-3" aria-hidden="true" /> Từ trợ lý
+                      </span>
+                    )}
                     {t.scheduledStart && <span className="inline-flex items-center gap-1"><CalendarClock className="w-3.5 h-3.5" />{formatRange(t.scheduledStart, t.scheduledEnd)}</span>}
                     {t.quoteTotal != null && <span>Báo giá: <strong className="text-text">{formatMoney(t.quoteTotal)}</strong></span>}
                     <span className="ml-auto">{formatDateTime(t.createdAt)}</span>
@@ -158,7 +212,22 @@ export function MaintenancePage() {
           onCreated={(ticket) => { setParams({ ticket: ticket.id }, { replace: true }); reload(); }}
         />
       )}
-      {openTicketId && !creating && (
+      {assistantOpen && !creating && (
+        <MaintenanceAssistantDrawer
+          homeId={homeId}
+          initialDeviceId={params.get('deviceId') ?? undefined}
+          onClose={closeDialogs}
+          onTicketCreated={() => reload()}
+          onViewTicket={(ticketId) => { setParams({ ticket: ticketId }, { replace: true }); reload(); }}
+          onSwitchToManual={(deviceId, note) => {
+            const next: Record<string, string> = { create: '1' };
+            if (deviceId) next.deviceId = deviceId;
+            if (note) next.note = note;
+            setParams(next, { replace: true });
+          }}
+        />
+      )}
+      {openTicketId && !creating && !assistantOpen && (
         <MaintenanceDetailModal homeId={homeId} ticketId={openTicketId} onClose={closeDialogs} onChanged={reload} />
       )}
     </div>

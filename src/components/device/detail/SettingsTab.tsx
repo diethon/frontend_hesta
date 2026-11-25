@@ -210,15 +210,15 @@ function AutomationOverrideAccordion({
     >
       <summary className="cursor-pointer">
         <span className="flex items-center gap-2">
-          <Lock className="w-4 h-4 text-amber-500" />
-          <span className="font-semibold text-text">Ghi đè thủ công & Tự động hóa</span>
+          <Lock className="w-4 h-4 text-[#b45309]" />
+          <span className="font-semibold text-[#0f172a]">Ghi đè thủ công & Tự động hóa</span>
         </span>
         <div className="flex items-center gap-2">
           <span
             className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 ${
               isOverrideActive
-                ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 animate-pulse'
-                : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                ? 'bg-[#fef3c7] text-[#92400e] border border-[#d97706]/50 animate-pulse'
+                : 'bg-[#ecfdf5] text-[#047857] border border-[#10b981]/45'
             }`}
           >
             {isOverrideActive ? `🔒 Khóa ${formattedTime}` : 'Đang tự động'}
@@ -229,31 +229,31 @@ function AutomationOverrideAccordion({
 
       <div className="space-y-3 pt-2">
         {isOverrideActive ? (
-          <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs space-y-2.5">
+          <div className="p-3 rounded-2xl bg-[#fffbeb] border border-[#d97706]/40 text-xs space-y-2.5">
             <div className="flex items-center justify-between gap-2">
               <div>
-                <strong className="block text-[var(--text)] font-semibold">Đang tạm dừng tự động hóa</strong>
-                <span className="text-[var(--secondary)] text-[11px] block mt-0.5">
-                  Bỏ qua kịch bản tự động, còn lại: <b className="text-amber-600 dark:text-amber-400 font-mono font-bold">{formattedTime}</b>
+                <strong className="block text-[#0f172a] font-semibold">Đang tạm dừng tự động hóa</strong>
+                <span className="text-[#475569] text-[11px] block mt-0.5">
+                  Bỏ qua kịch bản tự động, còn lại: <b className="text-[#92400e] font-mono font-bold">{formattedTime}</b>
                 </span>
               </div>
               <button
                 type="button"
                 disabled={isResuming}
                 onClick={onResumeAutomation}
-                className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-bold transition text-xs flex items-center gap-1 cursor-pointer disabled:opacity-50 shrink-0"
+                className="px-3 py-1.5 rounded-lg bg-[#d97706] hover:bg-[#b45309] text-white font-bold transition text-xs flex items-center gap-1 cursor-pointer disabled:opacity-50 shrink-0 shadow-2xs"
               >
                 <RotateCw className={`w-3.5 h-3.5 ${isResuming ? 'animate-spin' : ''}`} />
                 <span>{isResuming ? 'Đang xử lý…' : 'Khôi phục ngay'}</span>
               </button>
             </div>
-            <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-amber-500/20 text-[11px]">
-              <span className="text-[var(--secondary)] shrink-0">Gia hạn thêm:</span>
+            <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-[#d97706]/25 text-[11px]">
+              <span className="text-[#475569] shrink-0">Gia hạn thêm:</span>
               <button
                 type="button"
                 disabled={isExtending}
                 onClick={() => onExtendAutomation(0.5)}
-                className="px-2 py-0.5 rounded-md bg-amber-500/15 hover:bg-amber-500/25 text-amber-800 dark:text-amber-200 font-semibold border border-amber-500/30 cursor-pointer disabled:opacity-50"
+                className="px-2.5 py-1 rounded-md bg-white hover:bg-[#fef3c7] text-[#78350f] font-bold border border-[#d97706]/55 cursor-pointer disabled:opacity-50"
               >
                 +30 phút
               </button>
@@ -261,7 +261,7 @@ function AutomationOverrideAccordion({
                 type="button"
                 disabled={isExtending}
                 onClick={() => onExtendAutomation(1)}
-                className="px-2 py-0.5 rounded-md bg-amber-500/15 hover:bg-amber-500/25 text-amber-800 dark:text-amber-200 font-semibold border border-amber-500/30 cursor-pointer disabled:opacity-50"
+                className="px-2.5 py-1 rounded-md bg-white hover:bg-[#fef3c7] text-[#78350f] font-bold border border-[#d97706]/55 cursor-pointer disabled:opacity-50"
               >
                 +1 giờ
               </button>
@@ -269,17 +269,17 @@ function AutomationOverrideAccordion({
                 type="button"
                 disabled={isExtending}
                 onClick={() => onExtendAutomation(4)}
-                className="px-2 py-0.5 rounded-md bg-amber-500/15 hover:bg-amber-500/25 text-amber-800 dark:text-amber-200 font-semibold border border-amber-500/30 cursor-pointer disabled:opacity-50"
+                className="px-2.5 py-1 rounded-md bg-white hover:bg-[#fef3c7] text-[#78350f] font-bold border border-[#d97706]/55 cursor-pointer disabled:opacity-50"
               >
                 +4 giờ
               </button>
             </div>
           </div>
         ) : (
-          <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs space-y-2.5">
+          <div className="p-3 rounded-2xl bg-[#fffbeb] border border-[#d97706]/40 text-xs space-y-2.5">
             <div>
-              <strong className="block text-[var(--text)] font-semibold">Tự động hóa đang hoạt động</strong>
-              <span className="text-[var(--secondary)] text-[11px] block mt-0.5">
+              <strong className="block text-[#0f172a] font-semibold">Tự động hóa đang hoạt động</strong>
+              <span className="text-[#475569] text-[11px] block mt-0.5">
                 Chọn khoảng thời gian bạn muốn tạm dừng để giữ nguyên trạng thái thiết bị:
               </span>
             </div>
@@ -296,7 +296,7 @@ function AutomationOverrideAccordion({
                   type="button"
                   disabled={isCancelling}
                   onClick={() => onCancelAutomation(preset.mins)}
-                  className="px-2.5 py-1.5 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-800 dark:text-amber-200 font-semibold border border-amber-500/30 transition text-xs cursor-pointer disabled:opacity-50"
+                  className="px-2.5 py-1.5 rounded-lg bg-white hover:bg-[#fef3c7] text-[#78350f] font-semibold border border-[#d97706]/55 transition text-xs cursor-pointer disabled:opacity-50"
                 >
                   {preset.label}
                 </button>
@@ -304,7 +304,7 @@ function AutomationOverrideAccordion({
               <button
                 type="button"
                 onClick={() => setShowCustom(!showCustom)}
-                className="px-2.5 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--solid)] text-[var(--secondary)] hover:text-[var(--text)] text-xs font-medium cursor-pointer"
+                className="px-2.5 py-1.5 rounded-lg border border-[#cbd5e1] bg-white text-[#0f172a] hover:bg-[#f8fafc] text-xs font-semibold cursor-pointer"
               >
                 {showCustom ? 'Đóng tùy chỉnh' : 'Tùy chỉnh…'}
               </button>
@@ -327,7 +327,7 @@ function AutomationOverrideAccordion({
                   type="button"
                   disabled={isCancelling || !customMinutes || Number(customMinutes) <= 0}
                   onClick={() => onCancelAutomation(Number(customMinutes))}
-                  className="px-3 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs cursor-pointer disabled:opacity-50"
+                  className="px-3 py-1 rounded-lg bg-[#d97706] hover:bg-[#b45309] text-white font-bold text-xs cursor-pointer disabled:opacity-50 shadow-2xs"
                 >
                   Tạm dừng ngay
                 </button>
@@ -407,8 +407,8 @@ function DeviceShadowAccordion({
           <span
             className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 ${
               isInSync
-                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
-                : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 animate-pulse'
+                ? 'bg-[#ecfdf5] text-[#047857] border border-[#10b981]/45'
+                : 'bg-[#fef3c7] text-[#92400e] border border-[#d97706]/50 animate-pulse'
             }`}
           >
             {isInSync && <CheckCircle2 className="w-3 h-3" />}
@@ -450,14 +450,14 @@ function DeviceShadowAccordion({
         </div>
 
         {deltaKeys.length > 0 && (
-          <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300 space-y-1.5">
+          <div className="p-2.5 rounded-xl bg-[#fffbeb] border border-[#d97706]/40 text-[#78350f] space-y-1.5">
             <span className="text-[11px] font-bold flex items-center gap-1.5">
               <AlertTriangle className="w-3.5 h-3.5" />
               <span>Các trạng thái đang chờ thiết bị cập nhật:</span>
             </span>
             <div className="flex flex-wrap gap-1.5">
               {deltaKeys.map((key) => (
-                <code key={key} className="px-2 py-0.5 rounded-md bg-amber-500/20 text-[10px] font-bold font-mono">
+                <code key={key} className="px-2 py-0.5 rounded-md bg-white border border-[#d97706]/45 text-[#78350f] text-[10px] font-bold font-mono">
                   {key}: {JSON.stringify(shadow.deltaState[key])}
                 </code>
               ))}
@@ -482,7 +482,7 @@ function DeviceShadowAccordion({
               type="button"
               onClick={onReconcile}
               disabled={isReconciling}
-              className="px-3 py-1 text-[11px] font-bold rounded-xl bg-amber-500 hover:bg-amber-600 text-white transition-colors flex items-center gap-1 shadow-xs cursor-pointer"
+              className="px-3 py-1 text-[11px] font-bold rounded-xl bg-[#d97706] hover:bg-[#b45309] text-white transition-colors flex items-center gap-1 shadow-xs cursor-pointer"
             >
               <RotateCw className={`w-3.5 h-3.5 ${isReconciling ? 'animate-spin' : ''}`} />
               <span>Gửi lại lệnh đồng bộ</span>

@@ -38,10 +38,10 @@ export const NotificationPreferencesTab: React.FC = () => {
   };
 
   if (loadError) {
-    return <p role="alert" className="rounded-xl border border-error bg-error-soft px-4 py-3 text-xs text-text">{loadError}</p>;
+    return <p role="alert" className="rounded-xl border border-[#f43f5e]/45 bg-[#fff1f2] px-4 py-3 text-xs font-medium text-[#be123c]">{loadError}</p>;
   }
   if (!preferences) {
-    return <p role="status" className="py-8 text-center text-sm text-muted">Đang tải cài đặt…</p>;
+    return <p role="status" className="py-8 text-center text-sm text-[#475569]">Đang tải cài đặt…</p>;
   }
 
   return (
@@ -49,10 +49,10 @@ export const NotificationPreferencesTab: React.FC = () => {
       {OPTIONS.map((option) => {
         const checked = preferences[option.key];
         return (
-          <label key={option.key} className="flex cursor-pointer items-center justify-between gap-4 rounded-xl border border-line bg-surface px-4 py-3">
+          <label key={option.key} className="flex cursor-pointer items-center justify-between gap-4 rounded-2xl border border-[#cbd5e1] bg-[#f8fafc] hover:bg-white hover:border-[#94a3b8] px-4 py-3.5 transition-colors">
             <span>
-              <span className="block text-sm font-semibold text-text">{option.title}</span>
-              <span className="block text-xs text-muted">{option.description}</span>
+              <span className="block text-sm font-bold text-[#0f172a]">{option.title}</span>
+              <span className="block text-xs text-[#475569] mt-0.5">{option.description}</span>
             </span>
             <input
               type="checkbox"
@@ -64,21 +64,23 @@ export const NotificationPreferencesTab: React.FC = () => {
             />
             <span
               aria-hidden={true}
-              className={`relative h-6 w-11 shrink-0 rounded-full transition-colors after:absolute after:left-1 after:top-1 after:h-4 after:w-4 after:rounded-full after:bg-white after:shadow-sm after:transition-transform peer-focus-visible:ring-2 peer-focus-visible:ring-primary ${
-                checked ? 'bg-primary after:translate-x-5' : 'bg-off'
+              className={`relative h-6 w-11 shrink-0 rounded-full transition-colors after:absolute after:left-1 after:top-1 after:h-4 after:w-4 after:rounded-full after:bg-white after:shadow-sm after:transition-transform peer-focus-visible:ring-2 peer-focus-visible:ring-[#2563eb] ${
+                checked ? 'bg-[#2563eb] after:translate-x-5' : 'bg-[#cbd5e1]'
               }`}
             />
           </label>
         );
       })}
 
-      <p className="text-xs text-muted">Cảnh báo khẩn cấp (xâm nhập, khói, gas) luôn được gửi để đảm bảo an toàn.</p>
+      <p className="rounded-xl border border-[#f59e0b]/45 bg-[#fffbeb] px-3.5 py-2.5 text-xs font-medium text-[#92400e]">
+        Cảnh báo khẩn cấp (xâm nhập, khói, gas) luôn được gửi để đảm bảo an toàn.
+      </p>
 
-      <div className="pt-2">
+      <div className="pt-2 flex justify-end">
         <button
           type="submit"
           disabled={isSaving}
-          className="w-full py-2.5 px-4 bg-primary hover:bg-primary-hover text-white font-semibold text-sm rounded-xl transition shadow-xs active:scale-[0.98] disabled:opacity-50"
+          className="w-full sm:w-auto sm:min-w-[180px] py-2.5 px-6 bg-[#2563eb] hover:bg-[#1d4ed8] text-white font-bold text-sm rounded-xl transition shadow-xs active:scale-[0.99] disabled:opacity-50 cursor-pointer"
         >
           {isSaving ? 'Đang lưu…' : 'Lưu cài đặt'}
         </button>

@@ -1,12 +1,13 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Check, Search } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Check, ImagePlus, Search, X } from 'lucide-react';
 import { getDevicesByHome } from '../../services/deviceApi';
-import { createMaintenanceTicket } from '../../services/maintenanceApi';
+import { createMaintenanceTicket, uploadMaintenanceAttachment } from '../../services/maintenanceApi';
 import type { DeviceResponse } from '../../types/device';
-import type { MaintenancePriority, MaintenanceTicket } from '../../types/maintenance';
+import type { MaintenancePriority, MaintenanceTicket, UploadedMaintenanceAttachment } from '../../types/maintenance';
 import { getErrorMessage } from '../../utils/errors';
 import { notify } from '../ui/notify';
 import { MaintenanceModal, btnGhost, btnPrimary, fieldClass, labelClass } from './MaintenanceModal';
+import { AuthenticatedImage } from './AuthenticatedImage';
 import { SlotEditor } from './SlotEditor';
 import { PRIORITY_META, draftToSlot, newSlotDraft, slotProblem, type SlotDraft } from './maintenanceFormat';
 
@@ -22,6 +23,9 @@ interface CreateMaintenanceModalProps {
 interface Selected { note: string; anomalyId?: string }
 
 const MAX_DEVICES = 10;
+const MAX_ATTACHMENTS = 5;
+const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
+const ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
 export function CreateMaintenanceModal({ homeId, initialDeviceId, initialAnomalyId, initialNote, onClose, onCreated }: CreateMaintenanceModalProps) {
   const [devices, setDevices] = useState<DeviceResponse[]>([]);
@@ -35,6 +39,9 @@ export function CreateMaintenanceModal({ homeId, initialDeviceId, initialAnomaly
   const [priority, setPriority] = useState<MaintenancePriority>('NORMAL');
   const [contactPhone, setContactPhone] = useState('');
   const [slots, setSlots] = useState<SlotDraft[]>([newSlotDraft(1)]);
+  const [attachments, setAttachments] = useState<UploadedMaintenanceAttachment[]>([]);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -70,6 +77,41 @@ export function CreateMaintenanceModal({ homeId, initialDeviceId, initialAnomaly
     return { ...current, [id]: { note: '' } };
   });
 
+  const handleUploadFiles = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const remaining = MAX_ATTACHMENTS - attachments.length;
+    if (remaining <= 0) {
+      notify.info(`Mỗi yêu cầu chỉ đính kèm tối đa ${MAX_ATTACHMENTS} ảnh.`);
+      return;
+    }
+    const queue = Array.from(files).slice(0, remaining);
+    if (files.length > remaining) {
+      notify.info(`Chỉ tải thêm được ${remaining} ảnh (tối đa ${MAX_ATTACHMENTS} ảnh).`);
+    }
+    setUploadingImage(true);
+    try {
+      for (const file of queue) {
+        if (!ALLOWED_MIME.has(file.type)) {
+          notify.error(`"${file.name}" không phải định dạng JPEG, PNG hoặc WebP.`);
+          continue;
+        }
+        if (file.size > MAX_ATTACHMENT_BYTES) {
+          notify.error(`"${file.name}" vượt quá giới hạn 5 MB.`);
+          continue;
+        }
+        try {
+          const uploaded = await uploadMaintenanceAttachment(homeId, file);
+          setAttachments((prev) => [...prev, uploaded]);
+        } catch (err) {
+          notify.error(getErrorMessage(err, `Không tải được ảnh "${file.name}".`));
+        }
+      }
+    } finally {
+      setUploadingImage(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
   const problem = selectedIds.length === 0 ? 'Chọn ít nhất 1 thiết bị cần kiểm tra.'
     : !effectiveTitle.trim() ? 'Nhập tiêu đề yêu cầu.'
       : slotProblem(slots);
@@ -89,6 +131,7 @@ export function CreateMaintenanceModal({ homeId, initialDeviceId, initialAnomaly
           anomalyId: selected[deviceId].anomalyId,
         })),
         slots: slots.map(draftToSlot),
+        attachmentIds: attachments.length > 0 ? attachments.map((a) => a.attachmentId) : undefined,
       });
       notify.success(`Đã gửi yêu cầu ${ticket.code}`);
       onCreated(ticket);
@@ -104,7 +147,7 @@ export function CreateMaintenanceModal({ homeId, initialDeviceId, initialAnomaly
       onClose={onClose}
       footer={<>
         <button type="button" className={btnGhost} onClick={onClose}>Huỷ</button>
-        <button type="button" className={btnPrimary} disabled={submitting || !!problem} onClick={() => void submit()}>
+        <button type="button" className={btnPrimary} disabled={submitting || uploadingImage || !!problem} onClick={() => void submit()}>
           {submitting ? 'Đang gửi…' : 'Gửi yêu cầu'}
         </button>
       </>}>
@@ -176,6 +219,34 @@ export function CreateMaintenanceModal({ homeId, initialDeviceId, initialAnomaly
           <input className={fieldClass} type="tel" maxLength={20} value={contactPhone} onChange={(e) => setContactPhone(e.target.value)}
             placeholder="Mặc định dùng số trong hồ sơ" />
         </label>
+      </section>
+
+      <section className="space-y-2">
+        <div className="flex items-center justify-between">
+          <p className={labelClass}>Ảnh hiện trạng sự cố <span className="text-muted font-normal">({attachments.length}/{MAX_ATTACHMENTS}, tối đa 5 MB/ảnh)</span></p>
+          {attachments.length < MAX_ATTACHMENTS && (
+            <button type="button" disabled={uploadingImage} onClick={() => fileInputRef.current?.click()}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:text-primary-hover disabled:opacity-50">
+              <ImagePlus className="w-4 h-4" /> {uploadingImage ? 'Đang tải ảnh…' : 'Thêm ảnh'}
+            </button>
+          )}
+          <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" multiple className="hidden"
+            onChange={(e) => void handleUploadFiles(e.target.files)} />
+        </div>
+        {attachments.length > 0 && (
+          <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+            {attachments.map((att) => (
+              <div key={att.attachmentId} className="relative group rounded-xl overflow-hidden border border-line aspect-square bg-sidebar">
+                <AuthenticatedImage src={att.url} alt="Ảnh hiện trạng" className="w-full h-full object-cover" />
+                <button type="button" aria-label="Xoá ảnh"
+                  onClick={() => setAttachments((prev) => prev.filter((item) => item.attachmentId !== att.attachmentId))}
+                  className="absolute top-1 right-1 rounded-full bg-black/70 text-white p-1 hover:bg-rose-600">
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       <SlotEditor value={slots} onChange={setSlots} />

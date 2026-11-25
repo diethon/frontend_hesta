@@ -1,4 +1,5 @@
-import { CalendarClock, Phone, Star, Wrench } from 'lucide-react';
+import { Bot, CalendarClock, Paperclip, Phone, Star, Wrench } from 'lucide-react';
+import { AuthenticatedImage } from './AuthenticatedImage';
 import type { MaintenanceTicket } from '../../types/maintenance';
 import {
   ITEM_TYPE_LABEL,
@@ -31,8 +32,29 @@ export function TicketDetailView({ ticket, showContact }: { ticket: MaintenanceT
       <div className="flex flex-wrap items-center gap-2">
         <StatusPill status={ticket.status} />
         <PriorityPill priority={ticket.priority} />
+        {ticket.source === 'CHATBOT' && (
+          <span className="inline-flex items-center gap-1 rounded-full border border-indigo-500/30 bg-indigo-500/10 px-2.5 py-0.5 text-[11px] font-semibold text-indigo-600">
+            <Bot className="w-3 h-3" aria-hidden="true" /> Tạo từ trợ lý
+          </span>
+        )}
         <span className="text-xs text-muted">Tạo lúc {formatDateTime(ticket.createdAt)} bởi {ticket.createdBy?.fullName ?? '—'}</span>
       </div>
+      {ticket.diagnosisSummary && (
+        <section className="rounded-2xl border border-indigo-500/25 bg-indigo-500/5 p-3 space-y-1">
+          <h3 className="text-xs font-bold uppercase tracking-wide text-indigo-600 flex items-center gap-1.5">
+            <Bot className="w-3.5 h-3.5" aria-hidden="true" /> Tóm tắt chẩn đoán sơ bộ
+          </h3>
+          <p className="text-xs whitespace-pre-line text-text">{ticket.diagnosisSummary}</p>
+        </section>
+      )}
+      {ticket.imageObservations && (
+        <section className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-3 space-y-1">
+          <h3 className="text-xs font-bold uppercase tracking-wide text-amber-700 dark:text-amber-300 flex items-center gap-1.5">
+            <Bot className="w-3.5 h-3.5" aria-hidden="true" /> AI quan sát từ ảnh (chưa được kiểm chứng)
+          </h3>
+          <p className="text-xs whitespace-pre-line text-text">{ticket.imageObservations}</p>
+        </section>
+      )}
       {ticket.description && <p className="text-sm whitespace-pre-line">{ticket.description}</p>}
       {ticket.cancelReason && (
         <p className="rounded-xl border border-line bg-sidebar/60 p-3 text-sm"><strong>Lý do:</strong> {ticket.cancelReason}</p>
@@ -66,6 +88,22 @@ export function TicketDetailView({ ticket, showContact }: { ticket: MaintenanceT
           ))}
         </ul>
       </section>
+
+      {ticket.attachments && ticket.attachments.length > 0 && (
+        <section>
+          <h3 className={`${sectionTitle} flex items-center gap-1.5`}>
+            <Paperclip className="w-3.5 h-3.5" aria-hidden="true" /> Ảnh đính kèm ({ticket.attachments.length})
+          </h3>
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+            {ticket.attachments.map((att) => (
+              <div key={att.id}
+                className="block rounded-xl overflow-hidden border border-line aspect-square bg-sidebar hover:border-primary transition-colors">
+                <AuthenticatedImage src={att.url} alt="Ảnh sự cố" className="w-full h-full object-cover" openOnClick />
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section>
         <h3 className={sectionTitle}>Lịch hẹn</h3>

@@ -221,28 +221,28 @@ export const EnergyTrendChart: React.FC<EnergyTrendChartProps> = ({
 
   return (
     <div
-      className="glass-card glass-g2 p-5 sm:p-6 rounded-3xl border border-[var(--border)] shadow-xs flex flex-col flex-1 gap-4 energy-chart-container relative transition-all"
+      className="bg-white/95 p-5 sm:p-6 rounded-3xl border border-[#cbd5e1] shadow-sm flex flex-col flex-1 gap-4 energy-chart-container relative transition-all"
       tabIndex={0}
       onKeyDown={handleKeyDown}
       role="region"
       aria-label={ariaSummary}
     >
       {/* Chart Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-[var(--border)]/60 pb-3">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-[#e2e8f0] pb-3">
         <div>
           <div className="flex items-center gap-2">
-            <span className="p-1.5 rounded-lg bg-amber-500/15 text-amber-500">
+            <span className="p-1.5 rounded-lg bg-[#fffbeb] text-[#d97706] border border-[#f59e0b]/40">
               <Clock className="h-4 w-4" />
             </span>
-            <h3 className="text-base sm:text-lg font-bold text-[var(--text)] tracking-tight">
+            <h3 className="text-base sm:text-lg font-bold text-[#0f172a] tracking-tight">
               {periodTitle}
             </h3>
             {comparisonPercent !== undefined && comparisonPercent !== 0 && (
               <span
-                className={`inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full ${
+                className={`inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full border ${
                   comparisonPercent > 0
-                    ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400'
-                    : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                    ? 'bg-[#fff1f2] text-[#be123c] border-[#f43f5e]/40'
+                    : 'bg-[#ecfdf5] text-[#047857] border-[#10b981]/40'
                 }`}
                 title="So với kỳ trước"
               >
@@ -260,15 +260,15 @@ export const EnergyTrendChart: React.FC<EnergyTrendChartProps> = ({
         {/* Live Active Inspection Chip */}
         <div className="min-h-[34px] flex items-center">
           {activePoint && (
-            <div className="text-xs px-3 py-1.5 rounded-xl bg-[var(--solid)] border border-amber-500/40 text-[var(--text)] flex items-center gap-3 shadow-sm animate-in fade-in duration-150 tabular-nums">
-              <span className="font-semibold text-[var(--secondary)]">
+            <div className="text-xs px-3 py-1.5 rounded-xl bg-[#f8fafc] border border-[#f59e0b]/55 text-[#0f172a] flex items-center gap-3 shadow-xs animate-in fade-in duration-150 tabular-nums">
+              <span className="font-semibold text-[#475569]">
                 {activePoint.data.label}
               </span>
-              <span className="flex items-center gap-1 font-bold text-amber-500">
+              <span className="flex items-center gap-1 font-bold text-[#b45309]">
                 <Zap className="w-3 h-3" />
                 {formatKwh(activePoint.data.kwh)} kWh
               </span>
-              <span className="font-bold text-emerald-600 dark:text-emerald-400">
+              <span className="font-bold text-[#047857]">
                 {formatCurrencyVnd(activePoint.data.costVnd)}
               </span>
             </div>
@@ -280,15 +280,15 @@ export const EnergyTrendChart: React.FC<EnergyTrendChartProps> = ({
       <div ref={containerRef} className="relative w-full flex-1 min-h-[260px] overflow-hidden select-none">
         {isLoading ? (
           <div className="w-full h-full flex items-center justify-center animate-pulse">
-            <div className="text-xs text-[var(--secondary)]">Đang tải biểu đồ năng lượng...</div>
+            <div className="text-xs text-[#475569]">Đang tải biểu đồ năng lượng...</div>
           </div>
         ) : isAllZero ? (
           <div className="w-full h-full flex flex-col items-center justify-center text-center p-6 space-y-2">
-            <Zap className="w-8 h-8 text-[var(--tertiary)] stroke-[1.5]" />
-            <p className="text-sm font-semibold text-[var(--secondary)]">
+            <Zap className="w-8 h-8 text-[#94a3b8] stroke-[1.5]" />
+            <p className="text-sm font-semibold text-[#334155]">
               Chưa có dữ liệu tiêu thụ điện trong chu kỳ này
             </p>
-            <p className="text-xs text-[var(--tertiary)] max-w-xs">
+            <p className="text-xs text-[#64748b] max-w-xs">
               Các thiết bị trong nhà chưa ghi nhận năng lượng phát sinh trong khoảng thời gian đã chọn.
             </p>
           </div>
@@ -303,15 +303,10 @@ export const EnergyTrendChart: React.FC<EnergyTrendChartProps> = ({
           >
             <defs>
               <linearGradient id={`amberArea-${gradientId}`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.38" />
-                <stop offset="70%" stopColor="#f59e0b" stopOpacity="0.08" />
+                <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.26" />
+                <stop offset="70%" stopColor="#f59e0b" stopOpacity="0.06" />
                 <stop offset="100%" stopColor="#f59e0b" stopOpacity="0.00" />
               </linearGradient>
-
-              <filter id={`glow-${gradientId}`} x="-20%" y="-20%" width="140%" height="140%">
-                <feGaussianBlur stdDeviation="3" result="blur" />
-                <feComposite in="SourceGraphic" in2="blur" operator="over" />
-              </filter>
             </defs>
 
             {/* Horizontal Gridlines & Y-Axis Labels */}
@@ -324,16 +319,17 @@ export const EnergyTrendChart: React.FC<EnergyTrendChartProps> = ({
                     y1={y}
                     x2={containerWidth - padding.right}
                     y2={y}
-                    stroke="var(--border)"
+                    stroke="#cbd5e1"
                     strokeWidth="1"
                     strokeDasharray={i === 0 ? 'none' : '3 3'}
-                    opacity={i === 0 ? 0.9 : 0.55}
+                    opacity={i === 0 ? 0.95 : 0.75}
                   />
                   <text
                     x={padding.left - 8}
                     y={y + 3}
                     textAnchor="end"
-                    className="text-[10px] font-mono fill-[var(--tertiary)]"
+                    fill="#475569"
+                    className="text-[10px] font-mono font-medium"
                   >
                     {formatKwh(val, val >= 10 ? 0 : 1)}
                   </text>
@@ -349,27 +345,27 @@ export const EnergyTrendChart: React.FC<EnergyTrendChartProps> = ({
                   y1={avgY}
                   x2={containerWidth - padding.right}
                   y2={avgY}
-                  stroke="#3b82f6"
-                  strokeWidth="1.2"
+                  stroke="#2563eb"
+                  strokeWidth="1.25"
                   strokeDasharray="4 4"
-                  opacity="0.8"
+                  opacity="0.85"
                 />
                 <rect
-                  x={containerWidth - padding.right - 70}
+                  x={containerWidth - padding.right - 74}
                   y={avgY - 10}
-                  width="70"
-                  height="16"
-                  rx="4"
-                  fill="var(--solid)"
+                  width="74"
+                  height="18"
+                  rx="6"
+                  fill="#eff6ff"
                   stroke="#3b82f6"
                   strokeWidth="1"
-                  opacity="0.9"
                 />
                 <text
-                  x={containerWidth - padding.right - 35}
+                  x={containerWidth - padding.right - 37}
                   y={avgY + 2}
                   textAnchor="middle"
-                  className="text-[9px] font-bold fill-blue-500 font-mono"
+                  fill="#1d4ed8"
+                  className="text-[9px] font-bold font-mono"
                 >
                   TB {formatKwh(avgKwh, 1)} kWh
                 </text>
@@ -379,40 +375,58 @@ export const EnergyTrendChart: React.FC<EnergyTrendChartProps> = ({
             {/* Gradient Area Fill */}
             <path d={areaPath} fill={`url(#amberArea-${gradientId})`} />
 
-            {/* Smooth Spline Curve */}
+            {/* Crisp Smooth Spline Curve */}
             <path
               d={linePath}
               fill="none"
-              stroke="#f59e0b"
-              strokeWidth="2.75"
+              stroke="#d97706"
+              strokeWidth="2.5"
               strokeLinecap="round"
               strokeLinejoin="round"
-              filter={`url(#glow-${gradientId})`}
               className="energy-chart-line"
             />
 
             {/* Peak Marker Badge */}
-            {peakPoint && peakIndex >= 0 && svgPoints[peakIndex] && (
-              <g>
-                <circle
-                  cx={svgPoints[peakIndex].x}
-                  cy={svgPoints[peakIndex].y}
-                  r="5"
-                  fill="#ef4444"
-                  stroke="#ffffff"
-                  strokeWidth="2"
-                  className="animate-pulse"
-                />
-                <text
-                  x={svgPoints[peakIndex].x}
-                  y={Math.max(14, svgPoints[peakIndex].y - 10)}
-                  textAnchor="middle"
-                  className="text-[9px] font-extrabold fill-rose-500 font-mono"
-                >
-                  Đỉnh {formatKwh(peakPoint.kwh, 1)}
-                </text>
-              </g>
-            )}
+            {peakPoint && peakIndex >= 0 && svgPoints[peakIndex] && (() => {
+              const px = svgPoints[peakIndex].x;
+              const py = svgPoints[peakIndex].y;
+              const labelX = Math.min(
+                containerWidth - padding.right - 38,
+                Math.max(padding.left + 38, px),
+              );
+              const badgeY = Math.max(26, py);
+              return (
+                <g>
+                  <circle
+                    cx={px}
+                    cy={py}
+                    r="5"
+                    fill="#e11d48"
+                    stroke="#ffffff"
+                    strokeWidth="2"
+                  />
+                  <rect
+                    x={labelX - 36}
+                    y={badgeY - 25}
+                    width="72"
+                    height="17"
+                    rx="8.5"
+                    fill="#fff1f2"
+                    stroke="#f43f5e"
+                    strokeWidth="1"
+                  />
+                  <text
+                    x={labelX}
+                    y={badgeY - 13.5}
+                    textAnchor="middle"
+                    fill="#be123c"
+                    className="text-[9px] font-extrabold font-mono"
+                  >
+                    Đỉnh {formatKwh(peakPoint.kwh, 1)}
+                  </text>
+                </g>
+              );
+            })()}
 
             {/* X-Axis Labels */}
             {svgPoints.map((p, idx) => {
@@ -423,7 +437,8 @@ export const EnergyTrendChart: React.FC<EnergyTrendChartProps> = ({
                   x={p.x}
                   y={chartHeight - 12}
                   textAnchor="middle"
-                  className="text-[10px] font-mono fill-[var(--secondary)]"
+                  fill="#475569"
+                  className="text-[10px] font-mono font-medium"
                 >
                   {p.data.label}
                 </text>
@@ -439,27 +454,26 @@ export const EnergyTrendChart: React.FC<EnergyTrendChartProps> = ({
                   y1={padding.top}
                   x2={activePoint.x}
                   y2={padding.top + plotHeight}
-                  stroke="#f59e0b"
+                  stroke="#d97706"
                   strokeWidth="1.5"
                   strokeDasharray="3 3"
                   opacity="0.85"
                 />
-                {/* Outer Glow Circle */}
+                {/* Outer Ring */}
                 <circle
                   cx={activePoint.x}
                   cy={activePoint.y}
-                  r="7"
+                  r="8"
                   fill="#f59e0b"
-                  fillOpacity="0.3"
-                  className="animate-ping"
+                  fillOpacity="0.22"
                 />
                 {/* Center Solid Circle */}
                 <circle
                   cx={activePoint.x}
                   cy={activePoint.y}
                   r="4.5"
-                  fill="#f59e0b"
-                  stroke="var(--solid)"
+                  fill="#d97706"
+                  stroke="#ffffff"
                   strokeWidth="2"
                 />
               </g>

@@ -5,7 +5,6 @@ import type { DeviceResponse } from '../../types/device';
 import {
   sendManualPowerCommand,
   setAcPower,
-  setAcTemperature,
   sendDeviceCommand,
 } from '../../services/deviceApi';
 import { notify } from '../ui/notify';
@@ -13,7 +12,19 @@ import { getErrorMessage } from '../../utils/errors';
 import { ApiError } from '../../services/apiClient';
 import { invalidateCache } from '../../services/queryCache';
 import { DeviceDetailModal } from '../device/DeviceDetailModal';
+import { DeviceVisual } from '../device/DeviceVisual';
 import { mapDeviceToUI, type UIMappedDevice } from '../device/devicePageHelpers';
+import {
+  APERTURE_TRANSIT_LOCK_MS,
+  getApertureInterlock,
+  isRgbLightDevice,
+  resolveDeviceRgb,
+  isFanDevice,
+  isTvDevice,
+  extractSensorMetrics,
+  resolveFanSpeedLevel,
+  AC_MODE_CODE_TO_LABEL,
+} from '../device/deviceHelpers';
 
 interface HomeFavoriteDevicesProps {
   homeId?: string;
@@ -37,7 +48,7 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
   // Local interactive states for responsiveness
   const [localPower, setLocalPower] = useState<Record<string, boolean>>({});
   const [localBrightness, setLocalBrightness] = useState<Record<string, number>>({});
-  const [localAcTemp, setLocalAcTemp] = useState<Record<string, number>>({});
+  const [gateTransitMap, setGateTransitMap] = useState<Record<string, boolean>>({});
   const [selectedDetail, setSelectedDetail] = useState<UIMappedDevice | null>(null);
 
   // Clear optimistic overrides ONLY for the specific device(s) whose authoritative state actually changed.
@@ -67,7 +78,7 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
       };
       setLocalPower(clearIds);
       setLocalBrightness(clearIds);
-      setLocalAcTemp(clearIds);
+      setGateTransitMap(clearIds);
     }
   }
 
@@ -169,38 +180,6 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
     }
   };
 
-  const handleBrightnessChange = async (
-    device: UIMappedDevice,
-    e: React.MouseEvent<HTMLDivElement>
-  ) => {
-    e.stopPropagation();
-    if (device.offline) return;
-    if (isReadOnlyDevice(device)) return;
-    const prevBrightness = localBrightness[device.id];
-    const rect = e.currentTarget.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const newPercent = Math.min(100, Math.max(10, Math.round((clickX / rect.width) * 100)));
-    setLocalBrightness((prev) => ({ ...prev, [device.id]: newPercent }));
-
-    try {
-      const command = await sendDeviceCommand(device.id, 'SET_BRIGHTNESS', { brightness: newPercent });
-      if (command && command.success === false) {
-        restoreRecordValue(setLocalBrightness, device.id, prevBrightness);
-        notify.error(command.message || 'Không thể chỉnh độ sáng');
-        return;
-      }
-      patchDeviceStateInPlace(
-        device,
-        { brightness: newPercent },
-        command?.acknowledgedState,
-      );
-      notify.success(`Độ sáng ${device.name}: ${newPercent}%`);
-    } catch (err: unknown) {
-      restoreRecordValue(setLocalBrightness, device.id, prevBrightness);
-      notify.error(getErrorMessage(err, 'Lỗi khi chỉnh độ sáng'));
-    }
-  };
-
   const handleSetBrightness = async (device: UIMappedDevice, brightness: number) => {
     if (device.offline) return;
     if (isReadOnlyDevice(device)) return;
@@ -224,75 +203,78 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
     }
   };
 
-  const handleAdjustAcTemp = async (device: UIMappedDevice, delta: number) => {
-    if (device.offline || !device.on) return;
-    if (isReadOnlyDevice(device)) {
-      notify.warning('Bạn chỉ có quyền xem thiết bị này');
-      return;
-    }
-    const prevTemp = localAcTemp[device.id];
-    const currentTemp =
-      localAcTemp[device.id] ??
-      (device.raw?.currentState?.temperature
-        ? Number(device.raw.currentState.temperature)
-        : 26);
-    const newTemp = Math.min(32, Math.max(16, currentTemp + delta));
-    setLocalAcTemp((prev) => ({ ...prev, [device.id]: newTemp }));
-
+  const handleColorChange = async (
+    device: UIMappedDevice,
+    r: number,
+    g: number,
+    b: number,
+  ) => {
+    if (device.offline || isReadOnlyDevice(device) || !isRgbLightDevice(device.raw)) return;
+    const brightness = localBrightness[device.id] ?? device.brightness ?? 80;
     try {
-      const command = await setAcTemperature(device.id, newTemp);
+      const command = await sendDeviceCommand(device.id, 'SET_RGB', { r, g, b, brightness });
       if (command && command.success === false) {
-        restoreRecordValue(setLocalAcTemp, device.id, prevTemp);
-        notify.error(command.message || 'Không thể điều chỉnh nhiệt độ');
+        notify.error(command.message || 'Không thể đổi màu đèn');
         return;
       }
-      notify.success(`Điều hòa ${device.name}: ${newTemp}°C`);
-      patchDeviceStateInPlace(
-        device,
-        { temperature: newTemp },
-        command?.acknowledgedState,
+      const colorPatch = { r, g, b, color: { r, g, b } };
+      patchDeviceStateInPlace(device, colorPatch, command?.acknowledgedState);
+      setSelectedDetail((prev) =>
+        prev && prev.id === device.id && prev.raw
+          ? mapDeviceToUI(
+              {
+                ...prev.raw,
+                currentState: {
+                  ...prev.raw.currentState,
+                  ...colorPatch,
+                  ...(command?.acknowledgedState ?? {}),
+                },
+              },
+              localPower,
+              localBrightness,
+            )
+          : prev,
       );
     } catch (err: unknown) {
-      restoreRecordValue(setLocalAcTemp, device.id, prevTemp);
-      notify.error(getErrorMessage(err, 'Lỗi khi điều chỉnh nhiệt độ'));
-    }
-  };
-
-  const handleSetAcMode = async (device: UIMappedDevice, mode: string) => {
-    if (device.offline) return;
-    if (isReadOnlyDevice(device)) {
-      notify.warning('Bạn chỉ có quyền xem thiết bị này');
-      return;
-    }
-    try {
-      const command = await sendDeviceCommand(device.id, 'SET_MODE', { mode });
-      if (command && command.success === false) {
-        notify.error(command.message || 'Không thể chọn chế độ điều hòa');
-        return;
-      }
-      notify.success(`Chế độ ${device.name}: ${mode}`);
-      patchDeviceStateInPlace(
-        device,
-        { mode },
-        command?.acknowledgedState,
-      );
-    } catch (err: unknown) {
-      notify.error(getErrorMessage(err, 'Lỗi khi chọn chế độ điều hòa'));
+      notify.error(getErrorMessage(err, 'Lỗi khi đổi màu đèn'));
     }
   };
 
   const handleGateCommand = async (device: UIMappedDevice, action: string, label: string) => {
-    if (device.offline) return;
+    if (device.offline || isReadOnlyDevice(device)) return;
+    const interlock = getApertureInterlock(device.raw?.currentState?.state, Boolean(gateTransitMap[device.id]));
+    if (action === 'OPEN' && interlock.disableOpen) return;
+    if (action === 'CLOSE' && interlock.disableClose) return;
+    if (action === 'STOP' && interlock.disableStop) return;
+
     try {
       const command = await sendDeviceCommand(device.id, action);
       if (command && command.success === false) {
         notify.error(command.message || `Không thể gửi lệnh ${label}`);
         return;
       }
-      notify.success(`Cổng ${device.name}: ${label}`);
+      if (action === 'STOP') {
+        setGateTransitMap((prev) => {
+          const next = { ...prev };
+          delete next[device.id];
+          return next;
+        });
+      } else {
+        setGateTransitMap((prev) => ({ ...prev, [device.id]: true }));
+        setTimeout(() => {
+          setGateTransitMap((prev) => {
+            if (!prev[device.id]) return prev;
+            const next = { ...prev };
+            delete next[device.id];
+            return next;
+          });
+        }, APERTURE_TRANSIT_LOCK_MS);
+      }
+      const nextState = action === 'OPEN' ? 'OPENING' : action === 'CLOSE' ? 'CLOSING' : 'STOPPED';
+      notify.success(`${device.name}: ${label}`);
       patchDeviceStateInPlace(
         device,
-        { state: action },
+        { state: nextState },
         command?.acknowledgedState,
       );
     } catch (err: unknown) {
@@ -355,19 +337,28 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
             const isOn = Boolean(device.on);
             const currentBrightness = device.brightness ?? 80;
             const rawState = device.raw?.currentState;
-            const acTemp =
-              localAcTemp[device.id] ??
-              (rawState?.temperature ? Number(rawState.temperature) : 26);
+            const acTemp = rawState?.temperature ? Number(rawState.temperature) : 26;
 
-            const rgbHex =
-              rawState?.r !== undefined
-                ? `rgb(${rawState.r}, ${rawState.g}, ${rawState.b})`
-                : (rawState?.rgbHex as string | undefined);
+            const isRgbLight = isRgbLightDevice(device.raw);
+            const resolvedRgb = isRgbLight ? resolveDeviceRgb(rawState) : undefined;
+            const rgbHex = isRgbLight
+              ? resolvedRgb
+                ? `rgb(${resolvedRgb.r}, ${resolvedRgb.g}, ${resolvedRgb.b})`
+                : (rawState?.rgbHex as string | undefined)
+              : undefined;
 
             const handleCardClick = () => {
               setSelectedDetail(device);
             };
             const isViewOnly = isReadOnlyDevice(device);
+            const cardAmbientBg =
+              isOn && !device.offline
+                ? isRgbLight && rgbHex
+                  ? `radial-gradient(circle at 50% 46%, color-mix(in srgb, ${rgbHex} 16%, transparent) 0%, transparent 62%)`
+                  : device.type === 'Đèn'
+                    ? `radial-gradient(circle at 50% 46%, rgba(251, 191, 36, ${(0.1 + (currentBrightness / 100) * 0.1).toFixed(2)}) 0%, transparent 62%)`
+                    : undefined
+                : undefined;
 
             return (
               <article
@@ -378,227 +369,256 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
                 tabIndex={0}
                 onClick={handleCardClick}
                 onKeyDown={(e) => e.key === 'Enter' && handleCardClick()}
-                style={{ cursor: 'pointer' }}
+                style={cardAmbientBg ? { cursor: 'pointer', backgroundImage: cardAmbientBg } : { cursor: 'pointer' }}
               >
                 <div className="device-top">
-                  <div className="flex items-center gap-2">
-                    <span className="device-icon">
-                      <Icon name={device.icon} />
-                    </span>
-                    {rgbHex && (
+                  <div className="device-copy device-card-header-copy">
+                    <h3 title={device.name}>{device.name}</h3>
+                    {!device.offline && device.status !== 'Ngoại tuyến' && (
+                      <p>
+                        {device.type === 'Đèn'
+                          ? `${isOn ? 'Đang bật' : 'Đã tắt'} · ${currentBrightness}%`
+                          : device.status}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {isRgbLight && rgbHex && (
                       <span
-                        className="w-3 h-3 rounded-full border border-white/60 shadow-xs"
+                        data-rgb-indicator="true"
+                        className="w-3 h-3 rounded-full border border-white/60 shadow-xs shrink-0"
                         style={{ backgroundColor: rgbHex }}
                         title={`Màu RGB: ${rgbHex}`}
                       />
                     )}
-                  </div>
-
-                  <div className="flex items-center gap-1.5">
                     {isViewOnly && (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
                         Chỉ xem
                       </span>
                     )}
-                    {device.offline ? (
-                      <span className="offline-dot" title="Ngoại tuyến" />
-                    ) : device.type === 'Cảm biến' || device.type === 'Cổng' ? (
-                      <IconButton
-                        icon="more"
-                        label={`Tùy chọn ${device.name}`}
-                        onClick={handleCardClick}
-                      />
-                    ) : isViewOnly ? (
-                      <button
-                        type="button"
-                        disabled
-                        className={`toggle ${isOn ? 'active' : ''} opacity-40 cursor-not-allowed`}
-                        title="Thiết bị ở chế độ chỉ xem"
-                        onClick={(e) => e.stopPropagation()}
-                        aria-disabled="true"
-                        aria-label={`${device.name} (Chỉ xem)`}
-                      >
-                        <span />
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        className={`toggle ${isOn ? 'active' : ''}`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleToggle(device);
-                        }}
-                        aria-label={`${isOn ? 'Tắt' : 'Bật'} ${device.name}`}
-                        aria-pressed={isOn}
-                      >
-                        <span />
-                      </button>
+                    {!device.offline && (
+                      device.type === 'Cảm biến' || device.type === 'Cổng' ? (
+                        <IconButton
+                          icon="more"
+                          label={`Tùy chọn ${device.name}`}
+                          onClick={handleCardClick}
+                        />
+                      ) : isViewOnly ? (
+                        <button
+                          type="button"
+                          disabled
+                          className={`toggle ${isOn ? 'active' : ''} opacity-40 cursor-not-allowed`}
+                          title="Thiết bị ở chế độ chỉ xem"
+                          onClick={(e) => e.stopPropagation()}
+                          aria-disabled="true"
+                          aria-label={`${device.name} (Chỉ xem)`}
+                        >
+                          <span />
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className={`toggle ${isOn ? 'active' : ''}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleToggle(device);
+                          }}
+                          aria-label={`${isOn ? 'Tắt' : 'Bật'} ${device.name}`}
+                          aria-pressed={isOn}
+                        >
+                          <span />
+                        </button>
+                      )
                     )}
                   </div>
                 </div>
 
-                {/* Big sensor value if available */}
-                {device.type === 'Cảm biến' && device.value && (
-                  <strong className="sensor-value">{device.value}</strong>
-                )}
-
-                <div className="device-copy">
-                  <h3 title={device.name}>{device.name}</h3>
-                  <p>
-                    {!device.offline && device.type === 'Đèn'
-                      ? `${isOn ? 'Đang bật' : 'Đã tắt'} · ${currentBrightness}%`
-                      : device.status}
-                  </p>
+                <div className="device-visual-center">
+                  <div className="icon-tile-wrap">
+                    <span
+                      className="device-icon device-visual-tile"
+                      style={
+                        isOn && !device.offline
+                          ? isRgbLight && rgbHex
+                            ? {
+                                background: `color-mix(in srgb, ${rgbHex} 18%, transparent)`,
+                                boxShadow: `0 0 22px color-mix(in srgb, ${rgbHex} 48%, transparent)`,
+                              }
+                            : device.type === 'Đèn'
+                              ? {
+                                  background: 'rgba(251, 191, 36, 0.16)',
+                                  boxShadow: `0 0 20px rgba(245, 158, 11, ${(0.22 + (currentBrightness / 100) * 0.3).toFixed(2)})`,
+                                }
+                              : undefined
+                          : undefined
+                      }
+                    >
+                      <DeviceVisual
+                        uid={`home-${device.id}`}
+                        deviceType={device.raw?.deviceType}
+                        figmaType={device.type}
+                        name={device.name}
+                        icon={device.icon}
+                        isOn={isOn}
+                        offline={device.offline}
+                        brightness={currentBrightness}
+                        fanSpeed={resolveFanSpeedLevel(rawState)}
+                        rgbColor={isRgbLight ? rgbHex : undefined}
+                        acMode={typeof rawState?.mode === 'string' ? rawState.mode : undefined}
+                        gateState={typeof rawState?.state === 'string' ? rawState.state : undefined}
+                        sensorState={rawState}
+                        size={82}
+                      />
+                      <span
+                        className={`status-dot ${
+                          device.raw?.status === 'UNKNOWN'
+                            ? 'unknown'
+                            : device.offline
+                            ? 'offline'
+                            : 'online'
+                        }`}
+                        title={
+                          device.raw?.status === 'UNKNOWN'
+                            ? 'Không xác định'
+                            : device.offline
+                            ? 'Ngoại tuyến'
+                            : 'Trực tuyến'
+                        }
+                      />
+                    </span>
+                  </div>
                 </div>
 
-                {/* Interactive Controls per Device Type */}
-                {device.type === 'Đèn' ? (
-                  <div
-                    className={['brightness', device.offline && 'disabled', isViewOnly && 'opacity-60 cursor-default'].filter(Boolean).join(' ')}
-                    role="slider"
-                    aria-valuemin={10}
-                    aria-valuemax={100}
-                    aria-valuenow={currentBrightness}
-                    aria-disabled={device.offline || isViewOnly}
-                    aria-label={
-                      device.offline
-                        ? `${device.name} đang ngoại tuyến — không thể chỉnh độ sáng`
-                        : isViewOnly
-                          ? `${device.name} ở chế độ chỉ xem — độ sáng ${currentBrightness}%`
-                          : `Độ sáng ${currentBrightness}%`
-                    }
-                    title={
-                      device.offline
-                        ? 'Thiết bị đang ngoại tuyến'
-                        : isViewOnly
-                          ? 'Chế độ chỉ xem'
-                          : 'Nhấp để chỉnh độ sáng'
-                    }
-                    onClick={(e) => handleBrightnessChange(device, e)}
-                  >
-                    <span style={{ width: `${currentBrightness}%` }} />
-                    <b>{currentBrightness}%</b>
-                  </div>
-                ) : device.type === 'Điều hòa' ? (
-                  <div className="w-full space-y-1.5" onClick={(e) => e.stopPropagation()}>
-                    <div className="flex items-center justify-between gap-1.5 pt-1.5 border-t border-[var(--border)]">
-                      <button
-                        type="button"
-                        onClick={() => handleAdjustAcTemp(device, -1)}
-                        disabled={device.offline || isViewOnly || !isOn || acTemp <= 16}
-                        className="w-6 h-6 rounded-md bg-[var(--solid)] border border-[var(--border)] text-xs font-bold flex items-center justify-center hover:bg-[var(--g1)] disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
-                        title="Giảm nhiệt độ"
-                      >
-                        -
-                      </button>
-                      <span className="text-xs font-bold text-[var(--text)]">
-                        {acTemp}°C
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => handleAdjustAcTemp(device, 1)}
-                        disabled={device.offline || isViewOnly || !isOn || acTemp >= 32}
-                        className="w-6 h-6 rounded-md bg-[var(--solid)] border border-[var(--border)] text-xs font-bold flex items-center justify-center hover:bg-[var(--g1)] disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
-                        title="Tăng nhiệt độ"
-                      >
-                        +
-                      </button>
-                    </div>
-
-                    <div className="flex items-center gap-1 overflow-x-auto scrollbar-none">
-                      {(['Lạnh', 'Hút ẩm', 'Sưởi', 'Tự động'] as const).map((m) => {
-                        const isCurrentMode =
-                          rawState?.mode === m || (!rawState?.mode && m === 'Lạnh');
-                        return (
-                          <button
-                            key={m}
-                            type="button"
-                            disabled={device.offline || isViewOnly}
-                            onClick={() => handleSetAcMode(device, m)}
-                            className={`px-1.5 py-0.5 rounded text-[9px] font-semibold transition-colors shrink-0 disabled:opacity-40 disabled:cursor-not-allowed ${
-                              isCurrentMode && isOn
-                                ? 'bg-sky-500 text-white'
-                                : 'bg-[var(--solid)] text-[var(--secondary)] border border-[var(--border)] hover:bg-[var(--g1)]'
-                            }`}
-                          >
-                            {m}
-                          </button>
-                        );
-                      })}
-                    </div>
+                {/* Card Footer Summary / Quick Aperture Controls per Device Type */}
+                {device.type === 'Điều hòa' ? (
+                  <div className="flex items-center justify-center gap-1.5 w-full pt-2 border-t border-[var(--border)]">
+                    <strong className="text-sm font-extrabold text-[#0f172a] tabular-nums">
+                      {acTemp}°C
+                    </strong>
+                    <span className="px-2 py-0.5 rounded-full bg-sky-500/10 border border-sky-500/35 text-[10px] font-semibold text-sky-700">
+                      {AC_MODE_CODE_TO_LABEL[String(rawState?.mode ?? 'COOL').toUpperCase()] ?? 'Lạnh'}
+                    </span>
                   </div>
                 ) : device.type === 'Cổng' ? (
                   <div
-                    className="grid grid-cols-3 gap-1 w-full pt-1.5 border-t border-[var(--border)]"
+                    className="grid grid-cols-3 gap-1.5 w-full pt-2 border-t border-[var(--border)]"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    {(['Mở', 'Dừng', 'Đóng'] as const).map((btn) => {
-                      const action = btn === 'Mở' ? 'OPEN' : btn === 'Đóng' ? 'CLOSE' : 'STOP';
-                      const rawGateStr = String(rawState?.state ?? 'STOP').toUpperCase();
+                    {(() => {
+                      const interlock = getApertureInterlock(rawState?.state, Boolean(gateTransitMap[device.id]));
                       const activeGateLabel =
-                        rawGateStr === 'OPEN' || rawGateStr === 'OPENING'
+                        interlock.isOpen || interlock.isOpening
                           ? 'Mở'
-                          : rawGateStr === 'CLOSE' || rawGateStr === 'CLOSED' || rawGateStr === 'CLOSING'
+                          : interlock.isClosed || interlock.isClosing
                             ? 'Đóng'
                             : 'Dừng';
-                      const isGateActive = activeGateLabel === btn;
-                      return (
-                        <button
-                          key={btn}
-                          type="button"
-                          disabled={device.offline || isViewOnly}
-                          onClick={() => !device.offline && !isViewOnly && handleGateCommand(device, action, btn)}
-                          className={`py-1 px-1 rounded-md border text-[10px] font-bold transition-colors text-center disabled:opacity-40 disabled:cursor-not-allowed ${
-                            device.offline || isViewOnly ? 'cursor-not-allowed' : 'cursor-pointer'
-                          } ${
-                            isGateActive
-                              ? 'bg-primary text-white border-primary shadow-2xs'
-                              : 'bg-[var(--solid)] border-[var(--border)] text-[var(--text)] hover:bg-primary hover:text-white'
-                          }`}
-                        >
-                          {btn}
-                        </button>
-                      );
-                    })}
+                      return (['Mở', 'Dừng', 'Đóng'] as const).map((btn) => {
+                        const action = btn === 'Mở' ? 'OPEN' : btn === 'Đóng' ? 'CLOSE' : 'STOP';
+                        const isGateActive = activeGateLabel === btn;
+                        const btnLocked =
+                          (btn === 'Mở' && interlock.disableOpen) ||
+                          (btn === 'Đóng' && interlock.disableClose) ||
+                          (btn === 'Dừng' && interlock.disableStop);
+                        const isBtnDisabled = Boolean(device.offline || isViewOnly || btnLocked);
+                        const idleTone =
+                          btn === 'Mở'
+                            ? 'bg-emerald-500/10 border-emerald-500/55 text-black hover:bg-emerald-500/20'
+                            : btn === 'Đóng'
+                              ? 'bg-rose-500/10 border-rose-500/55 text-black hover:bg-rose-500/20'
+                              : 'bg-amber-500/10 border-amber-500/55 text-black hover:bg-amber-500/20';
+                        return (
+                          <button
+                            key={btn}
+                            type="button"
+                            disabled={isBtnDisabled}
+                            onClick={() => !isBtnDisabled && handleGateCommand(device, action, btn)}
+                            className={`py-1 px-1 rounded-lg border text-[10px] font-bold transition-colors text-center disabled:opacity-65 disabled:cursor-not-allowed ${
+                              isBtnDisabled ? 'cursor-not-allowed' : 'cursor-pointer'
+                            } ${
+                              isGateActive
+                                ? 'bg-primary text-white border-primary shadow-2xs'
+                                : idleTone
+                            }`}
+                          >
+                            {btn}
+                          </button>
+                        );
+                      });
+                    })()}
                   </div>
                 ) : device.type === 'Cảm biến' ? (
-                  <div className="flex flex-wrap items-center gap-1 w-full pt-1 border-t border-[var(--border)]">
-                    {rawState?.temperature !== undefined && (
-                      <span className="px-1.5 py-0.5 rounded bg-[var(--solid)] border border-[var(--border)] text-[9px] font-medium text-[var(--text)] flex items-center gap-1">
-                        <Icon name="thermometer" size={10} />
-                        {String(rawState.temperature)}°C
-                      </span>
-                    )}
-                    {rawState?.humidity !== undefined && (
-                      <span className="px-1.5 py-0.5 rounded bg-[var(--solid)] border border-[var(--border)] text-[9px] font-medium text-[var(--text)] flex items-center gap-1">
-                        <Icon name="droplet" size={10} />
-                        {String(rawState.humidity)}%
-                      </span>
-                    )}
-                    {(rawState?.lux !== undefined || rawState?.illuminance !== undefined) && (
-                      <span className="px-1.5 py-0.5 rounded bg-[var(--solid)] border border-[var(--border)] text-[9px] font-medium text-[var(--text)] flex items-center gap-1">
-                        <Icon name="sun" size={10} />
-                        {String(rawState.lux ?? rawState.illuminance)} lx
-                      </span>
-                    )}
-                    {rawState?.motion !== undefined && (
-                      <span className="px-1.5 py-0.5 rounded bg-[var(--solid)] border border-[var(--border)] text-[9px] font-medium text-[var(--text)] flex items-center gap-1">
-                        <Icon name="activity" size={10} />
-                        {rawState.motion ? 'Chuyển động' : 'Tĩnh'}
-                      </span>
-                    )}
-                    {rawState?.smoke !== undefined && (
-                      <span
-                        className={`px-1.5 py-0.5 rounded border text-[9px] font-medium flex items-center gap-1 ${
-                          rawState.smoke
-                            ? 'bg-rose-500/10 border-rose-500/30 text-rose-500'
-                            : 'bg-[var(--solid)] border-[var(--border)] text-[var(--text)]'
-                        }`}
-                      >
-                        <Icon name="shield" size={10} />
-                        {rawState.smoke ? 'Báo khói!' : 'An toàn'}
-                      </span>
-                    )}
+                  (() => {
+                    const sm = extractSensorMetrics(rawState);
+                    const isSmokeAlert =
+                      typeof sm.smoke === 'boolean'
+                        ? sm.smoke
+                        : typeof sm.smoke === 'number'
+                          ? sm.smoke > 50
+                          : false;
+                    const isGasAlert = (sm.gasPpm ?? 0) > 200;
+                    const allItems: Array<{ text: string; icon: 'thermometer' | 'droplet' | 'sun' | 'activity' | 'shield' | 'flame'; alert?: boolean }> = [];
+                    if (sm.temperature !== undefined) allItems.push({ text: `${sm.temperature}°C`, icon: 'thermometer' });
+                    if (sm.humidity !== undefined) allItems.push({ text: `${sm.humidity}%`, icon: 'droplet' });
+                    if (sm.lux !== undefined) allItems.push({ text: `${sm.lux} lx`, icon: 'sun' });
+                    else if (sm.lightBinary !== undefined) allItems.push({ text: sm.lightBinary ? 'Sáng' : 'Tối', icon: 'sun' });
+                    if (sm.motion !== undefined) allItems.push({ text: sm.motion ? 'Chuyển động' : 'Tĩnh', icon: 'activity', alert: Boolean(sm.motion) });
+                    if (sm.smoke !== undefined) {
+                      allItems.push({
+                        text: typeof sm.smoke === 'number' ? `${sm.smoke} ppm` : sm.smoke ? 'Báo khói!' : 'An toàn',
+                        icon: 'shield',
+                        alert: isSmokeAlert,
+                      });
+                    }
+                    if (sm.gasPpm !== undefined) allItems.push({ text: `${sm.gasPpm} ppm`, icon: 'flame', alert: isGasAlert });
+                    if (sm.flame !== undefined) allItems.push({ text: sm.flame ? 'Có lửa!' : 'An toàn', icon: 'flame', alert: Boolean(sm.flame) });
+                    const primaryText = device.value || allItems[0]?.text;
+                    const extraItems = allItems.filter((item, idx) => !(idx === 0 && item.text === primaryText) && item.text !== primaryText);
+                    if (!primaryText && extraItems.length === 0) {
+                      return <span className="room-label">{device.room}</span>;
+                    }
+                    return (
+                      <div className="flex flex-col items-center gap-1.5 w-full pt-1.5 border-t border-[var(--border)]">
+                        {primaryText && (
+                          <strong className="text-lg font-extrabold text-[#0f172a] tabular-nums leading-none">
+                            {primaryText}
+                          </strong>
+                        )}
+                        {extraItems.length > 0 && (
+                          <div className="flex flex-wrap items-center justify-center gap-1">
+                            {extraItems.map((item) => (
+                              <span
+                                key={item.text}
+                                className={`px-1.5 py-0.5 rounded-md border text-[10px] font-semibold flex items-center gap-1 ${
+                                  item.alert
+                                    ? 'bg-rose-500/10 border-rose-500/50 text-rose-700'
+                                    : 'bg-white border-[#cbd5e1] text-[#0f172a]'
+                                }`}
+                              >
+                                <Icon name={item.icon} size={10} />
+                                {item.text}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()
+                ) : isFanDevice(device.raw) && isOn && resolveFanSpeedLevel(rawState) > 0 ? (
+                  <div className="flex items-center justify-center w-full pt-2 border-t border-[var(--border)]">
+                    <span className="px-2.5 py-0.5 rounded-full bg-sky-500/10 border border-sky-500/35 text-[11px] font-semibold text-[#0f172a]">
+                      Mức {resolveFanSpeedLevel(rawState)}
+                    </span>
+                  </div>
+                ) : isTvDevice(device.raw) && isOn ? (
+                  <div className="flex items-center justify-center w-full pt-2 border-t border-[var(--border)]">
+                    <span className="px-2.5 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/35 text-[11px] font-semibold text-[#0f172a]">
+                      {rawState?.muted
+                        ? 'Tắt tiếng'
+                        : rawState?.channel !== undefined
+                          ? `Kênh ${rawState.channel}`
+                          : 'Đang bật'}
+                    </span>
                   </div>
                 ) : (
                   <span className="room-label">{device.room}</span>
@@ -634,15 +654,13 @@ export const HomeFavoriteDevices: React.FC<HomeFavoriteDevicesProps> = ({
           onBrightnessChange={(brightness) => {
             handleSetBrightness(selectedDetail, brightness);
           }}
-          onColorChange={(r, g, b) => {
-            if (selectedDetail.offline) return;
-            sendDeviceCommand(selectedDetail.id, 'SET_RGB', {
-              r,
-              g,
-              b,
-              brightness: localBrightness[selectedDetail.id] ?? 80,
-            }).catch(console.warn);
-          }}
+          onColorChange={
+            isRgbLightDevice(selectedDetail.raw)
+              ? (r, g, b) => {
+                  void handleColorChange(selectedDetail, r, g, b);
+                }
+              : undefined
+          }
         />
       )}
     </section>

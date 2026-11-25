@@ -45,6 +45,8 @@ export interface SceneResponse {
   description: string | null;
   enabled: boolean;
   actions: SceneActionResponse[];
+  /** When a one-off "run after X" fires; null/absent if none is pending. */
+  pendingRunAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -57,7 +59,7 @@ export interface SceneExecutionResponse {
   status: 'PENDING' | 'SUCCESS' | 'PARTIAL' | 'FAILED' | 'SKIPPED';
   startedAt: string;
   completedAt?: string;
-  resultDetail: Array<{ deviceId: string; action: string; success: boolean; status: string; message?: string }>;
+  resultDetail: Array<{ deviceId: string; action: string; success: boolean; status: string; message?: string; errorCode?: string }>;
 }
 
 export interface DeviceResponse {
