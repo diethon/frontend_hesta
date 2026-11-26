@@ -10,7 +10,7 @@ export type ActionOption = { code: string; label: string; valueLabel?: string; d
 export const actionOptions: ActionOption[] = [
   { code: 'TURN_ON', label: 'Bật nguồn', valueKind: 'none', defaultValue: '' },
   { code: 'TURN_OFF', label: 'Tắt nguồn', valueKind: 'none', defaultValue: '' },
-  { code: 'TOGGLE', label: 'Đảo trạng thái bật/tắt', valueKind: 'none', defaultValue: '' },
+  { code: 'TOGGLE', label: 'Bật/Tắt', valueKind: 'none', defaultValue: '' },
   { code: 'SET_BRIGHTNESS', label: 'Đặt độ sáng', valueKind: 'percentage', valueLabel: 'Độ sáng (%)', parameterKey: 'level', defaultValue: '50' },
   { code: 'SET_RGB', label: 'Đặt màu RGB', valueKind: 'color', valueLabel: 'Mã màu RGB (HEX)', parameterKey: 'color', defaultValue: '#ffc107' },
   { code: 'SET_COLOR', label: 'Đổi màu', valueKind: 'color', valueLabel: 'Mã màu (HEX hoặc RGB)', parameterKey: 'color', defaultValue: '#ffc107' },
@@ -33,8 +33,10 @@ const defaultActionsByDeviceType: Record<string, string[]> = {
   SOCKET: ['TURN_ON', 'TURN_OFF', 'TOGGLE'],
   SMART_PLUG: ['TURN_ON', 'TURN_OFF', 'TOGGLE'],
   GATE: ['OPEN', 'CLOSE', 'STOP'],
+  GATE_MOTOR: ['OPEN', 'CLOSE', 'STOP'],
   ROLLING_DOOR: ['OPEN', 'CLOSE', 'STOP'],
-  CURTAIN: ['OPEN', 'CLOSE', 'STOP', 'TURN_ON', 'TURN_OFF', 'TOGGLE'],
+  DOOR: ['OPEN', 'CLOSE', 'STOP'],
+  CURTAIN: ['OPEN', 'CLOSE', 'STOP'],
 };
 
 export function getDeviceActions(device?: DeviceSummary | any): ActionOption[] {
@@ -69,6 +71,13 @@ export function getDeviceActions(device?: DeviceSummary | any): ActionOption[] {
     const isAc = isAcDevice(device);
     const effType = isAc ? 'AIR_CONDITIONER' : (device.deviceType?.toUpperCase() ?? '');
     allowed = defaultActionsByDeviceType[effType] ?? [];
+  }
+
+  if ((device.deviceType || '').trim().toUpperCase() === 'LIGHT') {
+    allowed = allowed.filter((act) => {
+      const upper = act.trim().toUpperCase();
+      return upper !== 'SET_RGB' && upper !== 'SET_COLOR';
+    });
   }
 
   // Cross-mapping equivalents

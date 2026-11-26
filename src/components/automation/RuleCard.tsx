@@ -3,6 +3,11 @@ import { Icon, type IconName } from '../ui/LucideIcon';
 import type { AutomationRule, DeviceSummary } from '../../types/automation';
 import type { SceneResponse } from '../../types/scene';
 import { actionLabels, describeCondition, EVENT_FRIENDLY_NAMES } from './ruleLabels';
+import { AUTO_OFF_KEY, DELAY_ACTION } from '../../types/automation';
+import { autoOffVerb, formatDuration } from './ruleTiming';
+import { formatRepeatDays, formatScheduleTime } from '../scene/SceneScheduleSection';
+import { getFigmaIconForDevice } from '../scene/ScenePage';
+import { iconHue } from './iconHue';
 
 export interface RuleCardProps {
   rule: AutomationRule;
@@ -21,7 +26,13 @@ const TRIGGER_ICONS: Record<string, IconName> = { SENSOR: 'activity', EVENT: 'za
 const TRIGGER_LABELS: Record<string, string> = { SENSOR: 'Cảm biến', EVENT: 'Sự kiện', SCHEDULE: 'Lịch' };
 
 function describeTrigger(rule: AutomationRule, devices: DeviceSummary[]): string {
-  if (rule.triggerType === 'SCHEDULE') return 'Tự chạy vào giờ đã hẹn';
+  if (rule.triggerType === 'SCHEDULE') {
+    const times = (rule.schedules || []).filter((t) => t.active);
+    if (!times.length) return 'Chưa có giờ chạy nào đang bật';
+    const first = times[0];
+    const more = times.length > 1 ? ` (+${times.length - 1} giờ khác)` : '';
+    return `${formatRepeatDays(first.repeatDays)} lúc ${formatScheduleTime(first.scheduledTime).slice(0, 5)}${more}`;
+  }
   if (rule.triggerType === 'EVENT') {
     const raw = String(rule.conditions[0]?.expectedValue || '');
     const source = devices.find((d) => d.id === rule.conditions[0]?.deviceId)?.name ?? rule.conditions[0]?.deviceName;
@@ -30,19 +41,33 @@ function describeTrigger(rule: AutomationRule, devices: DeviceSummary[]): string
   }
   const first = rule.conditions[0];
   if (!first) return 'Chưa có điều kiện';
-  const device = devices.find((d) => d.id === first.deviceId)?.name ?? first.deviceName;
+  const device = first.groupId
+    ? `một thiết bị trong nhóm ${first.groupName || ''}`.trim()
+    : devices.find((d) => d.id === first.deviceId)?.name ?? first.deviceName;
   const more = rule.conditions.length > 1 ? ` và ${rule.conditions.length - 1} điều kiện khác` : '';
-  return `Khi ${describeCondition(first.attribute, first.operator, first.expectedValue, device)}${more}`;
+  const hold = rule.holdSeconds ? `, liên tục ${formatDuration(rule.holdSeconds)}` : '';
+  return `Khi ${describeCondition(first.attribute, first.operator, first.expectedValue, device)}${more}${hold}`;
 }
 
 function actionNodes(rule: AutomationRule, devices: DeviceSummary[], scenes: SceneResponse[]) {
   return rule.actions.map((action) => {
+    if (action.action === DELAY_ACTION) {
+      return { id: action.id, icon: 'clock' as IconName, text: `Chờ ${formatDuration(Number(action.parameters?.seconds) || 0)}` };
+    }
+    const autoOff = Number(action.parameters?.[AUTO_OFF_KEY]) || 0;
+    const verb = autoOffVerb(action.action, action.parameters);
+    const suffix = autoOff && verb ? `, ${verb.toLowerCase()} sau ${formatDuration(autoOff)}` : '';
+    if (action.groupId) {
+      return { id: action.id, icon: 'grid' as IconName, text: `${actionLabels[action.action] || action.action} nhóm ${action.groupName || ''}${suffix}` };
+    }
     if (action.sceneId || action.action === 'EXECUTE_SCENE') {
       const name = scenes.find((s) => s.id === action.sceneId)?.name || action.sceneName || 'kịch bản';
       return { id: action.id, icon: 'sparkles' as IconName, text: `Chạy ${name}` };
     }
     const device = devices.find((d) => d.id === action.deviceId)?.name || action.deviceName || 'thiết bị';
-    return { id: action.id, icon: 'power' as IconName, text: `${actionLabels[action.action] || action.action} ${device}` };
+    // Device kind icon (đèn, điều hòa, cửa…); 'power' when the name says nothing.
+    const kind = getFigmaIconForDevice(action.action, device);
+    return { id: action.id, icon: kind === 'grid' ? ('power' as IconName) : kind, text: `${actionLabels[action.action] || action.action} ${device}${suffix}` };
   });
 }
 
@@ -62,6 +87,7 @@ export const RuleCard: React.FC<RuleCardProps> = ({
   onDelete,
 }) => {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [menuUp, setMenuUp] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -113,13 +139,12 @@ export const RuleCard: React.FC<RuleCardProps> = ({
         <span className="st-status">
           <i className={`st-dot ${lastRunFailed ? 'err' : rule.enabled ? 'on' : ''}`} />
           {rule.enabled ? 'Đang bật' : 'Đang tắt'} · {TRIGGER_LABELS[rule.triggerType] || rule.triggerType}
-          {isSchedule ? '' : ` · ${rule.conditions.length} điều kiện`}
         </span>
       </div>
 
       <div className="st-pipe">
         <span className="st-node trigger" title={describeTrigger(rule, devices)}>
-          <i className="st-node-icon">
+          <i className="st-node-icon" style={iconHue(TRIGGER_ICONS[rule.triggerType] || 'zap')}>
             <Icon name={TRIGGER_ICONS[rule.triggerType] || 'zap'} />
           </i>
           <span>{describeTrigger(rule, devices)}</span>
@@ -130,7 +155,7 @@ export const RuleCard: React.FC<RuleCardProps> = ({
         ) : (
           <span className="st-node-stack">
             {nodes.slice(0, MAX_NODES).map((node) => (
-              <span key={node.id} className="st-node action" title={node.text}>
+              <span key={node.id} className="st-node action" title={node.text} style={iconHue(node.icon)}>
                 <Icon name={node.icon} />
                 <span>{node.text}</span>
               </span>
@@ -157,14 +182,18 @@ export const RuleCard: React.FC<RuleCardProps> = ({
           <button
             type="button"
             className="st-icon-btn"
-            onClick={() => setMenuOpen((open) => !open)}
+            onClick={(e) => {
+              // Open upward when the card sits near the bottom (incl. the mobile bottom nav).
+              setMenuUp(window.innerHeight - e.currentTarget.getBoundingClientRect().bottom < 280);
+              setMenuOpen((open) => !open);
+            }}
             aria-label="Thao tác khác"
             aria-expanded={menuOpen}
           >
             <Icon name="more" size={18} />
           </button>
           {menuOpen && (
-            <div className="st-menu">
+            <div className={`st-menu${menuUp ? ' up' : ''}`}>
               {menuItem('Chỉnh sửa', 'pencil', onEdit)}
               {menuItem('Xem lịch sử', 'clock', onHistory)}
               {isSchedule && onSchedule && menuItem('Lịch chạy', 'clock', onSchedule)}

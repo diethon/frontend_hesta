@@ -14,6 +14,8 @@ import { DevicePickerSheet, isDeviceControllable } from './DevicePickerSheet';
 import { SceneScheduleSection } from './SceneScheduleSection';
 import { createScene, updateScene } from '../../services/sceneApi';
 import { saveSchedule } from '../../services/scheduleApi';
+import { getRooms } from '../../services/roomApi';
+import type { RoomResponse } from '../../types/room';
 import type { Schedule } from '../../types/schedule';
 import { notify } from '../ui/notify';
 import { buildSceneTemplate, type SceneTemplateKey } from './sceneTemplates';
@@ -72,7 +74,7 @@ export function formatActionSummary(
   const code = act.action;
   if (code === 'TURN_ON') return 'Bật nguồn';
   if (code === 'TURN_OFF') return 'Tắt nguồn';
-  if (code === 'TOGGLE') return 'Đảo trạng thái bật/tắt';
+  if (code === 'TOGGLE') return 'Bật/Tắt';
   if (code === 'OPEN') return 'Mở cửa';
   if (code === 'CLOSE') return 'Đóng cửa';
   if (code === 'STOP') return 'Dừng hành trình';
@@ -142,6 +144,17 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
 
   // Sub-sheets
   const [pickingDeviceForIndex, setPickingDeviceForIndex] = useState<number | null>(null);
+
+  // Rooms (with their floor) for the device picker's floor/room filter; the picker still works without them.
+  const [homeRooms, setHomeRooms] = useState<RoomResponse[]>([]);
+  useEffect(() => {
+    if (!homeId) return;
+    let alive = true;
+    getRooms(homeId).then((list) => alive && setHomeRooms(list ?? [])).catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [homeId]);
 
   // Dialogs
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
@@ -641,7 +654,7 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
                       maxLength={30}
                       required
                     />
-                    <span className="scene-char-counter">{name.length}/30</span>
+                    {name.length >= 25 && <span className="scene-char-counter">{name.length}/30</span>}
                   </div>
                 </div>
 
@@ -668,7 +681,7 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
                         >
                           Thu gọn mô tả
                         </button>
-                        <span>{description.length}/100</span>
+                        {description.length >= 95 && <span>{description.length}/100</span>}
                       </div>
                     </div>
                   ) : (
@@ -688,7 +701,6 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
                 <div className="scene-section-title">
                   <div>
                     <strong>Hành động ({actions.length})</strong>
-                    <p>Cùng thiết bị chạy theo thứ tự từ trên xuống</p>
                   </div>
                   <button
                     type="button"
@@ -895,7 +907,7 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
                                           className={`command-chip ${act.action === 'TOGGLE' ? 'active' : ''}`}
                                           onClick={() => setActions((p) => p.map((a, i) => i === idx ? { ...a, action: 'TOGGLE', value: '' } : a))}
                                         >
-                                          Đảo trạng thái
+                                          Bật/Tắt
                                         </button>
                                         <button
                                           type="button"
@@ -1003,7 +1015,7 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
                                           className={`command-chip ${act.action === 'TOGGLE' ? 'active' : ''}`}
                                           onClick={() => setActions((p) => p.map((a, i) => i === idx ? { ...a, action: 'TOGGLE', value: '' } : a))}
                                         >
-                                          Đảo trạng thái
+                                          Bật/Tắt
                                         </button>
                                         {isFan && (
                                           <button
@@ -1331,6 +1343,7 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
         {pickingDeviceForIndex !== null && (
           <DevicePickerSheet
             devices={devices}
+            rooms={homeRooms}
             selectedDeviceId={actions[pickingDeviceForIndex]?.deviceId}
             onSelect={(selectedDev) => {
               const idx = pickingDeviceForIndex;

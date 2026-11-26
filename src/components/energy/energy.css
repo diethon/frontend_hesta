@@ -6,7 +6,7 @@
 
 /* Override index.css pale yellow (#ffd166) inside .energy-page for readable WCAG amber text */
 .energy-page .text-amber-500 {
-  color: #d97706;
+  color: #b45309;
 }
 
 html.dark .energy-page .text-amber-500,
@@ -49,12 +49,49 @@ html.dark .energy-page .text-amber-500,
 }
 
 .energy-scroll-area::-webkit-scrollbar-thumb {
-  background: var(--border);
+  background: #cbd5e1;
   border-radius: 9999px;
 }
 
 .energy-scroll-area::-webkit-scrollbar-thumb:hover {
-  background: var(--tertiary);
+  background: #94a3b8;
+}
+
+/* Crisp custom range slider for Demand Response threshold */
+.energy-range-slider {
+  appearance: none;
+  -webkit-appearance: none;
+  height: 8px;
+  border-radius: 9999px;
+  outline: none;
+}
+
+.energy-range-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 9999px;
+  background: #ffffff;
+  border: 3px solid #2563eb;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.25);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.energy-range-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.08);
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.35);
+}
+
+.energy-range-slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 9999px;
+  background: #ffffff;
+  border: 3px solid #2563eb;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.25);
+  cursor: pointer;
 }
 
 /* SVG Chart Transitions */

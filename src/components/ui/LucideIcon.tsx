@@ -50,8 +50,11 @@ import {
   Thermometer,
   Trash2,
   TriangleAlert,
+  Tv,
   Users,
+  Wind,
   Workflow,
+  Wrench,
   X,
   Zap,
   Bell,
@@ -120,6 +123,9 @@ const lucideIcons: Record<IconName, LucideIcon> = {
   flame: Flame,
   gate: Fence,
   play: Play,
+  wrench: Wrench,
+  tv: Tv,
+  wind: Wind,
 };
 
 export function Icon({ name, size = 22, className = 'icon' }: { name: IconName; size?: number; className?: string }) {

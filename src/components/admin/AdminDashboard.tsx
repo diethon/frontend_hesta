@@ -23,6 +23,7 @@ import {
   X,
   Layers,
   AlertCircle,
+  FileText,
 } from 'lucide-react';
 
 interface AdminDashboardProps {
@@ -152,6 +153,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout, 
       onClick: () => navigate('/admin/diagnostics'),
       active: false,
     },
+    {
+      id: 'maintenance',
+      icon: 'wrench' as const,
+      label: 'Bảo trì thiết bị',
+      onClick: () => navigate('/admin/maintenance'),
+      active: false,
+    },
+    {
+      id: 'contracts',
+      icon: 'briefcase' as const,
+      label: 'Hợp đồng lắp đặt',
+      onClick: () => navigate('/admin/contracts'),
+      active: false,
+    },
   ];
 
   const adminBottomNavItems = [
@@ -174,6 +189,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout, 
       icon: 'activity' as const,
       label: 'Hạ tầng',
       onClick: () => navigate('/admin/diagnostics'),
+      active: false,
+    },
+    {
+      id: 'maintenance',
+      icon: 'wrench' as const,
+      label: 'Bảo trì',
+      onClick: () => navigate('/admin/maintenance'),
+      active: false,
+    },
+    {
+      id: 'contracts',
+      icon: 'briefcase' as const,
+      label: 'Hợp đồng',
+      onClick: () => navigate('/admin/contracts'),
       active: false,
     },
   ];
@@ -209,6 +238,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout, 
           </div>
 
           <div className="flex items-center gap-3 shrink-0">
+            <button
+              type="button"
+              onClick={() => navigate('/admin/contracts')}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primary-hover shadow-xs transition-colors cursor-pointer"
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span>Hợp đồng lắp đặt</span>
+            </button>
+
             <span className="hidden sm:inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border border-line bg-surface/80 text-muted">
               Quản trị viên
             </span>

@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router';
 import { Icon, IconButton } from './HomeIcons';
 import type { UserResponse } from '../../types/auth';
 import { VoiceAssistantButton } from '../ui/VoiceAssistant';
 import { NotificationBell } from '../notification/NotificationBell';
-import { Sparkles, X, Pencil, Plus, Home } from 'lucide-react';
+import { Sparkles, X, Pencil, Plus, Home, FileText } from 'lucide-react';
 
 export interface HomeOption {
   homeId: string;
@@ -44,6 +45,7 @@ export const DashboardTopBar: React.FC<DashboardTopBarProps> = ({
   totalDevices,
   onlineDevices,
 }) => {
+  const navigate = useNavigate();
   const [isAvatarMenuOpen, setIsAvatarMenuOpen] = useState(false);
   const [isHomeMenuOpen, setIsHomeMenuOpen] = useState(false);
   const avatarRef = useRef<HTMLDivElement>(null);
@@ -246,6 +248,17 @@ export const DashboardTopBar: React.FC<DashboardTopBarProps> = ({
               </div>
 
               <div className="p-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsAvatarMenuOpen(false);
+                    navigate('/contracts');
+                  }}
+                  className="w-full text-left px-3 py-2 text-xs font-semibold text-[var(--text)] hover:bg-[var(--g1)] rounded-xl transition-colors flex items-center gap-2 cursor-pointer"
+                >
+                  <FileText className="w-4 h-4 text-primary" />
+                  <span>Hợp đồng lắp đặt</span>
+                </button>
                 <button
                   type="button"
                   onClick={() => {

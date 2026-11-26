@@ -5,7 +5,7 @@
 
 /* ── Device Card Redesign ── */
 .devices-page .devices-device-card {
-  min-height: 196px;
+  min-height: 210px;
   height: auto;
   border-radius: 20px;
   padding: 16px;
@@ -14,6 +14,9 @@
   min-width: 0;
   cursor: pointer;
   position: relative;
+  background: rgba(255, 255, 255, 0.97);
+  border: 1px solid rgba(148, 163, 184, 0.42);
+  box-shadow: 0 3px 12px rgba(15, 23, 42, 0.06);
   transition: transform 0.2s var(--ease), box-shadow 0.2s var(--ease), border-color 0.2s var(--ease);
 }
 
@@ -28,8 +31,39 @@
 }
 
 .devices-page .devices-device-card.offline {
-  opacity: 0.52;
-  filter: grayscale(20%);
+  position: relative;
+  opacity: 1 !important;
+  filter: none;
+  background: #f1f5f9 !important;
+  border-color: rgba(148, 163, 184, 0.56) !important;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04) !important;
+}
+
+.devices-page .devices-device-card.offline::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    180deg,
+    rgba(241, 245, 249, 0.38) 0%,
+    rgba(203, 213, 225, 0.5) 100%
+  );
+  backdrop-filter: grayscale(0.55);
+  -webkit-backdrop-filter: grayscale(0.55);
+  pointer-events: none;
+  z-index: 4;
+  transition: background 0.2s var(--ease), backdrop-filter 0.2s var(--ease);
+}
+
+.devices-page .devices-device-card.offline:hover::after {
+  background: linear-gradient(
+    180deg,
+    rgba(241, 245, 249, 0.22) 0%,
+    rgba(203, 213, 225, 0.32) 100%
+  );
+  backdrop-filter: grayscale(0.28);
+  -webkit-backdrop-filter: grayscale(0.28);
 }
 
 .devices-page .devices-device-card .brightness {
@@ -37,19 +71,19 @@
 }
 
 .devices-page .devices-device-card .gate-controls button:disabled {
-  opacity: 0.4;
+  opacity: 0.68;
   cursor: not-allowed;
 }
 
 .devices-page .devices-device-card .gate-controls button:disabled:not(.active):hover {
-  background: transparent;
+  background: #ffffff;
 }
 
 .devices-page .devices-device-card .device-top {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
 }
 
 /* Icon tile wrap and status indicator */
@@ -66,6 +100,16 @@
   place-items: center;
   position: relative;
   transition: all 0.2s var(--ease);
+}
+
+.devices-page .device-icon.device-visual-tile {
+  width: 84px;
+  height: 84px;
+  border-radius: 20px;
+  background: #ffffff;
+  border: 1px solid rgba(148, 163, 184, 0.36);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+  overflow: visible;
 }
 
 /* Tinted icon tile colors by device type */
@@ -100,39 +144,40 @@
 }
 
 /* Soft glow when device is ON */
-.devices-page .devices-device-card.on .device-icon.type-amber {
+.devices-page .devices-device-card.on:not(.offline) .device-icon.type-amber {
   box-shadow: 0 0 16px rgba(245, 158, 11, 0.38);
 }
 
-.devices-page .devices-device-card.on .device-icon.type-sky {
+.devices-page .devices-device-card.on:not(.offline) .device-icon.type-sky {
   box-shadow: 0 0 16px rgba(14, 165, 233, 0.38);
 }
 
-.devices-page .devices-device-card.on .device-icon.type-emerald {
+.devices-page .devices-device-card.on:not(.offline) .device-icon.type-emerald {
   box-shadow: 0 0 16px rgba(16, 185, 129, 0.38);
 }
 
-.devices-page .devices-device-card.on .device-icon.type-violet {
+.devices-page .devices-device-card.on:not(.offline) .device-icon.type-violet {
   box-shadow: 0 0 16px rgba(139, 92, 246, 0.38);
 }
 
-.devices-page .devices-device-card.on .device-icon.type-slate {
+.devices-page .devices-device-card.on:not(.offline) .device-icon.type-slate {
   box-shadow: 0 0 16px rgba(100, 116, 139, 0.38);
 }
 
-.devices-page .devices-device-card.on .device-icon.type-indigo {
+.devices-page .devices-device-card.on:not(.offline) .device-icon.type-indigo {
   box-shadow: 0 0 16px rgba(99, 102, 241, 0.38);
 }
 
 /* Small status dot indicator */
 .devices-page .status-dot {
   position: absolute;
-  bottom: -1px;
-  right: -1px;
-  width: 8px;
-  height: 8px;
+  bottom: -2px;
+  right: -2px;
+  z-index: 3;
+  width: 11px;
+  height: 11px;
   border-radius: 50%;
-  border: 1.5px solid var(--solid);
+  border: 2px solid var(--solid);
 }
 
 .devices-page .status-dot.online {
@@ -168,14 +213,14 @@
 
 /* Card Copy & Value */
 .devices-page .devices-device-card .device-copy {
-  margin-top: 10px;
+  margin-top: 0;
   min-width: 0;
 }
 
 .devices-page .devices-device-card .device-copy h3 {
   font-size: 14px;
-  font-weight: 600;
-  color: var(--text);
+  font-weight: 700;
+  color: #0f172a;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

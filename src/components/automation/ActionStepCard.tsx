@@ -1,6 +1,11 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'react-router';
+import { AUTO_OFF_KEY, DELAY_ACTION, MAX_AUTO_OFF_SECONDS, MAX_DELAY_SECONDS } from '../../types/automation';
 import type { DeviceSummary, RuleActionInput } from '../../types/automation';
 import type { SceneResponse } from '../../types/scene';
+import type { DeviceGroupResponse } from '../../types/deviceGroup';
+import { autoOffVerb, formatDuration } from './ruleTiming';
+import { DurationInput } from './DurationInput';
 import { Icon, type IconName } from '../ui/LucideIcon';
 import { PickerField } from './PickerField';
 import { StepperInput } from './StepperInput';
@@ -8,11 +13,13 @@ import { getDeviceActions, type ActionOption } from '../deviceActionOptions';
 import { getFigmaIconForDevice, getFigmaIconForScene } from '../scene/ScenePage';
 
 export interface ActionStepCardProps {
-  action: RuleActionInput & { id?: string; deviceName?: string; sceneName?: string };
+  action: RuleActionInput & { id?: string; deviceName?: string; sceneName?: string; groupName?: string };
   index: number;
   totalCount: number;
   devices: DeviceSummary[];
   scenes: SceneResponse[];
+  groups?: DeviceGroupResponse[];
+  onPickGroup?: () => void;
   isExpanded: boolean;
   onToggleExpand: () => void;
   onChange: (updated: RuleActionInput) => void;
@@ -31,17 +38,26 @@ const COLOR_SWATCHES = [
 export function formatActionSummaryHuman(
   act: RuleActionInput,
   device?: DeviceSummary,
-  scene?: SceneResponse
+  scene?: SceneResponse,
+  groupName?: string,
 ): string {
+  if (act.action === DELAY_ACTION) return `Chờ ${formatDuration(Number(act.parameters?.seconds) || 0)}`;
+  const text = formatCommand(act, device, scene, groupName);
+  const autoOff = Number(act.parameters?.[AUTO_OFF_KEY]) || 0;
+  const verb = autoOffVerb(act.action, act.parameters);
+  return autoOff > 0 && verb ? `${text}, ${verb.toLowerCase()} sau ${formatDuration(autoOff)}` : text;
+}
+
+function formatCommand(act: RuleActionInput, device?: DeviceSummary, scene?: SceneResponse, groupName?: string): string {
   if (act.action === 'EXECUTE_SCENE') {
     return scene ? `Chạy kịch bản: ${scene.name}` : 'Chạy kịch bản (chưa chọn)';
   }
 
-  const devName = device?.name || 'thiết bị';
+  const devName = act.groupId !== undefined ? `nhóm ${groupName || '(chưa chọn)'}` : device?.name || 'thiết bị';
   const code = act.action;
   if (code === 'TURN_ON') return `Bật ${devName}`;
   if (code === 'TURN_OFF') return `Tắt ${devName}`;
-  if (code === 'TOGGLE') return `Đảo trạng thái bật/tắt ${devName}`;
+  if (code === 'TOGGLE') return `Bật/Tắt ${devName}`;
   if (code === 'OPEN') return `Mở cổng/cửa ${devName}`;
   if (code === 'CLOSE') return `Đóng cổng/cửa ${devName}`;
   if (code === 'STOP') return `Dừng cổng/cửa ${devName}`;
@@ -82,6 +98,8 @@ export const ActionStepCard: React.FC<ActionStepCardProps> = ({
   onDelete,
   onPickDevice,
   onPickScene,
+  groups = [],
+  onPickGroup,
 }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [jsonAccordionOpen, setJsonAccordionOpen] = useState(false);
@@ -99,6 +117,11 @@ export const ActionStepCard: React.FC<ActionStepCardProps> = ({
   }, [menuOpen]);
 
   const isSceneStep = action.action === 'EXECUTE_SCENE';
+  const isDelayStep = action.action === DELAY_ACTION;
+  // A group step is created with groupId '' until a group is picked.
+  const isGroupStep = action.groupId !== undefined;
+  const group = useMemo(() => groups.find((g) => g.id === action.groupId), [groups, action.groupId]);
+  const groupName = group?.name || action.groupName;
 
   const device = useMemo(
     () => (action.deviceId ? devices.find((d) => d.id === action.deviceId) : undefined),
@@ -111,14 +134,30 @@ export const ActionStepCard: React.FC<ActionStepCardProps> = ({
   );
 
   const iconName: IconName = useMemo(() => {
+    if (isDelayStep) return 'clock';
+    if (isGroupStep) return 'grid';
     if (isSceneStep) return scene ? getFigmaIconForScene(scene.name, scene.icon) : 'sparkles';
     return device ? getFigmaIconForDevice(device.deviceType, device.name) : 'power';
-  }, [isSceneStep, scene, device]);
+  }, [isSceneStep, isDelayStep, isGroupStep, scene, device]);
 
+  // Raw-JSON "SET_STATE" is for debugging: offered only with ?advanced=1, or kept when a rule already uses it.
+  const [searchParams] = useSearchParams();
+  const showRawState = searchParams.has('advanced') || action.action === 'SET_STATE';
   const deviceActions: ActionOption[] = useMemo(() => {
-    if (!device) return [];
-    return getDeviceActions(device);
-  }, [device]);
+    let options: ActionOption[] = [];
+    if (isGroupStep) {
+      // Every command any member supports; members that cannot do it are skipped when the rule runs.
+      const seen = new Map<string, ActionOption>();
+      devices.filter((d) => group?.deviceIds.includes(d.id))
+        .forEach((d) => getDeviceActions(d).forEach((opt) => seen.has(opt.code) || seen.set(opt.code, opt)));
+      options = [...seen.values()];
+    } else if (device) {
+      options = getDeviceActions(device);
+    }
+    return showRawState ? options : options.filter((opt) => opt.code !== 'SET_STATE');
+  }, [device, devices, group, isGroupStep, showRawState]);
+  const autoOffSeconds = Number(action.parameters?.[AUTO_OFF_KEY]) || 0;
+  const undoVerb = autoOffVerb(action.action, action.parameters);
 
   const isOffline = device && device.status === 'OFFLINE';
 
@@ -170,13 +209,17 @@ export const ActionStepCard: React.FC<ActionStepCardProps> = ({
                 {index + 1}
               </span>
               <strong className="text-xs text-[var(--text)] block truncate">
-                {isSceneStep
+                {isDelayStep
+                  ? 'Chờ'
+                  : isGroupStep
+                  ? groupName ? `Nhóm ${groupName}` : 'Chọn nhóm...'
+                  : isSceneStep
                   ? scene?.name || 'Chọn kịch bản...'
                   : device?.name || 'Chọn thiết bị...'}
               </strong>
             </div>
             <span className="text-[11px] text-[var(--secondary)] block truncate mt-0.5">
-              {formatActionSummaryHuman(action, device, scene)}
+              {formatActionSummaryHuman(action, device, scene, groupName)}
             </span>
           </div>
         </div>
@@ -258,8 +301,33 @@ export const ActionStepCard: React.FC<ActionStepCardProps> = ({
       {/* ── Expanded Form ── */}
       {isExpanded && (
         <div className="action-step-expanded p-4 pt-1 border-t border-[var(--border)] bg-[var(--solid)]/50 space-y-4">
-          {/* Target Device / Scene Picker */}
-          {isSceneStep ? (
+          {/* Target Device / Scene / Group Picker, or the wait time */}
+          {isDelayStep ? (
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold text-[var(--secondary)] uppercase tracking-wider block">
+                Chờ bao lâu rồi làm bước tiếp theo
+              </label>
+              <DurationInput
+                label="Thời gian chờ"
+                seconds={Number(action.parameters?.seconds) || 30}
+                max={MAX_DELAY_SECONDS}
+                onChange={(seconds) => onChange({ ...action, parameters: { seconds } })}
+              />
+            </div>
+          ) : isGroupStep ? (
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold text-[var(--secondary)] uppercase tracking-wider block">
+                Nhóm thiết bị
+              </label>
+              <PickerField
+                label={groupName || 'Chọn nhóm'}
+                caption={group ? `${group.deviceCount} thiết bị · thiết bị không hỗ trợ lệnh sẽ được bỏ qua` : 'Nhấn để chọn nhóm'}
+                icon="grid"
+                hasError={!action.groupId}
+                onClick={() => onPickGroup?.()}
+              />
+            </div>
+          ) : isSceneStep ? (
             <div className="space-y-1">
               <label className="text-[11px] font-bold text-[var(--secondary)] uppercase tracking-wider block">
                 Kịch bản thực thi
@@ -300,7 +368,7 @@ export const ActionStepCard: React.FC<ActionStepCardProps> = ({
           )}
 
           {/* Device Command Chips */}
-          {!isSceneStep && device && (
+          {!isSceneStep && !isDelayStep && (device || group) && (
             <div className="space-y-1.5">
               <label className="text-[11px] font-bold text-[var(--secondary)] uppercase tracking-wider block">
                 Lệnh điều khiển
@@ -320,6 +388,34 @@ export const ActionStepCard: React.FC<ActionStepCardProps> = ({
                   );
                 })}
               </div>
+            </div>
+          )}
+
+          {/* Auto-off: undo a turn-on / open after a while */}
+          {!isSceneStep && !isDelayStep && undoVerb && (
+            <div className="space-y-2 p-3 rounded-2xl bg-[var(--solid)] border border-[var(--border)]">
+              <label className="flex items-center gap-2 text-xs font-semibold text-[var(--text)] cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={autoOffSeconds > 0}
+                  onChange={(e) => {
+                    const next = { ...action.parameters };
+                    if (e.target.checked) next[AUTO_OFF_KEY] = 300;
+                    else delete next[AUTO_OFF_KEY];
+                    onChange({ ...action, parameters: next });
+                  }}
+                  className="accent-[var(--accent)]"
+                />
+                {undoVerb} sau một khoảng thời gian
+              </label>
+              {autoOffSeconds > 0 && (
+                <DurationInput
+                  label={`${undoVerb} sau`}
+                  seconds={autoOffSeconds}
+                  max={MAX_AUTO_OFF_SECONDS}
+                  onChange={(seconds) => onChange({ ...action, parameters: { ...action.parameters, [AUTO_OFF_KEY]: seconds } })}
+                />
+              )}
             </div>
           )}
 

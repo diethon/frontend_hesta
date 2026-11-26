@@ -17,7 +17,7 @@ export interface DashboardNavRailCustomItem {
 
 export interface DashboardNavRailProps {
   homeId?: string;
-  activeItem?: 'overview' | 'devices' | 'twin' | 'energy' | 'scenes' | 'automations' | 'security' | 'members' | string;
+  activeItem?: 'overview' | 'devices' | 'twin' | 'energy' | 'scenes' | 'automations' | 'security' | 'maintenance' | 'members' | string;
   user?: UserResponse;
   onOpenSettings?: () => void;
   onSelectMembers?: () => void;
@@ -29,7 +29,7 @@ export interface DashboardNavRailProps {
 }
 
 interface NavItemDef {
-  id: 'overview' | 'devices' | 'twin' | 'energy' | 'scenes' | 'automations' | 'security' | 'members';
+  id: 'overview' | 'devices' | 'twin' | 'energy' | 'scenes' | 'automations' | 'security' | 'maintenance' | 'contracts' | 'members';
   icon: IconName;
   label: string;
 }
@@ -42,6 +42,7 @@ const navItems: NavItemDef[] = [
   { id: 'scenes', icon: 'sparkles', label: 'Kịch bản' },
   { id: 'automations', icon: 'automation', label: 'Tự động hóa' },
   { id: 'security', icon: 'shield', label: 'An ninh' },
+  { id: 'maintenance', icon: 'wrench', label: 'Bảo trì' },
   { id: 'members', icon: 'users', label: 'Thành viên' },
 ];
 
@@ -114,6 +115,16 @@ export const DashboardNavRail: React.FC<DashboardNavRailProps> = ({
         } else {
           notify.info('Hãy chọn hoặc tạo một ngôi nhà trước.');
         }
+        break;
+      case 'maintenance':
+        if (homeId) {
+          navigate(`/homes/${encodeURIComponent(homeId)}/maintenance`);
+        } else {
+          notify.info('Hãy chọn hoặc tạo một ngôi nhà trước.');
+        }
+        break;
+      case 'contracts':
+        navigate('/contracts');
         break;
       case 'members':
         if (onSelectMembers) {

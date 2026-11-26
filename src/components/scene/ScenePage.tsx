@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { sceneRunMessage } from './sceneRunMessage';
 import { useNavigate, useParams } from 'react-router';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { currentHomeChanged, currentHomeCleared } from '../../store/homeSlice';
@@ -8,6 +9,8 @@ import {
   updateScene,
   deleteScene,
   executeScene,
+  runSceneLater,
+  cancelSceneRunLater,
   getSceneExecutions,
   getDevices,
   getSceneActionTypes,
@@ -26,9 +29,10 @@ import { Icon, type IconName } from '../ui/LucideIcon';
 import { AutomationTopBar } from '../automation/AutomationTopBar';
 import { notify } from '../ui/notify';
 import { getErrorMessage } from '../../utils/errors';
-import { SceneEditor } from './SceneEditor';
+import { SceneEditor, ICON_POPOVER_LIST } from './SceneEditor';
 import { ConfirmModal } from '../ui/ConfirmModal';
 import { useRealtimeRefetch } from '../../realtime/useRealtimeRefetch';
+import { iconHue } from '../automation/iconHue';
 
 const SCENE_REFRESH_EVENTS = ['SCENE_CHANGED'] as const;
 
@@ -39,11 +43,91 @@ function runSucceeded(run: SceneExecutionResponse): boolean {
   return run.resultDetail.every((r) => r.success);
 }
 
+// Same presets as the mobile app (scene_timer.dart).
+const RUN_LATER_PRESETS = [
+  { label: '10 giây', seconds: 10 },
+  { label: '1 phút', seconds: 60 },
+  { label: '5 phút', seconds: 300 },
+  { label: '15 phút', seconds: 900 },
+  { label: '30 phút', seconds: 1800 },
+  { label: '1 giờ', seconds: 3600 },
+];
+const RUN_LATER_UNITS = [
+  { label: 'giây', seconds: 1 },
+  { label: 'phút', seconds: 60 },
+  { label: 'giờ', seconds: 3600 },
+];
+const MAX_RUN_LATER_SECONDS = 24 * 3600;
+
+/** "1:05:09" / "4:07" countdown to `runAt`. */
+export function formatCountdown(runAt: string, now: number): string {
+  const total = Math.max(0, Math.ceil((new Date(runAt).getTime() - now) / 1000));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const sec = String(total % 60).padStart(2, '0');
+  return h ? `${h}:${String(m).padStart(2, '0')}:${sec}` : `${m}:${sec}`;
+}
+
+/** Re-renders every second while `active`, for countdowns. */
+function useNow(active: boolean): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!active) return;
+    setNow(Date.now());
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [active]);
+  return now;
+}
+
+function RunLaterForm({ onSubmit }: { onSubmit: (seconds: number) => Promise<void> }) {
+  const [amount, setAmount] = useState('2');
+  const [unit, setUnit] = useState(60);
+  const [busy, setBusy] = useState(false);
+  const seconds = Math.round(Number(amount) * unit);
+  const valid = Number.isFinite(seconds) && seconds >= 1 && seconds <= MAX_RUN_LATER_SECONDS;
+  const submit = async (value: number) => {
+    setBusy(true);
+    try {
+      await onSubmit(value);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="st-run-later">
+      <p className="st-subtitle">Kịch bản sẽ tự chạy một lần sau khoảng thời gian bạn chọn. Đặt lại sẽ thay hẹn giờ cũ.</p>
+      <div className="st-run-later-presets">
+        {RUN_LATER_PRESETS.map((preset) => (
+          <button key={preset.seconds} type="button" className="st-btn st-btn-sm" disabled={busy}
+            onClick={() => void submit(preset.seconds)}>
+            {preset.label}
+          </button>
+        ))}
+      </div>
+      <form className="st-run-later-custom" onSubmit={(e) => { e.preventDefault(); if (valid) void submit(seconds); }}>
+        <label>
+          <span>Hoặc tự nhập</span>
+          <input type="number" min={1} step="any" inputMode="decimal" value={amount}
+            aria-label="Số lượng" onChange={(e) => setAmount(e.target.value)} />
+        </label>
+        <select aria-label="Đơn vị" value={unit} onChange={(e) => setUnit(Number(e.target.value))}>
+          {RUN_LATER_UNITS.map((u) => <option key={u.seconds} value={u.seconds}>{u.label}</option>)}
+        </select>
+        <button type="submit" className="st-btn st-btn-primary" disabled={!valid || busy}>Hẹn giờ</button>
+      </form>
+      {!valid && <small className="st-run-later-error">Chọn từ 1 giây đến 24 giờ.</small>}
+    </div>
+  );
+}
+
 // ──────────────────────────────────────────────────────────────────────────
 // Icon Mapping Helpers
 // ──────────────────────────────────────────────────────────────────────────
 
 export function getFigmaIconForScene(name?: string, icon?: string | null): IconName {
+  // An icon picked in the editor wins; name keywords only cover old scenes saved without one.
+  if (icon && (ICON_POPOVER_LIST as string[]).includes(icon)) return icon as IconName;
   const text = `${name ?? ''} ${icon ?? ''}`.toLowerCase();
   if (text.includes('sáng') || text.includes('sun') || text.includes('morning')) return 'sun';
   if (text.includes('ngủ') || text.includes('moon') || text.includes('tối') || text.includes('night')) return 'moon';
@@ -75,18 +159,6 @@ export function getFigmaIconForDevice(action?: string, deviceName?: string): Ico
 // Subcomponents matching Figma Design v3
 // ──────────────────────────────────────────────────────────────────────────
 
-// One accent hue per kind of scene so tiles are recognisable at a glance.
-const SCENE_HUES: Partial<Record<IconName, string>> = {
-  sun: '#d17a0b',
-  moon: '#6a55e0',
-  door: '#5b6b82',
-  home: '#2a9456',
-  film: '#d9486e',
-  briefcase: '#1769d6',
-  lamp: '#b8860b',
-  energy: '#0d8f8a',
-};
-
 function ScenarioCard({
   scene,
   onToggle,
@@ -95,6 +167,8 @@ function ScenarioCard({
   onDuplicate,
   onDelete,
   onRun,
+  onRunLater,
+  onCancelRunLater,
   running,
   runSuccess,
   hasFailed,
@@ -106,6 +180,8 @@ function ScenarioCard({
   onDuplicate: () => void;
   onDelete: () => void;
   onRun: () => void;
+  onRunLater: () => void;
+  onCancelRunLater: () => void;
   running: boolean;
   runSuccess: boolean;
   hasFailed?: boolean;
@@ -113,10 +189,13 @@ function ScenarioCard({
   const [menu, setMenu] = useState(false);
   const actions = scene.actions || [];
   const sceneIcon = getFigmaIconForScene(scene.name, scene.icon);
-  const hue = SCENE_HUES[sceneIcon];
 
+  const pendingRunAt = scene.pendingRunAt ?? null;
+  const now = useNow(!!pendingRunAt);
   const status = running
     ? { dot: 'on', text: 'Đang chạy…' }
+    : pendingRunAt
+    ? { dot: 'on', text: new Date(pendingRunAt).getTime() <= now ? 'Đang chạy…' : `Chạy sau ${formatCountdown(pendingRunAt, now)}` }
     : hasFailed
     ? { dot: 'err', text: 'Lần chạy gần nhất lỗi' }
     : scene.enabled
@@ -141,7 +220,6 @@ function ScenarioCard({
   return (
     <article
       className={`st-scene ${scene.enabled ? '' : 'is-off'}`}
-      style={hue ? ({ '--hue': hue } as React.CSSProperties) : undefined}
       onClick={onOpen}
       tabIndex={0}
       onKeyDown={(e) => e.key === 'Enter' && e.target === e.currentTarget && onOpen()}
@@ -154,7 +232,7 @@ function ScenarioCard({
       )}
 
       <div className="st-scene-head">
-        <span className="st-scene-icon">
+        <span className="st-scene-icon" style={iconHue(sceneIcon)}>
           <Icon name={sceneIcon} size={24} />
         </span>
         <button
@@ -180,7 +258,7 @@ function ScenarioCard({
       <ul className="st-scene-devices">
         {actions.length === 0 && <li className="more">Chưa có hành động nào</li>}
         {actions.slice(0, 3).map((action, index) => (
-          <li key={action.id || index}>
+          <li key={action.id || index} style={iconHue(getFigmaIconForDevice(action.action, action.targetDeviceName))}>
             <Icon name={getFigmaIconForDevice(action.action, action.targetDeviceName)} />
             <span title={action.targetDeviceName || undefined}>{action.targetDeviceName || 'Thiết bị'}</span>
             {(action.action === 'SET_RGB' || (action.action as string) === 'SET_COLOR') && typeof action.value === 'string' && /^#[0-9a-f]{3,8}$/i.test(action.value) ? (
@@ -218,6 +296,8 @@ function ScenarioCard({
           {menu && (
             <span className="st-menu up" onClick={(e) => e.stopPropagation()}>
               {menuItem('Chỉnh sửa', 'pencil', onOpen)}
+              {scene.enabled && actions.length > 0 && menuItem(pendingRunAt ? 'Đổi hẹn giờ chạy' : 'Chạy sau…', 'clock', onRunLater)}
+              {pendingRunAt && menuItem('Hủy hẹn giờ chạy', 'x', onCancelRunLater)}
               {menuItem('Xem lịch sử', 'clock', onHistory)}
               {menuItem('Nhân bản', 'copy', onDuplicate)}
               <hr />
@@ -329,6 +409,7 @@ export function SceneHistory({
     switch (trigger) {
       case 'MANUAL': return 'Bạn bấm chạy';
       case 'SCHEDULE': return 'Tự chạy theo giờ hẹn';
+      case 'TIMER': return 'Hẹn giờ chạy một lần';
       case 'AUTOMATION': return 'Do quy tắc tự động';
       case 'VOICE': return 'Ra lệnh bằng giọng nói';
       default: return 'Tự chạy';
@@ -418,87 +499,6 @@ export function SceneHistory({
   );
 }
 
-function AiSuggestions({
-  onClose,
-  onApplySuggestion,
-}: {
-  onClose: () => void;
-  onApplySuggestion: (name: string, description: string, icon: IconName) => void;
-}) {
-  const [list, setList] = useState<[IconName, string, string, string][]>([
-    [
-      'moon',
-      'Chuẩn bị đi ngủ',
-      'Bạn thường tắt đèn lúc 23:00',
-      'Tắt đèn · Khóa cửa',
-    ],
-    [
-      'energy',
-      'Tiết kiệm điện',
-      'Điều hòa thường bật khi không có người',
-      'Tắt điều hòa · Tắt đèn',
-    ],
-    [
-      'home',
-      'Chào đón về nhà',
-      'Bạn thường về nhà lúc 18:15',
-      'Mở đèn · Bật điều hòa',
-    ],
-    [
-      'film',
-      'Xem phim cuối tuần',
-      'Thường kích hoạt vào tối thứ Bảy',
-      'Đổi màu đèn sang Điện ảnh · Bật quạt',
-    ],
-  ]);
-
-  const handleDismiss = (name: string) => {
-    setList((prev) => prev.filter((item) => item[1] !== name));
-  };
-
-  return (
-    <PanelShell
-      title="Gợi ý cho bạn"
-      caption="Dựa trên thói quen gần đây"
-      onClose={onClose}
-    >
-      <div className="ai-list">
-        {list.map(([icon, name, reason, actions]) => (
-          <article className="ai-card glass-g1" key={name}>
-            <span>
-              <Icon name={icon} />
-            </span>
-            <div>
-              <strong>{name}</strong>
-              <p>{reason}</p>
-            </div>
-            <small>{actions}</small>
-            <footer>
-              <button type="button" onClick={() => handleDismiss(name)}>
-                Bỏ qua
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  onApplySuggestion(name, reason, icon);
-                  onClose();
-                }}
-              >
-                Thêm kịch bản
-              </button>
-            </footer>
-          </article>
-        ))}
-        {list.length === 0 && (
-          <div className="p-8 text-center text-xs text-slate-400">
-            Không còn gợi ý nào mới.
-          </div>
-        )}
-      </div>
-    </PanelShell>
-  );
-}
-
 
 
 
@@ -582,7 +582,7 @@ export function ScenePage() {
     | null
     | { type: 'editor'; scene?: SceneResponse | null }
     | { type: 'history'; scene: SceneResponse }
-    | { type: 'ai' };
+    | { type: 'timer'; scene: SceneResponse };
 
   const [sheet, setSheet] = useState<SheetType>(null);
   const [deletingScene, setDeletingScene] = useState<SceneResponse | null>(null);
@@ -677,17 +677,42 @@ export function ScenePage() {
       if (isOk) {
         setSuccessId(scene.id);
         setFailedIds((prev) => ({ ...prev, [scene.id]: false }));
-        notify.success(`Đã kích hoạt "${scene.name}" thành công`);
+        notify.success(sceneRunMessage(scene, res).text);
         window.setTimeout(() => setSuccessId(null), 1400);
       } else {
         setFailedIds((prev) => ({ ...prev, [scene.id]: true }));
-        notify.warning(`Kịch bản "${scene.name}" chạy với một số lỗi`);
+        const msg = sceneRunMessage(scene, res);
+        notify[msg.kind](msg.text);
       }
     } catch (err: unknown) {
       setFailedIds((prev) => ({ ...prev, [scene.id]: true }));
       notify.error(getErrorMessage(err, 'Lỗi khi kích hoạt kịch bản'));
     } finally {
       setRunningId(null);
+    }
+  };
+
+  const setPendingRun = (sceneId: string, pendingRunAt: string | null) =>
+    setScenes((prev) => prev.map((s) => (s.id === sceneId ? { ...s, pendingRunAt } : s)));
+
+  const handleRunLater = async (scene: SceneResponse, seconds: number) => {
+    try {
+      const runAt = await runSceneLater(homeId, scene.id, seconds);
+      setPendingRun(scene.id, runAt);
+      setSheet(null);
+      notify.success(`"${scene.name}" sẽ chạy lúc ${new Date(runAt).toLocaleTimeString('vi-VN', { hour12: false })}`);
+    } catch (err: unknown) {
+      notify.error(getErrorMessage(err, 'Không hẹn giờ được kịch bản'));
+    }
+  };
+
+  const handleCancelRunLater = async (scene: SceneResponse) => {
+    try {
+      await cancelSceneRunLater(homeId, scene.id);
+      setPendingRun(scene.id, null);
+      notify.info(`Đã hủy hẹn giờ "${scene.name}"`);
+    } catch (err: unknown) {
+      notify.error(getErrorMessage(err, 'Không hủy được hẹn giờ'));
     }
   };
 
@@ -773,6 +798,9 @@ export function ScenePage() {
 
   return (
     <div className="app-shell scenes-page studio st-theme st-pro">
+      <div className="mesh mesh-one" />
+      <div className="mesh mesh-two" />
+      <div className="mesh mesh-three" />
       <DashboardNavRail
         homeId={homeId}
         activeItem="scenes"
@@ -823,10 +851,6 @@ export function ScenePage() {
               <Icon name="automation" />
               <span>Quy tắc</span>
             </button>
-            <button type="button" className="st-link" onClick={() => setSheet({ type: 'ai' })}>
-              <Icon name="sparkles" />
-              <span>Gợi ý</span>
-            </button>
             <button type="button" className="st-btn st-btn-primary" onClick={handleCreateScene}>
               <Icon name="plus" size={18} />
               Tạo kịch bản
@@ -862,6 +886,8 @@ export function ScenePage() {
                 onDuplicate={() => handleDuplicate(scene)}
                 onDelete={() => setDeletingScene(scene)}
                 onRun={() => handleRun(scene)}
+                onRunLater={() => setSheet({ type: 'timer', scene })}
+                onCancelRunLater={() => void handleCancelRunLater(scene)}
                 running={runningId === scene.id}
                 runSuccess={successId === scene.id}
                 hasFailed={failedIds[scene.id]}
@@ -876,13 +902,11 @@ export function ScenePage() {
       {/* Side Panels / Sheets */}
       {sheet && (
         <>
-          {sheet.type === 'ai' && (
-            <AiSuggestions
-              onClose={() => setSheet(null)}
-              onApplySuggestion={handleQuickCreate}
-            />
+          {sheet.type === 'timer' && (
+            <PanelShell title={sheet.scene.name} caption="Hẹn giờ chạy một lần" onClose={() => setSheet(null)}>
+              <RunLaterForm onSubmit={(seconds) => handleRunLater(sheet.scene, seconds)} />
+            </PanelShell>
           )}
-
           {sheet.type === 'history' && (
             <PanelShell
               title={sheet.scene.name}

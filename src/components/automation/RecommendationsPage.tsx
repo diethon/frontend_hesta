@@ -1,6 +1,7 @@
 import { confirmDialog } from '../ui/confirmDialog';
+import { formatScheduleTime } from '../scene/SceneScheduleSection';
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router';
+import { useNavigate, useParams, useSearchParams } from 'react-router';
 import {
   generateRecommendations,
   getRecommendations,
@@ -20,6 +21,9 @@ import { actionLabels } from './ruleLabels';
 export function RecommendationsPage() {
   const { homeId = '' } = useParams();
   const navigate = useNavigate();
+  // Model metrics and retraining are for demos/debugging: shown only with ?advanced=1.
+  const [searchParams] = useSearchParams();
+  const showAdvanced = searchParams.has('advanced');
   const authUser = useAppSelector((state) => state.auth.user);
   // Given name (last word) like the nav rail and Scene page: "Việt Đức" → "Đ".
   const userInitial = (authUser?.fullName?.trim().split(' ').pop() || authUser?.email || 'U').charAt(0).toUpperCase();
@@ -102,7 +106,7 @@ export function RecommendationsPage() {
   };
 
   const resolve = async (item: Recommendation, action: 'approve' | 'reject' | 'dismiss') => {
-    if (action === 'approve' && !await confirmDialog({ title: 'Tạo quy tắc tự động?', description: `${actionText(item)} vào ${item.triggerCondition.time?.slice(0, 5) ?? 'giờ này'}.`, confirmText: 'Tạo quy tắc', variant: 'primary' })) {
+    if (action === 'approve' && !await confirmDialog({ title: 'Tạo quy tắc tự động?', description: `${actionText(item)} vào ${item.triggerCondition.time ? formatScheduleTime(item.triggerCondition.time) : 'giờ này'}.`, confirmText: 'Tạo quy tắc', variant: 'primary' })) {
       return;
     }
     setWorkingId(item.id);
@@ -219,7 +223,7 @@ export function RecommendationsPage() {
             </button>
           </div>
 
-          {/* Technical details stay available for admins/demo but collapsed by default. */}
+          {showAdvanced && (
           <details className="st-tech">
             <summary>Chi tiết kỹ thuật</summary>
             {isReady && modelStatus && (
@@ -258,6 +262,7 @@ export function RecommendationsPage() {
               {modelLoading ? 'Đang huấn luyện…' : 'Huấn luyện lại mô hình'}
             </button>
           </details>
+          )}
         </section>
 
         <div className="st-tabs" role="tablist">
@@ -293,7 +298,7 @@ export function RecommendationsPage() {
               {pendingItems.map((item) => (
                 <article key={item.id} className="st-insight">
                   <div className="st-when">
-                    <strong>{item.triggerCondition.time?.slice(0, 5) ?? '--:--'}</strong>
+                    <strong>{item.triggerCondition.time ? formatScheduleTime(item.triggerCondition.time) : '--:--:--'}</strong>
                     <small>{formatRepeatDays(item.triggerCondition.repeatDays || [])}</small>
                   </div>
 

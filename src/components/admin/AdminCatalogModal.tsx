@@ -39,6 +39,8 @@ export const AdminCatalogModal: React.FC<AdminCatalogModalProps> = ({
         imageUrl: editingCatalog.imageUrl || '',
         icon: editingCatalog.icon || 'lightbulb',
         defaultCapabilities: editingCatalog.defaultCapabilities,
+        unitPrice: editingCatalog.unitPrice ?? 0,
+        warrantyMonths: editingCatalog.warrantyMonths ?? 12,
       };
     }
     return {
@@ -49,6 +51,8 @@ export const AdminCatalogModal: React.FC<AdminCatalogModalProps> = ({
       description: '',
       imageUrl: '',
       icon: 'lightbulb',
+      unitPrice: 450000,
+      warrantyMonths: 12,
     };
   }, [editingCatalog]);
 
@@ -391,6 +395,42 @@ export const AdminCatalogModal: React.FC<AdminCatalogModalProps> = ({
             <p className="text-[11px] font-mono text-muted">
               Mẫu số sê-ri sinh ra: <span className="font-semibold text-text">{exampleSerial}</span>
             </p>
+
+            {/* Đơn giá niêm yết & Bảo hành */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label htmlFor="catalog-price" className="block text-xs font-medium text-text mb-1">
+                  Đơn giá niêm yết (VNĐ)
+                </label>
+                <input
+                  id="catalog-price"
+                  type="number"
+                  min={0}
+                  step={10000}
+                  value={formData.unitPrice ?? 0}
+                  onChange={(e) => setFormData({ ...formData, unitPrice: Math.max(0, Number(e.target.value) || 0) })}
+                  placeholder="450000"
+                  className="w-full min-h-[44px] rounded-xl border border-line bg-sidebar/30 px-3.5 py-2.5 text-xs sm:text-sm font-mono text-text focus:border-primary focus:bg-surface focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                />
+                <span className="text-[11px] text-muted block mt-1">Dùng tự động khi lập hợp đồng</span>
+              </div>
+              <div>
+                <label htmlFor="catalog-warranty" className="block text-xs font-medium text-text mb-1">
+                  Bảo hành mặc định (tháng)
+                </label>
+                <input
+                  id="catalog-warranty"
+                  type="number"
+                  min={1}
+                  max={60}
+                  value={formData.warrantyMonths ?? 12}
+                  onChange={(e) => setFormData({ ...formData, warrantyMonths: Math.max(1, Number(e.target.value) || 12) })}
+                  placeholder="12"
+                  className="w-full min-h-[44px] rounded-xl border border-line bg-sidebar/30 px-3.5 py-2.5 text-xs sm:text-sm font-mono text-text focus:border-primary focus:bg-surface focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                />
+                <span className="text-[11px] text-muted block mt-1">Ghi nhận trên phiếu bàn giao</span>
+              </div>
+            </div>
 
             {/* Clean Image Upload Dropzone */}
             <div>

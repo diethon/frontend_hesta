@@ -164,6 +164,11 @@ export function SecurityCenterPage() {
     if (anomaly.status !== 'RESOLVED') {
       actions.push({ label: 'Đã xử lý', primary: true, run: () => runAction(anomaly.id, () => resolveAnomaly(homeId, anomaly.id), 'Đã đánh dấu đã xử lý') });
     }
+    if (anomaly.status !== 'RESOLVED' && anomaly.deviceId) {
+      // Opens the maintenance form pre-filled; the ticket closes this anomaly once the device is repaired.
+      const report = new URLSearchParams({ create: '1', deviceId: anomaly.deviceId, anomalyId: anomaly.id, note: ANOMALY_TITLE[anomaly.anomalyType] ?? '' });
+      actions.push({ label: 'Báo hỏng', run: async () => navigate(`/homes/${encodeURIComponent(homeId)}/maintenance?${report.toString()}`) });
+    }
     return {
       id: anomaly.id,
       icon: anomaly.anomalyType === 'SMOKE_DETECTED' || anomaly.anomalyType === 'GAS_LEAKAGE' ? 'flame'

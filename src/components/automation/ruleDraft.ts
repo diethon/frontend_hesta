@@ -7,6 +7,9 @@ import type {
 } from '../../types/automation';
 import type { AutomationTemplate } from './TemplateGrid';
 
+// Kept local (= DELAY_ACTION in types/automation): this file stays free of runtime imports.
+const DELAY_ACTION = 'DELAY';
+
 export type TriggerType = 'SENSOR' | 'EVENT' | 'SCHEDULE';
 export type LogicalOp = 'AND' | 'OR';
 
@@ -37,6 +40,7 @@ export function moveItem<T extends { order: number }>(items: T[], from: number, 
 export function ruleToDraft(rule: AutomationRule): RuleDraftParts & { logicalOp: LogicalOp; mixedOps: boolean } {
   const conditions: RuleConditionInput[] = (rule.conditions || []).map((c, order) => ({
     deviceId: c.deviceId,
+    groupId: c.groupId ?? undefined,
     attribute: c.attribute,
     operator: c.operator,
     expectedValue: c.expectedValue,
@@ -46,6 +50,7 @@ export function ruleToDraft(rule: AutomationRule): RuleDraftParts & { logicalOp:
   const actions: RuleActionInput[] = (rule.actions || []).map((a, order) => ({
     deviceId: a.deviceId,
     sceneId: a.sceneId,
+    groupId: a.groupId ?? undefined,
     action: a.action,
     parameters: a.parameters || {},
     order,
@@ -100,11 +105,16 @@ export function validateRuleDraft(
   if (triggerType === 'SCHEDULE' && activeScheduleCount === 0) return 'Thêm ít nhất 1 giờ chạy';
   if (triggerType === 'SENSOR') {
     if (conditions.length === 0) return 'Thêm ít nhất 1 điều kiện cho cảm biến';
-    if (conditions.some((c) => !c.deviceId)) return 'Chọn cảm biến nguồn cho điều kiện';
+    if (conditions.some((c) => (c.groupId !== undefined ? !c.groupId : !c.deviceId))) return 'Chọn thiết bị hoặc nhóm cho điều kiện';
   }
   if (triggerType === 'EVENT' && !conditions[0]?.expectedValue) return 'Chọn sự kiện kích hoạt';
   if (actions.length === 0) return 'Thêm ít nhất 1 hành động thực thi';
-  const incomplete = actions.some((a) => (a.action === 'EXECUTE_SCENE' ? !a.sceneId : !a.deviceId));
-  if (incomplete) return 'Chọn thiết bị hoặc kịch bản cho hành động';
+  if (actions.every((a) => a.action === DELAY_ACTION)) return 'Thêm ít nhất 1 hành động ngoài bước chờ';
+  const incomplete = actions.some((a) => {
+    if (a.action === DELAY_ACTION) return !(Number(a.parameters?.seconds) >= 1);
+    if (a.action === 'EXECUTE_SCENE') return !a.sceneId;
+    return a.groupId !== undefined ? !a.groupId : !a.deviceId;
+  });
+  if (incomplete) return 'Chọn thiết bị, nhóm hoặc kịch bản cho hành động';
   return null;
 }

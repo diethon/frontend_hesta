@@ -1,7 +1,7 @@
 import type { DeviceResponse } from '../../../types/device';
 import type { IconName } from '../../home/HomeIcons';
 
-export type FigmaDeviceType = 'Đèn' | 'Điều hòa' | 'Cảm biến' | 'Cổng' | 'Công tắc' | 'Camera';
+export type FigmaDeviceType = 'Đèn' | 'Điều hòa' | 'Cảm biến' | 'Cổng' | 'Công tắc' | 'Camera' | 'Quạt' | 'TV';
 
 export interface CustomColorItem {
   id: string;
@@ -76,6 +76,12 @@ export function resolveFigmaDeviceType(device: DetailDeviceInput | null | undefi
   if (!device) return 'Công tắc';
   const devName = (device.name || '').toLowerCase();
   const devTypeStr = (device.type || device.raw?.deviceType || device.deviceType || '').toUpperCase();
+  const backendType = (device.raw?.deviceType || device.deviceType || '').toUpperCase();
+
+  // Quạt / TV / Cửa có bảng điều khiển riêng (theo test-http) — xét trước nhóm "Công tắc".
+  if (device.type === 'Quạt' || backendType === 'FAN' || backendType === 'SMART_FAN') return 'Quạt';
+  if (device.type === 'TV' || backendType === 'TV' || backendType === 'SMART_TV') return 'TV';
+  if (['DOOR', 'GATE', 'ROLLING_DOOR', 'CURTAIN'].includes(backendType)) return 'Cổng';
 
   if (
     devName.includes('bơm') ||

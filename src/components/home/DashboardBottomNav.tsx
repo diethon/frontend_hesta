@@ -30,7 +30,7 @@ const items: BottomNavItem[] = [
   { id: 'devices', icon: 'grid', label: 'Thiết bị' },
   { id: 'scenes', icon: 'sparkles', label: 'Kịch bản' },
   { id: 'energy', icon: 'energy', label: 'Điện năng' },
-  { id: 'more', icon: 'more', label: 'Thêm' },
+  { id: 'more', icon: 'settings', label: 'Cài đặt' },
 ];
 
 export const DashboardBottomNav: React.FC<DashboardBottomNavProps> = ({
@@ -75,6 +75,8 @@ export const DashboardBottomNav: React.FC<DashboardBottomNavProps> = ({
       case 'more':
         if (onOpenMore) {
           onOpenMore();
+        } else {
+          navigate('/profile');
         }
         break;
     }

@@ -57,7 +57,10 @@ export type IconName =
   | "alert"
   | "flame"
   | "gate"
-  | "play";
+  | "play"
+  | "wrench"
+  | "tv"
+  | "wind";
 
 export const iconPaths: Record<IconName, React.ReactNode> = {
   car: (
@@ -308,6 +311,7 @@ export const iconPaths: Record<IconName, React.ReactNode> = {
   ),
   plus: <path d="M12 5v14M5 12h14" />,
   play: <path d="M7 4.5v15l12-7.5z" />,
+  wrench: <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />,
   more: (
     <>
       <circle cx="5" cy="12" r="1" />
@@ -333,6 +337,19 @@ export const iconPaths: Record<IconName, React.ReactNode> = {
     <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
   ),
   gate: <path d="M3 3h4v18H3zM17 3h4v18h-4zM7 7h10M7 12h10M7 17h10" />,
+  tv: (
+    <>
+      <rect x="2" y="7" width="20" height="14" rx="2" />
+      <polyline points="17 2 12 7 7 2" />
+    </>
+  ),
+  wind: (
+    <>
+      <path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2" />
+      <path d="M9.6 4.6A2 2 0 1 1 11 8H2" />
+      <path d="M12.6 19.4A2 2 0 1 0 14 16H2" />
+    </>
+  ),
 };
 
 export function Icon({

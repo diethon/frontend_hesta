@@ -49,6 +49,20 @@ export const SystemDiagnosticsPage: React.FC<SystemDiagnosticsPageProps> = ({
       onClick: () => window.scrollTo({ top: 0, behavior: 'smooth' }),
       active: true,
     },
+    {
+      id: 'maintenance',
+      icon: 'wrench' as const,
+      label: 'Bảo trì thiết bị',
+      onClick: () => navigate('/admin/maintenance'),
+      active: false,
+    },
+    {
+      id: 'contracts',
+      icon: 'briefcase' as const,
+      label: 'Hợp đồng lắp đặt',
+      onClick: () => navigate('/admin/contracts'),
+      active: false,
+    },
   ];
 
   const adminBottomNavItems = [
@@ -72,6 +86,20 @@ export const SystemDiagnosticsPage: React.FC<SystemDiagnosticsPageProps> = ({
       label: 'Hạ tầng',
       onClick: () => window.scrollTo({ top: 0, behavior: 'smooth' }),
       active: true,
+    },
+    {
+      id: 'maintenance',
+      icon: 'wrench' as const,
+      label: 'Bảo trì',
+      onClick: () => navigate('/admin/maintenance'),
+      active: false,
+    },
+    {
+      id: 'contracts',
+      icon: 'briefcase' as const,
+      label: 'Hợp đồng',
+      onClick: () => navigate('/admin/contracts'),
+      active: false,
     },
   ];
 

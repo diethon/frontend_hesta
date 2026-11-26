@@ -36,7 +36,7 @@ export const EVENT_FRIENDLY_NAMES: Record<string, string> = {
 export const actionLabels: Record<string, string> = {
   TURN_ON: 'Bật',
   TURN_OFF: 'Tắt',
-  TOGGLE: 'Đảo trạng thái',
+  TOGGLE: 'Bật/Tắt',
   OPEN: 'Mở',
   CLOSE: 'Đóng',
   STOP: 'Dừng',
@@ -80,7 +80,7 @@ export function describeCondition(attribute: string | undefined, operator: strin
     const detected = operator === 'NE' ? !yes : yes;
     return detected ? `${deviceName} phát hiện có người` : `${deviceName} không còn thấy người`;
   }
-  if (attribute === 'state' && (yes || no || expected === 'ON' || expected === 'OFF')) {
+  if ((attribute === 'state' || attribute === 'power') && (yes || no || expected === 'ON' || expected === 'OFF')) {
     const on = yes || expected === 'ON';
     return `${deviceName} ${(operator === 'NE' ? !on : on) ? 'đang bật' : 'đang tắt'}`;
   }

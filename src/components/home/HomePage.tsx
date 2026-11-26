@@ -14,12 +14,14 @@ import { HomeFavoriteDevices } from "./HomeFavoriteDevices";
 import { HomeEnergyWidget } from "./HomeEnergyWidget";
 import { HomeActivityWidget } from "./HomeActivityWidget";
 import { SpotlightRecommendationBanner } from "./SpotlightRecommendationBanner";
+import { ActiveContractBanner } from "../contracts/ActiveContractBanner";
 import { DashboardNavRail } from "./DashboardNavRail";
 import { DashboardTopBar, type HomeOption } from "./DashboardTopBar";
 import { DashboardBottomNav } from "./DashboardBottomNav";
 import { getMyHomes, createHome, updateHome } from "../../services/homeApi";
 import { getRooms } from "../../services/roomApi";
 import { getDevicesByHome, sendManualPowerCommand, homeDevicesKey } from "../../services/deviceApi";
+import { normalizeSensorReadingPatch } from "../device/deviceHelpers";
 import { getScenes } from "../../services/sceneApi";
 import { realtimeEventDispatcher } from "../../realtime/realtimeEvents";
 import { useRealtimeRefetch } from "../../realtime/useRealtimeRefetch";
@@ -248,6 +250,38 @@ export const HomePage: React.FC<HomePageProps> = ({
           currentState: state ? { ...device.currentState, ...state } : device.currentState,
           status: data.status ?? device.status,
           lastSeen: data.lastSeen ?? device.lastSeen,
+        };
+      });
+      if (changed && userHome?.homeId) {
+        setCacheValue(homeDevicesKey(userHome.homeId), next);
+      }
+      return changed ? next : prev;
+    });
+  }), [userHome?.homeId]);
+
+  useEffect(() => realtimeEventDispatcher.register<{
+    deviceId?: string;
+    metricType?: string;
+    value?: unknown;
+    recordedAt?: string;
+  }>('SENSOR_READING_UPDATED', (event) => {
+    if (event.homeId !== userHome?.homeId) return;
+    const data = event.data;
+    const targetId = event.deviceId ?? data?.deviceId;
+    if (!targetId || !data?.metricType) return;
+    const patch = normalizeSensorReadingPatch(data.metricType, data.value);
+    if (Object.keys(patch).length === 0) return;
+    lastDevicePatchAtRef.current.set(targetId, Date.now());
+    setDevices((prev) => {
+      let changed = false;
+      const next = prev.map((device) => {
+        if (device.id !== targetId) return device;
+        changed = true;
+        return {
+          ...device,
+          currentState: { ...device.currentState, ...patch },
+          status: 'ONLINE' as const,
+          lastSeen: data.recordedAt ?? event.timestamp ?? device.lastSeen,
         };
       });
       if (changed && userHome?.homeId) {
@@ -533,6 +567,7 @@ export const HomePage: React.FC<HomePageProps> = ({
         {/* ── Main Dashboard: Real Data Only ── */}
         {activeTabSection === 'dashboard' && (
           <div className="dashboard">
+            <ActiveContractBanner />
             <SpotlightRecommendationBanner
               homeId={userHome?.homeId}
               onApplied={() => {
