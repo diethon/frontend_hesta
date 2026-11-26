@@ -227,6 +227,11 @@ export const VoiceAssistantButton: React.FC = () => {
       if (!cleanMessage) return;
 
       // 1. Ưu tiên cao nhất: Dùng Neural Audio (Base64 data URL tức thì < 10ms hoặc Stream URL từ server)
+      // Nếu server đã chủ động trả null (tức là TTS online lỗi/timeout), không gọi lại /api/voice/tts tránh double-timeout
+      if (customAudioPayload === null) {
+        fallbackLocalSpeech(cleanMessage);
+        return;
+      }
       const audioSrc = customAudioPayload || getTtsAudioUrl(cleanMessage);
       try {
         if (!audioPlayerRef.current) {
@@ -366,7 +371,7 @@ export const VoiceAssistantButton: React.FC = () => {
 
         // Phát giọng nói tiếng Việt chuẩn tự nhiên (ưu tiên Base64 phát tức thì < 10ms)
         if (resp.message) {
-          const directUrl = resp.audioUrl ? `${VOICE_SERVICE_URL}${resp.audioUrl}` : undefined;
+          const directUrl = resp.audioUrl ? `${VOICE_SERVICE_URL}${resp.audioUrl}` : null;
           const audioPayload = resp.audioData || directUrl;
           speakResponse(resp.message, audioPayload);
         }
