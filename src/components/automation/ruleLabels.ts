@@ -36,7 +36,7 @@ export const EVENT_FRIENDLY_NAMES: Record<string, string> = {
 export const actionLabels: Record<string, string> = {
   TURN_ON: 'Bật',
   TURN_OFF: 'Tắt',
-  TOGGLE: 'Bật/Tắt',
+  TOGGLE: 'Đổi bật ⇄ tắt',
   OPEN: 'Mở',
   CLOSE: 'Đóng',
   STOP: 'Dừng',
