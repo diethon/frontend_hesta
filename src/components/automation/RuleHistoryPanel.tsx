@@ -113,7 +113,7 @@ export const RuleHistoryPanel: React.FC<RuleHistoryPanelProps> = ({
     if (sceneId || action === 'EXECUTE_SCENE') return 'Chạy kịch bản';
     if (action === 'TURN_ON') return 'Bật thiết bị';
     if (action === 'TURN_OFF') return 'Tắt thiết bị';
-    if (action === 'TOGGLE') return 'Bật/Tắt';
+    if (action === 'TOGGLE') return 'Đổi bật ⇄ tắt';
     if (action === 'SET_BRIGHTNESS') return 'Đặt độ sáng';
     if (action === 'SET_COLOR') return 'Đổi màu đèn';
     if (action === 'SET_TEMPERATURE') return 'Đặt nhiệt độ';
