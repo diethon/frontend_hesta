@@ -1,5 +1,5 @@
 import { confirmDialog } from '../ui/confirmDialog';
-import { formatScheduleTime } from '../scene/SceneScheduleSection';
+import { displayScheduleTime } from '../scene/SceneScheduleSection';
 import React, { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router';
 import {
@@ -123,7 +123,7 @@ export const SpotlightRecommendationBanner: React.FC<SpotlightRecommendationBann
     : null;
 
   const scheduledTime = recommendation.triggerCondition?.time
-    ? formatScheduleTime(recommendation.triggerCondition.time)
+    ? displayScheduleTime(recommendation.triggerCondition.time)
     : '07:00';
 
   const confidencePct = Math.round((recommendation.confidence || 0.8) * 100);

@@ -57,7 +57,7 @@ function formatCommand(act: RuleActionInput, device?: DeviceSummary, scene?: Sce
   const code = act.action;
   if (code === 'TURN_ON') return `Bật ${devName}`;
   if (code === 'TURN_OFF') return `Tắt ${devName}`;
-  if (code === 'TOGGLE') return `Bật/Tắt ${devName}`;
+  if (code === 'TOGGLE') return `Đổi bật ⇄ tắt ${devName}`;
   if (code === 'OPEN') return `Mở cổng/cửa ${devName}`;
   if (code === 'CLOSE') return `Đóng cổng/cửa ${devName}`;
   if (code === 'STOP') return `Dừng cổng/cửa ${devName}`;

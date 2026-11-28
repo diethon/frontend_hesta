@@ -4,6 +4,7 @@ import { Icon } from '../../home/HomeIcons';
 import type { DeviceEnergyBreakdown } from '../../../types/energy';
 import type { DeviceUptimeResponse, DeviceHealthResponse, DeviceResponse } from '../../../types/device';
 import type { FigmaDeviceType, DetailDeviceInput } from './detailTypes';
+import { resolveDefaultDeviceWattage } from '../deviceHelpers';
 import { updateDeviceConfig } from '../../../services/deviceApi';
 import { getDeviceEnergy, deviceEnergyKey } from '../../../services/energyApi';
 import { peekCache } from '../../../services/queryCache';
@@ -21,33 +22,6 @@ export interface EnergyTabProps {
   healthData: DeviceHealthResponse | null;
   refreshEnergy: () => Promise<void>;
   onDeviceUpdated?: (updated: DeviceResponse) => void;
-}
-
-function resolveDefaultWattage(rawType?: string, resolvedType?: FigmaDeviceType): number {
-  const t = (rawType || '').trim().toUpperCase();
-  if (t) {
-    if (t === 'AIR_CONDITIONER' || t === 'AC' || t === 'AC_REMOTE') return 1500;
-    if (t === 'HEATER' || t === 'WATER_HEATER') return 2500;
-    if (t === 'SMART_PLUG' || t === 'SOCKET') return 500;
-    if (t === 'WATER_PUMP') return 370;
-    if (t === 'GATE' || t === 'GATE_MOTOR' || t === 'ROLLING_DOOR' || t === 'DOOR') return 350;
-    if (t === 'FRIDGE') return 150;
-    if (t === 'TV' || t === 'SMART_TV') return 120;
-    if (t === 'FAN' || t === 'SMART_FAN') return 65;
-    if (t === 'CURTAIN') return 60;
-    if (t === 'LIGHT' || t === 'LED') return 40;
-    if (t === 'LED_RGB') return 24;
-    if (t === 'CAMERA_AI' || t === 'CAMERA') return 15;
-    if (t === 'ROUTER') return 12;
-    if (t === 'IR_REMOTE') return 3;
-    if (t.includes('SENSOR')) return 2;
-  }
-  if (resolvedType === 'Điều hòa') return 1500;
-  if (resolvedType === 'Cổng') return 350;
-  if (resolvedType === 'TV') return 120;
-  if (resolvedType === 'Quạt') return 65;
-  if (resolvedType === 'Cảm biến') return 2;
-  return 40;
 }
 
 export const EnergyTab: React.FC<EnergyTabProps> = ({
@@ -101,7 +75,7 @@ export const EnergyTab: React.FC<EnergyTabProps> = ({
       ? propWattage
       : rawCustomWattage !== undefined
       ? Number(rawCustomWattage)
-      : (energyData?.wattage ?? resolveDefaultWattage(rawDeviceType, resolvedType));
+      : (energyData?.wattage ?? resolveDefaultDeviceWattage(rawDeviceType, resolvedType, isSensor));
   const hasCustomWattage =
     propHasCustomWattage !== undefined ? propHasCustomWattage : rawCustomWattage !== undefined;
 

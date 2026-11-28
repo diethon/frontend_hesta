@@ -16,6 +16,7 @@ import { getDeviceEnergy as getEnergyApiDeviceEnergy } from './energyApi';
 
 // Cache key helpers
 export const homeDevicesKey = (homeId: string): string => `devices:home:${homeId}`;
+export const homeRecentActivityKey = (homeId: string, limit = 5): string => `home:activity:${homeId}:${limit}`;
 export const deviceHistoryKey = (deviceId: string): string => `device:history:${deviceId}`;
 export const deviceUptimeKey = (deviceId: string, days = 7): string => `device:uptime:${deviceId}:${days}`;
 export const deviceHealthKey = (deviceId: string): string => `device:health:${deviceId}`;
@@ -26,7 +27,9 @@ export const invalidateDeviceMutations = (deviceId: string): void => {
   invalidateCache(`device:health:${deviceId}`);
   invalidateCache(`device:shadow:${deviceId}`);
   invalidateCache(`energy:device:${deviceId}`);
+  invalidateCache('energy:home:');
   invalidateCache('devices:home:');
+  invalidateCache('home:activity:');
 };
 
 function unwrapCommandResult(response: {
@@ -75,6 +78,17 @@ export const claimDevice = async (deviceId: string, request: DeviceClaimRequest)
   return response.data.result;
 };
 
+export interface HomeActivityItemResponse {
+  id: string;
+  deviceId: string;
+  deviceName: string;
+  deviceType?: string;
+  previousState?: Record<string, unknown>;
+  newState?: Record<string, unknown>;
+  source?: string;
+  changedAt: string;
+}
+
 export const getDevicesByHome = async (homeId: string): Promise<DeviceResponse[]> => {
   return cachedFetch(
     homeDevicesKey(homeId),
@@ -83,6 +97,23 @@ export const getDevicesByHome = async (homeId: string): Promise<DeviceResponse[]
       return response.data.result;
     },
     { ttlMs: 20_000 }
+  );
+};
+
+export const getHomeRecentActivity = async (
+  homeId: string,
+  limit = 5
+): Promise<HomeActivityItemResponse[]> => {
+  return cachedFetch(
+    homeRecentActivityKey(homeId, limit),
+    async () => {
+      const response = await apiClient.get(
+        `/homes/${encodeURIComponent(homeId)}/devices/recent-activity`,
+        { params: { limit } }
+      );
+      return response.data.result;
+    },
+    { ttlMs: 15_000 }
   );
 };
 

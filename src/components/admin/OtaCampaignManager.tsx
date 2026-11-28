@@ -1,5 +1,5 @@
 import { confirmDialog } from '../ui/confirmDialog';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   UploadCloud,
   Play,
@@ -20,82 +20,209 @@ import {
   Link2,
   Clock,
   XCircle,
+  PackageCheck,
+  Rocket,
+  Check,
+  AlertTriangle,
+  Home,
+  Trash2,
 } from 'lucide-react';
-import type { OtaCampaign, FirmwarePackage } from '../../types/diagnostics';
+import type { OtaCampaign, FirmwarePackage, NodeDiagnostics } from '../../types/diagnostics';
 import {
   getOtaCampaigns,
   getOtaPackages,
   uploadOtaPackage,
   registerOtaPackage,
+  deleteOtaPackage,
   createOtaCampaign,
   abortOtaCampaign,
+  getNodeDiagnostics,
 } from '../../services/diagnosticsApi';
 import { notify } from '../ui/notify';
+import { getErrorMessage } from '../../utils/errors';
 
-const DEVICE_TYPE_OPTIONS = [
-  { value: 'ALL', label: 'Tất cả Node ESP32 (ALL)' },
-  { value: 'ESP32_RELAY', label: 'Công tắc Relay (ESP32_RELAY)' },
-  { value: 'AIR_CONDITIONER', label: 'Điều hòa IR (AIR_CONDITIONER)' },
-  { value: 'GATE', label: 'Cổng trượt tự động (GATE)' },
-  { value: 'LIGHT', label: 'Đèn thông minh / Dimmer (LIGHT)' },
-  { value: 'SENSOR', label: 'Cảm biến môi trường (SENSOR)' },
-  { value: 'ESP32_FALL_ALARM', label: 'Còi báo té ngã (ESP32_FALL_ALARM)' },
-  { value: 'ESP32_ENERGY', label: 'Đo điện năng (ESP32_ENERGY)' },
+const MAX_FIRMWARE_BYTES = 20 * 1024 * 1024;
+const SHA256_REGEX = /^[0-9a-f]{64}$/i;
+
+const OTA_DEVICE_TYPE_GROUPS: Array<{
+  group: string;
+  options: Array<{ value: string; label: string }>;
+}> = [
+  {
+    group: 'Hệ thống',
+    options: [{ value: 'ALL', label: 'Tất cả Edge Node ESP32 (ALL)' }],
+  },
+  {
+    group: 'Chiếu sáng',
+    options: [
+      { value: 'LIGHT', label: 'Đèn / Công tắc chiếu sáng (LIGHT)' },
+      { value: 'LED_RGB', label: 'Đèn LED RGB (LED_RGB)' },
+    ],
+  },
+  {
+    group: 'Điều hòa & TV',
+    options: [
+      { value: 'AIR_CONDITIONER', label: 'Điều hòa nhiệt độ (AIR_CONDITIONER)' },
+      { value: 'TV', label: 'Tivi (TV)' },
+    ],
+  },
+  {
+    group: 'Động cơ, Quạt, Bơm & Cửa',
+    options: [
+      { value: 'FAN', label: 'Quạt thông minh (FAN)' },
+      { value: 'WATER_PUMP', label: 'Máy bơm nước (WATER_PUMP)' },
+      { value: 'DOOR', label: 'Cửa chính (DOOR)' },
+      { value: 'ROLLING_DOOR', label: 'Cửa cuốn (ROLLING_DOOR)' },
+      { value: 'CURTAIN', label: 'Rèm thông minh (CURTAIN)' },
+    ],
+  },
+  {
+    group: 'Cảm biến môi trường & An toàn',
+    options: [
+      { value: 'TEMP_HUMID_SENSOR', label: 'Cảm biến nhiệt ẩm (TEMP_HUMID_SENSOR)' },
+      { value: 'MOTION_SENSOR', label: 'Cảm biến chuyển động (MOTION_SENSOR)' },
+      { value: 'LUX_SENSOR', label: 'Cảm biến ánh sáng (LUX_SENSOR)' },
+      { value: 'SMOKE_SENSOR', label: 'Cảm biến khói (SMOKE_SENSOR)' },
+      { value: 'FLAME_SENSOR', label: 'Cảm biến lửa (FLAME_SENSOR)' },
+    ],
+  },
 ];
 
-export const OtaCampaignManager: React.FC = () => {
+const DEVICE_TYPE_LABEL_MAP: Record<string, string> = {
+  ALL: 'Toàn bộ Node ESP32',
+  '*': 'Toàn bộ Node ESP32',
+  LIGHT: 'Đèn / Công tắc chiếu sáng (LIGHT)',
+  LED_RGB: 'Đèn LED RGB (LED_RGB)',
+  AIR_CONDITIONER: 'Điều hòa nhiệt độ (AIR_CONDITIONER)',
+  TV: 'Tivi (TV)',
+  FAN: 'Quạt thông minh (FAN)',
+  WATER_PUMP: 'Máy bơm nước (WATER_PUMP)',
+  DOOR: 'Cửa chính (DOOR)',
+  ROLLING_DOOR: 'Cửa cuốn (ROLLING_DOOR)',
+  CURTAIN: 'Rèm thông minh (CURTAIN)',
+  TEMP_HUMID_SENSOR: 'Cảm biến nhiệt ẩm (TEMP_HUMID_SENSOR)',
+  MOTION_SENSOR: 'Cảm biến chuyển động (MOTION_SENSOR)',
+  LUX_SENSOR: 'Cảm biến ánh sáng (LUX_SENSOR)',
+  SMOKE_SENSOR: 'Cảm biến khói (SMOKE_SENSOR)',
+  FLAME_SENSOR: 'Cảm biến lửa (FLAME_SENSOR)',
+};
+
+const CANARY_STEPS = [
+  { wave: 1, label: 'Đợt 1 · Canary', ratio: '10%' },
+  { wave: 2, label: 'Đợt 2 · Mở rộng', ratio: '50%' },
+  { wave: 3, label: 'Đợt 3 · Toàn bộ', ratio: '100%' },
+];
+
+const doesNodeMatchDeviceType = (node: NodeDiagnostics, deviceType: string): boolean => {
+  const target = (deviceType || '').trim().toUpperCase();
+  if (!target || target === 'ALL' || target === '*') return true;
+  if ((node.deviceType || '').trim().toUpperCase() === target) return true;
+  return (node.attachedDeviceTypes || []).some((dt) => dt.trim().toUpperCase() === target);
+};
+
+interface OtaCampaignManagerProps {
+  onCampaignChange?: () => void;
+}
+
+export const OtaCampaignManager: React.FC<OtaCampaignManagerProps> = ({ onCampaignChange }) => {
   const [campaigns, setCampaigns] = useState<OtaCampaign[]>([]);
   const [packages, setPackages] = useState<FirmwarePackage[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [allNodes, setAllNodes] = useState<NodeDiagnostics[]>([]);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
   const [isCampaignModalOpen, setIsCampaignModalOpen] = useState(false);
   const [isPackageModalOpen, setIsPackageModalOpen] = useState(false);
   const [expandedCampaignId, setExpandedCampaignId] = useState<string | null>(null);
+  const [nodeFilterByCampaign, setNodeFilterByCampaign] = useState<Record<string, string>>({});
 
-  // Campaign form state
+  // List filters
+  const [pkgTypeFilter, setPkgTypeFilter] = useState('ALL_TYPES');
+  const [campaignFilter, setCampaignFilter] = useState<'ALL' | 'RUNNING' | 'COMPLETED' | 'STOPPED'>('ALL');
+
+  // Campaign form state + targeted node selector
   const [name, setName] = useState('');
   const [selectedPkgId, setSelectedPkgId] = useState('');
   const [strategy, setStrategy] = useState('CANARY');
   const [threshold, setThreshold] = useState(20);
+  const [modalHomeFilter, setModalHomeFilter] = useState('ALL');
+  const [showAllNodesManual, setShowAllNodesManual] = useState(false);
+  const [manualNodeIds, setManualNodeIds] = useState<string[] | null>(null);
   const [isSubmittingCampaign, setIsSubmittingCampaign] = useState(false);
 
   // Package upload/register form state
   const [pkgMode, setPkgMode] = useState<'UPLOAD' | 'URL'>('UPLOAD');
-  const [pkgDeviceType, setPkgDeviceType] = useState('ESP32_RELAY');
+  const [pkgDeviceType, setPkgDeviceType] = useState('LIGHT');
   const [pkgVersion, setPkgVersion] = useState('');
   const [pkgReleaseNotes, setPkgReleaseNotes] = useState('');
   const [pkgFile, setPkgFile] = useState<File | null>(null);
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
   const [pkgUrl, setPkgUrl] = useState('');
   const [pkgSha256, setPkgSha256] = useState('');
   const [isSubmittingPkg, setIsSubmittingPkg] = useState(false);
+  const [deletingPkgId, setDeletingPkgId] = useState<string | null>(null);
 
-  const fetchData = async () => {
-    setIsLoading(true);
-    try {
-      const [cList, pList] = await Promise.all([getOtaCampaigns(), getOtaPackages()]);
-      setCampaigns(cList);
-      setPackages(pList);
-    } catch {
-      notify.error('Không thể tải dữ liệu cập nhật phần mềm');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const fetchData = useCallback(
+    async ({ silent = false, manual = false }: { silent?: boolean; manual?: boolean } = {}) => {
+      if (manual) setIsRefreshing(true);
+      try {
+        const [cList, pList, nList] = await Promise.all([
+          getOtaCampaigns(),
+          getOtaPackages(),
+          getNodeDiagnostics(),
+        ]);
+        setCampaigns(cList);
+        setPackages(pList);
+        setAllNodes(nList);
+      } catch (err) {
+        if (!silent) {
+          notify.error(
+            'Không thể tải dữ liệu OTA Firmware',
+            getErrorMessage(err, 'Vui lòng kiểm tra kết nối backend')
+          );
+        }
+      } finally {
+        setInitialLoading(false);
+        if (manual) setIsRefreshing(false);
+      }
+    },
+    []
+  );
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void fetchData();
-    const timer = setInterval(fetchData, 4000);
+    const timer = setInterval(() => {
+      void fetchData({ silent: true });
+    }, 4000);
     return () => clearInterval(timer);
-  }, []);
+  }, [fetchData]);
 
-  const extractErrMsg = (err: unknown, fallback: string): string => {
-    if (typeof err === 'object' && err !== null && 'response' in err) {
-      const msg = (err as { response?: { data?: { message?: string } } }).response?.data?.message;
-      if (typeof msg === 'string' && msg.trim()) return msg;
-    }
-    if (err instanceof Error && err.message.trim()) return err.message;
-    return fallback;
-  };
+  // Escape key handler for modals
+  useEffect(() => {
+    if (!isPackageModalOpen && !isCampaignModalOpen) return;
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsPackageModalOpen(false);
+        setIsCampaignModalOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [isPackageModalOpen, isCampaignModalOpen]);
+
+  const selectedPackage = useMemo(
+    () => packages.find((p) => p.id === selectedPkgId) ?? null,
+    [packages, selectedPkgId]
+  );
+
+  const selectedNodeIds = useMemo(() => {
+    if (manualNodeIds !== null) return manualNodeIds;
+    if (!selectedPackage) return [];
+    return allNodes
+      .filter((n) => n.status === 'ONLINE' && doesNodeMatchDeviceType(n, selectedPackage.deviceType))
+      .map((n) => n.nodeId);
+  }, [manualNodeIds, selectedPackage, allNodes]);
 
   const resetPackageForm = () => {
     setPkgVersion('');
@@ -105,22 +232,55 @@ export const OtaCampaignManager: React.FC = () => {
     setPkgSha256('');
   };
 
+  const validateAndPickBinFile = (file: File | null) => {
+    if (!file) {
+      setPkgFile(null);
+      return;
+    }
+    if (!file.name.toLowerCase().endsWith('.bin')) {
+      notify.error('Định dạng tệp không hợp lệ', 'Chỉ hỗ trợ tệp firmware nhị phân đuôi .bin');
+      return;
+    }
+    if (file.size <= 0) {
+      notify.error('Tệp rỗng', 'Tệp .bin phải có kích thước lớn hơn 0 byte');
+      return;
+    }
+    if (file.size > MAX_FIRMWARE_BYTES) {
+      notify.error('Tệp quá dung lượng', 'Kích thước firmware .bin tối đa là 20 MB');
+      return;
+    }
+    setPkgFile(file);
+  };
+
   const handleCreatePackage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!pkgDeviceType.trim() || !pkgVersion.trim()) {
-      notify.error('Vui lòng nhập loại thiết bị và phiên bản firmware');
+      notify.error('Thiếu thông tin bắt buộc', 'Vui lòng chọn loại thiết bị và nhập phiên bản firmware');
       return;
+    }
+
+    if (pkgMode === 'UPLOAD' && !pkgFile) {
+      notify.error('Chưa chọn tệp firmware', 'Vui lòng chọn tệp .bin (<= 20 MB) để tải lên');
+      return;
+    }
+
+    if (pkgMode === 'URL') {
+      const cleanUrl = pkgUrl.trim();
+      const cleanSha = pkgSha256.trim();
+      if (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) {
+        notify.error('URL không hợp lệ', 'Đường dẫn firmware phải bắt đầu bằng http:// hoặc https://');
+        return;
+      }
+      if (!SHA256_REGEX.test(cleanSha)) {
+        notify.error('Checksum SHA-256 không hợp lệ', 'Checksum phải gồm đúng 64 ký tự hệ thập lục phân (hex)');
+        return;
+      }
     }
 
     setIsSubmittingPkg(true);
     try {
       let created: FirmwarePackage;
-      if (pkgMode === 'UPLOAD') {
-        if (!pkgFile) {
-          notify.error('Vui lòng chọn tệp firmware .bin để tải lên');
-          setIsSubmittingPkg(false);
-          return;
-        }
+      if (pkgMode === 'UPLOAD' && pkgFile) {
         created = await uploadOtaPackage({
           file: pkgFile,
           deviceType: pkgDeviceType.trim(),
@@ -140,9 +300,10 @@ export const OtaCampaignManager: React.FC = () => {
       setSelectedPkgId(created.id);
       setIsPackageModalOpen(false);
       resetPackageForm();
-      await fetchData();
+      await fetchData({ silent: true });
+      onCampaignChange?.();
     } catch (err) {
-      notify.error(extractErrMsg(err, 'Không thể nạp gói firmware OTA'));
+      notify.error('Không thể nạp gói firmware OTA', getErrorMessage(err, 'Vui lòng kiểm tra lại dữ liệu'));
     } finally {
       setIsSubmittingPkg(false);
     }
@@ -151,24 +312,39 @@ export const OtaCampaignManager: React.FC = () => {
   const handleCreateCampaign = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedPkgId) {
-      notify.error('Vui lòng chọn bản cập nhật phần mềm');
+      notify.error('Chưa chọn gói Firmware', 'Vui lòng chọn bản cập nhật phần mềm trước khi phát hành');
+      return;
+    }
+    if (selectedNodeIds.length === 0) {
+      notify.error(
+        'Chưa có Edge Node trực tuyến được chọn',
+        'Vui lòng chọn ít nhất 1 Edge Node đang ONLINE để triển khai cập nhật'
+      );
       return;
     }
 
     setIsSubmittingCampaign(true);
     try {
       await createOtaCampaign({
-        name: name.trim() || 'Bản cập nhật phần mềm thiết bị',
+        name: name.trim() || 'Chiến dịch nâng cấp firmware thiết bị',
         firmwarePackageId: selectedPkgId,
         rolloutStrategy: strategy,
         failureThresholdPercent: threshold,
+        targetNodeIds: selectedNodeIds,
       });
-      notify.success('Đã khởi tạo đợt cập nhật thành công', 'Bắt đầu gửi bản nâng cấp qua MQTT');
+      notify.success(
+        'Đã khởi tạo chiến dịch OTA',
+        `Đang phát lệnh nâng cấp qua MQTT tới ${selectedNodeIds.length} Edge Node`
+      );
       setIsCampaignModalOpen(false);
       setName('');
-      await fetchData();
+      await fetchData({ silent: true });
+      onCampaignChange?.();
     } catch (err) {
-      notify.error(extractErrMsg(err, 'Lỗi khi khởi tạo đợt cập nhật'));
+      notify.error(
+        'Không thể khởi tạo chiến dịch OTA',
+        getErrorMessage(err, 'Vui lòng kiểm tra lại Edge Node trực tuyến hoặc xung đột chiến dịch')
+      );
     } finally {
       setIsSubmittingCampaign(false);
     }
@@ -177,9 +353,11 @@ export const OtaCampaignManager: React.FC = () => {
   const handleAbort = async (id: string) => {
     if (
       !(await confirmDialog({
-        title: 'Dừng khẩn cấp đợt cập nhật?',
-        description: 'Hệ thống sẽ phát lệnh hủy qua MQTT; các thiết bị chưa flash sẽ dừng cập nhật an toàn.',
-        confirmText: 'Dừng cập nhật',
+        title: 'Dừng khẩn cấp chiến dịch OTA?',
+        description:
+          'Hệ thống sẽ phát bản tin /ota/abort qua MQTT tới các node đang cập nhật; các node chưa flash xong sẽ hủy an toàn.',
+        confirmText: 'Dừng khẩn cấp',
+        cancelText: 'Tiếp tục theo dõi',
         variant: 'danger',
       }))
     ) {
@@ -187,21 +365,58 @@ export const OtaCampaignManager: React.FC = () => {
     }
     try {
       await abortOtaCampaign(id, 'Quản trị viên chủ động dừng khẩn cấp trên giao diện');
-      notify.success('Đã dừng khẩn cấp đợt cập nhật an toàn');
-      await fetchData();
+      notify.success('Đã dừng khẩn cấp chiến dịch OTA');
+      await fetchData({ silent: true });
+      onCampaignChange?.();
     } catch (err) {
-      notify.error(extractErrMsg(err, 'Gặp sự cố khi dừng đợt cập nhật'));
+      notify.error('Gặp sự cố khi dừng chiến dịch', getErrorMessage(err, 'Vui lòng thử lại'));
     }
   };
 
+  const handleDeletePackage = async (pkg: FirmwarePackage) => {
+    if (usedPackageIds.has(pkg.id)) {
+      notify.error('Không thể xóa gói firmware', 'Gói này đang được tham chiếu bởi một chiến dịch OTA');
+      return;
+    }
+    if (
+      !(await confirmDialog({
+        title: `Xóa gói firmware ${pkg.version}?`,
+        description: `Hệ thống sẽ xóa gói ${pkg.deviceType} (${pkg.version}) khỏi cơ sở dữ liệu và kho lưu trữ đám mây.`,
+        confirmText: 'Xóa gói firmware',
+        cancelText: 'Giữ lại',
+        variant: 'danger',
+      }))
+    ) {
+      return;
+    }
+    setDeletingPkgId(pkg.id);
+    try {
+      await deleteOtaPackage(pkg.id);
+      if (selectedPkgId === pkg.id) {
+        setSelectedPkgId('');
+      }
+      notify.success('Đã xóa gói Firmware OTA', `${pkg.deviceType} ${pkg.version}`);
+      await fetchData({ silent: true });
+      onCampaignChange?.();
+    } catch (err) {
+      notify.error('Không thể xóa gói firmware', getErrorMessage(err, 'Vui lòng thử lại'));
+    } finally {
+      setDeletingPkgId(null);
+    }
+  };
+
+  const openCampaignForPackage = (pkg: FirmwarePackage) => {
+    setSelectedPkgId(pkg.id);
+    setManualNodeIds(null);
+    if (!name.trim()) {
+      setName(`Nâng cấp ${pkg.deviceType} lên ${pkg.version}`);
+    }
+    setIsCampaignModalOpen(true);
+  };
+
   const formatDeviceType = (type: string) => {
-    if (type === 'ALL' || type === '*') return 'Toàn bộ Node ESP32';
-    if (type.includes('RELAY')) return 'Công tắc Relay (ESP32)';
-    if (type.includes('ENERGY')) return 'Đo điện năng (ESP32)';
-    if (type.includes('AIR_CONDITIONER')) return 'Điều hòa IR';
-    if (type.includes('GATE')) return 'Cổng trượt L298N';
-    if (type.includes('FALL')) return 'Còi báo té ngã';
-    return type || 'Thiết bị thông minh';
+    const clean = (type || '').trim().toUpperCase();
+    return DEVICE_TYPE_LABEL_MAP[clean] || type || 'Thiết bị thông minh';
   };
 
   const formatBytes = (bytes?: number) => {
@@ -214,38 +429,59 @@ export const OtaCampaignManager: React.FC = () => {
   const getFriendlyStatus = (status: string) => {
     switch (status) {
       case 'RUNNING_CANARY_10':
-        return { label: 'Đang thử nghiệm đợt 1 (10% thiết bị)', color: 'bg-primary/10 text-primary border-primary/20' };
+        return {
+          label: 'Đang chạy Đợt 1 (Canary 10%)',
+          color: 'bg-info-soft text-sky-700 border-sky-200',
+        };
       case 'RUNNING_CANARY_50':
-        return { label: 'Đang mở rộng đợt 2 (50% thiết bị)', color: 'bg-indigo-500/10 text-indigo-500 border-indigo-500/20' };
+        return {
+          label: 'Đang chạy Đợt 2 (Mở rộng 50%)',
+          color: 'bg-info-soft text-sky-700 border-sky-200',
+        };
       case 'RUNNING_FULL_100':
-        return { label: 'Đang triển khai toàn đội (100% thiết bị)', color: 'bg-blue-500/10 text-blue-500 border-blue-500/20' };
+        return {
+          label: 'Đang triển khai Toàn đội (100%)',
+          color: 'bg-info-soft text-sky-700 border-sky-200',
+        };
       case 'COMPLETED':
-        return { label: 'Nâng cấp thành công hoàn tất', color: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' };
+        return {
+          label: 'Hoàn tất 100%',
+          color: 'bg-success-soft text-emerald-700 border-emerald-200',
+        };
       case 'ABORTED_FAILURE_THRESHOLD':
       case 'ABORTED':
       case 'ABORTED_AUTO':
-        return { label: 'Đã dừng khẩn cấp (Vượt ngưỡng lỗi)', color: 'bg-rose-500/10 text-rose-500 border-rose-500/20 animate-pulse' };
+        return {
+          label: 'Tự ngắt khẩn cấp (Vượt ngưỡng lỗi)',
+          color: 'bg-error-soft text-rose-700 border-rose-200 animate-pulse',
+        };
       case 'CANCELLED':
-        return { label: 'Đã hủy bởi quản trị viên', color: 'bg-muted/20 text-muted border-line' };
+        return {
+          label: 'Đã hủy bởi quản trị viên',
+          color: 'bg-sidebar text-muted border-line',
+        };
       default:
-        return { label: status, color: 'bg-primary/10 text-primary border-primary/20' };
+        return {
+          label: status,
+          color: 'bg-info-soft text-sky-700 border-sky-200',
+        };
     }
   };
 
   const getNodeStatusBadge = (status: string) => {
     switch (status) {
       case 'SUCCEEDED':
-        return 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20';
+        return 'bg-success-soft text-emerald-700 border-emerald-200';
       case 'FAILED':
-        return 'bg-rose-500/10 text-rose-600 border-rose-500/20';
+        return 'bg-error-soft text-rose-700 border-rose-200';
       case 'CANCELLED':
-        return 'bg-muted/15 text-muted border-line';
+        return 'bg-sidebar text-muted border-line';
       case 'DOWNLOADING':
       case 'VERIFYING':
       case 'REBOOTING':
       case 'FLASHING':
       case 'DISPATCHED':
-        return 'bg-primary/10 text-primary border-primary/20';
+        return 'bg-info-soft text-sky-700 border-sky-200';
       default:
         return 'bg-sidebar text-muted border-line';
     }
@@ -256,22 +492,89 @@ export const OtaCampaignManager: React.FC = () => {
     notify.success(`Đã sao chép ${label}`);
   };
 
+  const kpiStats = useMemo(() => {
+    const running = campaigns.filter((c) => c.status.startsWith('RUNNING')).length;
+    const completed = campaigns.filter((c) => c.status === 'COMPLETED').length;
+    const stopped = campaigns.filter(
+      (c) => c.status.includes('ABORTED') || c.status === 'CANCELLED'
+    ).length;
+    const uploadedPkgs = packages.filter((p) => p.uploaded).length;
+    return { running, completed, stopped, uploadedPkgs };
+  }, [campaigns, packages]);
+
+  const usedPackageIds = useMemo(
+    () => new Set(campaigns.map((c) => c.firmwarePackageId).filter(Boolean)),
+    [campaigns]
+  );
+
+  const availablePkgTypes = useMemo(() => {
+    return Array.from(new Set(packages.map((p) => p.deviceType)));
+  }, [packages]);
+
+  const filteredPackages = useMemo(() => {
+    if (pkgTypeFilter === 'ALL_TYPES') return packages;
+    return packages.filter((p) => p.deviceType === pkgTypeFilter);
+  }, [packages, pkgTypeFilter]);
+
+  const filteredCampaigns = useMemo(() => {
+    return campaigns.filter((c) => {
+      if (campaignFilter === 'ALL') return true;
+      if (campaignFilter === 'RUNNING') return c.status.startsWith('RUNNING');
+      if (campaignFilter === 'COMPLETED') return c.status === 'COMPLETED';
+      return c.status.includes('ABORTED') || c.status === 'CANCELLED';
+    });
+  }, [campaigns, campaignFilter]);
+
+  // Modal target node filter lists
+  const modalHomeOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const n of allNodes) {
+      if (n.homeId) {
+        map.set(n.homeId, n.homeName && n.homeName !== 'N/A' ? n.homeName : 'Nhà chưa đặt tên');
+      }
+    }
+    return Array.from(map.entries()).map(([id, label]) => ({ id, label }));
+  }, [allNodes]);
+
+  const modalCandidateNodes = useMemo(() => {
+    return allNodes
+      .filter((n) => {
+        if (modalHomeFilter !== 'ALL' && n.homeId !== modalHomeFilter) return false;
+        if (!selectedPackage || showAllNodesManual) return true;
+        return doesNodeMatchDeviceType(n, selectedPackage.deviceType);
+      })
+      .sort((a, b) => {
+        if (a.status === 'ONLINE' && b.status !== 'ONLINE') return -1;
+        if (a.status !== 'ONLINE' && b.status === 'ONLINE') return 1;
+        return (a.nodeCode || '').localeCompare(b.nodeCode || '');
+      });
+  }, [allNodes, modalHomeFilter, selectedPackage, showAllNodesManual]);
+
+  const toggleTargetNode = (nodeId: string) => {
+    setManualNodeIds((prev) => {
+      const current = prev ?? selectedNodeIds;
+      return current.includes(nodeId)
+        ? current.filter((id) => id !== nodeId)
+        : [...current, nodeId];
+    });
+  };
+
   return (
     <div className="space-y-6 tabular-nums">
       {/* Header Banner */}
-      <div className="rounded-3xl border border-line bg-surface shadow-xs p-6 flex flex-wrap items-center justify-between gap-4">
+      <div className="rounded-3xl border border-line bg-surface/95 backdrop-blur-sm shadow-soft p-5 sm:p-6 flex flex-wrap items-center justify-between gap-4">
         <div className="space-y-1.5">
-          <div className="flex items-center gap-2">
-            <span className="p-2.5 rounded-2xl bg-primary/10 text-primary">
+          <div className="flex items-center gap-2.5">
+            <span className="p-2.5 rounded-2xl bg-info-soft border border-sky-200 text-sky-700">
               <UploadCloud className="w-5 h-5" />
             </span>
-            <h3 className="text-lg font-bold text-text">
-              Cập nhật phần mềm thiết bị từ xa (OTA)
-            </h3>
+            <h2 className="text-base sm:text-lg font-bold text-text">
+              Điều phối cập nhật Firmware từ xa (OTA)
+            </h2>
           </div>
           <p className="text-xs text-muted max-w-2xl leading-relaxed">
-            Tải lên tệp nhị phân <code>.bin</code> (tự tính SHA-256) và triển khai nâng cấp qua MQTT theo chiến lược
-            <strong> Canary 3 đợt (10% &rarr; 50% &rarr; 100%)</strong> kèm tự ngắt an toàn khi tỷ lệ lỗi vượt ngưỡng.
+            Lưu trữ gói <code>.bin</code> khớp chuẩn các dòng thiết bị thực tế của HESTA, chọn đích danh Edge Node mục tiêu theo từng ngôi nhà và phát hành qua{' '}
+            <strong>Canary 3 đợt (10% &rarr; 50% &rarr; 100%)</strong>.
           </p>
         </div>
 
@@ -279,26 +582,31 @@ export const OtaCampaignManager: React.FC = () => {
           <button
             type="button"
             onClick={() => setIsPackageModalOpen(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-full border border-line text-xs font-semibold text-text hover:bg-surface-hover transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-full border border-line bg-surface text-xs font-semibold text-text hover:bg-sidebar-hover/70 transition-colors cursor-pointer"
           >
-            <FileCode className="w-4 h-4 text-primary" />
+            <FileCode className="w-4 h-4 text-sky-700" />
             <span>Tải lên Firmware (.bin)</span>
           </button>
 
           <button
             type="button"
-            onClick={fetchData}
-            disabled={isLoading}
-            className="p-2 rounded-xl border border-line text-xs font-semibold text-text hover:bg-surface-hover transition-colors cursor-pointer"
-            title="Làm mới dữ liệu"
+            onClick={() => void fetchData({ manual: true })}
+            disabled={isRefreshing}
+            className="p-2 rounded-xl border border-line bg-surface text-xs font-semibold text-text hover:bg-sidebar-hover/70 transition-colors cursor-pointer disabled:opacity-50"
+            title="Làm mới dữ liệu OTA"
           >
-            <RotateCw className={`w-4 h-4 text-muted ${isLoading ? 'animate-spin text-primary' : ''}`} />
+            <RotateCw
+              className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-primary' : 'text-muted'}`}
+            />
           </button>
 
           <button
             type="button"
-            onClick={() => setIsCampaignModalOpen(true)}
-            className="flex items-center gap-1.5 px-4 py-2.5 rounded-full bg-primary text-white text-xs font-semibold hover:bg-primary-hover transition-colors shadow-2xs cursor-pointer active:scale-98"
+            onClick={() => {
+              setManualNodeIds(null);
+              setIsCampaignModalOpen(true);
+            }}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-primary text-white text-xs font-semibold hover:bg-primary-hover transition-colors shadow-2xs cursor-pointer active:scale-98"
           >
             <Plus className="w-4 h-4" />
             <span>Khởi tạo chiến dịch OTA</span>
@@ -306,56 +614,180 @@ export const OtaCampaignManager: React.FC = () => {
         </div>
       </div>
 
-      {/* Kho Firmware Packages */}
-      <div className="rounded-3xl border border-line bg-surface shadow-xs p-5 space-y-3">
-        <div className="flex items-center justify-between gap-2">
-          <h4 className="text-sm font-bold text-text flex items-center gap-2">
-            <FileCode className="w-4 h-4 text-primary" />
-            <span>Kho gói Firmware đã đăng ký ({packages.length})</span>
-          </h4>
+      {/* 4 KPI Cards OTA */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="rounded-3xl border border-line bg-surface/95 shadow-soft p-4 flex items-center justify-between">
+          <div>
+            <p className="text-xs text-muted font-medium">Kho gói Firmware</p>
+            <div className="text-2xl font-extrabold text-text mt-1">{packages.length}</div>
+            <p className="text-[11px] text-muted mt-0.5">{kpiStats.uploadedPkgs} tệp .bin nội bộ</p>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-info-soft border border-sky-200 text-sky-700 flex items-center justify-center">
+            <PackageCheck className="w-5 h-5" />
+          </div>
         </div>
 
-        {packages.length === 0 ? (
-          <p className="text-xs text-muted py-3">
-            Chưa có bản firmware nào. Bấm &quot;Tải lên Firmware (.bin)&quot; để nạp bản cập nhật thật trước khi tạo chiến dịch.
-          </p>
+        <div className="rounded-3xl border border-line bg-surface/95 shadow-soft p-4 flex items-center justify-between">
+          <div>
+            <p className="text-xs text-muted font-medium">Chiến dịch đang chạy</p>
+            <div className="text-2xl font-extrabold text-sky-700 mt-1">{kpiStats.running}</div>
+            <p className="text-[11px] text-muted mt-0.5">Theo dõi Watchdog 180s</p>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-info-soft border border-sky-200 text-sky-700 flex items-center justify-center">
+            <Rocket className="w-5 h-5" />
+          </div>
+        </div>
+
+        <div className="rounded-3xl border border-line bg-surface/95 shadow-soft p-4 flex items-center justify-between">
+          <div>
+            <p className="text-xs text-muted font-medium">Hoàn tất thành công</p>
+            <div className="text-2xl font-extrabold text-emerald-700 mt-1">{kpiStats.completed}</div>
+            <p className="text-[11px] text-muted mt-0.5">100% node đạt phiên bản mới</p>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-success-soft border border-emerald-200 text-emerald-700 flex items-center justify-center">
+            <CheckCircle className="w-5 h-5" />
+          </div>
+        </div>
+
+        <div className="rounded-3xl border border-line bg-surface/95 shadow-soft p-4 flex items-center justify-between">
+          <div>
+            <p className="text-xs text-muted font-medium">Ngắt khẩn cấp / Hủy</p>
+            <div
+              className={`text-2xl font-extrabold mt-1 ${
+                kpiStats.stopped > 0 ? 'text-rose-700' : 'text-text'
+              }`}
+            >
+              {kpiStats.stopped}
+            </div>
+            <p className="text-[11px] text-muted mt-0.5">Bảo vệ roll-forward sai</p>
+          </div>
+          <div
+            className={`w-10 h-10 rounded-xl border flex items-center justify-center ${
+              kpiStats.stopped > 0
+                ? 'bg-error-soft border-rose-200 text-rose-700'
+                : 'bg-sidebar border-line text-muted'
+            }`}
+          >
+            <AlertOctagon className="w-5 h-5" />
+          </div>
+        </div>
+      </div>
+
+      {/* Kho Firmware Packages */}
+      <div className="rounded-3xl border border-line bg-surface/95 backdrop-blur-sm shadow-soft p-5 space-y-3.5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-sm font-bold text-text flex items-center gap-2">
+            <FileCode className="w-4 h-4 text-primary" />
+            <span>Kho gói Firmware đã đăng ký ({filteredPackages.length})</span>
+          </h3>
+
+          {availablePkgTypes.length > 1 && (
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <button
+                type="button"
+                onClick={() => setPkgTypeFilter('ALL_TYPES')}
+                className={`px-2.5 py-1 rounded-xl text-[11px] font-semibold border cursor-pointer ${
+                  pkgTypeFilter === 'ALL_TYPES'
+                    ? 'bg-primary text-white border-primary'
+                    : 'bg-surface text-muted border-line hover:bg-sidebar-hover/60'
+                }`}
+              >
+                Tất cả loại
+              </button>
+              {availablePkgTypes.map((dt) => (
+                <button
+                  key={dt}
+                  type="button"
+                  onClick={() => setPkgTypeFilter(dt)}
+                  className={`px-2.5 py-1 rounded-xl text-[11px] font-semibold border cursor-pointer ${
+                    pkgTypeFilter === dt
+                      ? 'bg-primary text-white border-primary'
+                      : 'bg-surface text-muted border-line hover:bg-sidebar-hover/60'
+                  }`}
+                >
+                  {dt}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {initialLoading ? (
+          <p className="text-xs text-muted py-4">Đang tải danh sách gói Firmware...</p>
+        ) : filteredPackages.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-line bg-sidebar/40 p-6 text-center">
+            <p className="text-xs font-semibold text-text">Chưa có gói firmware nào</p>
+            <p className="text-xs text-muted mt-1">
+              Nhấn &quot;Tải lên Firmware (.bin)&quot; để nạp tệp nhị phân hoặc đăng ký URL tải ngoài.
+            </p>
+          </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {packages.map((pkg) => (
-              <div key={pkg.id} className="rounded-2xl border border-line bg-sidebar/40 p-3.5 text-xs space-y-1.5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+            {filteredPackages.map((pkg) => (
+              <div
+                key={pkg.id}
+                className="rounded-2xl border border-line bg-sidebar/45 hover:bg-sidebar/70 p-4 text-xs space-y-2 transition-colors"
+              >
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-mono font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-md">
+                    <span className="font-mono font-bold text-sky-700 bg-info-soft border border-sky-200 px-2.5 py-0.5 rounded-lg">
                       {pkg.version}
                     </span>
-                    <span className="font-semibold text-text">{formatDeviceType(pkg.deviceType)}</span>
+                    <span className="font-bold text-text">{formatDeviceType(pkg.deviceType)}</span>
                   </div>
-                  <span className="text-[11px] font-medium px-2 py-0.5 rounded-full border border-line text-muted">
-                    {pkg.uploaded ? formatBytes(pkg.fileSizeBytes) : 'External URL'}
+                  <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full border border-line bg-surface text-muted">
+                    {pkg.uploaded ? formatBytes(pkg.fileSizeBytes) : 'URL ngoài'}
                   </span>
                 </div>
 
-                {pkg.releaseNotes && <p className="text-muted line-clamp-2">{pkg.releaseNotes}</p>}
+                {pkg.releaseNotes && (
+                  <p className="text-muted line-clamp-2 leading-relaxed">{pkg.releaseNotes}</p>
+                )}
 
-                <div className="flex items-center justify-between gap-2 pt-1 text-[11px] font-mono text-muted">
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-line/60 text-[11px]">
                   <button
                     type="button"
                     onClick={() => copyText(pkg.checksumSha256, 'SHA-256')}
-                    className="inline-flex items-center gap-1 hover:text-text cursor-pointer"
+                    className="inline-flex items-center gap-1 font-mono text-muted hover:text-text cursor-pointer"
                     title={pkg.checksumSha256}
                   >
                     <Copy className="w-3 h-3" />
-                    <span>SHA256: {pkg.checksumSha256.slice(0, 14)}...</span>
+                    <span>SHA256: {pkg.checksumSha256.slice(0, 12)}...</span>
                   </button>
-                  <a
-                    href={pkg.fileUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1 text-primary hover:underline"
-                  >
-                    <Download className="w-3 h-3" />
-                    <span>Tải .bin</span>
-                  </a>
+
+                  <div className="flex items-center gap-3">
+                    <a
+                      href={pkg.fileUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 font-semibold text-sky-700 hover:underline"
+                    >
+                      <Download className="w-3 h-3" />
+                      <span>Tải .bin</span>
+                    </a>
+                    <button
+                      type="button"
+                      disabled={usedPackageIds.has(pkg.id) || deletingPkgId === pkg.id}
+                      onClick={() => void handleDeletePackage(pkg)}
+                      title={
+                        usedPackageIds.has(pkg.id)
+                          ? 'Không thể xóa gói đã được dùng trong chiến dịch OTA'
+                          : 'Xóa gói firmware này'
+                      }
+                      aria-label={`Xóa gói firmware ${pkg.version}`}
+                      className="inline-flex items-center justify-center p-1.5 rounded-lg border border-line text-muted hover:text-rose-700 hover:border-rose-200 hover:bg-error-soft transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => openCampaignForPackage(pkg)}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-primary text-white font-semibold hover:bg-primary-hover transition-colors cursor-pointer"
+                    >
+                      <Play className="w-3 h-3 fill-current" />
+                      <span>Phát hành</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
@@ -363,60 +795,116 @@ export const OtaCampaignManager: React.FC = () => {
         )}
       </div>
 
-      {/* Danh Sách Các Đợt Cập Nhật */}
+      {/* Danh Sách Chiến Dịch OTA */}
       <div className="space-y-4">
-        <h4 className="text-sm font-bold text-text flex items-center gap-2">
-          <Activity className="w-4 h-4 text-primary" />
-          <span>Tiến độ các chiến dịch OTA ({campaigns.length})</span>
-        </h4>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h3 className="text-sm font-bold text-text flex items-center gap-2">
+            <Activity className="w-4 h-4 text-primary" />
+            <span>Tiến độ chiến dịch OTA ({filteredCampaigns.length})</span>
+          </h3>
 
-        {campaigns.length === 0 ? (
-          <div className="rounded-3xl border border-line bg-surface shadow-xs p-12 text-center">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {(
+              [
+                { id: 'ALL', label: `Tất cả (${campaigns.length})` },
+                { id: 'RUNNING', label: `Đang chạy (${kpiStats.running})` },
+                { id: 'COMPLETED', label: `Hoàn tất (${kpiStats.completed})` },
+                { id: 'STOPPED', label: `Đã dừng (${kpiStats.stopped})` },
+              ] as const
+            ).map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => setCampaignFilter(opt.id)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors cursor-pointer ${
+                  campaignFilter === opt.id
+                    ? 'bg-primary text-white border-primary shadow-2xs'
+                    : 'bg-surface text-muted border-line hover:text-text hover:bg-sidebar-hover/60'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {initialLoading ? (
+          <div className="rounded-3xl border border-line bg-surface/95 shadow-soft p-10 text-center text-xs text-muted">
+            Đang tải danh sách chiến dịch OTA...
+          </div>
+        ) : filteredCampaigns.length === 0 ? (
+          <div className="rounded-3xl border border-line bg-surface/95 shadow-soft p-12 text-center">
             <Layers className="w-12 h-12 text-muted mx-auto mb-3 opacity-40" />
-            <p className="text-sm font-semibold text-text">Chưa có chiến dịch OTA nào</p>
+            <p className="text-sm font-semibold text-text">
+              {campaigns.length === 0
+                ? 'Chưa có chiến dịch OTA nào'
+                : 'Không có chiến dịch nào trong bộ lọc này'}
+            </p>
             <p className="text-xs text-muted mt-1 max-w-md mx-auto">
-              Tải lên bản firmware `.bin` rồi bấm &quot;Khởi tạo chiến dịch OTA&quot; để phát hành an toàn tới các Edge Node trực tuyến.
+              Tải lên bản firmware <code>.bin</code> rồi nhấn &quot;Khởi tạo chiến dịch OTA&quot; để phân phối theo đợt an toàn tới các Edge Node đã chọn.
             </p>
           </div>
         ) : (
-          campaigns.map((camp) => {
+          filteredCampaigns.map((camp) => {
             const isAborted = camp.status.includes('ABORTED');
             const isCompleted = camp.status === 'COMPLETED';
             const isCancelled = camp.status === 'CANCELLED';
+            const isRunning = !isAborted && !isCompleted && !isCancelled;
             const statusInfo = getFriendlyStatus(camp.status);
             const isExpanded = expandedCampaignId === camp.id;
 
-            const realPercent =
-              camp.totalNodes > 0 ? Math.round((camp.attemptedNodes * 100) / camp.totalNodes) : 0;
-            const progressPercent = isCompleted ? 100 : Math.max(realPercent, camp.status === 'RUNNING_CANARY_10' ? 5 : 0);
-            const failRate = camp.attemptedNodes > 0 ? Math.round((camp.failedNodes * 100) / camp.attemptedNodes) : 0;
+            const successPct =
+              camp.totalNodes > 0 ? Math.round((camp.successNodes * 100) / camp.totalNodes) : 0;
+            const failedPct =
+              camp.totalNodes > 0 ? Math.round((camp.failedNodes * 100) / camp.totalNodes) : 0;
+            const inFlightCount = (camp.nodeExecutions || []).filter((ne) =>
+              ['DISPATCHED', 'DOWNLOADING', 'VERIFYING', 'FLASHING', 'REBOOTING'].includes(ne.status)
+            ).length;
+            const inFlightPct =
+              camp.totalNodes > 0 ? Math.round((inFlightCount * 100) / camp.totalNodes) : 0;
+
+            const failRate =
+              camp.attemptedNodes > 0 ? Math.round((camp.failedNodes * 100) / camp.attemptedNodes) : 0;
+
+            const activeNodeFilter = nodeFilterByCampaign[camp.id] || 'ALL';
+            const filteredNodes = (camp.nodeExecutions || []).filter((ne) => {
+              if (activeNodeFilter === 'ALL') return true;
+              if (activeNodeFilter === 'FAILED') return ne.status === 'FAILED';
+              return String(ne.wave) === activeNodeFilter;
+            });
+
+            const currentWave = camp.currentWave || 1;
 
             return (
               <div
                 key={camp.id}
-                className="rounded-3xl border border-line bg-surface shadow-xs p-5 hover:border-primary/40 transition-colors"
+                className="rounded-3xl border border-line bg-surface/95 backdrop-blur-sm shadow-soft p-5 sm:p-6 space-y-4 hover:border-primary/50 transition-colors"
               >
-                <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <div className="flex items-center gap-2 flex-wrap">
-                      <h5 className="text-base font-bold text-text">{camp.name}</h5>
-                      <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-semibold bg-primary/10 text-primary">
+                      <span className="text-base font-bold text-text">{camp.name}</span>
+                      <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-info-soft text-sky-700 border border-sky-200">
                         {camp.version}
                       </span>
-                      <span className="px-2.5 py-0.5 rounded-md text-[11px] font-semibold bg-sidebar text-muted flex items-center gap-1">
+                      <span className="px-2.5 py-0.5 rounded-lg text-[11px] font-semibold bg-sidebar text-muted border border-line flex items-center gap-1">
                         <Cpu className="w-3 h-3" />
                         {formatDeviceType(camp.deviceType)}
                       </span>
                     </div>
                     <p className="text-[11px] text-muted mt-1">
-                      Bắt đầu: {new Date(camp.createdAt || '').toLocaleString('vi-VN')} &bull; Chiến lược: {camp.rolloutStrategy}
-                      {camp.currentWave ? ` (Đợt ${camp.currentWave})` : ''}
+                      Tạo lúc: {camp.createdAt ? new Date(camp.createdAt).toLocaleString('vi-VN') : '--'} &bull;{' '}
+                      Chiến lược:{' '}
+                      <strong className="text-text">
+                        {camp.rolloutStrategy === 'CANARY' ? 'Canary 3 đợt' : 'Đồng loạt 100%'}
+                      </strong>
+                      {camp.currentWave ? ` (Đang ở Đợt ${camp.currentWave})` : ''}
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span
-                      className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold border ${statusInfo.color}`}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${statusInfo.color}`}
                     >
                       {isCompleted && <CheckCircle className="w-3.5 h-3.5" />}
                       {isAborted && <AlertOctagon className="w-3.5 h-3.5" />}
@@ -424,11 +912,11 @@ export const OtaCampaignManager: React.FC = () => {
                       {statusInfo.label}
                     </span>
 
-                    {!isCompleted && !isAborted && !isCancelled && (
+                    {isRunning && (
                       <button
                         type="button"
                         onClick={() => handleAbort(camp.id)}
-                        className="px-3 py-1 rounded-xl border border-rose-500/30 text-rose-500 hover:bg-rose-500/10 text-xs font-semibold transition-colors cursor-pointer"
+                        className="px-3 py-1 rounded-xl border border-rose-200 bg-error-soft text-rose-700 hover:brightness-95 text-xs font-bold transition-colors cursor-pointer"
                       >
                         Dừng khẩn cấp
                       </button>
@@ -436,52 +924,138 @@ export const OtaCampaignManager: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Progress Bar */}
-                <div className="space-y-2 mb-4">
+                {/* Canary Wave Stepper Visual */}
+                {camp.rolloutStrategy === 'CANARY' ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                    {CANARY_STEPS.map((step) => {
+                      const waveNodes = (camp.nodeExecutions || []).filter(
+                        (ne) => ne.wave === step.wave
+                      );
+                      const waveSucceeded = waveNodes.filter((ne) => ne.status === 'SUCCEEDED').length;
+                      const isDone =
+                        isCompleted ||
+                        (waveNodes.length > 0 && waveSucceeded === waveNodes.length);
+                      const isActiveStep = isRunning && currentWave === step.wave && !isDone;
+                      const isStoppedStep =
+                        (isAborted || isCancelled) && currentWave === step.wave;
+
+                      return (
+                        <div
+                          key={step.wave}
+                          className={`rounded-2xl border px-3 py-2.5 flex items-center justify-between gap-2 text-xs transition-colors ${
+                            isStoppedStep
+                              ? 'bg-error-soft border-rose-200 text-rose-700'
+                              : isDone
+                              ? 'bg-success-soft border-emerald-200 text-emerald-700'
+                              : isActiveStep
+                              ? 'bg-info-soft border-sky-200 text-sky-700'
+                              : 'bg-sidebar/60 border-line text-muted'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span
+                              className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 ${
+                                isStoppedStep
+                                  ? 'bg-rose-600 text-white'
+                                  : isDone
+                                  ? 'bg-emerald-600 text-white'
+                                  : isActiveStep
+                                  ? 'bg-primary text-white animate-pulse'
+                                  : 'bg-surface border border-line text-muted'
+                              }`}
+                            >
+                              {isDone ? <Check className="w-3.5 h-3.5" /> : step.wave}
+                            </span>
+                            <div className="min-w-0">
+                              <div className="font-bold truncate">{step.label}</div>
+                              <div className="text-[10px] opacity-80">
+                                {waveNodes.length} node ({step.ratio})
+                              </div>
+                            </div>
+                          </div>
+                          {waveNodes.length > 0 && (
+                            <span className="font-mono text-[11px] font-bold shrink-0">
+                              {waveSucceeded}/{waveNodes.length}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-line bg-sidebar/60 px-3.5 py-2 text-xs font-semibold text-text flex items-center justify-between">
+                    <span>Chiến lược IMMEDIATE — Triển khai đồng loạt 100% thiết bị đã chọn</span>
+                    <span className="font-mono text-sky-700">
+                      {camp.attemptedNodes}/{camp.totalNodes} node phản hồi
+                    </span>
+                  </div>
+                )}
+
+                {/* Multi-Segment Progress Bar */}
+                <div className="space-y-1.5">
                   <div className="flex justify-between text-xs text-muted font-medium">
                     <span>
-                      Tiến độ thực tế ({camp.attemptedNodes}/{camp.totalNodes} node phản hồi):
+                      Tiến độ thực tế ({camp.attemptedNodes}/{camp.totalNodes} node hoàn tất phản hồi)
                     </span>
-                    <strong className="text-text">{progressPercent}%</strong>
+                    <span className="font-bold text-text">{successPct}% thành công</span>
                   </div>
-                  <div className="w-full h-2.5 rounded-full bg-sidebar overflow-hidden relative">
-                    <div
-                      className={`h-full transition-all duration-700 ${
-                        isAborted ? 'bg-rose-500' : isCompleted ? 'bg-emerald-500' : 'bg-primary'
-                      }`}
-                      style={{ width: `${progressPercent}%` }}
-                    />
+                  <div className="w-full h-3 rounded-full bg-sidebar overflow-hidden flex border border-line/60">
+                    {successPct > 0 && (
+                      <div
+                        className="h-full bg-emerald-500 transition-all duration-500"
+                        style={{ width: `${successPct}%` }}
+                        title={`Thành công: ${camp.successNodes}`}
+                      />
+                    )}
+                    {inFlightPct > 0 && (
+                      <div
+                        className="h-full bg-primary animate-pulse transition-all duration-500"
+                        style={{ width: `${inFlightPct}%` }}
+                        title={`Đang nạp: ${inFlightCount}`}
+                      />
+                    )}
+                    {failedPct > 0 && (
+                      <div
+                        className="h-full bg-rose-500 transition-all duration-500"
+                        style={{ width: `${failedPct}%` }}
+                        title={`Thất bại: ${camp.failedNodes}`}
+                      />
+                    )}
                   </div>
                 </div>
 
                 {/* Summary Stats */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 border-t border-line text-xs">
                   <div>
-                    <span className="text-muted block">Tổng Node mục tiêu:</span>
+                    <span className="text-muted block">Tổng Node mục tiêu</span>
                     <strong className="text-text font-bold text-sm">{camp.totalNodes} node</strong>
                   </div>
                   <div>
-                    <span className="text-muted block">Thành công:</span>
-                    <strong className="text-emerald-500 font-bold text-sm">{camp.successNodes} node</strong>
+                    <span className="text-muted block">Cập nhật thành công</span>
+                    <strong className="text-emerald-700 font-bold text-sm">
+                      {camp.successNodes} node
+                    </strong>
                   </div>
                   <div>
-                    <span className="text-muted block">Thất bại / Timeout:</span>
-                    <strong className="text-rose-500 font-bold text-sm">{camp.failedNodes} node</strong>
+                    <span className="text-muted block">Thất bại / Timeout</span>
+                    <strong className="text-rose-700 font-bold text-sm">
+                      {camp.failedNodes} node
+                    </strong>
                   </div>
                   <div>
-                    <span className="text-muted block">Tỷ lệ lỗi hiện tại:</span>
+                    <span className="text-muted block">Tỷ lệ lỗi / Ngưỡng ngắt</span>
                     <strong
                       className={`font-bold text-sm ${
-                        failRate > camp.failureThresholdPercent ? 'text-rose-500' : 'text-text'
+                        failRate > camp.failureThresholdPercent ? 'text-rose-700' : 'text-text'
                       }`}
                     >
-                      {failRate}% (Tối đa {camp.failureThresholdPercent}%)
+                      {failRate}% / {camp.failureThresholdPercent}%
                     </strong>
                   </div>
                 </div>
 
                 {camp.abortReason && (
-                  <div className="mt-3 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs font-medium flex items-center gap-2">
+                  <div className="p-3.5 rounded-2xl bg-error-soft border border-rose-200 text-rose-700 text-xs font-semibold flex items-center gap-2">
                     <ShieldAlert className="w-4 h-4 shrink-0" />
                     <span>Lý do dừng: {camp.abortReason}</span>
                   </div>
@@ -489,42 +1063,93 @@ export const OtaCampaignManager: React.FC = () => {
 
                 {/* Per-Node Rollout Detail Toggle */}
                 {camp.nodeExecutions && camp.nodeExecutions.length > 0 && (
-                  <div className="mt-3 pt-3 border-t border-line/60">
+                  <div className="pt-3 border-t border-line/70">
                     <button
                       type="button"
                       onClick={() => setExpandedCampaignId(isExpanded ? null : camp.id)}
-                      className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline cursor-pointer"
+                      className="inline-flex items-center gap-1.5 text-xs font-bold text-sky-700 hover:underline cursor-pointer"
                     >
-                      {isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-                      <span>Chi tiết từng Node ({camp.nodeExecutions.length})</span>
+                      {isExpanded ? (
+                        <ChevronDown className="w-3.5 h-3.5" />
+                      ) : (
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      )}
+                      <span>Chi tiết thực thi từng Node ({camp.nodeExecutions.length})</span>
                     </button>
 
                     {isExpanded && (
-                      <div className="mt-2.5 space-y-1.5 max-h-64 overflow-y-auto pr-1">
-                        {camp.nodeExecutions.map((ne) => (
-                          <div
-                            key={ne.id || ne.nodeCode}
-                            className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 rounded-xl bg-sidebar/50 border border-line/60 text-xs"
-                          >
-                            <div className="flex items-center gap-2">
-                              <span className="font-mono font-semibold text-text">{ne.nodeCode}</span>
-                              <span className="text-[11px] text-muted">Đợt {ne.wave}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {ne.errorMessage && (
-                                <span className="text-[11px] text-rose-500 max-w-xs truncate" title={ne.errorMessage}>
-                                  {ne.errorMessage}
-                                </span>
-                              )}
-                              {ne.reportedVersion && (
-                                <span className="text-[11px] font-mono text-emerald-600">{ne.reportedVersion}</span>
-                              )}
-                              <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold border ${getNodeStatusBadge(ne.status)}`}>
-                                {ne.status}
-                              </span>
-                            </div>
-                          </div>
-                        ))}
+                      <div className="mt-3 space-y-2.5">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {[
+                            { id: 'ALL', label: 'Tất cả' },
+                            { id: '1', label: 'Đợt 1' },
+                            { id: '2', label: 'Đợt 2' },
+                            { id: '3', label: 'Đợt 3' },
+                            { id: 'FAILED', label: 'Chỉ hiện Lỗi' },
+                          ].map((f) => (
+                            <button
+                              key={f.id}
+                              type="button"
+                              onClick={() =>
+                                setNodeFilterByCampaign((prev) => ({
+                                  ...prev,
+                                  [camp.id]: f.id,
+                                }))
+                              }
+                              className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border cursor-pointer ${
+                                activeNodeFilter === f.id
+                                  ? 'bg-primary text-white border-primary'
+                                  : 'bg-sidebar text-muted border-line hover:text-text'
+                              }`}
+                            >
+                              {f.label}
+                            </button>
+                          ))}
+                        </div>
+
+                        <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1 custom-scrollbar">
+                          {filteredNodes.length === 0 ? (
+                            <p className="text-xs text-muted py-2">
+                              Không có Node nào thuộc nhóm lọc này.
+                            </p>
+                          ) : (
+                            filteredNodes.map((ne) => (
+                              <div
+                                key={ne.id || ne.nodeCode}
+                                className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 rounded-xl bg-sidebar/55 border border-line/70 text-xs"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <span className="font-mono font-bold text-text">{ne.nodeCode}</span>
+                                  <span className="px-1.5 py-0.5 rounded bg-surface border border-line text-[10px] font-semibold text-muted">
+                                    Đợt {ne.wave}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  {ne.errorMessage && (
+                                    <span
+                                      className="text-[11px] text-rose-700 font-medium max-w-xs truncate"
+                                      title={ne.errorMessage}
+                                    >
+                                      {ne.errorMessage}
+                                    </span>
+                                  )}
+                                  {ne.reportedVersion && (
+                                    <span className="text-[11px] font-mono font-semibold text-emerald-700">
+                                      {ne.reportedVersion}
+                                    </span>
+                                  )}
+                                  <span
+                                    className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${getNodeStatusBadge(
+                                      ne.status
+                                    )}`}
+                                  >
+                                    {ne.status}
+                                  </span>
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -540,24 +1165,25 @@ export const OtaCampaignManager: React.FC = () => {
         <div
           role="dialog"
           aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-text/30 backdrop-blur-md"
           onClick={() => setIsPackageModalOpen(false)}
         >
           <div
-            className="w-full max-w-lg rounded-3xl bg-surface border border-line p-6 sm:p-7 shadow-2xl text-text space-y-4"
+            className="w-full max-w-lg rounded-3xl bg-surface border border-line p-6 sm:p-7 shadow-float text-text space-y-4 max-h-[92vh] overflow-y-auto custom-scrollbar"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between border-b border-line/60 pb-3">
+            <div className="flex items-center justify-between border-b border-line/70 pb-3">
               <div>
                 <h4 className="text-base font-bold text-text">Thêm bản Firmware OTA mới</h4>
                 <p className="text-xs text-muted mt-0.5">
-                  Tải trực tiếp tệp <code>.bin</code> lên server hoặc nhập URL tải ngoài.
+                  Danh mục thiết bị khớp chuẩn 100% với bảng thiết bị HESTA &amp; IoT firmware.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setIsPackageModalOpen(false)}
-                className="p-1.5 rounded-xl text-muted hover:text-text hover:bg-surface-hover cursor-pointer"
+                aria-label="Đóng"
+                className="p-1.5 rounded-xl text-muted hover:text-text hover:bg-sidebar-hover/70 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -567,8 +1193,10 @@ export const OtaCampaignManager: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setPkgMode('UPLOAD')}
-                className={`flex-1 py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer ${
-                  pkgMode === 'UPLOAD' ? 'bg-primary text-white shadow-2xs' : 'text-muted hover:text-text'
+                className={`flex-1 py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer transition-colors ${
+                  pkgMode === 'UPLOAD'
+                    ? 'bg-primary text-white shadow-2xs'
+                    : 'text-muted hover:text-text'
                 }`}
               >
                 <UploadCloud className="w-3.5 h-3.5" />
@@ -577,8 +1205,10 @@ export const OtaCampaignManager: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setPkgMode('URL')}
-                className={`flex-1 py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer ${
-                  pkgMode === 'URL' ? 'bg-primary text-white shadow-2xs' : 'text-muted hover:text-text'
+                className={`flex-1 py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer transition-colors ${
+                  pkgMode === 'URL'
+                    ? 'bg-primary text-white shadow-2xs'
+                    : 'text-muted hover:text-text'
                 }`}
               >
                 <Link2 className="w-3.5 h-3.5" />
@@ -589,27 +1219,36 @@ export const OtaCampaignManager: React.FC = () => {
             <form onSubmit={handleCreatePackage} className="space-y-3.5">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="block text-xs font-semibold">Loại thiết bị (Device Type)</label>
+                  <label className="block text-xs font-semibold text-text">
+                    Loại thiết bị (Device Type)
+                  </label>
                   <select
+                    aria-label="Loại thiết bị Firmware"
                     value={pkgDeviceType}
                     onChange={(e) => setPkgDeviceType(e.target.value)}
                     className="w-full min-h-[42px] px-3 rounded-2xl border border-line bg-sidebar text-xs text-text focus:outline-none focus:border-primary"
                   >
-                    {DEVICE_TYPE_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
+                    {OTA_DEVICE_TYPE_GROUPS.map((grp) => (
+                      <optgroup key={grp.group} label={grp.group}>
+                        {grp.options.map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </optgroup>
                     ))}
                   </select>
                 </div>
 
                 <div className="space-y-1">
-                  <label className="block text-xs font-semibold">Phiên bản (Version)</label>
+                  <label className="block text-xs font-semibold text-text">
+                    Phiên bản (Version)
+                  </label>
                   <input
                     type="text"
                     value={pkgVersion}
                     onChange={(e) => setPkgVersion(e.target.value)}
-                    placeholder="VD: v2.2.0"
+                    placeholder="VD: v2.4.0"
                     className="w-full min-h-[42px] px-3.5 rounded-2xl border border-line bg-sidebar text-xs text-text focus:outline-none focus:border-primary"
                     required
                   />
@@ -617,36 +1256,61 @@ export const OtaCampaignManager: React.FC = () => {
               </div>
 
               {pkgMode === 'UPLOAD' ? (
-                <div className="space-y-1">
-                  <label className="block text-xs font-semibold">Tệp firmware biên dịch (.bin, tối đa 20MB)</label>
-                  <input
-                    type="file"
-                    accept=".bin"
-                    onChange={(e) => setPkgFile(e.target.files?.[0] || null)}
-                    className="w-full px-3 py-2 rounded-2xl border border-dashed border-line bg-sidebar text-xs text-text file:mr-3 file:px-3 file:py-1.5 file:rounded-xl file:border-0 file:bg-primary/10 file:text-primary file:font-semibold cursor-pointer"
-                    required
-                  />
-                  {pkgFile && (
-                    <p className="text-[11px] text-emerald-600 font-medium">
-                      Đã chọn: {pkgFile.name} ({formatBytes(pkgFile.size)})
-                    </p>
-                  )}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-semibold text-text">
+                    Tệp firmware biên dịch (.bin, tối đa 20 MB)
+                  </label>
+                  <label
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      setIsDraggingFile(true);
+                    }}
+                    onDragLeave={() => setIsDraggingFile(false)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setIsDraggingFile(false);
+                      validateAndPickBinFile(e.dataTransfer.files?.[0] || null);
+                    }}
+                    className={`flex flex-col items-center justify-center gap-1.5 px-4 py-5 rounded-2xl border-2 border-dashed transition-colors cursor-pointer text-center ${
+                      isDraggingFile
+                        ? 'border-primary bg-info-soft'
+                        : 'border-line bg-sidebar/70 hover:border-primary/60 hover:bg-sidebar'
+                    }`}
+                  >
+                    <UploadCloud className="w-6 h-6 text-sky-700" />
+                    <span className="text-xs font-semibold text-text">
+                      {pkgFile ? pkgFile.name : 'Chọn hoặc kéo thả tệp .bin vào đây'}
+                    </span>
+                    <span className="text-[11px] text-muted">
+                      {pkgFile
+                        ? `Dung lượng: ${formatBytes(pkgFile.size)} • Server sẽ tự tính SHA-256`
+                        : 'Định dạng .bin hợp lệ, giới hạn <= 20 MB'}
+                    </span>
+                    <input
+                      type="file"
+                      accept=".bin"
+                      onChange={(e) => validateAndPickBinFile(e.target.files?.[0] || null)}
+                      className="sr-only"
+                    />
+                  </label>
                 </div>
               ) : (
                 <>
                   <div className="space-y-1">
-                    <label className="block text-xs font-semibold">URL tải tệp .bin</label>
+                    <label className="block text-xs font-semibold text-text">URL tải tệp .bin</label>
                     <input
                       type="url"
                       value={pkgUrl}
                       onChange={(e) => setPkgUrl(e.target.value)}
-                      placeholder="https://example.com/firmware_v2.2.0.bin"
+                      placeholder="https://example.com/firmware_v2.4.0.bin"
                       className="w-full min-h-[42px] px-3.5 rounded-2xl border border-line bg-sidebar text-xs text-text focus:outline-none focus:border-primary"
                       required
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="block text-xs font-semibold">Checksum SHA-256 (64 ký tự hex)</label>
+                    <label className="block text-xs font-semibold text-text">
+                      Checksum SHA-256 (64 ký tự hex)
+                    </label>
                     <input
                       type="text"
                       value={pkgSha256}
@@ -660,7 +1324,9 @@ export const OtaCampaignManager: React.FC = () => {
               )}
 
               <div className="space-y-1">
-                <label className="block text-xs font-semibold">Ghi chú phát hành (Release Notes)</label>
+                <label className="block text-xs font-semibold text-text">
+                  Ghi chú phát hành (Release Notes)
+                </label>
                 <textarea
                   rows={2}
                   value={pkgReleaseNotes}
@@ -670,11 +1336,11 @@ export const OtaCampaignManager: React.FC = () => {
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-line/60">
+              <div className="flex justify-end gap-2 pt-3 border-t border-line/70">
                 <button
                   type="button"
                   onClick={() => setIsPackageModalOpen(false)}
-                  className="min-h-[40px] px-5 rounded-full border border-line text-xs font-semibold text-muted hover:text-text cursor-pointer"
+                  className="min-h-[40px] px-5 rounded-full border border-line text-xs font-semibold text-muted hover:text-text hover:bg-sidebar-hover/60 cursor-pointer"
                 >
                   Hủy
                 </button>
@@ -692,29 +1358,29 @@ export const OtaCampaignManager: React.FC = () => {
         </div>
       )}
 
-      {/* Modal Khởi Tạo Đợt Cập Nhật */}
+      {/* Modal Khởi Tạo Chiến Dịch OTA + Chọn Đích Danh Edge Nodes */}
       {isCampaignModalOpen && (
         <div
           role="dialog"
           aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-text/30 backdrop-blur-md"
           onClick={() => setIsCampaignModalOpen(false)}
         >
           <div
-            className="w-full max-w-lg rounded-3xl bg-surface border border-line p-6 sm:p-7 shadow-2xl relative text-text space-y-4"
+            className="w-full max-w-2xl rounded-3xl bg-surface border border-line p-6 sm:p-7 shadow-float relative text-text space-y-4 max-h-[92vh] overflow-y-auto custom-scrollbar"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between border-b border-line/60 pb-3">
+            <div className="flex items-center justify-between border-b border-line/70 pb-3">
               <div>
                 <h4 className="text-base font-bold text-text">Khởi tạo chiến dịch OTA mới</h4>
                 <p className="text-xs text-muted mt-0.5">
-                  Gửi bản nâng cấp tới các Edge Node trực tuyến phù hợp theo quy trình an toàn.
+                  Xem trước thiết bị con trên từng mạch và chọn chính xác Edge Node nhận bản nâng cấp.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setIsCampaignModalOpen(false)}
-                className="p-1.5 rounded-xl text-muted hover:text-text hover:bg-surface-hover cursor-pointer"
+                className="p-1.5 rounded-xl text-muted hover:text-text hover:bg-sidebar-hover/70 cursor-pointer"
                 aria-label="Đóng"
               >
                 <X className="w-5 h-5" />
@@ -722,60 +1388,250 @@ export const OtaCampaignManager: React.FC = () => {
             </div>
 
             <form onSubmit={handleCreateCampaign} className="space-y-4">
-              <div className="space-y-1">
-                <label className="block text-xs font-semibold text-text">Tên chiến dịch</label>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Ví dụ: Bản vá v2.2.0 cho cụm Relay tầng 1"
-                  className="w-full min-h-[44px] px-3.5 py-2 rounded-2xl border border-line bg-sidebar text-xs sm:text-sm text-text focus:outline-none focus:border-primary"
-                  required
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="block text-xs font-semibold text-text">Tên chiến dịch</label>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="VD: Vá firmware v2.4.0 cho Nhà Việt Đức"
+                    className="w-full min-h-[42px] px-3.5 py-2 rounded-2xl border border-line bg-sidebar text-xs sm:text-sm text-text focus:outline-none focus:border-primary"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-xs font-semibold text-text">Chọn gói Firmware</label>
+                  {packages.length === 0 ? (
+                    <p className="text-xs text-rose-700 font-medium pt-2">
+                      Chưa có gói firmware. Hãy tải lên bản <code>.bin</code> trước.
+                    </p>
+                  ) : (
+                    <select
+                      aria-label="Chọn gói Firmware triển khai"
+                      value={selectedPkgId}
+                      onChange={(e) => {
+                        setSelectedPkgId(e.target.value);
+                        setManualNodeIds(null);
+                      }}
+                      className="w-full min-h-[42px] px-3.5 py-2 rounded-2xl border border-line bg-sidebar text-xs text-text focus:outline-none focus:border-primary"
+                      required
+                    >
+                      <option value="">-- Chọn bản firmware --</option>
+                      {packages.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.deviceType} — {p.version} (
+                          {p.uploaded ? formatBytes(p.fileSizeBytes) : 'URL'})
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
               </div>
 
-              <div className="space-y-1">
-                <label className="block text-xs font-semibold text-text">Chọn gói Firmware</label>
-                {packages.length === 0 ? (
-                  <p className="text-xs text-rose-500">
-                    Chưa có bản firmware nào. Hãy tải lên bản `.bin` trước.
-                  </p>
-                ) : (
+              {/* Target Node Preview & Picker */}
+              <div className="rounded-2xl border border-line bg-sidebar/50 p-3.5 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <div className="text-xs font-bold text-text flex items-center gap-1.5">
+                      <Cpu className="w-3.5 h-3.5 text-sky-700" />
+                      <span>
+                        Chọn đích danh Edge Node mục tiêu ({selectedNodeIds.length} node đang ONLINE được chọn)
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-muted mt-0.5">
+                      Với mạch ESP32 đa năng gánh nhiều thiết bị trên cùng GPIO, kiểm tra kỹ danh sách thiết bị con trước khi nạp.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2 text-[11px]">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setManualNodeIds(
+                          modalCandidateNodes
+                            .filter((n) => n.status === 'ONLINE')
+                            .map((n) => n.nodeId)
+                        )
+                      }
+                      className="font-semibold text-sky-700 hover:underline cursor-pointer"
+                    >
+                      Chọn tất cả Online
+                    </button>
+                    <span className="text-line">|</span>
+                    <button
+                      type="button"
+                      onClick={() => setManualNodeIds([])}
+                      className="font-semibold text-muted hover:text-text cursor-pointer"
+                    >
+                      Bỏ chọn hết
+                    </button>
+                  </div>
+                </div>
+
+                {/* Filters inside target node list */}
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <select
-                    value={selectedPkgId}
-                    onChange={(e) => setSelectedPkgId(e.target.value)}
-                    className="w-full min-h-[44px] px-3.5 py-2 rounded-2xl border border-line bg-sidebar text-xs sm:text-sm text-text focus:outline-none focus:border-primary"
-                    required
+                    aria-label="Lọc Edge Node theo ngôi nhà"
+                    value={modalHomeFilter}
+                    onChange={(e) => setModalHomeFilter(e.target.value)}
+                    className="min-h-[36px] px-3 py-1 rounded-xl border border-line bg-surface text-xs text-text focus:outline-none focus:border-primary"
                   >
-                    <option value="">-- Chọn bản firmware triển khai --</option>
-                    {packages.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {formatDeviceType(p.deviceType)} — {p.version} ({p.uploaded ? formatBytes(p.fileSizeBytes) : 'URL'})
+                    <option value="ALL">Tất cả ngôi nhà ({modalHomeOptions.length} nhà)</option>
+                    {modalHomeOptions.map((h) => (
+                      <option key={h.id} value={h.id}>
+                        {h.label}
                       </option>
                     ))}
                   </select>
-                )}
+
+                  <label className="inline-flex items-center gap-1.5 text-[11px] font-medium text-text cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={showAllNodesManual}
+                      onChange={(e) => setShowAllNodesManual(e.target.checked)}
+                      className="rounded accent-primary"
+                    />
+                    <span>Hiện tất cả Node để chọn thủ công</span>
+                  </label>
+                </div>
+
+                {/* Node List */}
+                <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1 custom-scrollbar">
+                  {modalCandidateNodes.length === 0 ? (
+                    <div className="py-5 text-center text-xs text-muted bg-surface rounded-xl border border-dashed border-line">
+                      Không có Edge Node nào khớp với loại thiết bị của gói Firmware này.
+                    </div>
+                  ) : (
+                    modalCandidateNodes.map((n) => {
+                      const isOnline = n.status === 'ONLINE';
+                      const checked = selectedNodeIds.includes(n.nodeId);
+                      const attachedTypes = n.attachedDeviceTypes || [];
+                      const isMultiPurpose = attachedTypes.length > 1;
+
+                      return (
+                        <label
+                          key={n.nodeId}
+                          className={`flex items-start justify-between gap-2.5 p-2.5 rounded-xl border text-xs transition-colors ${
+                            !isOnline
+                              ? 'bg-surface/50 border-line/60 opacity-60 cursor-not-allowed'
+                              : checked
+                              ? 'bg-info-soft/70 border-primary/60 cursor-pointer'
+                              : 'bg-surface border-line hover:bg-sidebar cursor-pointer'
+                          }`}
+                        >
+                          <div className="flex items-start gap-2.5 min-w-0">
+                            <input
+                              type="checkbox"
+                              disabled={!isOnline}
+                              checked={checked}
+                              onChange={() => toggleTargetNode(n.nodeId)}
+                              className="mt-0.5 rounded accent-primary"
+                            />
+                            <div className="min-w-0 space-y-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-mono font-bold text-text">{n.nodeCode}</span>
+                                <span className="inline-flex items-center gap-1 text-[11px] text-muted">
+                                  <Home className="w-3 h-3" />
+                                  {n.homeName && n.homeName !== 'N/A' ? n.homeName : 'Chưa gán nhà'}
+                                </span>
+                                {n.firmwareVersion && (
+                                  <span className="px-1.5 py-0.5 rounded bg-surface border border-line font-mono text-[10px] text-sky-700">
+                                    FW {n.firmwareVersion}
+                                  </span>
+                                )}
+                              </div>
+
+                              {attachedTypes.length > 0 && (
+                                <div className="flex items-center gap-1 flex-wrap">
+                                  {attachedTypes.map((dt) => (
+                                    <span
+                                      key={dt}
+                                      className="px-1.5 py-0.5 rounded bg-sidebar text-[10px] font-mono text-muted border border-line/70"
+                                    >
+                                      {dt}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+
+                              {isMultiPurpose && (
+                                <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-warning-soft border border-amber-200 text-amber-800 text-[10px] font-semibold">
+                                  <AlertTriangle className="w-3 h-3 shrink-0" />
+                                  <span>
+                                    Mạch đa năng ({attachedTypes.length} loại thiết bị) — cần đúng file .bin tổng hợp!
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 border ${
+                              isOnline
+                                ? 'bg-success-soft text-emerald-700 border-emerald-200'
+                                : 'bg-sidebar text-muted border-line'
+                            }`}
+                          >
+                            {n.status}
+                          </span>
+                        </label>
+                      );
+                    })
+                  )}
+                </div>
               </div>
 
-              <div className="space-y-1">
-                <label className="block text-xs font-semibold text-text">Phương thức cập nhật</label>
-                <select
-                  value={strategy}
-                  onChange={(e) => setStrategy(e.target.value)}
-                  className="w-full min-h-[44px] px-3.5 py-2 rounded-2xl border border-line bg-sidebar text-xs sm:text-sm text-text focus:outline-none focus:border-primary"
-                >
-                  <option value="CANARY">
-                    Nâng cấp an toàn 3 đợt (10% → 50% → 100%) [Khuyên dùng]
-                  </option>
-                  <option value="IMMEDIATE">Cập nhật đồng loạt toàn đội ngay (100%)</option>
-                </select>
+              {/* Strategy Cards */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-semibold text-text">Chiến lược phân phối</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setStrategy('CANARY')}
+                    className={`text-left p-3 rounded-2xl border transition-all cursor-pointer ${
+                      strategy === 'CANARY'
+                        ? 'bg-info-soft border-primary shadow-2xs'
+                        : 'bg-sidebar/60 border-line hover:bg-sidebar'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-text">Canary 3 đợt</span>
+                      <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-success-soft text-emerald-700">
+                        Khuyên dùng
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-muted mt-1">
+                      Nâng cấp lần lượt 10% &rarr; 50% &rarr; 100%, tự kiểm tra qua từng đợt.
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setStrategy('IMMEDIATE')}
+                    className={`text-left p-3 rounded-2xl border transition-all cursor-pointer ${
+                      strategy === 'IMMEDIATE'
+                        ? 'bg-info-soft border-primary shadow-2xs'
+                        : 'bg-sidebar/60 border-line hover:bg-sidebar'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-text">Đồng loạt (Immediate)</span>
+                    </div>
+                    <p className="text-[11px] text-muted mt-1">
+                      Gửi đồng thời tới 100% các node bạn đã tick chọn ở trên.
+                    </p>
+                  </button>
+                </div>
               </div>
 
-              <div className="space-y-1.5 p-3.5 rounded-2xl bg-sidebar/50 border border-line">
+              <div className="space-y-1.5 p-3.5 rounded-2xl bg-sidebar/60 border border-line">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-semibold text-text flex items-center gap-1.5">
-                    <ShieldAlert className="w-4 h-4 text-primary" />
-                    Ngưỡng tự động dừng: <span className="text-primary font-bold">{threshold}% lỗi</span>
+                    <ShieldAlert className="w-4 h-4 text-sky-700" />
+                    Ngưỡng tự động dừng:{' '}
+                    <span className="text-sky-700 font-bold">{threshold}% lỗi</span>
                   </label>
                   <span className="text-[11px] text-muted">Mặc định: 20%</span>
                 </div>
@@ -790,21 +1646,27 @@ export const OtaCampaignManager: React.FC = () => {
                 />
               </div>
 
-              <div className="flex justify-end gap-2.5 pt-3 border-t border-line/60">
+              <div className="flex justify-end gap-2.5 pt-3 border-t border-line/70">
                 <button
                   type="button"
                   onClick={() => setIsCampaignModalOpen(false)}
-                  className="min-h-[40px] px-5 rounded-full border border-line text-xs font-semibold text-muted hover:text-text cursor-pointer"
+                  className="min-h-[40px] px-5 rounded-full border border-line text-xs font-semibold text-muted hover:text-text hover:bg-sidebar-hover/60 cursor-pointer"
                 >
                   Hủy bỏ
                 </button>
                 <button
                   type="submit"
-                  disabled={isSubmittingCampaign || packages.length === 0}
+                  disabled={
+                    isSubmittingCampaign || packages.length === 0 || selectedNodeIds.length === 0
+                  }
                   className="min-h-[40px] flex items-center gap-1.5 px-5 rounded-full bg-primary text-white text-xs font-semibold hover:bg-primary-hover disabled:opacity-50 cursor-pointer"
                 >
                   <Play className="w-3.5 h-3.5 fill-current" />
-                  <span>Bắt đầu cập nhật</span>
+                  <span>
+                    {isSubmittingCampaign
+                      ? 'Đang khởi tạo...'
+                      : `Bắt đầu cập nhật (${selectedNodeIds.length} node)`}
+                  </span>
                 </button>
               </div>
             </form>

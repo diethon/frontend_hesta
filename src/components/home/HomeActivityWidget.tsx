@@ -1,8 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router';
 import { Icon, type IconName } from './HomeIcons';
 import type { DeviceResponse, DeviceStateHistoryResponse } from '../../types/device';
-import { getDeviceHistory } from '../../services/deviceApi';
+import {
+  getDeviceHistory,
+  getHomeRecentActivity,
+  homeRecentActivityKey,
+  type HomeActivityItemResponse,
+} from '../../services/deviceApi';
+import { peekCache } from '../../services/queryCache';
 import { notify } from '../ui/notify';
 
 interface HomeActivityWidgetProps {
@@ -92,71 +98,117 @@ function formatEventDescription(
   return `${deviceName} cập nhật trạng thái`;
 }
 
+function mapRecentActivityItems(items: HomeActivityItemResponse[]): ActivityItem[] {
+  return items.slice(0, 5).map((event) => {
+    const text = formatEventDescription(
+      event.deviceName || 'Thiết bị',
+      (event.newState as Record<string, unknown>) || {},
+      event.deviceType || ''
+    );
+    return {
+      id: event.id || `${event.deviceId}-${event.changedAt}`,
+      icon: resolveActivityIcon(event.deviceType, text),
+      text,
+      time: formatTimeVi(event.changedAt),
+    };
+  });
+}
+
 export const HomeActivityWidget: React.FC<HomeActivityWidgetProps> = ({
   homeId,
   devices = [],
 }) => {
   const navigate = useNavigate();
-  const [historyItems, setHistoryItems] = useState<ActivityItem[]>([]);
+  const [historyItems, setHistoryItems] = useState<ActivityItem[]>(() => {
+    if (!homeId) return [];
+    const cached = peekCache<HomeActivityItemResponse[]>(homeRecentActivityKey(homeId, 5));
+    return cached ? mapRecentActivityItems(cached) : [];
+  });
+  const devicesRef = useRef<DeviceResponse[]>(devices);
+  devicesRef.current = devices;
+  const hasDevices = devices.length > 0;
 
   useEffect(() => {
-    if (!devices || devices.length === 0) return;
+    if (!homeId && !hasDevices) {
+      setHistoryItems([]);
+      return;
+    }
 
     let active = true;
-    const targets = devices.slice(0, 5);
 
-    Promise.allSettled(targets.map((d) => getDeviceHistory(d.id)))
-      .then((results) => {
-        if (!active) return;
-        const events: {
-          event: DeviceStateHistoryResponse;
-          deviceName: string;
-          deviceType: string;
-        }[] = [];
+    const loadFallbackDeviceHistories = () => {
+      const targets = devicesRef.current.slice(0, 3);
+      if (targets.length === 0) return;
 
-        results.forEach((res, i) => {
-          if (res.status === 'fulfilled' && Array.isArray(res.value)) {
-            const dev = targets[i];
-            for (const h of res.value) {
-              events.push({
-                event: h,
-                deviceName: dev.name,
-                deviceType: dev.deviceType,
-              });
+      Promise.allSettled(targets.map((d) => getDeviceHistory(d.id)))
+        .then((results) => {
+          if (!active) return;
+          const events: {
+            event: DeviceStateHistoryResponse;
+            deviceName: string;
+            deviceType: string;
+          }[] = [];
+
+          results.forEach((res, i) => {
+            if (res.status === 'fulfilled' && Array.isArray(res.value)) {
+              const dev = targets[i];
+              for (const h of res.value) {
+                events.push({
+                  event: h,
+                  deviceName: dev.name,
+                  deviceType: dev.deviceType,
+                });
+              }
             }
+          });
+
+          events.sort(
+            (a, b) =>
+              new Date(b.event.changedAt).getTime() - new Date(a.event.changedAt).getTime()
+          );
+
+          const latest5 = events.slice(0, 5).map(({ event, deviceName, deviceType }) => {
+            const text = formatEventDescription(
+              deviceName,
+              event.newState as Record<string, unknown>,
+              deviceType
+            );
+            return {
+              id: event.id || `${deviceName}-${event.changedAt}`,
+              icon: resolveActivityIcon(deviceType, text),
+              text,
+              time: formatTimeVi(event.changedAt),
+            };
+          });
+
+          setHistoryItems(latest5);
+        })
+        .catch((err) => {
+          console.warn('Failed to fetch device histories:', err);
+        });
+    };
+
+    if (homeId) {
+      const cached = peekCache<HomeActivityItemResponse[]>(homeRecentActivityKey(homeId, 5));
+      setHistoryItems(cached ? mapRecentActivityItems(cached) : []);
+      getHomeRecentActivity(homeId, 5)
+        .then((items) => {
+          if (!active) return;
+          setHistoryItems(mapRecentActivityItems(Array.isArray(items) ? items : []));
+        })
+        .catch(() => {
+          if (active && hasDevices) {
+            loadFallbackDeviceHistories();
           }
         });
-
-        // Sort descending by changedAt
-        events.sort(
-          (a, b) =>
-            new Date(b.event.changedAt).getTime() - new Date(a.event.changedAt).getTime()
-        );
-
-        const latest5 = events.slice(0, 5).map(({ event, deviceName, deviceType }) => {
-          const text = formatEventDescription(
-            deviceName,
-            event.newState as Record<string, unknown>,
-            deviceType
-          );
-          return {
-            id: event.id || `${deviceName}-${event.changedAt}`,
-            icon: resolveActivityIcon(deviceType, text),
-            text,
-            time: formatTimeVi(event.changedAt),
-          };
-        });
-
-        setHistoryItems(latest5);
-      })
-      .catch((err) => {
-        console.warn('Failed to fetch device histories:', err);
-      });
+    } else {
+      loadFallbackDeviceHistories();
+    }
 
     return () => {
       active = false;
     };
-  }, [devices]);
+  }, [homeId, hasDevices]);
 
   // Fallback to recent lastSeen devices if no history table rows
   const fallbackActivities: ActivityItem[] = devices

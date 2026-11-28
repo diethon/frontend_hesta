@@ -4,7 +4,6 @@ import type {
   ParentalGuardianLog,
   CreateGuardianRuleInput,
   UpdateGuardianRuleInput,
-  SimulateEventType,
 } from '../types/guardian';
 
 const basePath = (homeId: string) => `/homes/${homeId}/guardian-rules`;
@@ -50,12 +49,6 @@ export const extendGuardianSession = (homeId: string, ruleId: string, extraMinut
 export const unlockGuardianSession = (homeId: string, ruleId: string) =>
   featureRequest<ParentalGuardianRule>(`${basePath(homeId)}/${ruleId}/unlock`, {
     method: 'POST',
-  });
-
-export const simulateGuardianEvent = (homeId: string, ruleId: string, eventType: SimulateEventType) =>
-  featureRequest<ParentalGuardianRule>(`${basePath(homeId)}/${ruleId}/simulate`, {
-    method: 'POST',
-    body: JSON.stringify({ eventType }),
   });
 
 export const getGuardianLogs = (homeId: string, ruleId: string) =>

@@ -1,5 +1,5 @@
 import { confirmDialog } from '../ui/confirmDialog';
-import { formatScheduleTime } from '../scene/SceneScheduleSection';
+import { displayScheduleTime } from '../scene/SceneScheduleSection';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router';
 import {
@@ -106,7 +106,7 @@ export function RecommendationsPage() {
   };
 
   const resolve = async (item: Recommendation, action: 'approve' | 'reject' | 'dismiss') => {
-    if (action === 'approve' && !await confirmDialog({ title: 'Tạo quy tắc tự động?', description: `${actionText(item)} vào ${item.triggerCondition.time ? formatScheduleTime(item.triggerCondition.time) : 'giờ này'}.`, confirmText: 'Tạo quy tắc', variant: 'primary' })) {
+    if (action === 'approve' && !await confirmDialog({ title: 'Tạo quy tắc tự động?', description: `${actionText(item)} vào ${item.triggerCondition.time ? displayScheduleTime(item.triggerCondition.time) : 'giờ này'}.`, confirmText: 'Tạo quy tắc', variant: 'primary' })) {
       return;
     }
     setWorkingId(item.id);
@@ -298,7 +298,7 @@ export function RecommendationsPage() {
               {pendingItems.map((item) => (
                 <article key={item.id} className="st-insight">
                   <div className="st-when">
-                    <strong>{item.triggerCondition.time ? formatScheduleTime(item.triggerCondition.time) : '--:--:--'}</strong>
+                    <strong>{item.triggerCondition.time ? displayScheduleTime(item.triggerCondition.time) : '--:--'}</strong>
                     <small>{formatRepeatDays(item.triggerCondition.repeatDays || [])}</small>
                   </div>
 

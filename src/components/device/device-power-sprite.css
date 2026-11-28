@@ -1,0 +1,41 @@
+/* Sprite sheets: 24 frames left → right, frame 0 = off, frame 23 = on (scripts/blender/hesta_devices.py).
+   Frame k sits at background-position-x = k / 23 * 100%. Turning off replays the same frames backwards. */
+.power-sprite {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background-repeat: no-repeat;
+  background-size: 2400% 100%;
+  background-position: 0% 0;
+  transition: background-position 0.8s steps(24, jump-none), filter 0.5s ease;
+}
+
+.power-sprite.is-on {
+  background-position: 100% 0;
+}
+
+.power-sprite--light.is-on { filter: drop-shadow(0 0 10px rgba(255, 190, 110, 0.75)); }
+.power-sprite--ac.is-on { filter: drop-shadow(0 4px 8px rgba(96, 200, 255, 0.45)); }
+.power-sprite--tv.is-on { filter: drop-shadow(0 0 8px rgba(47, 181, 163, 0.5)); }
+.power-sprite--plug.is-on { filter: drop-shadow(0 0 6px rgba(60, 230, 180, 0.45)); }
+
+/* Fan: spin up over frames 0–15, then loop frames 16–23 (120°, seamless for three blades). */
+.power-sprite--fan {
+  transition-duration: 0.7s;
+  transition-timing-function: steps(16, jump-none);
+}
+
+.power-sprite--fan.is-on {
+  background-position: calc(15 / 23 * 100%) 0;
+  animation: power-sprite-spin 0.32s steps(8, jump-end) 0.7s infinite;
+}
+
+@keyframes power-sprite-spin {
+  from { background-position: calc(16 / 23 * 100%) 0; }
+  to { background-position: calc(24 / 23 * 100%) 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .power-sprite { transition: none; }
+  .power-sprite--fan.is-on { animation: none; }
+}

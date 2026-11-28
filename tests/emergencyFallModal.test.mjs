@@ -281,13 +281,29 @@ test('EmergencyFallModal renders red border + floating SOS bubble first and only
     let html = harness.renderHtml();
 
     assert.equal(findElements(tree, (el) => el.props?.['data-testid'] === 'sos-screen-edge').length, 1);
-    const bubbles = findElements(tree, (el) => el.props?.['data-testid'] === 'sos-floating-bubble');
+    let bubbles = findElements(tree, (el) => el.props?.['data-testid'] === 'sos-floating-bubble');
     assert.equal(bubbles.length, 1);
     assert.equal(findElements(tree, (el) => el.props?.role === 'dialog').length, 0);
     assert.equal(findElements(tree, (el) => el.props?.role === 'heading').length, 0);
     assert.doesNotMatch(html, /role="dialog"|LIVE YOLOv8-POSE HUD|https:\/\/voice\.hesta\.homes\/camera\/video_feed/);
 
-    // 4. Click SOS bubble -> full Emergency SOS modal opens and bubble hides, border remains
+    // 3b. Person stands back up (STANDING, alert: false) -> Medical Alarm Latching keeps SOS active until dismissed
+    currentStatus = {
+      alert: false,
+      state: 'STANDING',
+      incident_type: 'NONE',
+      safe_zone: 'Phòng khách',
+      metrics: { spine_angle: 88, accel_g: 1.0, jerk_g_per_sec: 0.5, ptt_sec: 0 },
+      fps: 30,
+    };
+    await pollEntry.fn();
+    tree = harness.renderTree();
+    assert.ok(tree);
+    assert.equal(findElements(tree, (el) => el.props?.['data-testid'] === 'sos-screen-edge').length, 1);
+    bubbles = findElements(tree, (el) => el.props?.['data-testid'] === 'sos-floating-bubble');
+    assert.equal(bubbles.length, 1);
+
+    // 4. Click SOS bubble -> full Emergency SOS modal opens with preserved fall metrics and bubble hides, border remains
     bubbles[0].props.onClick();
     tree = harness.renderTree();
     html = harness.renderHtml();
@@ -295,6 +311,9 @@ test('EmergencyFallModal renders red border + floating SOS bubble first and only
     assert.equal(findElements(tree, (el) => el.props?.['data-testid'] === 'sos-floating-bubble').length, 0);
     assert.equal(findElements(tree, (el) => el.props?.role === 'dialog').length, 1);
     assert.match(html, /role="dialog"[^>]*>.*>CẢNH BÁO TÉ NGÃ KHẨN CẤP \(EMERGENCY SOS\)</);
+    assert.match(html, /14\.0°/);
+    assert.doesNotMatch(html, /GỌI CỨU HỘ 115|tel:115/);
+    assert.match(html, /Tôi đang kiểm tra/);
 
     // 5. Click collapse button -> collapses back to SOS bubble + red border
     const collapseBtn = findElements(tree, (el) => el.props?.['data-testid'] === 'sos-collapse-btn')[0];
