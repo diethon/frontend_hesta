@@ -4,7 +4,9 @@ import { getNotificationPreferences, updateNotificationPreferences } from '../..
 import { getErrorMessage } from '../../utils/errors';
 import { notify } from '../ui/notify';
 
-const OPTIONS: Array<{ key: keyof NotificationPreferences; title: string; description: string }> = [
+type ToggleKey = 'securityEnabled' | 'automationEnabled' | 'systemEnabled';
+
+const OPTIONS: Array<{ key: ToggleKey; title: string; description: string }> = [
   { key: 'securityEnabled', title: 'An ninh & bất thường', description: 'Chuyển động, xâm nhập, cảm biến mất kết nối, khói/gas.' },
   { key: 'automationEnabled', title: 'Tự động hóa', description: 'Kịch bản, quy tắc tự động và gợi ý thói quen.' },
   { key: 'systemEnabled', title: 'Hệ thống & thiết bị', description: 'Cập nhật hệ thống và trạng thái thiết bị.' },
@@ -44,6 +46,8 @@ export const NotificationPreferencesTab: React.FC = () => {
     return <p role="status" className="py-8 text-center text-sm text-[#475569]">Đang tải cài đặt…</p>;
   }
 
+  const quietWindowEmpty = preferences.quietHoursEnabled && preferences.quietHoursStart === preferences.quietHoursEnd;
+
   return (
     <form onSubmit={handleSave} className="space-y-3 animate-in slide-in-from-right-4 duration-300">
       {OPTIONS.map((option) => {
@@ -72,14 +76,73 @@ export const NotificationPreferencesTab: React.FC = () => {
         );
       })}
 
-      <p className="rounded-xl border border-[#f59e0b]/45 bg-[#fffbeb] px-3.5 py-2.5 text-xs font-medium text-[#92400e]">
-        Cảnh báo khẩn cấp (xâm nhập, khói, gas) luôn được gửi để đảm bảo an toàn.
-      </p>
+      <div className="rounded-2xl border border-[#cbd5e1] bg-[#f8fafc] px-4 py-3.5 space-y-3">
+        <label className="flex cursor-pointer items-center justify-between gap-4">
+          <span>
+            <span className="block text-sm font-bold text-[#0f172a]">Giờ yên tĩnh</span>
+            <span className="block text-xs text-[#475569] mt-0.5">Vẫn lưu thông báo nhưng không bật popup trong khung giờ này.</span>
+          </span>
+          <input
+            type="checkbox"
+            role="switch"
+            aria-label="Giờ yên tĩnh"
+            checked={preferences.quietHoursEnabled}
+            onChange={() => setPreferences({ ...preferences, quietHoursEnabled: !preferences.quietHoursEnabled })}
+            className="peer sr-only"
+          />
+          <span
+            aria-hidden={true}
+            className={`relative h-6 w-11 shrink-0 rounded-full transition-colors after:absolute after:left-1 after:top-1 after:h-4 after:w-4 after:rounded-full after:bg-white after:shadow-sm after:transition-transform peer-focus-visible:ring-2 peer-focus-visible:ring-[#2563eb] ${
+              preferences.quietHoursEnabled ? 'bg-[#2563eb] after:translate-x-5' : 'bg-[#cbd5e1]'
+            }`}
+          />
+        </label>
+        {preferences.quietHoursEnabled && (
+          <div className="flex flex-wrap items-center gap-3 text-xs font-medium text-[#334155]">
+            <label className="flex items-center gap-2">
+              Từ
+              <input
+                type="time"
+                required
+                value={preferences.quietHoursStart}
+                onChange={(e) => setPreferences({ ...preferences, quietHoursStart: e.target.value })}
+                className="rounded-lg border border-[#cbd5e1] bg-white px-2 py-1.5 text-sm text-[#0f172a]"
+              />
+            </label>
+            <label className="flex items-center gap-2">
+              đến
+              <input
+                type="time"
+                required
+                value={preferences.quietHoursEnd}
+                onChange={(e) => setPreferences({ ...preferences, quietHoursEnd: e.target.value })}
+                className="rounded-lg border border-[#cbd5e1] bg-white px-2 py-1.5 text-sm text-[#0f172a]"
+              />
+            </label>
+            {quietWindowEmpty && <span role="alert" className="text-[#be123c]">Giờ bắt đầu và kết thúc phải khác nhau.</span>}
+          </div>
+        )}
+      </div>
+
+      <div className="flex items-center justify-between gap-4 rounded-2xl border border-[#f59e0b]/45 bg-[#fffbeb] px-4 py-3.5">
+        <span>
+          <span className="block text-sm font-bold text-[#92400e]">Cảnh báo khẩn cấp</span>
+          <span className="block text-xs text-[#92400e] mt-0.5">Xâm nhập, khói, gas luôn được gửi, kể cả trong giờ yên tĩnh.</span>
+        </span>
+        <span
+          role="switch"
+          aria-checked={true}
+          aria-disabled={true}
+          aria-label="Cảnh báo khẩn cấp luôn bật"
+          title="Luôn bật để đảm bảo an toàn"
+          className="relative h-6 w-11 shrink-0 cursor-not-allowed rounded-full bg-[#f59e0b] opacity-70 after:absolute after:left-1 after:top-1 after:h-4 after:w-4 after:translate-x-5 after:rounded-full after:bg-white after:shadow-sm"
+        />
+      </div>
 
       <div className="pt-2 flex justify-end">
         <button
           type="submit"
-          disabled={isSaving}
+          disabled={isSaving || quietWindowEmpty}
           className="w-full sm:w-auto sm:min-w-[180px] py-2.5 px-6 bg-[#2563eb] hover:bg-[#1d4ed8] text-white font-bold text-sm rounded-xl transition shadow-xs active:scale-[0.99] disabled:opacity-50 cursor-pointer"
         >
           {isSaving ? 'Đang lưu…' : 'Lưu cài đặt'}

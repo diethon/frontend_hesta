@@ -8,6 +8,8 @@ import { GoogleSignInButton } from './GoogleAccountModal';
 import { AuthShell } from '../ui/AuthShell';
 import { notify } from '../ui/notify';
 
+const LANDING_URL = (import.meta.env.VITE_LANDING_URL || 'https://hesta.homes').replace(/\/+$/, '');
+
 interface LoginFormProps {
   onLoginSuccess: (authData: AuthResponse) => void;
 }
@@ -218,6 +220,11 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
           >
             Đăng ký ngay
           </Link>
+        </p>
+        <p className="pt-2 text-center text-sm text-muted">
+          <a href={`${LANDING_URL}/bao-gia`} className="font-semibold text-primary-hover underline-offset-4 hover:underline">
+            Xem bảng giá thiết bị
+          </a>
         </p>
       </div>
     </AuthShell>
