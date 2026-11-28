@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router';
+import { Navigate, Outlet, Route, Routes, useLocation, useNavigate } from 'react-router';
 import { LoginForm } from '../components/auth/LoginForm';
 import { RegisterForm } from '../components/auth/RegisterForm';
 import { ForgotPasswordForm } from '../components/auth/ForgotPasswordForm';
@@ -103,13 +103,19 @@ export function AppRoutes() {
         <Route path="/home" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <HomePage user={user!} onLogout={logout} />} />
         <Route path="/contracts" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin/contracts" replace /> : <UserContractsPage user={user!} onLogout={logout} />} />
         <Route path="/contracts/:contractId" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin/contracts" replace /> : <UserContractsPage user={user!} onLogout={logout} />} />
-        <Route path="/profile" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <ProfilePage user={user!} onLogout={logout} onProfileUpdate={updateUser} />} />
-        <Route path="/homes/:homeId/scenes" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <ScenePage />} />
-        <Route path="/homes/:homeId/scenes/:sceneId" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <ScenePage />} />
-        <Route path="/homes/:homeId/automation-rules" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <AutomationRulePage />} />
-        <Route path="/homes/:homeId/recommendations" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <RecommendationsPage />} />
-        <Route path="/homes/:homeId/guardian" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <ParentalGuardianRouteWrapper />} />
-        <Route path="/homes/:homeId/security" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <SecurityCenterPage />} />
+        <Route element={<>
+          <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" />
+          <Outlet />
+        </>}>
+          <Route path="/profile" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <ProfilePage user={user!} onLogout={logout} onProfileUpdate={updateUser} />} />
+          <Route path="/homes/:homeId/scenes" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <ScenePage />} />
+          <Route path="/homes/:homeId/scenes/:sceneId" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <ScenePage />} />
+          <Route path="/homes/:homeId/automation-rules" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <AutomationRulePage />} />
+          <Route path="/homes/:homeId/recommendations" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <RecommendationsPage />} />
+          <Route path="/homes/:homeId/guardian" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <ParentalGuardianRouteWrapper />} />
+          <Route path="/homes/:homeId/security" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <SecurityCenterPage />} />
+          <Route path="/home/:homeId/digital-twin" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <Suspense fallback={<p role="status" className="p-8 text-muted">Đang tải Digital Twin…</p>}><DigitalTwinPage /></Suspense>} />
+        </Route>
         <Route path="/homes/:homeId/anomalies" element={<Navigate to="../security?tab=anomalies" relative="path" replace />} />
         <Route path="/homes/:homeId/maintenance" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin/maintenance" replace /> : <MaintenancePage />} />
         <Route path="/homes/:homeId/members" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <MemberPage />} />
@@ -119,7 +125,6 @@ export function AppRoutes() {
         <Route path="/home/:homeId/fall-detection" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <FallDetectionPage />} />
         <Route path="/fall-detection" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <FallDetectionPage />} />
         <Route path="/camera-ai" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <FallDetectionPage />} />
-        <Route path="/home/:homeId/digital-twin" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <Suspense fallback={<p role="status" className="p-8 text-muted">Đang tải Digital Twin…</p>}><DigitalTwinPage /></Suspense>} />
         <Route element={<RequireAdmin initialized={initialized} user={user} />}>
           <Route path="/admin" element={<AdminDashboard user={user!} onLogout={logout} onProfileUpdate={updateUser} />} />
           <Route path="/admin/devices" element={<Navigate to="/admin" replace />} />
