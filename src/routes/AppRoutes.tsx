@@ -29,6 +29,9 @@ import { FallDetectionPage } from '../components/emergency/FallDetectionPage';
 import { MemberPage } from '../components/member/MemberPage';
 import { MaintenancePage } from '../components/maintenance/MaintenancePage';
 import { AdminMaintenancePage } from '../components/maintenance/AdminMaintenancePage';
+import { UserContractsPage } from '../components/contracts/UserContractsPage';
+import { AdminContractsPage } from '../components/contracts/AdminContractsPage';
+import { NotFoundPage } from '../components/ui/NotFoundPage';
 
 export function AppRoutes() {
   const { initialized, user, login, logout, updateUser } = useRouteSession();
@@ -98,6 +101,8 @@ export function AppRoutes() {
       )} />
       <Route element={<RequireAuth initialized={initialized} user={user} />}>
         <Route path="/home" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <HomePage user={user!} onLogout={logout} />} />
+        <Route path="/contracts" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin/contracts" replace /> : <UserContractsPage user={user!} onLogout={logout} />} />
+        <Route path="/contracts/:contractId" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin/contracts" replace /> : <UserContractsPage user={user!} onLogout={logout} />} />
         <Route path="/profile" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <ProfilePage user={user!} onLogout={logout} onProfileUpdate={updateUser} />} />
         <Route path="/homes/:homeId/scenes" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <ScenePage />} />
         <Route path="/homes/:homeId/scenes/:sceneId" element={user?.platformRole === 'ADMIN' ? <Navigate to="/admin" replace /> : <ScenePage />} />
@@ -121,12 +126,14 @@ export function AppRoutes() {
           <Route path="/admin/users" element={<AdminUsersPage user={user!} onLogout={logout} onProfileUpdate={updateUser} />} />
           <Route path="/admin/diagnostics" element={<SystemDiagnosticsPage user={user!} onLogout={logout} onProfileUpdate={updateUser} />} />
           <Route path="/admin/maintenance" element={<AdminMaintenancePage user={user!} onLogout={logout} onProfileUpdate={updateUser} />} />
+          <Route path="/admin/contracts" element={<AdminContractsPage user={user!} onLogout={logout} onProfileUpdate={updateUser} />} />
         </Route>
       </Route>
-      <Route path="*" element={
+      <Route path="/" element={
         <Navigate to={{ pathname: defaultRoute(user), search: location.search, hash: location.hash }}
           state={state} replace />
       } />
+      <Route path="*" element={initialized ? <NotFoundPage homePath={defaultRoute(user)} user={user} /> : null} />
     </Routes>
   );
 }

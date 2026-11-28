@@ -8,14 +8,19 @@ import { GoogleSignInButton } from './GoogleAccountModal';
 import { AuthShell } from '../ui/AuthShell';
 import { notify } from '../ui/notify';
 
+const LANDING_URL = (import.meta.env.VITE_LANDING_URL || 'https://hesta.homes').replace(/\/+$/, '');
+
 interface LoginFormProps {
   onLoginSuccess: (authData: AuthResponse) => void;
 }
 
 export const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
   const location = useLocation();
+  const urlParams = new URLSearchParams(location.search);
+  const initialEmail = urlParams.get('email') || '';
+  const hasContractToken = Boolean(urlParams.get('contractToken'));
   const [formData, setFormData] = useState<LoginRequest>({
-    email: '',
+    email: initialEmail,
     password: '',
     deviceId: 'WEB_CLIENT',
     deviceType: 'BROWSER',
@@ -107,7 +112,11 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
         <div className="mb-8">
           <p className="text-xs font-semibold uppercase tracking-wider text-primary-hover">Đăng nhập</p>
           <h1 className="mt-2 text-3xl font-bold tracking-tight text-text">Chào mừng trở lại</h1>
-          <p className="mt-2 text-sm text-muted">Đăng nhập để tiếp tục quản lý ngôi nhà của bạn.</p>
+          <p className="mt-2 text-sm text-muted">
+            {hasContractToken
+              ? 'Đăng nhập để liên kết hồ sơ hợp đồng lắp đặt và theo dõi tiến độ.'
+              : 'Đăng nhập để tiếp tục quản lý ngôi nhà của bạn.'}
+          </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
@@ -211,6 +220,11 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
           >
             Đăng ký ngay
           </Link>
+        </p>
+        <p className="pt-2 text-center text-sm text-muted">
+          <a href={`${LANDING_URL}/bao-gia`} className="font-semibold text-primary-hover underline-offset-4 hover:underline">
+            Xem bảng giá thiết bị
+          </a>
         </p>
       </div>
     </AuthShell>

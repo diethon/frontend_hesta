@@ -46,6 +46,8 @@ import { notify } from '../ui/notify';
 import { realtimeEventDispatcher } from '../../realtime/realtimeEvents';
 import type { RealtimeEvent } from '../../realtime/realtimeTypes';
 import { useOverrideCountdown } from './useOverrideCountdown';
+import { DevicePowerSprite } from './DevicePowerSprite';
+import { powerSpriteKind } from './powerSprite';
 import {
   type UIMappedDevice,
   type DeviceSortOption,
@@ -300,6 +302,7 @@ function DevicesDeviceCard({
       ? `rgb(${resolvedRgb.r}, ${resolvedRgb.g}, ${resolvedRgb.b})`
       : (typeof rawState?.rgbHex === 'string' ? rawState.rgbHex : undefined)
     : undefined;
+  const spriteKind = powerSpriteKind(device.raw?.deviceType ?? '', device.name);
   const isPowerDevice =
     !device.sensor && device.type !== 'Cảm biến' && device.type !== 'Camera';
   const showKwh = isPowerDevice && !device.offline && (kwhToday ?? 0) > 0;
@@ -412,7 +415,7 @@ function DevicesDeviceCard({
       <div className="device-visual-center">
         <div className="icon-tile-wrap">
           <span
-            className={`device-icon device-visual-tile type-${colorClass}`}
+            className={`device-icon device-visual-tile type-${colorClass}${spriteKind ? ' has-sprite' : ''}`}
             style={
               isRgbLight && device.on && !device.offline && rgbHex
                 ? {
@@ -422,6 +425,9 @@ function DevicesDeviceCard({
                 : undefined
             }
           >
+            {spriteKind ? (
+              <DevicePowerSprite kind={spriteKind} on={!!device.on && !device.offline} />
+            ) : (
             <DeviceVisual
               uid={`page-${device.id}`}
               deviceType={device.raw?.deviceType}
@@ -438,6 +444,7 @@ function DevicesDeviceCard({
               sensorState={rawState}
               size={82}
             />
+            )}
             <span
               className={`status-dot ${
                 device.raw?.status === 'UNKNOWN'

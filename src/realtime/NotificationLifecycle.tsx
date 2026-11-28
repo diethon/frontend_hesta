@@ -24,6 +24,8 @@ export function NotificationLifecycle() {
       if (receiveNotificationFromRealtime.fulfilled.match(action) && action.payload) {
         const state = reduxStore.getState();
         if (state.auth.user?.id !== action.payload.userId || state.home.currentHomeId !== action.payload.homeId) return;
+        // Backend sets silent during the recipient's quiet hours: keep it in the list, skip the popup.
+        if ((event.data as { silent?: unknown } | null)?.silent === true) return;
         notify.info(action.payload.title, action.payload.message, `notification-${action.payload.id}`);
       }
     });

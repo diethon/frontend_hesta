@@ -664,9 +664,11 @@ export const RuleEditorPanel: React.FC<RuleEditorPanelProps> = ({
                   <span className="text-[11px] font-bold text-[var(--secondary)] uppercase tracking-wider block">
                     1. Thông tin quy tắc
                   </span>
-                  <span className="text-[11px] font-mono text-[var(--tertiary)]">
-                    {name.length}/40
-                  </span>
+                  {name.length >= 35 && (
+                    <span className="text-[11px] font-mono text-[var(--tertiary)]">
+                      {name.length}/40
+                    </span>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -975,9 +977,6 @@ export const RuleEditorPanel: React.FC<RuleEditorPanelProps> = ({
                   <div>
                     <span className="text-[11px] font-bold text-[var(--secondary)] uppercase tracking-wider block">
                       3. Thì làm gì (Hành động {actions.length})
-                    </span>
-                    <span className="text-[10px] text-[var(--tertiary)] block">
-                      Cùng thiết bị chạy theo thứ tự từ trên xuống
                     </span>
                   </div>
                 </div>

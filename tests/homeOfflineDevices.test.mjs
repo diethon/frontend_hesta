@@ -12,7 +12,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const require = createRequire(import.meta.url);
 const modules = new Map();
-globalThis.__viteEnv = { VITE_API_BASE_URL: 'http://backend.test/api/v1' };
+globalThis.__viteEnv = { VITE_API_BASE_URL: 'http://backend.test/api/v1', BASE_URL: '/' };
 
 function loadSource(path) {
   const filename = resolve(root, path);
@@ -23,12 +23,13 @@ function loadSource(path) {
   const { outputText } = ts.transpileModule(source, {
     compilerOptions: {
       module: ts.ModuleKind.CommonJS,
-      jsx: ts.JsxEmit.React,
+      jsx: ts.JsxEmit.ReactJSX,
       target: ts.ScriptTarget.ES2022,
     },
     fileName: filename,
   });
   const sourceRequire = (name) => {
+    if (name.endsWith('.css')) return {};
     if (!name.startsWith('.')) return require(name);
     const base = resolve(dirname(filename), name);
     const dependencyPath = ['', '.ts', '.tsx'].map((extension) => base + extension).find(existsSync);
@@ -422,6 +423,8 @@ function createDevicePageHarness({ initialDevices = [], onSendCommand, onSendPow
     if (id === './DeviceVisual') {
       return loadSource('src/components/device/DeviceVisual.tsx');
     }
+    if (id === './DevicePowerSprite') return loadSource('src/components/device/DevicePowerSprite.tsx');
+    if (id === './powerSprite') return loadSource('src/components/device/powerSprite.ts');
     if (id === './DeviceGroupSection') return { DeviceGroupSection: () => null };
     if (id === './DevicesOverviewStrip') return { DevicesOverviewStrip: () => null };
     if (id === '../../services/deviceApi') {

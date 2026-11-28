@@ -26,6 +26,18 @@ trên tường, mặc định 2,4 × 2,1 m nếu phòng chưa có lỗ cửa. Th
 Chưa chuyển: đèn (cần giữ nguồn sáng `LampEmitter`), camera, cảm biến, ổ cắm, cửa/cửa sổ/rèm
 (đang dựng theo lỗ tường) và đồ nội thất.
 
+## Sinh lại bằng Blender (bản hiện dùng)
+
+```powershell
+blender -b --factory-startup -P scripts/blender/hesta_devices.py -- models    # public/twin-models/*.glb
+blender -b --factory-startup -P scripts/blender/hesta_devices.py -- sprites   # public/device-sprites/*.webp
+```
+
+Script dựng toàn bộ model bằng Python (Blender 5.x, không cần file `.blend`) theo đúng bảng trên.
+`sprites` render bằng Cycles 24 khung tắt → bật cho card thiết bị (`light`, `fan`, `ac`, `tv`, `plug`);
+`DevicePowerSprite` phát xuôi khi bật, ngược khi tắt. Quạt: khung 0–15 tăng tốc, 16–23 lặp vòng quay.
+Có thể chỉ render một loại: `-- sprites fan`.
+
 ## Sinh lại bản placeholder
 
 ```powershell

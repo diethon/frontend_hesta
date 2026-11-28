@@ -11,6 +11,7 @@ import { AvatarUploader } from './AvatarUploader';
 import { ProfileInfoForm } from './ProfileInfoForm';
 import { ChangePasswordForm } from './ChangePasswordForm';
 import { NotificationPreferencesTab } from './NotificationPreferencesTab';
+import { getMyHomes } from '../../services/homeApi';
 
 type Section = 'info' | 'security' | 'notifications';
 
@@ -35,7 +36,18 @@ export const ProfilePage: React.FC<{
   onProfileUpdate: (updatedUser: UserResponse) => void;
 }> = ({ user, onLogout, onProfileUpdate }) => {
   const navigate = useNavigate();
-  const homeId = useAppSelector(selectCurrentHomeId) ?? undefined;
+  const currentHomeId = useAppSelector(selectCurrentHomeId);
+  // HomePage clears currentHomeId on unmount, so fall back to the user's first home for nav links.
+  const [fallbackHomeId, setFallbackHomeId] = React.useState<string>();
+  React.useEffect(() => {
+    if (currentHomeId) return;
+    let active = true;
+    getMyHomes()
+      .then((homes) => { if (active) setFallbackHomeId(homes?.[0]?.homeId); })
+      .catch(() => undefined);
+    return () => { active = false; };
+  }, [currentHomeId]);
+  const homeId = currentHomeId ?? fallbackHomeId;
   const [searchParams, setSearchParams] = useSearchParams();
   const requested = searchParams.get('tab');
   const section: Section = requested === 'security' || requested === 'notifications' ? requested : 'info';
@@ -114,6 +126,16 @@ export const ProfilePage: React.FC<{
                   {item.label}
                 </button>
               ))}
+              <button
+                type="button"
+                onClick={() => navigate('/contracts')}
+                className="flex min-h-11 items-center gap-3 rounded-xl px-3 text-left text-sm font-semibold border border-transparent text-[#334155] hover:bg-[#f8fafc] hover:border-[#cbd5e1] hover:text-[#0f172a] transition-colors cursor-pointer"
+              >
+                <span className="text-[#2563eb]">
+                  <Icon name="briefcase" size={18} />
+                </span>
+                Hợp đồng lắp đặt
+              </button>
               <button
                 type="button"
                 onClick={onLogout}

@@ -29,7 +29,7 @@ export interface DashboardNavRailProps {
 }
 
 interface NavItemDef {
-  id: 'overview' | 'devices' | 'twin' | 'energy' | 'scenes' | 'automations' | 'security' | 'maintenance' | 'members';
+  id: 'overview' | 'devices' | 'twin' | 'energy' | 'scenes' | 'automations' | 'security' | 'maintenance' | 'contracts' | 'members';
   icon: IconName;
   label: string;
 }
@@ -122,6 +122,9 @@ export const DashboardNavRail: React.FC<DashboardNavRailProps> = ({
         } else {
           notify.info('Hãy chọn hoặc tạo một ngôi nhà trước.');
         }
+        break;
+      case 'contracts':
+        navigate('/contracts');
         break;
       case 'members':
         if (onSelectMembers) {

@@ -20,6 +20,22 @@
   }
 }
 
+@media print {
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+  body {
+    background: #ffffff !important;
+    color: #0f172a !important;
+  }
+  .contract-print-sheet {
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+}
+
 .twin-viewport {
   --twin-canvas-height: clamp(28rem, 38vw, 38rem);
   height: calc(var(--twin-canvas-height) + 2px);
@@ -416,6 +432,22 @@ textarea:disabled {
   border-radius: 999px;
   background: #d6e4ec;
   background-clip: padding-box;
+}
+
+/* 404 page: house badge bobs gently. */
+@keyframes not-found-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+.not-found-float {
+  animation: not-found-float 3.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .not-found-float {
+    animation: none;
+  }
 }
 
 @keyframes gentle-rise {

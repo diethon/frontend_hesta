@@ -11,6 +11,9 @@ export function ParentalGuardianRouteWrapper() {
 
   return (
     <div className="app-shell scenes-page studio st-theme">
+      <div className="mesh mesh-one" />
+      <div className="mesh mesh-two" />
+      <div className="mesh mesh-three" />
 
       {/* Desktop/Tablet NavRail */}
       <DashboardNavRail

@@ -22,6 +22,102 @@ interface VoiceResult {
   errorCode?: string | null;
   status?: string | null;
   subCommands?: SubCommandResult[];
+  audioPayload?: string | null;
+}
+
+/* ── 10ms Silent WAV data URI để mở khóa Autoplay Policy trên Chrome/Edge/Safari ── */
+const SILENT_WAV_URI = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
+
+/* ── Chọn file âm thanh MP3 cục bộ dự phòng (phát được cả khi Voice Service trên Pi đang Offline!) ── */
+function getLocalFallbackAudioUrl(errorCode?: string | null, message?: string): string | null {
+  const code = (errorCode || '').toUpperCase();
+  const msg = (message || '').toLowerCase();
+
+  if (code === 'CONNECTION_ERROR' || msg.includes('không thể kết nối tới trợ lý') || msg.includes('failed to fetch')) {
+    return '/audio/voice-offline.mp3';
+  }
+  if (code === 'INTENT_NOT_FOUND' || msg.includes('không hiểu') || msg.includes('chưa hiểu')) {
+    return '/audio/voice-unknown.mp3';
+  }
+  if (code === 'ACCESS_DENIED' || code === 'UNAUTHORIZED' || msg.includes('không có quyền')) {
+    return '/audio/voice-denied.mp3';
+  }
+  if (
+    code === 'DEVICE_OFFLINE' ||
+    code === 'GATEWAY_DISCONNECTED' ||
+    code === 'TIMEOUT' ||
+    msg.includes('ngoại tuyến') ||
+    msg.includes('không phản hồi') ||
+    msg.includes('chưa kết nối')
+  ) {
+    return '/audio/voice-device-offline.mp3';
+  }
+  if (code === 'SCENE_NOT_FOUND' || msg.includes('không tìm thấy')) {
+    return '/audio/voice-not-found.mp3';
+  }
+  return null;
+}
+
+function polishVoiceTranscript(raw: string): string {
+  if (!raw) return raw;
+  let cleaned = raw.replace(/\s+/g, ' ').trim();
+  // Lưu ý: KHÔNG dùng \b của JS vì JS \b chỉ nhận ASCII, sẽ cắt sai giữa ký tự có dấu tiếng Việt và chữ cái kế tiếp!
+  // Luôn dùng Unicode boundary (?<![\p{L}\p{N}_]) và (?![\p{L}\p{N}_]) với cờ /giu.
+  const B = '(?<![\\p{L}\\p{N}_])';
+  const E = '(?![\\p{L}\\p{N}_])';
+  const rules: Array<[RegExp, string]> = [
+    [
+      new RegExp(
+        `${B}(bật|mở|chạy|kích\\s+hoạt|thực\\s+thi|áp\\s+dụng|chuyển\\s+sang|đổi\\s+sang|tắt|dừng|hủy|ngưng|thoát|đóng)((?:\\s+(?:dùm|giùm|hộ|giúp|cho|tôi|mình|anh|em|cái))*)\\s+(?:kết\\s+bạn|kích\\s+bản|kịch\\s+bảng|kết\\s+bảng|kích\\s+bảng|kịch\\s+bạn|kịp\\s+bản)${E}`,
+        'giu',
+      ),
+      '$1$2 kịch bản',
+    ],
+    [new RegExp(`${B}(?:kịch\\s+bảng|kích\\s+bản|kết\\s+bảng|kích\\s+bảng|kịp\\s+bản)${E}`, 'giu'), 'kịch bản'],
+    [
+      new RegExp(
+        `${B}(?:tắc|bắt|đắt|bắc)\\s+(đèn|quạt|điều\\s+hòa|máy\\s+lạnh|tivi|ti\\s+vi|tv|rèm|cổng|máy\\s+bơm|kịch\\s+bản|tất\\s+cả|toàn\\s+bộ|cả\\s+nhà)${E}`,
+        'giu',
+      ),
+      'tắt $1',
+    ],
+    [
+      new RegExp(
+        `${B}(phòng\\s+ngủ|phòng|đèn\\s+ngủ|đèn)\\s+(?:mắt\\s+tơ|mát\\s+tơ|mác\\s+tơ|ma\\s+tơ|mất\\s+tơ|mết\\s+tơ|mắc\\s+tơ|bác\\s+tơ|mặt\\s+tơ)${E}`,
+        'giu',
+      ),
+      '$1 master',
+    ],
+    [new RegExp(`${B}cửa\\s+cuống${E}`, 'giu'), 'cửa cuốn'],
+    [new RegExp(`${B}đèn\\s+(?:lét|lết|lép)${E}`, 'giu'), 'đèn LED'],
+    [new RegExp(`${B}chế\\s+đồ${E}`, 'giu'), 'chế độ'],
+  ];
+  for (const [pat, repl] of rules) {
+    cleaned = cleaned.replace(pat, repl);
+  }
+  return cleaned;
+}
+
+function formatVoiceNetworkError(err: any): string {
+  const raw = String(err?.message || '').trim();
+  const lower = raw.toLowerCase();
+  if (
+    !raw ||
+    lower.includes('failed to fetch') ||
+    lower.includes('networkerror') ||
+    lower.includes('load failed') ||
+    lower.includes('aborted') ||
+    lower.includes('timeout')
+  ) {
+    return 'Không thể kết nối tới trợ lý giọng nói. Vui lòng kiểm tra thiết bị trung tâm.';
+  }
+  if (raw.startsWith('Voice service error: 401') || raw.startsWith('Voice service error: 403')) {
+    return 'Phiên đăng nhập đã hết hạn hoặc bạn không có quyền sử dụng trợ lý giọng nói.';
+  }
+  if (raw.startsWith('Voice service error: 502') || raw.startsWith('Voice service error: 503') || raw.startsWith('Voice service error: 504')) {
+    return 'Trợ lý giọng nói đang tạm thời ngoại tuyến hoặc khởi động lại. Vui lòng thử lại sau giây lát.';
+  }
+  return raw;
 }
 
 /* ── MicIcon ── */
@@ -100,11 +196,11 @@ const VolumeMuteIcon: React.FC<{ className?: string }> = ({ className = 'h-4 w-4
 
 const QUICK_COMMANDS = [
   'Bật đèn phòng ngủ',
-  'Bật quạt phòng khách',
+  'Bật đèn chiếu tivi',
+  'Bật kịch bản chào buổi sáng',
   'Mở cổng',
-  'Bật máy bơm',
   'Đặt nhiệt độ 26 độ',
-  'Tăng độ sáng 80',
+  'Tắt tất cả đèn',
 ];
 
 /* ══════════════════════════════════════════════════
@@ -135,15 +231,33 @@ export const VoiceAssistantButton: React.FC = () => {
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
   const watchdogTimerRef = useRef<any>(null);
 
-  /* ── Kích hoạt / Unlock AudioContext & Audio Player trên tương tác người dùng ── */
+  /* ── Kích hoạt / Unlock Audio Player thực sự ngay trong user gesture (chống Chrome NotAllowedError) ── */
   const unlockAudioPlayer = useCallback(() => {
     if (typeof window === 'undefined') return;
     try {
       if (!audioPlayerRef.current) {
         audioPlayerRef.current = new Audio();
       }
-      // Đảm bảo volume = 1.0 và trình duyệt ghi nhận gesture unlock
-      audioPlayerRef.current.volume = 1.0;
+      const audio = audioPlayerRef.current;
+      audio.volume = 1.0;
+      // Phát 1 frame WAV câm 10ms ngay trong click handler để trình duyệt cấp quyền autoplay lâu dài
+      if (audio.paused && !audio.dataset?.unlocked) {
+        audio.muted = true;
+        audio.src = SILENT_WAV_URI;
+        const p = audio.play();
+        if (p !== undefined) {
+          p.then(() => {
+            audio.pause();
+            audio.currentTime = 0;
+            audio.muted = false;
+            if (audio.dataset) audio.dataset.unlocked = '1';
+          }).catch(() => {
+            audio.muted = false;
+          });
+        } else {
+          audio.muted = false;
+        }
+      }
     } catch {}
   }, []);
 
@@ -217,61 +331,93 @@ export const VoiceAssistantButton: React.FC = () => {
     }
   }, []);
 
-  /* ── Phát âm thanh giọng đọc phản hồi tiếng Việt ── */
+  /* ── Phát âm thanh giọng đọc phản hồi tiếng Việt (3 tầng: Base64/URL Server -> Static MP3 Cục Bộ -> Local Speech) ── */
   const speakResponse = useCallback(
-    (text: string, customAudioPayload?: string | null) => {
+    (text: string, customAudioPayload?: string | null, errorCode?: string | null) => {
       if (!ttsEnabled) return;
       stopAllAudio();
 
       const cleanMessage = text.replace(/[✅⚠️❌⚡📝🔒🔓💡🔌🌀❄️☀️🌡️🔊🔇\*_`~#]/g, '').trim();
       if (!cleanMessage) return;
 
-      // 1. Ưu tiên cao nhất: Dùng Neural Audio (Base64 data URL tức thì < 10ms hoặc Stream URL từ server)
-      const audioSrc = customAudioPayload || getTtsAudioUrl(cleanMessage);
-      try {
-        if (!audioPlayerRef.current) {
-          audioPlayerRef.current = new Audio();
-        }
-        const audio = audioPlayerRef.current;
-        audio.pause();
-        audio.src = audioSrc;
+      const localStaticFallback = getLocalFallbackAudioUrl(errorCode, cleanMessage);
 
-        let finished = false;
-        const finishSpeech = () => {
-          if (finished) return;
-          finished = true;
-          setIsSpeaking(false);
-          if (watchdogTimerRef.current) {
-            clearTimeout(watchdogTimerRef.current);
-            watchdogTimerRef.current = null;
-          }
-        };
-
-        audio.onplay = () => setIsSpeaking(true);
-        audio.onended = finishSpeech;
-        audio.onerror = () => {
-          console.warn('Audio playback error, falling back...');
-          finishSpeech();
-          fallbackLocalSpeech(cleanMessage);
-        };
-
-        // Watchdog: Tự động giải phóng trạng thái isSpeaking sau 8s để không bao giờ bị đơ UI
-        if (watchdogTimerRef.current) clearTimeout(watchdogTimerRef.current);
-        watchdogTimerRef.current = setTimeout(finishSpeech, 8000);
-
-        const playPromise = audio.play();
-        if (playPromise !== undefined) {
-          playPromise.catch((err) => {
-            console.warn('Audio play() rejected:', err);
-            finishSpeech();
-            fallbackLocalSpeech(cleanMessage);
-          });
-        }
-      } catch (e) {
-        console.warn('Could not initialize Audio player:', e);
-        setIsSpeaking(false);
-        fallbackLocalSpeech(cleanMessage);
+      // Xác định nguồn audio ưu tiên:
+      // 1. Base64 data URI hoặc URL từ server
+      // 2. Nếu server trả null (TTS lỗi hoặc Voice Service offline) → dùng ngay MP3 tĩnh trong /audio/ (0ms!)
+      // 3. Nếu không truyền (undefined) → dùng static fallback nếu là lỗi offline, ngược lại gọi /api/voice/tts
+      let primarySrc: string | null = null;
+      if (customAudioPayload) {
+        primarySrc = customAudioPayload;
+      } else if (customAudioPayload === null) {
+        primarySrc = localStaticFallback;
+      } else {
+        primarySrc = localStaticFallback || getTtsAudioUrl(cleanMessage);
       }
+
+      if (!primarySrc) {
+        fallbackLocalSpeech(cleanMessage);
+        return;
+      }
+
+      const playAudioUrl = (src: string, allowStaticFallback: boolean) => {
+        try {
+          if (!audioPlayerRef.current) {
+            audioPlayerRef.current = new Audio();
+          }
+          const audio = audioPlayerRef.current;
+          audio.pause();
+          audio.muted = false;
+          audio.volume = 1.0;
+          audio.src = src;
+
+          let finished = false;
+          const finishSpeech = () => {
+            if (finished) return;
+            finished = true;
+            setIsSpeaking(false);
+            if (watchdogTimerRef.current) {
+              clearTimeout(watchdogTimerRef.current);
+              watchdogTimerRef.current = null;
+            }
+          };
+
+          const handlePlaybackFailure = () => {
+            finishSpeech();
+            // Nếu nguồn server bị lỗi/timeout mà ta có file MP3 cục bộ tương ứng -> phát ngay!
+            if (allowStaticFallback && localStaticFallback && src !== localStaticFallback) {
+              playAudioUrl(localStaticFallback, false);
+              return;
+            }
+            fallbackLocalSpeech(cleanMessage);
+          };
+
+          audio.onplay = () => setIsSpeaking(true);
+          audio.onended = finishSpeech;
+          audio.onerror = () => {
+            console.warn('Audio playback error on', src.slice(0, 60));
+            handlePlaybackFailure();
+          };
+
+          // Watchdog: Tự động giải phóng trạng thái isSpeaking sau 10s để không bao giờ bị đơ UI
+          if (watchdogTimerRef.current) clearTimeout(watchdogTimerRef.current);
+          watchdogTimerRef.current = setTimeout(finishSpeech, 10000);
+
+          const playPromise = audio.play();
+          if (playPromise !== undefined) {
+            playPromise.catch((err) => {
+              console.warn('Audio play() rejected:', err);
+              handlePlaybackFailure();
+            });
+          }
+        } catch (e) {
+          console.warn('Could not initialize Audio player:', e);
+          setIsSpeaking(false);
+          fallbackLocalSpeech(cleanMessage);
+        }
+      };
+
+      playAudioUrl(primarySrc, true);
     },
     [ttsEnabled, stopAllAudio, fallbackLocalSpeech],
   );
@@ -333,7 +479,7 @@ export const VoiceAssistantButton: React.FC = () => {
   /* ── Gửi text command → voice service ── */
   const sendCommand = useCallback(
     async (text: string) => {
-      const cleanText = text.trim();
+      const cleanText = polishVoiceTranscript(text);
       if (!cleanText) return;
 
       if (autoCloseTimerRef.current) {
@@ -350,6 +496,9 @@ export const VoiceAssistantButton: React.FC = () => {
           userId: user?.id,
         });
 
+        const directUrl = resp.audioUrl ? `${VOICE_SERVICE_URL}${resp.audioUrl}` : null;
+        const audioPayload = resp.audioData || directUrl;
+
         const voiceResult: VoiceResult = {
           success: resp.success,
           message: resp.message,
@@ -358,17 +507,17 @@ export const VoiceAssistantButton: React.FC = () => {
           errorCode: resp.errorCode,
           status: resp.status,
           subCommands: resp.subCommands,
+          audioPayload,
         };
 
+        setServiceOnline(true);
         setResult(voiceResult);
         setVoiceState(resp.success ? 'success' : 'error');
         setHistory((prev) => [voiceResult, ...prev.filter((h) => h.transcript !== cleanText)].slice(0, 8));
 
         // Phát giọng nói tiếng Việt chuẩn tự nhiên (ưu tiên Base64 phát tức thì < 10ms)
         if (resp.message) {
-          const directUrl = resp.audioUrl ? `${VOICE_SERVICE_URL}${resp.audioUrl}` : undefined;
-          const audioPayload = resp.audioData || directUrl;
-          speakResponse(resp.message, audioPayload);
+          speakResponse(resp.message, audioPayload, resp.errorCode);
         }
 
         // Tự động chuyển về idle sau 5s (đủ nghe trọn vẹn câu phản hồi)
@@ -376,21 +525,24 @@ export const VoiceAssistantButton: React.FC = () => {
           setVoiceState('idle');
         }, 5000);
       } catch (err: any) {
+        const friendlyMsg = formatVoiceNetworkError(err);
+        const offlineAudio = getLocalFallbackAudioUrl('CONNECTION_ERROR', friendlyMsg);
         const voiceResult: VoiceResult = {
           success: false,
-          message: err.message || 'Lỗi kết nối voice service',
+          message: friendlyMsg,
           transcript: cleanText,
           durationMs: 0,
           errorCode: 'CONNECTION_ERROR',
           status: 'ERROR',
+          audioPayload: offlineAudio,
         };
+        setServiceOnline(false);
         setResult(voiceResult);
         setVoiceState('error');
         setHistory((prev) => [voiceResult, ...prev.filter((h) => h.transcript !== cleanText)].slice(0, 8));
 
-        if (voiceResult.message) {
-          speakResponse(voiceResult.message);
-        }
+        // Luôn phát thông báo giọng nói tiếng Việt ngay từ static asset /audio/voice-offline.mp3 (0ms!)
+        speakResponse(voiceResult.message, offlineAudio, 'CONNECTION_ERROR');
       }
     },
     [currentHomeId, user?.id, speakResponse],
@@ -443,10 +595,10 @@ export const VoiceAssistantButton: React.FC = () => {
         }
       }
 
-      setTranscript(finalTranscript || interimTranscript);
+      setTranscript(polishVoiceTranscript(finalTranscript || interimTranscript));
 
       if (finalTranscript) {
-        sendCommand(finalTranscript);
+        sendCommand(polishVoiceTranscript(finalTranscript));
       }
     };
 
@@ -740,7 +892,10 @@ export const VoiceAssistantButton: React.FC = () => {
                       {/* Replay TTS button */}
                       <button
                         type="button"
-                        onClick={() => speakResponse(result.message)}
+                        onClick={() => {
+                          unlockAudioPlayer();
+                          speakResponse(result.message, result.audioPayload, result.errorCode);
+                        }}
                         className={`p-1.5 rounded-xl border transition-all shrink-0 ${
                           isSpeaking
                             ? 'bg-primary text-white border-primary shadow-sm animate-pulse'
@@ -795,7 +950,10 @@ export const VoiceAssistantButton: React.FC = () => {
                       <button
                         key={cmd}
                         type="button"
-                        onClick={() => sendCommand(cmd)}
+                        onClick={() => {
+                          unlockAudioPlayer();
+                          sendCommand(cmd);
+                        }}
                         className="rounded-xl px-3 py-1.5 text-xs font-medium border border-line bg-surface text-text hover:bg-sidebar-hover hover:border-primary/40 hover:text-primary-hover transition-all active:scale-95"
                       >
                         "{cmd}"
@@ -821,7 +979,10 @@ export const VoiceAssistantButton: React.FC = () => {
                       {history.map((item, idx) => (
                         <div
                           key={idx}
-                          onClick={() => sendCommand(item.transcript)}
+                          onClick={() => {
+                            unlockAudioPlayer();
+                            sendCommand(item.transcript);
+                          }}
                           title="Click để chạy lại lệnh này"
                           className="flex items-center justify-between gap-2 rounded-xl px-3 py-2 text-xs bg-sidebar/50 hover:bg-sidebar-hover cursor-pointer border border-transparent hover:border-primary/20 transition-all"
                         >

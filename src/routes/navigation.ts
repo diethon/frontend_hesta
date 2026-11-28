@@ -29,6 +29,11 @@ export function invitationToken(search: string) {
   return params.get('inviteToken') || params.get('token');
 }
 
+export function contractTokenParam(search: string) {
+  const params = new URLSearchParams(search);
+  return params.get('contractToken');
+}
+
 // Add the alias a flow needs without discarding any existing query parameters.
 export function invitationSearch(search: string, key: 'token' | 'inviteToken') {
   const params = new URLSearchParams(search);
@@ -45,7 +50,10 @@ export function loginDestination(user: UserResponse, search: string, state: Navi
   }
   const token = invitationToken(search);
   if (token && state.handledInviteToken !== token) return '/join';
-  if (state.returnTo === '/home') return state.returnTo;
+  const cToken = contractTokenParam(search);
+  if (cToken) return '/contracts';
+  if (state.returnTo === '/home' || state.returnTo === '/contracts') return state.returnTo;
+  if (state.returnTo?.startsWith('/contracts/')) return state.returnTo;
   if (isTwinReturnPath(state.returnTo)) return state.returnTo;
   if (state.returnTo?.match(/^\/homes\/[0-9a-f-]+\/(scenes|automation-rules)$/i)) return state.returnTo;
   return defaultRoute(user);
@@ -53,7 +61,8 @@ export function loginDestination(user: UserResponse, search: string, state: Navi
 
 function isSafeReturnPath(value: unknown): value is string {
   return typeof value === 'string' && (
-    value === '/home' || value === '/admin' || value === '/admin/users' || value === '/admin/diagnostics' || value === '/join' ||
+    value === '/home' || value === '/contracts' || /^\/contracts\/[0-9a-f-]+$/i.test(value) ||
+    value === '/admin' || value === '/admin/users' || value === '/admin/diagnostics' || value === '/admin/contracts' || value === '/admin/maintenance' || value === '/join' ||
     isTwinReturnPath(value) ||
     /^\/homes\/[0-9a-f-]+\/(scenes|automation-rules)$/i.test(value)
   );
