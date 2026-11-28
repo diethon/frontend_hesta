@@ -31,6 +31,7 @@ import { MaintenancePage } from '../components/maintenance/MaintenancePage';
 import { AdminMaintenancePage } from '../components/maintenance/AdminMaintenancePage';
 import { UserContractsPage } from '../components/contracts/UserContractsPage';
 import { AdminContractsPage } from '../components/contracts/AdminContractsPage';
+import { NotFoundPage } from '../components/ui/NotFoundPage';
 
 export function AppRoutes() {
   const { initialized, user, login, logout, updateUser } = useRouteSession();
@@ -128,10 +129,11 @@ export function AppRoutes() {
           <Route path="/admin/contracts" element={<AdminContractsPage user={user!} onLogout={logout} onProfileUpdate={updateUser} />} />
         </Route>
       </Route>
-      <Route path="*" element={
+      <Route path="/" element={
         <Navigate to={{ pathname: defaultRoute(user), search: location.search, hash: location.hash }}
           state={state} replace />
       } />
+      <Route path="*" element={initialized ? <NotFoundPage homePath={defaultRoute(user)} user={user} /> : null} />
     </Routes>
   );
 }

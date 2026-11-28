@@ -206,12 +206,19 @@ test('password reset supports restored history state and a safe direct-entry fal
   assert.deepEqual(redirects[0].to, { pathname: '/forgot-password', search, hash: '#flow' });
 });
 
-test('root and unknown paths redirect according to the restored platform role', () => {
-  for (const path of ['/', '/unknown']) {
-    for (const [account, destination] of [[null, '/login'], [user, '/home'], [admin, '/admin']]) {
-      renderRoute(path, account);
-      assert.deepEqual(redirects[0].to, { pathname: destination, search, hash: '#flow' });
-    }
+test('root path redirects according to the restored platform role', () => {
+  for (const [account, destination] of [[null, '/login'], [user, '/home'], [admin, '/admin']]) {
+    renderRoute('/', account);
+    assert.deepEqual(redirects[0].to, { pathname: destination, search, hash: '#flow' });
+  }
+});
+
+test('unknown paths render the 404 page with a role-aware home link', () => {
+  for (const [account, destination] of [[null, '/login'], [user, '/home'], [admin, '/admin']]) {
+    const html = renderRoute('/khong-ton-tai', account);
+    assert.equal(redirects.length, 0);
+    assert.ok(html.includes('Không tìm thấy trang'));
+    assert.ok(html.includes(`href="${destination}"`));
   }
 });
 
