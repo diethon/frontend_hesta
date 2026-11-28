@@ -425,9 +425,6 @@ function createDevicePageHarness({ initialDevices = [], onSendCommand, onSendPow
     }
     if (id === './DeviceGroupSection') return { DeviceGroupSection: () => null };
     if (id === './DevicesOverviewStrip') return { DevicesOverviewStrip: () => null };
-    // No sprite kind keeps DevicePage on the DeviceVisual branch these assertions target.
-    if (id === './DevicePowerSprite') return { DevicePowerSprite: () => null };
-    if (id === './powerSprite') return { powerSpriteKind: () => null };
     if (id === '../../services/deviceApi') {
       return {
         getDevicesByHome: async () => initialDevices,

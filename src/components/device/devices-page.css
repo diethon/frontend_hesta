@@ -112,11 +112,6 @@
   overflow: visible;
 }
 
-/* Blender sprite fills the visual tile instead of DeviceVisual. */
-.devices-page .device-icon.device-visual-tile.has-sprite {
-  padding: 4px;
-}
-
 /* Tinted icon tile colors by device type */
 .devices-page .device-icon.type-amber {
   background: rgba(245, 158, 11, 0.12);
