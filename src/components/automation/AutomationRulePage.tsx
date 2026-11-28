@@ -156,7 +156,7 @@ export function AutomationRulePage() {
         if (!haystack.some((text) => text?.toLowerCase().includes(q))) return false;
       }
       return true;
-    });
+    }).sort((a, b) => Number(b.enabled) - Number(a.enabled)); // enabled first, same as the app
   }, [rules, statusFilter, typeFilter, query, targetFilter, deviceGroups]);
 
   // Optimistic Toggle
@@ -366,14 +366,6 @@ export function AutomationRulePage() {
             >
               <Icon name="sparkles" />
               <span>Kịch bản</span>
-            </button>
-            <button
-              type="button"
-              className="st-link"
-              onClick={() => navigate(homeId ? `/homes/${homeId}/recommendations` : '/home')}
-            >
-              <Icon name="zap" />
-              <span>Gợi ý AI</span>
             </button>
             <button
               type="button"

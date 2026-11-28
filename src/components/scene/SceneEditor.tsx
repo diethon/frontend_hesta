@@ -74,7 +74,7 @@ export function formatActionSummary(
   const code = act.action;
   if (code === 'TURN_ON') return 'Bật nguồn';
   if (code === 'TURN_OFF') return 'Tắt nguồn';
-  if (code === 'TOGGLE') return 'Bật/Tắt';
+  if (code === 'TOGGLE') return 'Đổi bật ⇄ tắt';
   if (code === 'OPEN') return 'Mở cửa';
   if (code === 'CLOSE') return 'Đóng cửa';
   if (code === 'STOP') return 'Dừng hành trình';
@@ -421,7 +421,7 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
               <span className="caption">
                 {!isEdit
                   ? 'Kịch bản mới'
-                  : `${actions.length} hành động · ${enabled ? 'Đang bật' : 'Đang tắt'}`}
+                  : `${actions.length} hành động · ${enabled ? 'Đang dùng' : 'Tạm dừng'}`}
               </span>
             </div>
 
@@ -907,7 +907,7 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
                                           className={`command-chip ${act.action === 'TOGGLE' ? 'active' : ''}`}
                                           onClick={() => setActions((p) => p.map((a, i) => i === idx ? { ...a, action: 'TOGGLE', value: '' } : a))}
                                         >
-                                          Bật/Tắt
+                                          Đổi bật ⇄ tắt
                                         </button>
                                         <button
                                           type="button"
@@ -1015,7 +1015,7 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
                                           className={`command-chip ${act.action === 'TOGGLE' ? 'active' : ''}`}
                                           onClick={() => setActions((p) => p.map((a, i) => i === idx ? { ...a, action: 'TOGGLE', value: '' } : a))}
                                         >
-                                          Bật/Tắt
+                                          Đổi bật ⇄ tắt
                                         </button>
                                         {isFan && (
                                           <button

@@ -33,13 +33,16 @@ export const GuardianEditorModal: React.FC<GuardianEditorModalProps> = ({
   onSave,
 }) => {
   const [name, setName] = useState(initialRule?.name || 'Giới hạn xem TV khi vắng nhà');
-  const [targetDeviceId, setTargetDeviceId] = useState(initialRule?.targetDeviceId || '');
+  const [targetDeviceIds, setTargetDeviceIds] = useState<string[]>(
+    () => initialRule?.targetDevices.map((d) => d.id) ?? [],
+  );
   const [useCamera, setUseCamera] = useState(!!initialRule?.cameraDeviceId);
   const [cameraDeviceId, setCameraDeviceId] = useState(initialRule?.cameraDeviceId || '');
   const [allowedDuration, setAllowedDuration] = useState(initialRule?.allowedDurationMinutes || 45);
   const [warningMinutes, setWarningMinutes] = useState(initialRule?.warningMinutesBefore || 5);
   const [autoLockout, setAutoLockout] = useState(initialRule ? initialRule.autoLockout : true);
   const [devices, setDevices] = useState<DeviceSummary[]>([]);
+  const [deviceQuery, setDeviceQuery] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -49,10 +52,11 @@ export const GuardianEditorModal: React.FC<GuardianEditorModalProps> = ({
         if (!active) return;
         setDevices(data);
         // Preselect the first TV / smart plug for a new rule.
-        setTargetDeviceId((current) => {
-          if (current) return current;
+        setTargetDeviceIds((current) => {
+          if (current.length) return current;
           const controllable = data.filter(isDeviceControllable);
-          return (controllable.find(looksLikeScreen) || controllable[0])?.id || '';
+          const first = controllable.find(looksLikeScreen) || controllable[0];
+          return first ? [first.id] : [];
         });
       })
       .catch(() => toast.error('Không thể tải danh sách thiết bị'));
@@ -69,13 +73,21 @@ export const GuardianEditorModal: React.FC<GuardianEditorModalProps> = ({
 
   const targets = devices.filter(isDeviceControllable);
   const cameras = devices.filter(isCamera);
-  const target = devices.find((d) => d.id === targetDeviceId);
+  const selectedTargets = targets.filter((d) => targetDeviceIds.includes(d.id));
+  const query = deviceQuery.trim().toLowerCase();
+  const shownTargets = query
+    ? targets.filter((d) =>
+        [d.name, d.roomName, d.room, getDeviceTypeLabel(d)].some((text) => text?.toLowerCase().includes(query)),
+      )
+    : targets;
+  const toggleTarget = (id: string) =>
+    setTargetDeviceIds((current) => (current.includes(id) ? current.filter((x) => x !== id) : [...current, id]));
   const warningTooLong = warningMinutes >= allowedDuration;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return toast.error('Vui lòng nhập tên quy tắc');
-    if (!targetDeviceId) return toast.error('Vui lòng chọn thiết bị cần giới hạn');
+    if (!targetDeviceIds.length) return toast.error('Vui lòng chọn ít nhất một thiết bị cần giới hạn');
     if (useCamera && !cameraDeviceId) return toast.error('Vui lòng chọn camera nhận diện');
     if (warningTooLong) return toast.error('Thời gian nhắc phải ngắn hơn thời lượng cho phép');
 
@@ -83,7 +95,7 @@ export const GuardianEditorModal: React.FC<GuardianEditorModalProps> = ({
     try {
       await onSave({
         name: name.trim(),
-        targetDeviceId,
+        targetDeviceIds,
         cameraDeviceId: useCamera ? cameraDeviceId : undefined,
         allowedDurationMinutes: allowedDuration,
         warningMinutesBefore: warningMinutes,
@@ -133,26 +145,46 @@ export const GuardianEditorModal: React.FC<GuardianEditorModalProps> = ({
             />
           </label>
 
-          <label className="gd-field">
-            <span className="gd-label">Thiết bị cần giới hạn</span>
-            <select
-              className="gd-input"
-              value={targetDeviceId}
-              onChange={(e) => setTargetDeviceId(e.target.value)}
-              required
-            >
-              {targets.length === 0 && <option value="">Chưa có thiết bị điều khiển được</option>}
-              {targets.map((dev) => (
-                <option key={dev.id} value={dev.id}>
-                  {deviceLabel(dev)}
-                </option>
-              ))}
-            </select>
+          <fieldset className="gd-field">
+            <div className="gd-label-row">
+              <legend className="gd-label">Thiết bị cần giới hạn</legend>
+              <strong className="gd-value">{selectedTargets.length} đã chọn</strong>
+            </div>
+            {targets.length === 0 ? (
+              <span className="gd-hint">Nhà chưa có thiết bị điều khiển được.</span>
+            ) : (
+              <>
+                <input
+                  type="search"
+                  className="gd-input"
+                  value={deviceQuery}
+                  onChange={(e) => setDeviceQuery(e.target.value)}
+                  placeholder="Tìm theo tên, phòng hoặc loại thiết bị…"
+                  aria-label="Tìm thiết bị cần giới hạn"
+                />
+                {shownTargets.length === 0 && <span className="gd-hint">Không có thiết bị nào khớp “{deviceQuery}”.</span>}
+                <div className="gd-devices">
+                  {shownTargets.map((dev) => (
+                    <label key={dev.id} className={`gd-device ${targetDeviceIds.includes(dev.id) ? 'active' : ''}`}>
+                      <input
+                        type="checkbox"
+                        checked={targetDeviceIds.includes(dev.id)}
+                        onChange={() => toggleTarget(dev.id)}
+                      />
+                      <span>
+                        <strong>{dev.name}</strong>
+                        <small>{[getDeviceTypeLabel(dev), dev.roomName || dev.room].filter(Boolean).join(' · ')}</small>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </>
+            )}
             <span className="gd-hint">
-              {target ? `${getDeviceTypeLabel(target)} · ` : ''}Đồng hồ bắt đầu đếm khi thiết bị này được bật lúc bố mẹ
-              vắng nhà.
+              Các thiết bị dùng chung một hạn mức: đồng hồ bắt đầu khi con bật bất kỳ thiết bị nào lúc bố mẹ vắng nhà,
+              hết giờ thì tắt tất cả.
             </span>
-          </label>
+          </fieldset>
 
           <div className="gd-field">
             <span className="gd-label">Khi nào coi là vắng nhà</span>
@@ -271,14 +303,16 @@ export const GuardianEditorModal: React.FC<GuardianEditorModalProps> = ({
 
         <footer className="gd-foot">
           <p>
-            Khi vắng nhà, <b>{target?.name || 'thiết bị'}</b> được dùng tối đa <b>{allowedDuration} phút</b> mỗi lần
+            Khi vắng nhà,{' '}
+            <b>{selectedTargets.length > 1 ? `${selectedTargets.length} thiết bị` : selectedTargets[0]?.name || 'thiết bị'}</b>{' '}
+            được dùng chung tối đa <b>{allowedDuration} phút</b> mỗi lần
             {autoLockout ? ', sau đó bị khóa.' : '.'}
           </p>
           <div>
             <button type="button" className="st-btn" onClick={onClose} disabled={submitting}>
               Hủy
             </button>
-            <button type="submit" className="st-btn st-btn-primary" disabled={submitting || !targetDeviceId}>
+            <button type="submit" className="st-btn st-btn-primary" disabled={submitting || !targetDeviceIds.length}>
               {submitting ? 'Đang lưu…' : initialRule ? 'Lưu thay đổi' : 'Tạo quy tắc'}
             </button>
           </div>

@@ -200,7 +200,7 @@ function ScenarioCard({
     ? { dot: 'err', text: 'Lần chạy gần nhất lỗi' }
     : scene.enabled
     ? { dot: 'on', text: `${actions.length} hành động` }
-    : { dot: '', text: 'Đang tắt' };
+    : { dot: '', text: 'Tạm dừng' };
 
   const menuItem = (label: string, icon: IconName, handler: () => void, danger = false) => (
     <button
@@ -239,12 +239,12 @@ function ScenarioCard({
           type="button"
           className={`toggle ${scene.enabled ? 'active' : ''}`}
           aria-pressed={scene.enabled}
-          aria-label={scene.enabled ? `Tắt kịch bản ${scene.name}` : `Bật kịch bản ${scene.name}`}
+          aria-label={scene.enabled ? `Tạm dừng kịch bản ${scene.name}` : `Dùng lại kịch bản ${scene.name}`}
           onClick={(event) => {
             event.stopPropagation();
             onToggle();
           }}
-          title={scene.enabled ? 'Tắt kịch bản' : 'Bật kịch bản'}
+          title={scene.enabled ? 'Tạm dừng kịch bản' : 'Dùng lại kịch bản'}
         >
           <span />
         </button>
@@ -305,19 +305,24 @@ function ScenarioCard({
             </span>
           )}
         </span>
-        <button
-          type="button"
-          className={`st-run ${runSuccess ? 'done' : ''}`}
-          disabled={!actions.length || running || !scene.enabled}
-          onClick={(e) => {
-            e.stopPropagation();
-            onRun();
-          }}
-          title={scene.enabled ? 'Chạy kịch bản ngay' : 'Bật kịch bản để chạy'}
-        >
-          {running ? <i className="st-spin" /> : <Icon name={runSuccess ? 'check' : 'play'} />}
-          {runSuccess ? 'Xong' : 'Chạy'}
-        </button>
+        {/* The backend refuses to run a paused scene, so say how to use it instead of a dead button. */}
+        {scene.enabled ? (
+          <button
+            type="button"
+            className={`st-run ${runSuccess ? 'done' : ''}`}
+            disabled={!actions.length || running}
+            onClick={(e) => {
+              e.stopPropagation();
+              onRun();
+            }}
+            title="Chạy kịch bản ngay"
+          >
+            {running ? <i className="st-spin" /> : <Icon name={runSuccess ? 'check' : 'play'} />}
+            {runSuccess ? 'Xong' : 'Chạy'}
+          </button>
+        ) : (
+          <span className="st-run-hint">Bật công tắc để dùng lại</span>
+        )}
       </footer>
     </article>
   );
@@ -473,7 +478,7 @@ export function SceneHistory({
                         <p key={idx}>
                           <span title={deviceName(act.deviceId)}>{`${deviceName(act.deviceId)} · ${actionLabels[act.action] || 'Điều khiển'}`}</span>
                           <b className={act.success ? 'text-emerald-600' : 'text-rose-500'}>
-                            {act.success ? 'Thành công' : 'Thiết bị không phản hồi'}
+                            {act.success ? 'Thành công' : act.message || 'Thiết bị không phản hồi'}
                           </b>
                         </p>
                       ))
@@ -565,7 +570,7 @@ export function ScenePage() {
 
   const [scenes, setScenes] = useState<SceneResponse[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<'Tất cả' | 'Đang bật' | 'Đang tắt'>('Tất cả');
+  const [filter, setFilter] = useState<'Tất cả' | 'Đang dùng' | 'Tạm dừng'>('Tất cả');
   const [query, setQuery] = useState('');
 
   // Devices & Action Types for Editor
@@ -653,7 +658,7 @@ export function ScenePage() {
         prev.map((s) => (s.id === updated.id ? updated : s))
       );
       notify.success(
-        updated.enabled ? `Đã bật "${scene.name}"` : `Đã tắt "${scene.name}"`
+        updated.enabled ? `Đã dùng lại "${scene.name}"` : `Đã tạm dừng "${scene.name}"`
       );
     } catch (err: unknown) {
       // Revert optimistic update
@@ -720,7 +725,7 @@ export function ScenePage() {
   const handleDuplicate = async (scene: SceneResponse) => {
     try {
       const duplicatePayload = {
-        name: `${scene.name} (Bản sao)`,
+        name: `${scene.name} (bản sao)`,
         description: scene.description || undefined,
         icon: scene.icon,
         enabled: scene.enabled,
@@ -781,10 +786,10 @@ export function ScenePage() {
         scene.name.toLowerCase().includes(query.toLowerCase()) ||
         (scene.description || '').toLowerCase().includes(query.toLowerCase());
       if (!matchesSearch) return false;
-      if (filter === 'Đang bật') return scene.enabled;
-      if (filter === 'Đang tắt') return !scene.enabled;
+      if (filter === 'Đang dùng') return scene.enabled;
+      if (filter === 'Tạm dừng') return !scene.enabled;
       return true;
-    });
+    }).sort((a, b) => Number(b.enabled) - Number(a.enabled)); // enabled first, same as the app
   }, [scenes, query, filter]);
 
   const activeCount = scenes.filter((s) => s.enabled).length;
@@ -810,7 +815,7 @@ export function ScenePage() {
 
       <main>
         <AutomationTopBar
-          caption={loading && scenes.length === 0 ? 'Đang tải kịch bản...' : `${scenes.length} kịch bản · ${activeCount} đang bật`}
+          caption={loading && scenes.length === 0 ? 'Đang tải kịch bản...' : `${scenes.length} kịch bản · ${activeCount} đang dùng`}
           title="Kịch bản"
           subtitle="Gom nhiều thao tác thành một lần chạm: chạy ngay, theo lịch hoặc từ quy tắc tự động."
           userInitial={userInitial}
@@ -818,7 +823,7 @@ export function ScenePage() {
 
         <div className="st-toolbar">
           <div className="st-seg" role="tablist" aria-label="Lọc kịch bản">
-            {(['Tất cả', 'Đang bật', 'Đang tắt'] as const).map((item) => (
+            {(['Tất cả', 'Đang dùng', 'Tạm dừng'] as const).map((item) => (
               <button
                 key={item}
                 type="button"

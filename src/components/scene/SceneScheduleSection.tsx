@@ -28,6 +28,12 @@ export function formatScheduleTime(time?: string | null): string {
   return `${h.padStart(2, '0')}:${m.padStart(2, '0')}:${s.slice(0, 2).padStart(2, '0')}`;
 }
 
+/** For display: "07:30:00" → "07:30"; seconds are only shown when actually set. */
+export function displayScheduleTime(time?: string | null): string {
+  const hms = formatScheduleTime(time);
+  return hms.endsWith(':00') ? hms.slice(0, 5) : hms;
+}
+
 export function formatRepeatDays(days: number[]): string {
   if (!days || days.length === 0 || days.length === 7) return 'Hằng ngày';
   if (days.length === 5 && [1, 2, 3, 4, 5].every((d) => days.includes(d))) return 'Ngày thường (T2–T6)';
@@ -85,6 +91,13 @@ export const SceneScheduleSection: React.FC<SceneScheduleSectionProps> = ({
   useEffect(() => {
     void fetchSchedules();
   }, [fetchSchedules]);
+
+  // Tell the parent outside setState: calling it from an updater updates SceneEditor during this render.
+  const commitSchedules = (next: Schedule[]) => {
+    setSchedules(next);
+    onScheduleCountChange?.(next.length);
+    onSchedulesChange?.(next, true);
+  };
 
   // Open inline add form
   const handleOpenAdd = () => {
@@ -162,14 +175,9 @@ export const SceneScheduleSection: React.FC<SceneScheduleSectionProps> = ({
         repeatDays: selectedDays,
         active: true,
       };
-      setSchedules((prev) => {
-        const next = editingId
-          ? prev.map((s) => (s.id === editingId ? draftSch : s))
-          : [...prev, draftSch];
-        onScheduleCountChange?.(next.length);
-        onSchedulesChange?.(next, true);
-        return next;
-      });
+      commitSchedules(
+        editingId ? schedules.map((s) => (s.id === editingId ? draftSch : s)) : [...schedules, draftSch]
+      );
       handleCloseForm();
       if (!draft) notify.success('Đã lưu lịch tự động');
       return;
@@ -193,11 +201,7 @@ export const SceneScheduleSection: React.FC<SceneScheduleSectionProps> = ({
   const handleToggleSchedule = async (sch: Schedule) => {
     const nextState = !sch.active;
     // Optimistic
-    setSchedules((prev) => {
-      const next = prev.map((s) => (s.id === sch.id ? { ...s, active: nextState } : s));
-      onSchedulesChange?.(next, true);
-      return next;
-    });
+    commitSchedules(schedules.map((s) => (s.id === sch.id ? { ...s, active: nextState } : s)));
 
     if (live && !sch.id.startsWith('temp_')) {
       try {
@@ -214,11 +218,7 @@ export const SceneScheduleSection: React.FC<SceneScheduleSectionProps> = ({
         );
       } catch (err) {
         // Revert
-        setSchedules((prev) => {
-          const reverted = prev.map((s) => (s.id === sch.id ? { ...s, active: sch.active } : s));
-          onSchedulesChange?.(reverted, true);
-          return reverted;
-        });
+        commitSchedules(schedules.map((s) => (s.id === sch.id ? { ...s, active: sch.active } : s)));
         notify.error(err instanceof Error ? err.message : 'Không thể cập nhật trạng thái lịch');
       }
     }
@@ -226,14 +226,9 @@ export const SceneScheduleSection: React.FC<SceneScheduleSectionProps> = ({
 
   // Delete schedule
   const handleDeleteSchedule = async (sch: Schedule) => {
-    if (!await confirmDialog({ title: `Xóa lịch chạy ${formatScheduleTime(sch.scheduledTime)}?`, description: 'Kịch bản sẽ không còn tự chạy vào giờ này.', confirmText: 'Xóa lịch', variant: 'danger' })) return;
+    if (!await confirmDialog({ title: `Xóa lịch chạy ${displayScheduleTime(sch.scheduledTime)}?`, description: 'Kịch bản sẽ không còn tự chạy vào giờ này.', confirmText: 'Xóa lịch', variant: 'danger' })) return;
 
-    setSchedules((prev) => {
-      const next = prev.filter((s) => s.id !== sch.id);
-      onScheduleCountChange?.(next.length);
-      onSchedulesChange?.(next, true);
-      return next;
-    });
+    commitSchedules(schedules.filter((s) => s.id !== sch.id));
 
     if (live && !sch.id.startsWith('temp_')) {
       try {
@@ -254,7 +249,7 @@ export const SceneScheduleSection: React.FC<SceneScheduleSectionProps> = ({
       ) : schedules.length > 0 ? (
         <div className="space-y-2">
           {schedules.map((sch) => {
-            const timeStr = formatScheduleTime(sch.scheduledTime);
+            const timeStr = displayScheduleTime(sch.scheduledTime);
             return (
               <div
                 key={sch.id}
@@ -326,7 +321,7 @@ export const SceneScheduleSection: React.FC<SceneScheduleSectionProps> = ({
           {/* Time Picker 24h */}
           <div className="space-y-1">
             <label className="text-[10px] font-bold text-[var(--secondary)] uppercase tracking-wider block">
-              Giờ kích hoạt (giờ : phút : giây)
+              Giờ kích hoạt (giờ : phút)
             </label>
             <div className="flex items-center gap-2 justify-center py-2 bg-[var(--solid)] rounded-xl border border-[var(--border)]">
               <input
@@ -347,16 +342,6 @@ export const SceneScheduleSection: React.FC<SceneScheduleSectionProps> = ({
                 onChange={(e) => setMinute(e.target.value.slice(-2))}
                 className="w-12 text-center text-lg font-bold bg-transparent text-[var(--text)] focus:outline-none"
                 aria-label="Phút"
-              />
-              <span className="text-lg font-bold text-[var(--tertiary)]">:</span>
-              <input
-                type="number"
-                min="0"
-                max="59"
-                value={second}
-                onChange={(e) => setSecond(e.target.value.slice(-2))}
-                className="w-12 text-center text-lg font-bold bg-transparent text-[var(--text)] focus:outline-none"
-                aria-label="Giây"
               />
             </div>
           </div>
@@ -410,7 +395,7 @@ export const SceneScheduleSection: React.FC<SceneScheduleSectionProps> = ({
 
           {overlappingSchedule && (
             <p className="text-[10px] text-amber-600 font-medium">
-              Trùng giờ với một lịch chạy hiện có ({formatScheduleTime(overlappingSchedule.scheduledTime)}).
+              Trùng giờ với một lịch chạy hiện có ({displayScheduleTime(overlappingSchedule.scheduledTime)}).
             </p>
           )}
 
