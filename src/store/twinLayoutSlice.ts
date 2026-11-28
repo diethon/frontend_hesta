@@ -39,7 +39,7 @@ function failure(error: unknown): LayoutFailure {
 }
 export const loadLayoutRole = createAsyncThunk<HomeSummary['role'] | null, string, ThunkConfig>(
   'twinLayout/loadRole', async (homeId, { rejectWithValue }) => {
-    try { return (await getMyHomes()).find((home) => home.homeId === homeId)?.role ?? null; }
+    try { return (await getMyHomes({ forceRefresh: true })).find((home) => home.homeId === homeId)?.role ?? null; }
     catch (error) { return rejectWithValue(failure(error)); }
   }, { condition: (homeId, { getState }) => getState().twinLayout.homeId === homeId && !getState().twinLayout.roleRequestId },
 );

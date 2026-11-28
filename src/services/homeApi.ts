@@ -1,4 +1,7 @@
 import { apiClient } from './apiClient';
+import { cachedFetch, invalidateCache } from './queryCache';
+
+export const myHomesKey = (): string => 'homes:my';
 
 export type AccessScope = 'ALL' | 'CUSTOM';
 export type AccessLevel = 'NONE' | 'VIEW' | 'CONTROL';
@@ -103,11 +106,13 @@ export const generateInvitation = async (
 
 export const updateMemberRole = async (homeId: string, memberId: string, role: 'OWNER' | 'MEMBER') => {
   const response = await apiClient.put(`/homes/${homeId}/members/${memberId}/role?role=${role}`);
+  invalidateCache(myHomesKey());
   return response.data.result;
 };
 
 export const removeMember = async (homeId: string, memberId: string) => {
   const response = await apiClient.delete(`/homes/${homeId}/members/${memberId}`);
+  invalidateCache(myHomesKey());
   return response.data.result;
 };
 
@@ -130,24 +135,34 @@ export const updateMemberAccess = async (
 
 export const joinHome = async (codeOrToken: string) => {
   const response = await apiClient.post(`/homes/join?codeOrToken=${encodeURIComponent(codeOrToken)}`);
+  invalidateCache(myHomesKey());
   return response.data.result;
 };
 
-export const getMyHomes = async (): Promise<HomeSummary[]> => {
-  const response = await apiClient.get(`/homes/my-homes`);
-  return response.data.result;
+export const getMyHomes = async (options?: { forceRefresh?: boolean }): Promise<HomeSummary[]> => {
+  return cachedFetch(
+    myHomesKey(),
+    async () => {
+      const response = await apiClient.get(`/homes/my-homes`);
+      return response.data.result;
+    },
+    { ttlMs: 30_000, forceRefresh: options?.forceRefresh }
+  );
 };
 
 export const createHome = async (name?: string) => {
   const response = await apiClient.post(`/homes`, { name: name || '' });
+  invalidateCache(myHomesKey());
   return response.data.result;
 };
 
 export const updateHome = async (homeId: string, name: string): Promise<HomeSummary> => {
   const response = await apiClient.put(`/homes/${encodeURIComponent(homeId)}`, { name });
+  invalidateCache(myHomesKey());
   return response.data.result;
 };
 
 export const createHomeRoom = async (homeId: string, name: string): Promise<void> => {
   await apiClient.post('/homes/' + encodeURIComponent(homeId) + '/rooms', { name });
+  invalidateCache(`rooms:home:${homeId}`);
 };

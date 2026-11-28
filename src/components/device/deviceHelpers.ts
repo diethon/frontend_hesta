@@ -657,3 +657,53 @@ export const getDeviceCapabilityMap = (device?: DeviceResponse | any): DeviceCap
     brightnessActions,
   };
 };
+
+export function purgeLegacyWattageLocalStorage(deviceId?: string | null): void {
+  if (!deviceId || typeof window === 'undefined') return;
+  try {
+    window.localStorage?.removeItem(`hesta_wattage_${deviceId}`);
+  } catch {
+    // Ignore storage access errors in restricted/SSR environments
+  }
+}
+
+export function resolveDefaultDeviceWattage(
+  rawType?: string | null,
+  uiType?: string | null,
+  isSensor?: boolean,
+): number {
+  const t = (rawType || '').trim().toUpperCase();
+  if (t) {
+    if (t === 'AIR_CONDITIONER' || t === 'AC' || t === 'AC_REMOTE') return 1500;
+    if (t === 'HEATER' || t === 'WATER_HEATER') return 2500;
+    if (t === 'SMART_PLUG' || t === 'SOCKET') return 500;
+    if (t === 'WATER_PUMP') return 370;
+    if (t === 'GATE' || t === 'GATE_MOTOR' || t === 'ROLLING_DOOR' || t === 'DOOR') return 350;
+    if (t === 'FRIDGE') return 150;
+    if (t === 'TV' || t === 'SMART_TV') return 120;
+    if (t === 'FAN' || t === 'SMART_FAN') return 65;
+    if (t === 'CURTAIN') return 60;
+    if (t === 'LIGHT' || t === 'LED') return 40;
+    if (t === 'LED_RGB') return 24;
+    if (t === 'CAMERA_AI' || t === 'CAMERA') return 15;
+    if (t === 'ROUTER') return 12;
+    if (t === 'IR_REMOTE') return 3;
+    if (
+      t.includes('SENSOR') ||
+      t.includes('SMOKE') ||
+      t.includes('GAS') ||
+      t.includes('LEAK') ||
+      t.includes('FLAME')
+    ) {
+      return 2;
+    }
+  }
+  if (uiType === 'Điều hòa') return 1500;
+  if (uiType === 'Cổng') return 350;
+  if (uiType === 'TV') return 120;
+  if (uiType === 'Quạt') return 65;
+  if (uiType === 'Đèn') return 40;
+  if (uiType === 'Camera') return 15;
+  if (isSensor || uiType === 'Cảm biến') return 2;
+  return 60;
+}

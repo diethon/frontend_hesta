@@ -26,9 +26,17 @@ export const pingNode = async (nodeId: string): Promise<NodeDiagnostics> => {
   return response.data.result;
 };
 
-export const getMqttPackets = async (): Promise<MqttPacket[]> => {
-  const response = await apiClient.get('/admin/diagnostics/mqtt-sniffer');
-  return response.data.result;
+export const getMqttPackets = async (params?: {
+  nodeCode?: string;
+  homeId?: string;
+}): Promise<MqttPacket[]> => {
+  const response = await apiClient.get('/admin/diagnostics/mqtt-sniffer', {
+    params: {
+      ...(params?.nodeCode ? { nodeCode: params.nodeCode } : {}),
+      ...(params?.homeId ? { homeId: params.homeId } : {}),
+    },
+  });
+  return response.data.result || [];
 };
 
 // DLQ (Dead-Letter Queue) Endpoints
@@ -83,6 +91,10 @@ export const registerOtaPackage = async (data: Partial<FirmwarePackage>): Promis
   return response.data.result;
 };
 
+export const deleteOtaPackage = async (packageId: string): Promise<void> => {
+  await apiClient.delete(`/admin/ota/packages/${packageId}`);
+};
+
 export const getOtaCampaigns = async (): Promise<OtaCampaign[]> => {
   const response = await apiClient.get('/admin/ota/campaigns');
   return response.data.result || [];
@@ -93,6 +105,7 @@ export const createOtaCampaign = async (data: {
   firmwarePackageId: string;
   failureThresholdPercent?: number;
   rolloutStrategy?: string;
+  targetNodeIds?: string[];
 }): Promise<OtaCampaign> => {
   const response = await apiClient.post('/admin/ota/campaigns', data);
   return response.data.result;

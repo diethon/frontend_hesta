@@ -31,6 +31,8 @@ const helpersRequire = (id) => {
 new Function('module', 'exports', 'require', helpersJs)(helpersModule, helpersModule.exports, helpersRequire);
 const {
   formatWattage,
+  mapDeviceToUI,
+  getDeviceRatedWattage,
   SORT_OPTIONS,
   DEVICE_TYPE_FILTER_OPTIONS,
 } = helpersModule.exports;
@@ -256,4 +258,90 @@ test('DeviceMobileFilterModal renders all options when open', () => {
   }
   // Must render apply button
   assert.match(html, /Áp dụng/);
+});
+
+test('mapDeviceToUI ignores and purges stale hesta_wattage_* localStorage overrides', () => {
+  const prevWindowDesc = Object.getOwnPropertyDescriptor(globalThis, 'window');
+  const store = new Map([
+    ['hesta_wattage_dev-ac', '750'],
+    ['hesta_wattage_dev-light', '999'],
+  ]);
+  Object.defineProperty(globalThis, 'window', {
+    configurable: true,
+    value: {
+      localStorage: {
+        getItem: (k) => store.get(k) ?? null,
+        setItem: (k, v) => store.set(k, String(v)),
+        removeItem: (k) => store.delete(k),
+      },
+    },
+  });
+
+  try {
+    const acMapped = mapDeviceToUI(
+      {
+        id: 'dev-ac',
+        name: 'Điều hòa phòng khách',
+        deviceType: 'AIR_CONDITIONER',
+        status: 'ONLINE',
+        currentState: { power: 'ON', temperature: 24 },
+        settings: { wattage: 1800 },
+      },
+      {},
+      {}
+    );
+    assert.equal(acMapped.raw?.settings?.wattage, 1800);
+    assert.equal(store.has('hesta_wattage_dev-ac'), false);
+
+    const lightMapped = mapDeviceToUI(
+      {
+        id: 'dev-light',
+        name: 'Đèn trần',
+        deviceType: 'LIGHT',
+        status: 'ONLINE',
+        currentState: { power: 'ON' },
+        settings: {},
+      },
+      {},
+      {}
+    );
+    assert.equal(lightMapped.raw?.settings?.wattage, undefined);
+    assert.equal(store.has('hesta_wattage_dev-light'), false);
+  } finally {
+    if (prevWindowDesc) {
+      Object.defineProperty(globalThis, 'window', prevWindowDesc);
+    } else {
+      delete globalThis.window;
+    }
+  }
+});
+
+test('getDeviceRatedWattage prioritizes settings -> breakdown -> Backend-aligned defaults', () => {
+  const mk = (deviceType, settings = {}) =>
+    mapDeviceToUI(
+      {
+        id: `id-${deviceType}`,
+        name: deviceType,
+        deviceType,
+        status: 'ONLINE',
+        currentState: { power: 'ON' },
+        settings,
+      },
+      {},
+      {}
+    );
+
+  // 1. Custom DB settings wins over breakdown and default
+  assert.equal(getDeviceRatedWattage(mk('AIR_CONDITIONER', { wattage: 2000 }), 1500), 2000);
+  // 2. Breakdown wattage wins over default when DB has no custom wattage
+  assert.equal(getDeviceRatedWattage(mk('AIR_CONDITIONER'), 1350), 1350);
+  // 3. Backend-aligned defaults when neither DB nor breakdown provides wattage
+  assert.equal(getDeviceRatedWattage(mk('AIR_CONDITIONER')), 1500);
+  assert.equal(getDeviceRatedWattage(mk('WATER_PUMP')), 370);
+  assert.equal(getDeviceRatedWattage(mk('GATE')), 350);
+  assert.equal(getDeviceRatedWattage(mk('TV')), 120);
+  assert.equal(getDeviceRatedWattage(mk('FAN')), 65);
+  assert.equal(getDeviceRatedWattage(mk('LIGHT')), 40);
+  assert.equal(getDeviceRatedWattage(mk('LED_RGB')), 24);
+  assert.equal(getDeviceRatedWattage(mk('LUX_SENSOR')), 2);
 });

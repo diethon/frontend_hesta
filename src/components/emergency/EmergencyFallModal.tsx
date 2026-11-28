@@ -1,7 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   AlertTriangle,
-  PhoneCall,
   CheckCircle2,
   Volume2,
   VolumeX,
@@ -212,21 +211,14 @@ export const EmergencyFallModal: React.FC = () => {
               metrics: status.metrics,
             };
           });
-        } else {
-          setActiveIncident((prev) => {
-            if (prev && prev.id.startsWith('local-fall-')) {
-              stopSiren();
-              setIsModalOpen(false);
-              return null;
-            }
-            return prev;
-          });
         }
+        // Latch confirmed fall alerts even if the person later stands up (Medical Alarm Latching);
+        // alerts are cleared only when the user explicitly confirms safety or Backend sends FALSE_ALARM/RESOLVED.
       }
     }, 2500);
 
     return () => clearInterval(pollInterval);
-  }, [startSiren, stopSiren]);
+  }, [startSiren]);
 
   // --- Collapse modal with Escape key back to SOS bubble ---
   useEffect(() => {
@@ -273,10 +265,6 @@ export const EmergencyFallModal: React.FC = () => {
       await fallDetectionService.acknowledgeIncident(activeIncident.id);
       setActiveIncident((prev) => (prev ? { ...prev, state: 'ACKNOWLEDGED' } : null));
     }
-  };
-
-  const handleCallEmergency = () => {
-    window.open('tel:115', '_self');
   };
 
   const formatClassification = (type: string) => {
@@ -404,10 +392,10 @@ export const EmergencyFallModal: React.FC = () => {
                 </span>
                 <span className="text-xs font-medium text-[var(--text)] max-w-md leading-relaxed">
                   {activeIncident.state === 'ESCALATED_SOS'
-                    ? 'Hết thời gian chờ! Đã tự động kích hoạt cuộc gọi khẩn cấp SOS và còi hú tối đa.'
+                    ? 'Hết thời gian chờ! Đã tự động phát cảnh báo SOS khẩn cấp và bật còi hú tối đa.'
                     : activeIncident.state === 'ACKNOWLEDGED'
                     ? 'Người thân đã xác nhận đang kiểm tra hiện trường. Bộ đếm tạm dừng.'
-                    : 'Nếu không xác nhận trong vòng 30 giây, hệ thống sẽ tự động kích hoạt còi hú 12V và gọi cấp cứu.'}
+                    : 'Nếu không xác nhận trong vòng 30 giây, hệ thống sẽ tự động leo thang SOS khẩn cấp và bật còi hú 12V.'}
                 </span>
               </div>
 
@@ -560,24 +548,13 @@ export const EmergencyFallModal: React.FC = () => {
                     <span>TÔI ỔN / BÁO ĐỘNG GIẢ (HỦY BÁO ĐỘNG)</span>
                   </button>
 
-                  <div className="grid grid-cols-2 gap-2.5">
-                    <button
-                      type="button"
-                      onClick={handleAcknowledge}
-                      className="py-2.5 px-3 bg-[var(--g1)] hover:bg-[var(--muted)] text-[var(--text)] text-xs font-bold rounded-2xl border border-[var(--border)] transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-                    >
-                      <span>Tôi đang kiểm tra</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={handleCallEmergency}
-                      className="py-2.5 px-3 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-2xl shadow-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-                    >
-                      <PhoneCall className="w-4 h-4 text-white shrink-0" />
-                      <span>GỌI CỨU HỘ 115</span>
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAcknowledge}
+                    className="w-full py-2.5 px-3 bg-[var(--g1)] hover:bg-[var(--muted)] text-[var(--text)] text-xs font-bold rounded-2xl border border-[var(--border)] transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <span>Tôi đang kiểm tra</span>
+                  </button>
                 </div>
               </div>
             </div>

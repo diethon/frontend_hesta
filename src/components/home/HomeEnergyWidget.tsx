@@ -172,36 +172,37 @@ export const HomeEnergyWidget: React.FC<HomeEnergyWidgetProps> = ({
   const navigate = useNavigate();
   // Default to 'week' (7 days of week T2..CN) per user requirement
   const [activeSegment, setActiveSegment] = useState<Segment>('week');
-  const [cache, setCache] = useState<Record<string, EnergyAnalyticsResponse>>({});
+  const [fallbackPeriodData, setFallbackPeriodData] = useState<{
+    key: string;
+    data: EnergyAnalyticsResponse;
+  } | null>(null);
   const [selectedBarIndex, setSelectedBarIndex] = useState<number | null>(null);
 
   const activePeriod = segmentPeriodMap[activeSegment];
-  const peeked = homeId ? peekCache<EnergyAnalyticsResponse>(energyAnalyticsKey(homeId, activePeriod)) : undefined;
+  const cacheEntryKey = homeId ? `${homeId}:${activePeriod}` : activePeriod;
+  const peeked = homeId
+    ? peekCache<EnergyAnalyticsResponse>(energyAnalyticsKey(homeId, activePeriod))
+    : undefined;
+  const hasCachedPeriod = Boolean(peeked);
   const analyticsData =
-    cache[activePeriod] ??
-    (activeSegment === 'week' && energyAnalytics ? energyAnalytics : peeked ?? null);
+    peeked ??
+    (activeSegment === 'week' && energyAnalytics
+      ? energyAnalytics
+      : fallbackPeriodData?.key === cacheEntryKey
+        ? fallbackPeriodData.data
+        : null);
 
-  // Fetch when segment changes if not yet cached + silently prefetch other periods
+  // Fetch active segment when queryCache does not currently hold it (initial tab click or after invalidation).
   useEffect(() => {
     if (!homeId) return;
-
-    // Silently prefetch 24H and 30D after 300ms so tab switching on dashboard is 0ms
-    const timer = setTimeout(() => {
-      const remaining = ['24H', '7D', '30D'].filter((p) => p !== activePeriod);
-      remaining.forEach((p) => {
-        getHomeEnergyAnalytics(homeId, p).catch(() => null);
-      });
-    }, 300);
-
-    if (cache[activePeriod]) {
-      return () => clearTimeout(timer);
-    }
+    if (hasCachedPeriod) return;
+    if (activeSegment === 'week' && energyAnalytics) return;
 
     let active = true;
     getHomeEnergyAnalytics(homeId, activePeriod)
       .then((res) => {
         if (active && res) {
-          setCache((prev) => ({ ...prev, [activePeriod]: res }));
+          setFallbackPeriodData({ key: cacheEntryKey, data: res });
         }
       })
       .catch((err) => {
@@ -210,9 +211,8 @@ export const HomeEnergyWidget: React.FC<HomeEnergyWidgetProps> = ({
 
     return () => {
       active = false;
-      clearTimeout(timer);
     };
-  }, [homeId, activeSegment, activePeriod, cache]);
+  }, [homeId, activeSegment, activePeriod, cacheEntryKey, hasCachedPeriod, energyAnalytics]);
 
   const activeSummary = analyticsData?.summary ?? energySummary;
   const totalKwh =

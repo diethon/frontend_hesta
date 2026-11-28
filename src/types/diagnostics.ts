@@ -3,6 +3,7 @@ export type CircuitState = 'CLOSED' | 'OPEN' | 'HALF_OPEN';
 export interface DiagnosticsSummary {
   brokerConnected: boolean;
   brokerUrl: string;
+  totalHomes?: number;
   totalNodes: number;
   onlineNodes: number;
   offlineNodes: number;
@@ -19,6 +20,10 @@ export interface NodeDiagnostics {
   nodeId: string;
   nodeCode: string;
   status: 'ONLINE' | 'OFFLINE' | 'ERROR';
+  firmwareVersion?: string;
+  deviceType?: string;
+  attachedDeviceCount?: number;
+  attachedDeviceTypes?: string[];
   homeId?: string;
   homeName?: string;
   circuitState: CircuitState;
@@ -26,6 +31,9 @@ export interface NodeDiagnostics {
   totalCommands: number;
   successfulCommands: number;
   averageLatencyMs: number;
+  minLatencyMs?: number;
+  maxLatencyMs?: number;
+  avgLatencyMs?: number;
   p95LatencyMs?: number;
   latencyMetrics?: LatencyMetrics;
   lastPingAt?: string;
