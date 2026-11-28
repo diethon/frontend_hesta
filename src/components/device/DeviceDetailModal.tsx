@@ -12,6 +12,10 @@ import {
   extendDeviceAutomation,
 } from '../../services/deviceApi';
 import { useOverrideCountdown } from './useOverrideCountdown';
+import {
+  purgeLegacyWattageLocalStorage,
+  resolveDefaultDeviceWattage,
+} from './deviceHelpers';
 import { notify } from '../ui/notify';
 import { getErrorMessage } from '../../utils/errors';
 import './device-detail.css';
@@ -317,38 +321,36 @@ const DeviceDetailInner: React.FC<DeviceDetailModalProps & { device: DetailDevic
   };
 
   // Wattage calculation & reactive state
-  const isAc = resolvedType === 'Điều hòa';
   const isSensor = resolvedType === 'Cảm biến';
   const getInitialCustomWattage = (dev: DetailDeviceInput | null | undefined): number | undefined => {
     const rawW = dev?.raw?.settings?.wattage ?? dev?.settings?.wattage;
     if (rawW !== undefined && rawW !== null && !Number.isNaN(Number(rawW)) && Number(rawW) > 0) {
       return Number(rawW);
     }
-    const targetId = dev?.raw?.id || dev?.id;
-    if (targetId && typeof window !== 'undefined') {
-      const saved = window.localStorage.getItem(`hesta_wattage_${targetId}`);
-      if (saved !== null && !Number.isNaN(Number(saved)) && Number(saved) > 0) {
-        return Number(saved);
-      }
-    }
     return undefined;
   };
 
-  const [localCustomWattage, setLocalCustomWattage] = useState<number | undefined>(() =>
-    getInitialCustomWattage(device)
+  const serverCustomWattage = getInitialCustomWattage(device);
+  const [localCustomWattage, setLocalCustomWattage] = useState<number | undefined>(
+    serverCustomWattage
   );
-  const [prevWattageDevId, setPrevWattageDevId] = useState(devId);
-  if (devId !== prevWattageDevId) {
-    setPrevWattageDevId(devId);
-    setLocalCustomWattage(getInitialCustomWattage(device));
+  const wattageSyncKey = `${devId ?? ''}:${serverCustomWattage ?? ''}`;
+  const [prevWattageSyncKey, setPrevWattageSyncKey] = useState(wattageSyncKey);
+  if (wattageSyncKey !== prevWattageSyncKey) {
+    setPrevWattageSyncKey(wattageSyncKey);
+    setLocalCustomWattage(serverCustomWattage);
   }
 
-  const effectiveCustomWattage =
-    localCustomWattage ?? getInitialCustomWattage(device);
+  const effectiveCustomWattage = localCustomWattage ?? serverCustomWattage;
   const currentWattage =
     effectiveCustomWattage !== undefined
       ? effectiveCustomWattage
-      : (energyData?.wattage ?? (isAc ? 750 : isSensor ? 2 : 40));
+      : (energyData?.wattage ??
+          resolveDefaultDeviceWattage(
+            device?.raw?.deviceType || device?.deviceType,
+            resolvedType,
+            isSensor
+          ));
   const hasCustomWattage = effectiveCustomWattage !== undefined;
 
   const handleSaveWattage = async (newWatt: number): Promise<boolean> => {
@@ -363,11 +365,9 @@ const DeviceDetailInner: React.FC<DeviceDetailModalProps & { device: DetailDevic
       wattage: newWatt,
     };
 
-    // Optimistic local state + localStorage persistence
+    // Optimistic local state while persisting to backend DB; clear legacy localStorage override
     setLocalCustomWattage(newWatt);
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem(`hesta_wattage_${devId}`, String(newWatt));
-    }
+    purgeLegacyWattageLocalStorage(devId);
 
     try {
       const apiUpdated = await updateDeviceConfig(devId, {
@@ -390,21 +390,10 @@ const DeviceDetailInner: React.FC<DeviceDetailModalProps & { device: DetailDevic
       notify.success(`Đã cập nhật công suất định mức thành ${newWatt} W`);
       return true;
     } catch (err) {
-      console.warn('Update device wattage fallback to local:', err);
-      // Even if backend returns an error in demo/offline mode, keep local update consistent
-      const fallbackUpdated = {
-        ...(device?.raw || {}),
-        id: devId,
-        homeId: device?.raw?.homeId || '',
-        name: device?.raw?.name || device?.name || '',
-        deviceType: device?.raw?.deviceType || device?.deviceType || 'SWITCH',
-        status: device?.raw?.status || 'ONLINE',
-        currentState: device?.raw?.currentState || device?.currentState || {},
-        settings: updatedSettings,
-      } as DeviceResponse;
-      onDeviceUpdated?.(fallbackUpdated);
-      notify.success(`Đã lưu công suất định mức ${newWatt} W`);
-      return true;
+      console.warn('Update device wattage failed:', err);
+      setLocalCustomWattage(serverCustomWattage);
+      notify.error(getErrorMessage(err, 'Không thể cập nhật công suất định mức'));
+      return false;
     }
   };
 

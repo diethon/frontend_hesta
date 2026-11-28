@@ -17,11 +17,11 @@ import { SpotlightRecommendationBanner } from "./SpotlightRecommendationBanner";
 import { DashboardNavRail } from "./DashboardNavRail";
 import { DashboardTopBar, type HomeOption } from "./DashboardTopBar";
 import { DashboardBottomNav } from "./DashboardBottomNav";
-import { getMyHomes, createHome, updateHome } from "../../services/homeApi";
-import { getRooms } from "../../services/roomApi";
+import { getMyHomes, createHome, updateHome, myHomesKey } from "../../services/homeApi";
+import { getRooms, homeRoomsKey } from "../../services/roomApi";
 import { getDevicesByHome, sendManualPowerCommand, homeDevicesKey } from "../../services/deviceApi";
-import { normalizeSensorReadingPatch } from "../device/deviceHelpers";
-import { getScenes } from "../../services/sceneApi";
+import { normalizeSensorReadingPatch, resolveDefaultDeviceWattage } from "../device/deviceHelpers";
+import { getScenes, getCachedScenes } from "../../services/sceneApi";
 import { realtimeEventDispatcher } from "../../realtime/realtimeEvents";
 import { useRealtimeRefetch } from "../../realtime/useRealtimeRefetch";
 import type { TwinDeviceSnapshotResponse } from "../../types/twin";
@@ -92,9 +92,17 @@ export const HomePage: React.FC<HomePageProps> = ({
   const requestedHomeId = searchParams.get("homeId");
 
 
-  // Home state
-  const [userHome, setUserHome] = useState<HomeOption | null>(null);
-  const [homesList, setHomesList] = useState<HomeOption[]>([]);
+  // Home state (hydrated synchronously from SWR cache for 0ms return navigation)
+  const [homesList, setHomesList] = useState<HomeOption[]>(() => {
+    return peekCache<HomeOption[]>(myHomesKey()) ?? [];
+  });
+  const [userHome, setUserHome] = useState<HomeOption | null>(() => {
+    const cachedHomes = peekCache<HomeOption[]>(myHomesKey()) ?? [];
+    return retainSelectedHome(
+      cachedHomes,
+      cachedHomes.find((home) => home.homeId === requestedHomeId) ?? null,
+    );
+  });
   const [newHomeName, setNewHomeName] = useState("");
   const [createLoading, setCreateLoading] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -105,12 +113,28 @@ export const HomePage: React.FC<HomePageProps> = ({
   const [onboardingHomeName, setOnboardingHomeName] = useState("");
   const [onboardingLoading, setOnboardingLoading] = useState(false);
 
-  // Dashboard Data State
-  const [rooms, setRooms] = useState<RoomResponse[]>([]);
-  const [devices, setDevices] = useState<DeviceResponse[]>([]);
-  const [scenes, setScenes] = useState<SceneResponse[]>([]);
-  const [energySummary, setEnergySummary] = useState<EnergySummary | null>(null);
-  const [energyAnalytics, setEnergyAnalytics] = useState<EnergyAnalyticsResponse | null>(null);
+  // Dashboard Data State (hydrated synchronously from SWR cache when homeId is known)
+  const [rooms, setRooms] = useState<RoomResponse[]>(() =>
+    userHome?.homeId ? peekCache<RoomResponse[]>(homeRoomsKey(userHome.homeId)) ?? [] : []
+  );
+  const [devices, setDevices] = useState<DeviceResponse[]>(() => {
+    if (!userHome?.homeId) return [];
+    const cached = peekCache<DeviceResponse[]>(homeDevicesKey(userHome.homeId));
+    return cached ? sortDevicesStable(cached) : [];
+  });
+  const [scenes, setScenes] = useState<SceneResponse[]>(() =>
+    userHome?.homeId ? getCachedScenes(userHome.homeId) ?? [] : []
+  );
+  const [energyAnalytics, setEnergyAnalytics] = useState<EnergyAnalyticsResponse | null>(() =>
+    userHome?.homeId
+      ? peekCache<EnergyAnalyticsResponse>(energyAnalyticsKey(userHome.homeId, '7D')) ?? null
+      : null
+  );
+  const [energySummary, setEnergySummary] = useState<EnergySummary | null>(() =>
+    userHome?.homeId
+      ? peekCache<EnergyAnalyticsResponse>(energyAnalyticsKey(userHome.homeId, '7D'))?.summary ?? null
+      : null
+  );
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [isRoomModalOpen, setIsRoomModalOpen] = useState(false);
   const [activeTabSection, setActiveTabSection] = useState<'dashboard' | 'members'>('dashboard');
@@ -157,7 +181,7 @@ export const HomePage: React.FC<HomePageProps> = ({
     setDashboardVersion((v) => v + 1);
   }, []);
 
-  // Load home details, rooms, devices, scenes, energy asynchronously
+  // Load home details, rooms, devices, scenes, energy progressively (each widget renders immediately as it arrives)
   useEffect(() => {
     if (!userHome?.homeId) return;
     const homeId = userHome.homeId;
@@ -166,63 +190,73 @@ export const HomePage: React.FC<HomePageProps> = ({
     lastLoadedHomeIdRef.current = homeId;
     const fetchStartedAt = Date.now();
 
-    // Fast-path: only restore cached devices on initial load / home switch so reloadDashboard never rolls back live WS state
+    // Fast-path: restore cached slices on initial load / home switch so reloadDashboard never rolls back live WS state
     if (isHomeSwitch) {
       lastDevicePatchAtRef.current.clear();
+      setSelectedRoomId(null);
+      const cachedRooms = peekCache<RoomResponse[]>(homeRoomsKey(homeId));
+      setRooms(cachedRooms ?? []);
       const cachedDevices = peekCache<DeviceResponse[]>(homeDevicesKey(homeId));
-      if (cachedDevices) {
-        setDevices(sortDevicesStable(cachedDevices));
-      }
+      setDevices(cachedDevices ? sortDevicesStable(cachedDevices) : []);
+      const cachedScenes = getCachedScenes(homeId);
+      setScenes(cachedScenes ?? []);
       const cachedAnalytics = peekCache<EnergyAnalyticsResponse>(energyAnalyticsKey(homeId, '7D'));
-      if (cachedAnalytics) {
-        setEnergyAnalytics(cachedAnalytics);
-        if (cachedAnalytics.summary) {
-          setEnergySummary(cachedAnalytics.summary);
-        }
-      }
+      setEnergyAnalytics(cachedAnalytics ?? null);
+      setEnergySummary(cachedAnalytics?.summary ?? null);
     }
 
-    Promise.allSettled([
-      getRooms(homeId),
-      getDevicesByHome(homeId),
-      getScenes(homeId),
-      getHomeEnergyAnalytics(homeId, '7D').catch(() => null),
-    ])
-      .then(([fetchedRooms, fetchedDevices, fetchedScenes, fetchedAnalytics]) => {
-        if (!active) return;
-        if (fetchedRooms.status === 'fulfilled') setRooms(fetchedRooms.value || []);
-        if (fetchedDevices.status === 'fulfilled') {
-          const sorted = sortDevicesStable(fetchedDevices.value || []);
-          setDevices((prev) => {
-            const prevById = new Map(prev.map((d) => [d.id, d]));
-            const merged = sorted.map((d) => {
-              const patchedAt = lastDevicePatchAtRef.current.get(d.id) ?? 0;
-              const existing = prevById.get(d.id);
-              if (existing && patchedAt >= fetchStartedAt) {
-                return {
-                  ...d,
-                  currentState: existing.currentState,
-                  status: existing.status,
-                  lastSeen: existing.lastSeen ?? d.lastSeen,
-                };
-              }
-              return d;
-            });
-            setCacheValue(homeDevicesKey(homeId), merged);
-            return merged;
-          });
-        }
-        if (fetchedScenes.status === 'fulfilled') setScenes(fetchedScenes.value || []);
-        if (fetchedAnalytics.status === 'fulfilled' && fetchedAnalytics.value) {
-          setEnergyAnalytics(fetchedAnalytics.value);
-          if (fetchedAnalytics.value.summary) {
-            setEnergySummary(fetchedAnalytics.value.summary);
-          }
-        }
+    getRooms(homeId)
+      .then((fetchedRooms) => {
+        if (active) setRooms(fetchedRooms || []);
       })
       .catch((err) => {
-        console.warn("Error loading dashboard data:", err);
+        console.warn("Error loading rooms:", err);
       });
+
+    getDevicesByHome(homeId)
+      .then((fetchedDevices) => {
+        if (!active) return;
+        const sorted = sortDevicesStable(fetchedDevices || []);
+        setDevices((prev) => {
+          const prevById = new Map(prev.map((d) => [d.id, d]));
+          const merged = sorted.map((d) => {
+            const patchedAt = lastDevicePatchAtRef.current.get(d.id) ?? 0;
+            const existing = prevById.get(d.id);
+            if (existing && patchedAt >= fetchStartedAt) {
+              return {
+                ...d,
+                currentState: existing.currentState,
+                status: existing.status,
+                lastSeen: existing.lastSeen ?? d.lastSeen,
+              };
+            }
+            return d;
+          });
+          setCacheValue(homeDevicesKey(homeId), merged);
+          return merged;
+        });
+      })
+      .catch((err) => {
+        console.warn("Error loading devices:", err);
+      });
+
+    getScenes(homeId)
+      .then((fetchedScenes) => {
+        if (active) setScenes(fetchedScenes || []);
+      })
+      .catch((err) => {
+        console.warn("Error loading scenes:", err);
+      });
+
+    getHomeEnergyAnalytics(homeId, '7D')
+      .then((fetchedAnalytics) => {
+        if (!active || !fetchedAnalytics) return;
+        setEnergyAnalytics(fetchedAnalytics);
+        if (fetchedAnalytics.summary) {
+          setEnergySummary(fetchedAnalytics.summary);
+        }
+      })
+      .catch(() => null);
 
     return () => {
       active = false;
@@ -454,20 +488,12 @@ export const HomePage: React.FC<HomePageProps> = ({
   // Real active power watts (0 if no device on)
   const activePowerWatts = devices.reduce((sum, d) => {
     if (!isDeviceOn(d)) return sum;
-    const savedLocalW =
-      typeof window !== 'undefined' && d.id
-        ? Number(window.localStorage.getItem(`hesta_wattage_${d.id}`)) || undefined
-        : undefined;
     const rawWattage =
-      savedLocalW ??
       d.currentState?.watts ??
       d.currentState?.powerWatts ??
       d.settings?.wattage ??
       breakdownMap.get(d.id)?.wattage ??
-      (d.deviceType?.toUpperCase().includes('AC') ||
-      d.deviceType?.toUpperCase().includes('AIR_CONDITIONER')
-        ? 750
-        : 40);
+      resolveDefaultDeviceWattage(d.deviceType);
     return sum + Number(rawWattage || 0);
   }, 0);
 

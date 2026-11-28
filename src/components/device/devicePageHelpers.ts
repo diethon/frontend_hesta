@@ -4,6 +4,8 @@ import type { IconName } from '../home/HomeIcons';
 import {
   AC_MODE_CODE_TO_LABEL,
   extractSensorMetrics,
+  purgeLegacyWattageLocalStorage,
+  resolveDefaultDeviceWattage,
   resolveFanSpeedLevel,
 } from './deviceHelpers';
 
@@ -249,15 +251,8 @@ export function mapDeviceToUI(
     }
   }
 
-  // Merge local custom wattage override if saved
-  let mergedSettings = d.settings;
-  if (typeof window !== 'undefined' && d.id) {
-    const savedWatt = window.localStorage.getItem(`hesta_wattage_${d.id}`);
-    if (savedWatt !== null && !Number.isNaN(Number(savedWatt)) && Number(savedWatt) > 0) {
-      mergedSettings = { ...(d.settings || {}), wattage: Number(savedWatt) };
-    }
-  }
-  const normalizedDevice: DeviceResponse = mergedSettings !== d.settings ? { ...d, settings: mergedSettings } : d;
+  // Clear legacy localStorage wattage overrides so DB settings remain the single source of truth
+  purgeLegacyWattageLocalStorage(d.id);
 
   return {
     id: d.id,
@@ -279,7 +274,7 @@ export function mapDeviceToUI(
         ? new Date(d.manualOverrideUntil).getTime() > Date.now()
         : false),
     accessLevel: d.accessLevel,
-    raw: normalizedDevice,
+    raw: d,
   };
 }
 
@@ -324,14 +319,8 @@ export function getDeviceRatedWattage(
     return breakdownWattage;
   }
 
-  // 3. Fallbacks: 750 for 'Điều hòa', 0 for sensors/camera, 40 otherwise
-  if (device.type === 'Điều hòa') {
-    return 750;
-  }
-  if (device.sensor || device.type === 'Cảm biến' || device.type === 'Camera') {
-    return 0;
-  }
-  return 40;
+  // 3. Fallback baseline wattage aligned with Backend EnergyPowerCalculator
+  return resolveDefaultDeviceWattage(device.raw?.deviceType, device.type, device.sensor);
 }
 
 export function formatWattage(watts: number): string {

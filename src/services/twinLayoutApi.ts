@@ -1,4 +1,6 @@
 import { apiClient, ApiError } from './apiClient';
+import { invalidateCache } from './queryCache';
+import { homeRoomsKey } from './roomApi';
 import type { TwinLayout, TwinLayoutSaveRequest } from '../types/twinLayout';
 
 interface LayoutResponse { code: number; message?: string; result: TwinLayout }
@@ -23,5 +25,7 @@ export async function getTwinLayout(homeId: string, signal?: AbortSignal) {
 
 export async function putTwinLayout(homeId: string, request: TwinLayoutSaveRequest, signal?: AbortSignal) {
   const { data } = await apiClient.put<LayoutResponse>(`/homes/${encodeURIComponent(homeId)}/twin-layout`, request, { signal });
-  return unwrap(data, homeId);
+  const result = unwrap(data, homeId);
+  invalidateCache(homeRoomsKey(homeId));
+  return result;
 }
