@@ -10,7 +10,7 @@ export type ActionOption = { code: string; label: string; valueLabel?: string; d
 export const actionOptions: ActionOption[] = [
   { code: 'TURN_ON', label: 'Bật nguồn', valueKind: 'none', defaultValue: '' },
   { code: 'TURN_OFF', label: 'Tắt nguồn', valueKind: 'none', defaultValue: '' },
-  { code: 'TOGGLE', label: 'Bật/Tắt', valueKind: 'none', defaultValue: '' },
+  { code: 'TOGGLE', label: 'Đổi bật ⇄ tắt', valueKind: 'none', defaultValue: '' },
   { code: 'SET_BRIGHTNESS', label: 'Đặt độ sáng', valueKind: 'percentage', valueLabel: 'Độ sáng (%)', parameterKey: 'level', defaultValue: '50' },
   { code: 'SET_RGB', label: 'Đặt màu RGB', valueKind: 'color', valueLabel: 'Mã màu RGB (HEX)', parameterKey: 'color', defaultValue: '#ffc107' },
   { code: 'SET_COLOR', label: 'Đổi màu', valueKind: 'color', valueLabel: 'Mã màu (HEX hoặc RGB)', parameterKey: 'color', defaultValue: '#ffc107' },

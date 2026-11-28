@@ -11,14 +11,14 @@ export interface SystemEventOption {
 export const SYSTEM_EVENTS: SystemEventOption[] = [
   {
     code: 'EVENT',
-    name: 'Sự kiện thiết bị (IoT Event)',
-    description: 'Phát sinh khi thiết bị trong nhà (công tắc, rèm, khóa, cổng) thay đổi trạng thái và gửi bản tin sự kiện',
+    name: 'Thiết bị báo sự kiện',
+    description: 'Khi công tắc, rèm, khóa hoặc cổng trong nhà báo có thay đổi',
     icon: 'zap',
   },
   {
     code: 'DEVICE_STATE_CHANGED',
-    name: 'Thay đổi trạng thái thiết bị (Realtime)',
-    description: 'Sự kiện phát sinh trên luồng realtime khi thiết bị thay đổi trạng thái hoạt động',
+    name: 'Thiết bị đổi trạng thái',
+    description: 'Khi một thiết bị được bật, tắt hoặc đổi chế độ',
     icon: 'activity',
   },
 ];
@@ -120,23 +120,7 @@ export const EventPickerSheet: React.FC<EventPickerSheetProps> = ({
             );
           })}
 
-          {filtered.length === 0 && query.trim() ? (
-            <div className="p-4 rounded-2xl bg-[var(--solid)] border border-[var(--border)] text-center space-y-2">
-              <p className="text-xs text-[var(--secondary)]">
-                Dùng mã sự kiện tùy chỉnh: <strong className="text-[var(--text)]">{query.trim()}</strong>
-              </p>
-              <button
-                type="button"
-                onClick={() => {
-                  onSelect(query.trim());
-                  onClose();
-                }}
-                className="px-4 py-2 rounded-xl text-xs font-bold bg-[var(--accent)] text-white hover:opacity-90 cursor-pointer"
-              >
-                Sử dụng mã sự kiện này
-              </button>
-            </div>
-          ) : filtered.length === 0 ? (
+          {filtered.length === 0 ? (
             <div className="p-8 text-center text-xs text-[var(--tertiary)]">
               Không tìm thấy sự kiện nào phù hợp.
             </div>

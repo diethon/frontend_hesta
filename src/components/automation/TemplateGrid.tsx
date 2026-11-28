@@ -93,7 +93,7 @@ export const TemplateGrid: React.FC<TemplateGridProps> = ({
             </div>
 
             <div>
-              <strong className="text-xs font-bold text-[var(--text)] block truncate">
+              <strong className="text-xs font-bold text-[var(--text)] block line-clamp-2">
                 {tmpl.name}
               </strong>
             </div>

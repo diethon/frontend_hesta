@@ -15,7 +15,7 @@ import { PickerField } from './PickerField';
 import { ConditionCard } from './ConditionCard';
 import { ActionStepCard } from './ActionStepCard';
 import { SplitButton } from './SplitButton';
-import { EventPickerSheet } from './EventPickerSheet';
+import { EventPickerSheet, SYSTEM_EVENTS } from './EventPickerSheet';
 import { ScenePickerSheet } from './ScenePickerSheet';
 import { DevicePickerSheet } from '../scene/DevicePickerSheet';
 import { SceneScheduleSection, formatRepeatDays, formatScheduleTime } from '../scene/SceneScheduleSection';
@@ -901,7 +901,7 @@ export const RuleEditorPanel: React.FC<RuleEditorPanelProps> = ({
                         }
                         caption={
                           conditions[0]?.expectedValue
-                            ? `Mã sự kiện: ${String(conditions[0].expectedValue)}`
+                            ? SYSTEM_EVENTS.find((e) => e.code === String(conditions[0].expectedValue))?.description ?? 'Sự kiện khác'
                             : 'Nhấn để chọn sự kiện kích hoạt'
                         }
                         icon="zap"
@@ -1072,11 +1072,7 @@ export const RuleEditorPanel: React.FC<RuleEditorPanelProps> = ({
             devices={devices}
             filterMode={
               // Conditions may watch any device: a sensor reading, or a light/plug turning on or off.
-              devicePickerMode.target === 'condition'
-                ? 'all'
-                : devicePickerMode.target === 'eventSource'
-                ? 'all'
-                : 'actionable-only'
+              devicePickerMode.target === 'action' ? 'actionable-only' : 'any'
             }
             title={
               devicePickerMode.target === 'condition'

@@ -9,7 +9,8 @@ interface DevicePickerSheetProps {
   selectedDeviceId?: string;
   onSelect: (device: DeviceSummary) => void;
   onClose: () => void;
-  filterMode?: 'all' | 'sensors-only' | 'actionable-only';
+  /** all: controllable selectable, sensors shown read-only; any: everything selectable (rule conditions). */
+  filterMode?: 'all' | 'any' | 'sensors-only' | 'actionable-only';
   title?: string;
   /** Home rooms; their `floor` adds a floor filter when the home has 2+ floors. */
   rooms?: RoomResponse[];
@@ -113,8 +114,13 @@ export const DevicePickerSheet: React.FC<DevicePickerSheetProps> = ({
 
   // Choose selectable vs non-selectable based on filterMode
   const isSensorsMode = filterMode === 'sensors-only';
-  const selectableDevices = isSensorsMode ? sensors : controllable;
-  const nonSelectableDevices = filterMode === 'actionable-only' ? [] : (isSensorsMode ? controllable : sensors);
+  // [selectable, shown read-only]; "any" lists sensors first because conditions usually watch a sensor.
+  const [selectableDevices, nonSelectableDevices] = {
+    all: [controllable, sensors],
+    any: [[...sensors, ...controllable], []],
+    'sensors-only': [sensors, controllable],
+    'actionable-only': [controllable, []],
+  }[filterMode];
   const nonSelectableTitle = isSensorsMode ? `Thiết bị khác (${controllable.length})` : `Cảm biến (${sensors.length})`;
   const nonSelectableCaption = isSensorsMode ? 'Không phải cảm biến' : 'Chỉ đọc · không thể điều khiển';
 
