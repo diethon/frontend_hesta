@@ -434,6 +434,22 @@ textarea:disabled {
   background-clip: padding-box;
 }
 
+/* 404 page: house badge bobs gently. */
+@keyframes not-found-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+.not-found-float {
+  animation: not-found-float 3.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .not-found-float {
+    animation: none;
+  }
+}
+
 @keyframes gentle-rise {
   from {
     transform: translateY(6px);

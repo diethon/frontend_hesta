@@ -11,6 +11,7 @@ import { AvatarUploader } from './AvatarUploader';
 import { ProfileInfoForm } from './ProfileInfoForm';
 import { ChangePasswordForm } from './ChangePasswordForm';
 import { NotificationPreferencesTab } from './NotificationPreferencesTab';
+import { getMyHomes } from '../../services/homeApi';
 
 type Section = 'info' | 'security' | 'notifications';
 
@@ -35,7 +36,18 @@ export const ProfilePage: React.FC<{
   onProfileUpdate: (updatedUser: UserResponse) => void;
 }> = ({ user, onLogout, onProfileUpdate }) => {
   const navigate = useNavigate();
-  const homeId = useAppSelector(selectCurrentHomeId) ?? undefined;
+  const currentHomeId = useAppSelector(selectCurrentHomeId);
+  // HomePage clears currentHomeId on unmount, so fall back to the user's first home for nav links.
+  const [fallbackHomeId, setFallbackHomeId] = React.useState<string>();
+  React.useEffect(() => {
+    if (currentHomeId) return;
+    let active = true;
+    getMyHomes()
+      .then((homes) => { if (active) setFallbackHomeId(homes?.[0]?.homeId); })
+      .catch(() => undefined);
+    return () => { active = false; };
+  }, [currentHomeId]);
+  const homeId = currentHomeId ?? fallbackHomeId;
   const [searchParams, setSearchParams] = useSearchParams();
   const requested = searchParams.get('tab');
   const section: Section = requested === 'security' || requested === 'notifications' ? requested : 'info';
